@@ -237,7 +237,7 @@ impl Panel {
                 format_args!("{tags}"),
                 frame.rect(LEFT_X + LEFT_WIDTH - 150.0, y + 10.0, 136.0, 24.0),
                 16.0 * s,
-                color::GOLD_BRIGHT,
+                color::ACCENT_BRIGHT,
                 FontWeight::Regular,
                 TextAlign::End,
             );
@@ -398,7 +398,7 @@ impl Panel {
                 frame.rect(MIDDLE_X + 68.0, y + 4.0, 220.0, 28.0),
                 21.0 * s,
                 if held > 0 {
-                    color::GOLD_BRIGHT
+                    color::ACCENT_BRIGHT
                 } else {
                     color::MUTED
                 },
@@ -589,7 +589,7 @@ impl Panel {
                 frame.rect(x, y + 1.0, cell - 96.0, 20.0),
                 16.0 * s,
                 if held {
-                    color::GOLD_BRIGHT
+                    color::ACCENT_BRIGHT
                 } else {
                     color::MUTED
                 },
@@ -865,7 +865,7 @@ impl Panel {
                 frame.rect(RIGHT_X, y, 230.0, 28.0),
                 19.0 * s,
                 if held.unlocked > 0 {
-                    color::GOLD_BRIGHT
+                    color::ACCENT_BRIGHT
                 } else {
                     color::TEXT
                 },
@@ -1079,7 +1079,7 @@ impl Panel {
                 frame.rect(RIGHT_X + 196.0, row_y + 4.0, 230.0, 24.0),
                 14.0 * s,
                 if sent {
-                    color::GOLD_BRIGHT
+                    color::ACCENT_BRIGHT
                 } else {
                     color::QUIET
                 },
@@ -1437,7 +1437,7 @@ impl Panel {
         let (line, colour) = if self.picking {
             (
                 "Choose the player to merge away in the list (Esc lets go)",
-                color::GOLD_BRIGHT,
+                color::ACCENT_BRIGHT,
             )
         } else {
             match self.shown.merge_problem {
@@ -1446,7 +1446,7 @@ impl Panel {
                     color::MUTED,
                 ),
                 Some(MergeProblem::Empty) => (MergeProblem::Empty.words(), color::QUIET),
-                Some(problem) => (problem.words(), color::EMBER),
+                Some(problem) => (problem.words(), color::DANGER),
             }
         };
         text(
@@ -1504,9 +1504,9 @@ impl Panel {
                 "Kept",
                 named(&kept.name),
                 merge.kept.as_str(),
-                color::GOLD_BRIGHT,
+                color::ACCENT_BRIGHT,
             ),
-            ("Merged away", gone, merge.from.as_str(), color::EMBER),
+            ("Merged away", gone, merge.from.as_str(), color::DANGER),
         ] {
             text(
                 &mut self.ui,
@@ -1577,9 +1577,9 @@ impl Panel {
         let (line, colour) = if staff.busy {
             ("Working...".to_owned(), color::MUTED)
         } else if staff.failed {
-            (cut(&staff.message, 90), color::EMBER)
+            (cut(&staff.message, 90), color::DANGER)
         } else {
-            (cut(&staff.message, 90), color::GOLD_BRIGHT)
+            (cut(&staff.message, 90), color::ACCENT_BRIGHT)
         };
         text(
             &mut self.ui,

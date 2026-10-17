@@ -197,7 +197,7 @@ const PW_CLOAKED: u32 = 1 << 11;
 
 /// Mount the bundled files.
 pub(crate) fn mount(vfs: &mut VirtualFileSystem) -> Result<(), VfsError> {
-    vfs.mount_memory("SJK holocron", FILES.iter().copied())?;
+    vfs.mount_memory("SlashJK holocron", FILES.iter().copied())?;
     Ok(())
 }
 

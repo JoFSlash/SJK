@@ -185,7 +185,7 @@ const HELP: &[(&str, &str)] = &[
     // VIDEO
     (
         crate::graphics_quality::ROW_NAME,
-        "Vanilla style: the original look, the most FPS. SJK (recommended): SJK's image on the maps' lighting. Experimental: everything on.",
+        "Vanilla style: the original look, the most FPS. SlashJK (recommended): richer light. Experimental: everything on.",
     ),
     (
         "r_resolution",
@@ -205,7 +205,7 @@ const HELP: &[(&str, &str)] = &[
     ),
     (
         crate::server_caps::OVERRIDE_CVAR,
-        "On, Gameplay FPS applies on servers SJK knows to cap commands (JoF's: 125) too. Inputs may stop going through.",
+        "On, Gameplay FPS applies on servers SlashJK knows to cap commands (JoF's: 125) too. Inputs may stop going through.",
     ),
     (
         crate::gameplay_fps::CVAR,
@@ -297,7 +297,7 @@ const HELP: &[(&str, &str)] = &[
     ),
     (
         "cg_playerCard",
-        "Look at a player without moving and a card shows their model, sabers and SJK profile.",
+        "Look at a player without moving and a card shows their model, sabers and SlashJK profile.",
     ),
     (
         "cg_playerCardDelay",
@@ -338,7 +338,7 @@ const HELP: &[(&str, &str)] = &[
     ),
     (
         "cg_nameplateShare",
-        "Your real health, shield and Force for the other SJK players, through the SJK hub. Always on while your nameplates show bars.",
+        "Your real health, shield and Force for the other SlashJK players, through the hub. Always on while your nameplates show bars.",
     ),
     (
         "cg_nameplateEstimate",
@@ -370,7 +370,7 @@ const HELP: &[(&str, &str)] = &[
     ),
     (
         crate::world_ping::SHOW_CVAR,
-        "Shows other SJK players' pings (+ping, middle mouse): your team's in team games, everyone's otherwise. Off hides them.",
+        "Shows other SlashJK players' pings (+ping, middle mouse): your team's in team games, everyone's otherwise. Off hides them.",
     ),
     (
         crate::world_ping::SOUND_CVAR,
@@ -383,7 +383,7 @@ const HELP: &[(&str, &str)] = &[
     ),
     (
         crate::version_overlay::CVAR,
-        "Shows SJK's version, build date and commit at the top, so screenshots say which build.",
+        "Shows SlashJK's version, build date and commit at the top, so screenshots say which build.",
     ),
     (
         "cg_lagometer",
@@ -404,7 +404,7 @@ const HELP: &[(&str, &str)] = &[
     ),
     (
         crate::chat::reply::REMEMBER_CVAR,
-        "The chat key opens on your last channel: All, Team, SJK or a whisper. Off, it opens on All.",
+        "The chat key opens on your last channel: All, Team, SlashJK or a whisper. Off, it opens on All.",
     ),
     (
         "cg_chatBoxLetterSpacing",
@@ -412,7 +412,7 @@ const HELP: &[(&str, &str)] = &[
     ),
     (
         crate::menu_hud::STYLE_CVAR,
-        "Which HUD shows health, armor, Force and ammo: the game's, an installed HUD pack's, or SJK's.",
+        "Which HUD shows health, armor, Force and ammo: the game's, an installed HUD pack's, or SlashJK's.",
     ),
     (
         crate::menu_hud::FILES_CVAR,
@@ -424,7 +424,7 @@ const HELP: &[(&str, &str)] = &[
     ),
     (
         crate::game_font::CVAR,
-        "Draws the menus and console in the original game's fonts instead of SJK's.",
+        "Draws the menus and console in the original game's fonts instead of SlashJK's.",
     ),
     (
         crate::ground_hud::CVAR,
@@ -503,7 +503,7 @@ const HELP: &[(&str, &str)] = &[
     ),
     (
         crate::camera::STYLE_CVAR,
-        "EJK: the third-person camera stays locked behind you, as in JoF EJK. SJK: it trails you a little as you move and turn.",
+        "EJK: the third-person camera stays locked behind you, as in JoF EJK. SlashJK: it trails you a little as you move and turn.",
     ),
     (
         "cg_thirdPersonCameraDamp",
@@ -551,7 +551,7 @@ const HELP: &[(&str, &str)] = &[
     ),
     (
         crate::menu::style::CVAR,
-        "The SJK UI, SJK's own menus over the live map; or classic menus after the original game's.",
+        "The SlashJK, SlashJK's own menus over the live map; or classic menus after the original game's.",
     ),
     (
         crate::quick_wheel::pages::FILE,
@@ -572,43 +572,43 @@ const HELP: &[(&str, &str)] = &[
     ),
     (
         "cl_autoUpdate",
-        "Looks for a newer SJK release at start and every 30 minutes while SJK runs, and says so with a card. Install it from the Update page.",
+        "Looks for a newer release at start and every 30 minutes while the game runs, and says so with a card. Install it from the Update page.",
     ),
     (
         "ui_hideFirstSetup",
-        "Ticked, First setup no longer opens when SJK starts. Settings and the firstsetup command still open it.",
+        "Ticked, First setup no longer opens when SlashJK starts. Settings and the firstsetup command still open it.",
     ),
     (
         "cl_identity",
-        "Makes an identity key and tells the SJK hub where you play and if you are active (badge, holocrons). Off sends nothing.",
+        "Makes an identity key and tells the hub where you play and if you are active (badge, holocrons). Off sends nothing.",
     ),
     (
         crate::installed_models::CVAR,
-        "Tells the SJK hub which player models you have, so SJK players' cards say if they see yours. Off makes it forget.",
+        "Tells the hub which player models you have, so SlashJK players' cards say if they see yours. Off makes it forget.",
     ),
     (
         "cl_hubUrl",
-        "The SJK hub's address (https://...). Empty means no hub: nothing is sent.",
+        "The hub's address (https://...). Empty means no hub: nothing is sent.",
     ),
     (
         crate::crash_report::CVAR,
-        "After a crash, the next start sends the SJK team a report: system, map, the error, recent console lines (no chat). Off sends none.",
+        "After a crash, the next start sends the team a report: system, map, the error, recent console lines (no chat). Off sends none.",
     ),
     (
         crate::settings_usage::CVAR,
-        "Tells the SJK team anonymously what you change and search for here, to make Settings clearer. No key or name sent.",
+        "Tells the team anonymously what you change and search for here, to make Settings clearer. No key or name sent.",
     ),
     (
         "cl_sjkChat",
-        "The chat every SJK player shares through the SJK hub, in menus and games. Off hides it.",
+        "The chat everyone online shares through the hub, in menus and games. Off hides it.",
     ),
     (
         crate::sjk_chat_frame::SOUND_CVAR,
-        "A sound for each new SJK chat message, yours included, in menus and games. Chat sounds off (cg_chatSounds 0) silences it too.",
+        "A sound for each new global chat message, yours included, in menus and games. Chat sounds off (cg_chatSounds 0) silences it too.",
     ),
     (
         crate::chat_gifs::CVAR,
-        "GIPHY links in SJK chat show their GIF. Your PC loads it from GIPHY, which sees your address. Off keeps links as text.",
+        "GIPHY links in global chat show their GIF. Your PC loads it from GIPHY, which sees your address. Off keeps links as text.",
     ),
     (
         crate::chat_gifs::search::KEY_CVAR,
@@ -616,7 +616,7 @@ const HELP: &[(&str, &str)] = &[
     ),
     (
         super::catalog::IDENTITY_ROW,
-        "Your SJK key: switch it on, back it up, copy its id. Enter opens it; the key stays hidden until Show.",
+        "Your SlashJK key: switch it on, back it up, copy its id. Enter opens it; the key stays hidden until Show.",
     ),
     (
         super::catalog::IMPORT_ROW,
@@ -643,15 +643,15 @@ const HELP: &[(&str, &str)] = &[
     ),
     (
         crate::scoreboard::style::CVAR,
-        "Auto matches the menus: SJK's own with the SJK UI, else the classic one after the original game's.",
+        "Auto matches the menus: SlashJK's own with the SlashJK, else the classic one after the original game's.",
     ),
     (
         crate::scoreboard::style::COMPACT_CVAR,
-        "Thinner rows on SJK's scoreboard, so every player fits in one column, in a board as wide as its names, centred.",
+        "Thinner rows on SlashJK's scoreboard, so every player fits in one column, in a board as wide as its names, centred.",
     ),
     (
         crate::scoreboard::style::FPS_CVAR,
-        "Shows your frame rate on SJK's scoreboard, left of the match clock.",
+        "Shows your frame rate on SlashJK's scoreboard, left of the match clock.",
     ),
     (
         "cg_showClientIDs",
@@ -672,7 +672,7 @@ const HELP: &[(&str, &str)] = &[
     // TEXT
     (
         crate::console::console_options::STYLE_CVAR,
-        "The console's look: the SJK UI's with its menus, or classic, after EternalJK's.",
+        "The console's look: the SlashJK with its menus, or classic, after EternalJK's.",
     ),
     (crate::text::style::SCALE_CVAR, "Size of the menu text."),
     (
@@ -815,7 +815,7 @@ const HELP: &[(&str, &str)] = &[
     // LIGHTING
     (
         "r_dayNight",
-        "Lights maps with SJK's sun and sky as well as their own baked light.",
+        "Lights maps with SlashJK's sun and sky as well as their own baked light.",
     ),
     (
         "r_liveLighting",

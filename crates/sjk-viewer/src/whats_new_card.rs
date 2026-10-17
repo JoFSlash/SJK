@@ -33,7 +33,7 @@ pub(crate) const SEEN_CVAR: &str = "cl_whatsNewSeen";
 /// Console command that shows the newest recap again.
 pub(crate) const COMMAND: &str = "whatsnew";
 /// Help text for completion and `cmdlist`.
-pub(crate) const HELP: &str = "Show what the latest SJK update brought";
+pub(crate) const HELP: &str = "Show what the latest SlashJK update brought";
 
 /// Close, Full changelog, the page arrows, and the chips (`CHIP_BASE + n`, in reading
 /// order).
@@ -251,7 +251,7 @@ impl Default for Card {
         Self {
             checked: false,
             version: String::new(),
-            kicker: "SJK updated",
+            kicker: "SlashJK updated",
             pages: Vec::new(),
             page: 0,
             laid: Vec::new(),
@@ -274,7 +274,11 @@ impl Card {
     pub(crate) fn offer(&mut self, version: &str, digests: &[Digest], preview: bool) {
         self.put_away();
         self.version = version.to_owned();
-        self.kicker = if preview { "Preview" } else { "SJK updated" };
+        self.kicker = if preview {
+            "Preview"
+        } else {
+            "SlashJK updated"
+        };
         for digest in digests {
             let blocks = if digest.lines.is_empty() {
                 (!digest.intro.trim().is_empty())
@@ -435,7 +439,7 @@ impl Card {
             format_args!("{}", self.kicker),
             frame.rect(TEXT_X, top + 30.0, TEXT_WIDTH, 30.0),
             22.0 * s,
-            color::GOLD_BRIGHT,
+            color::ACCENT_BRIGHT,
             FontWeight::Semibold,
             TextAlign::Start,
         );
@@ -487,7 +491,7 @@ impl Card {
                         format_args!("{heading}"),
                         frame.rect(TEXT_X + INDENT, y, TEXT_WIDTH - INDENT, HEADING_HEIGHT),
                         HEADING_SIZE * s,
-                        color::GOLD_BRIGHT,
+                        color::ACCENT_BRIGHT,
                         FontWeight::Semibold,
                         TextAlign::Start,
                     );
@@ -542,7 +546,7 @@ impl Card {
                 &Place {
                     x: TEXT_X,
                     y: y + CREDIT_GAP,
-                    colour: color::alpha(color::GOLD, 0.85),
+                    colour: color::alpha(color::ACCENT, 0.85),
                     code_family: TextFamily::Code,
                 },
                 None,
@@ -627,9 +631,9 @@ fn pager(ui: &mut MenuCanvas, frame: &Frame, y: f32, page: usize, pages: usize) 
             rect: dot,
             radius: dot.width * 0.5,
             color: if lit {
-                color::GOLD_BRIGHT
+                color::ACCENT_BRIGHT
             } else {
-                color::alpha(color::HOLO, 0.35)
+                color::alpha(color::LINE, 0.35)
             },
         });
     }

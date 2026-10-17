@@ -225,7 +225,7 @@ impl crate::GpuState {
         self.in_game_menu.players.waiting = false;
         let message = if outcome.sent {
             format!(
-                "Player report sent ({}). The SJK team will look at it.",
+                "Player report sent ({}). The team will look at it.",
                 outcome.message
             )
         } else {

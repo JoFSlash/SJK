@@ -92,7 +92,7 @@ pub(crate) fn start(config_directory: &Path, earlier: &[String]) {
         written: 0,
     };
     started.line(&format!(
-        "SJK {} session started {} (pid {})",
+        "SlashJK {} session started {} (pid {})",
         crate::build_info::VERSION,
         stamp(unix_now()),
         std::process::id()
@@ -179,7 +179,7 @@ pub(crate) struct Context {
 pub(crate) fn gather(context: &Context, home: &str) -> sjk_identity::LogUpload {
     let dir = lock().as_ref().map(|session| session.dir.clone());
     let mut logs = format!(
-        "SJK logs, sent {}\nBuild: {}\nSystem: {}\nGraphics: {}\n",
+        "SlashJK logs, sent {}\nBuild: {}\nSystem: {}\nGraphics: {}\n",
         stamp(unix_now()),
         crate::build_info::VERSION,
         context.os,

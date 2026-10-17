@@ -50,19 +50,19 @@ pub(super) fn showing(inputs: &Inputs<'_>) -> ((String, &'static str), Vec<Showi
     let headline = match (inputs.enabled, &awards) {
         (false, _) => (
             "Identity is off".to_owned(),
-            "Your medals are kept on the SJK hub: switch the identity on in Settings, Network, to see them.",
+            "Your medals are kept on the hub: switch the identity on in Settings, Network, to see them.",
         ),
         (true, None) => (
             "Contacting the hub...".to_owned(),
-            "Your medals show once the SJK hub has answered.",
+            "Your medals show once the hub has answered.",
         ),
         (true, Some(_)) if held == 0 => (
             format!("0 of {count} medals"),
-            "The SJK team gives medals by hand, for what players do for SJK.",
+            "The team gives medals by hand, for what players do for SJK.",
         ),
         (true, Some(_)) => (
             format!("{held} of {count} medals"),
-            "Given by the SJK team by hand, for what players do for SJK.",
+            "Given by the team by hand, for what players do for SJK.",
         ),
     };
     let mut shown: Vec<Showing> = awards
@@ -119,13 +119,13 @@ impl Panel {
         // The rail, with a bead at each end.
         let _ = self.ui.draw_list_mut().push(DrawCommand::SolidRect {
             rect: frame.rect(LEFT_X, RAIL_Y, RAIL_WIDTH, 1.5),
-            color: color::alpha(color::HOLO, 0.45),
+            color: color::alpha(color::LINE, 0.45),
         });
         for x in [LEFT_X, LEFT_X + RAIL_WIDTH] {
             let _ = self.ui.draw_list_mut().push(DrawCommand::RoundedRect {
                 rect: frame.rect(x - 4.0, RAIL_Y - 3.0, 8.0, 8.0),
                 radius: 4.0 * s,
-                color: color::HOLO,
+                color: color::LINE,
             });
         }
         let slot = (RAIL_WIDTH / shown.len().max(1) as f32).min(SLOT);
@@ -139,14 +139,14 @@ impl Panel {
         while x < LEFT_X + RAIL_WIDTH {
             let _ = self.ui.draw_list_mut().push(DrawCommand::SolidRect {
                 rect: frame.rect(x, 720.0, 8.0, 1.0),
-                color: color::alpha(color::HOLO, 0.22),
+                color: color::alpha(color::LINE, 0.22),
             });
             x += 16.0;
         }
         text(
             &mut self.ui,
             TextFamily::Body,
-            format_args!("More medals will hang here as the SJK team adds them."),
+            format_args!("More medals will hang here as the team adds them."),
             frame.rect(LEFT_X, 736.0, RAIL_WIDTH, 24.0),
             15.0 * s,
             color::QUIET,
@@ -178,7 +178,7 @@ impl Panel {
                 frame,
                 [centre, RAIL_Y + art * 0.68],
                 art * 0.62,
-                color::GOLD,
+                color::ACCENT,
                 if chosen { 0.42 } else { 0.18 },
             );
         }
@@ -195,7 +195,7 @@ impl Panel {
             let _ = self.ui.draw_list_mut().push(DrawCommand::RoundedRect {
                 rect: frame.rect(centre - 2.0, RAIL_Y - 9.0, 4.0, 18.0),
                 radius: 2.0 * s,
-                color: color::GOLD_BRIGHT,
+                color: color::ACCENT_BRIGHT,
             });
         }
         let name = showing
@@ -210,7 +210,7 @@ impl Panel {
             frame.rect(centre - 110.0, caption, 220.0, 30.0),
             23.0 * s,
             match (chosen, held) {
-                (true, _) => color::GOLD_BRIGHT,
+                (true, _) => color::ACCENT_BRIGHT,
                 (false, true) => color::TEXT,
                 (false, false) => color::QUIET,
             },
@@ -236,7 +236,7 @@ impl Panel {
             format_args!("{status}"),
             frame.rect(centre - 110.0, caption + 32.0, 220.0, 22.0),
             15.0 * s,
-            if held { color::GOLD } else { color::QUIET },
+            if held { color::ACCENT } else { color::QUIET },
             FontWeight::Regular,
             TextAlign::Center,
         );
@@ -258,7 +258,7 @@ impl Panel {
                 frame,
                 [middle, top + BIG_ART * 0.62],
                 280.0,
-                color::GOLD,
+                color::ACCENT,
                 0.4,
             );
         }
@@ -283,7 +283,7 @@ impl Panel {
             frame.rect(SHOWCASE_X, y, SHOWCASE_WIDTH, 60.0),
             54.0 * s,
             if held {
-                color::GOLD_BRIGHT
+                color::ACCENT_BRIGHT
             } else {
                 color::alpha(color::TEXT, 0.75)
             },
@@ -302,7 +302,7 @@ impl Panel {
             format_args!("{line}"),
             frame.rect(SHOWCASE_X, y, SHOWCASE_WIDTH, 24.0),
             18.0 * s,
-            if held { color::GOLD } else { color::QUIET },
+            if held { color::ACCENT } else { color::QUIET },
             FontWeight::Semibold,
             TextAlign::Center,
         );
@@ -337,7 +337,7 @@ impl Panel {
             y += 10.0;
             let _ = self.ui.draw_list_mut().push(DrawCommand::SolidRect {
                 rect: frame.rect(middle - 32.0, y, 64.0, 1.0),
-                color: color::alpha(color::HOLO, 0.45),
+                color: color::alpha(color::LINE, 0.45),
             });
             y += 14.0;
             text(
@@ -348,7 +348,7 @@ impl Panel {
                     if note == crate::debug_collectibles::NOTE {
                         "Not really yours"
                     } else {
-                        "From the SJK team"
+                        "From the team"
                     }
                 ),
                 frame.rect(SHOWCASE_X, y, SHOWCASE_WIDTH, 20.0),
@@ -371,9 +371,9 @@ impl Panel {
             );
         }
         let footer = if held {
-            "Every SJK player sees it on your card, on the scoreboard and in SJK chat."
+            "Every SlashJK player sees it on your card, on the scoreboard and in global chat."
         } else {
-            "The SJK team gives it by hand."
+            "The team gives it by hand."
         };
         text(
             &mut self.ui,

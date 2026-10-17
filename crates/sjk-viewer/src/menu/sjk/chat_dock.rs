@@ -463,11 +463,11 @@ impl DockCache {
     /// not go shows under the field.
     pub(crate) fn send(&mut self, text: String, chat_on: bool) {
         self.local = if !chat_on {
-            "SJK chat is off (Settings > Network)"
+            "Global chat is off (Settings > Network)"
         } else if player_identity::chat(text) {
             ""
         } else {
-            "Turn the SJK identity on to chat"
+            "Turn the online identity on to chat"
         };
     }
 
@@ -489,7 +489,7 @@ impl DockCache {
         let notice = if !self.local.is_empty() {
             self.local
         } else if self.mark == Some(None) {
-            "Turn the SJK identity on to chat"
+            "Turn the online identity on to chat"
         } else {
             self.refused.as_str()
         };
@@ -655,7 +655,7 @@ pub(crate) fn draw(
     text(
         canvas,
         TextFamily::Display,
-        format_args!("SJK chat"),
+        format_args!("Global chat"),
         frame.rect(x, top, width, 30.0),
         24.0 * s,
         color::TEXT,
@@ -699,13 +699,13 @@ pub(crate) fn draw(
     let _ = canvas.draw_list_mut().push(DrawCommand::RoundedRect {
         rect: field,
         radius: 8.0 * s,
-        color: color::alpha(color::HOLO, if lit { 0.14 } else { 0.07 }),
+        color: color::alpha(color::LINE, if lit { 0.14 } else { 0.07 }),
     });
     if lit {
         let _ = canvas.draw_list_mut().push(DrawCommand::RoundedRect {
             rect: frame.rect(x - FIELD_OVERHANG, field_top + 6.0, 3.0, 22.0),
             radius: 1.5 * s,
-            color: color::GOLD_BRIGHT,
+            color: color::ACCENT_BRIGHT,
         });
     }
     let inside = frame.rect(x, field_top + 5.0, width - 4.0, 24.0);
@@ -740,14 +740,14 @@ pub(crate) fn draw(
             inside,
             color::MUTED,
             TextAlign::Start,
-            format_args!("Enter to talk to every SJK player"),
+            format_args!("Enter to talk to everyone online"),
         ),
         None => body(
             canvas,
             inside,
             color::QUIET,
             TextAlign::Start,
-            format_args!("Say something to every SJK player"),
+            format_args!("Say something to everyone online"),
         ),
     }
     canvas.hit_region(tokens.field, field);
@@ -766,7 +766,11 @@ pub(crate) fn draw(
     body(
         canvas,
         open,
-        if lit { color::GOLD_BRIGHT } else { color::GOLD },
+        if lit {
+            color::ACCENT_BRIGHT
+        } else {
+            color::ACCENT
+        },
         TextAlign::End,
         format_args!("Open chat"),
     );

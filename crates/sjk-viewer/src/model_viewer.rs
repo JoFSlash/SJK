@@ -402,7 +402,7 @@ impl Panel {
                     format_args!("{skin}"),
                     frame.rect(x, y + 786.0, width, 30.0),
                     20.0 * s,
-                    color::GOLD_BRIGHT,
+                    color::ACCENT_BRIGHT,
                     FontWeight::Regular,
                     TextAlign::Center,
                 );

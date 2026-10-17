@@ -253,7 +253,7 @@ impl Default for Panel {
 /// and TGA files; it blocks until the dialog closes, so it runs on a worker thread.
 fn pick_picture() -> Option<PathBuf> {
     crate::file_dialog::pick_file(
-        "Choose your SJK picture",
+        "Choose your SlashJK picture",
         "Pictures (PNG, JPEG, TGA)",
         &["png", "jpg", "jpeg", "tga"],
     )
@@ -392,7 +392,7 @@ impl Panel {
     fn pick_emoji(&mut self, emoji: &str, notice: Option<String>) -> PanelAction {
         if !self.writable {
             self.emoji_message = Some((
-                "The name emoji needs the SJK identity on and the SJK hub answering".to_owned(),
+                "The name emoji needs the online identity on and the hub answering".to_owned(),
                 false,
             ));
             return PanelAction::None;
@@ -527,7 +527,7 @@ impl Panel {
         self.remove_armed = None;
         if !self.writable {
             self.picture_message = Some((
-                "Pictures need the SJK identity on and the SJK hub answering".to_owned(),
+                "Pictures need the online identity on and the hub answering".to_owned(),
                 false,
             ));
             return PanelAction::None;
@@ -647,7 +647,7 @@ impl Panel {
                 }
             } else {
                 let why = if outcome.message.contains("not connected") {
-                    "Not sent: the SJK hub is not answering (is the identity on?)".to_owned()
+                    "Not sent: the hub is not answering (is the identity on?)".to_owned()
                 } else {
                     format!("Not sent: {}", outcome.message)
                 };

@@ -644,7 +644,7 @@ impl PlayerMenu {
         });
         let _ = self.canvas.draw_list_mut().push(DrawCommand::SolidRect {
             rect: frame.rect(x + width * 0.25, MODEL_FEET_Y, width * 0.5, 1.5),
-            color: color::alpha(color::GOLD, 0.35),
+            color: color::alpha(color::ACCENT, 0.35),
         });
         if self.preview_ready {
             let _ = self.canvas.draw_list_mut().push(DrawCommand::TexturedQuad {
@@ -1129,7 +1129,7 @@ impl PlayerMenu {
                         format_args!("{name}  ·  {members}"),
                         frame.rect(x + 16.0, top, width - 32.0, HILT_ROW - 2.0),
                         16.0 * s,
-                        color::GOLD,
+                        color::ACCENT,
                         FontWeight::Regular,
                         TextAlign::Start,
                     );
@@ -1156,7 +1156,7 @@ impl PlayerMenu {
                         rect,
                         radius: 8.0 * s,
                         color: color::alpha(
-                            if picked { color::GOLD } else { color::HOLO },
+                            if picked { color::ACCENT } else { color::LINE },
                             if picked { 0.16 } else { 0.1 },
                         ),
                     });
@@ -1176,7 +1176,7 @@ impl PlayerMenu {
                     frame.rect(cell[0] + 12.0, cell[1], cell[2] - 40.0, cell[3]),
                     17.0 * s,
                     match (picked, hovered) {
-                        (true, _) => color::GOLD_BRIGHT,
+                        (true, _) => color::ACCENT_BRIGHT,
                         (false, true) => color::TEXT,
                         (false, false) => color::alpha(color::TEXT, 0.82),
                     },
@@ -1278,7 +1278,7 @@ impl PlayerMenu {
                     if hovered {
                         Color::new(1.0, 1.0, 1.0, 1.0)
                     } else {
-                        color::GOLD_BRIGHT
+                        color::ACCENT_BRIGHT
                     },
                     FontWeight::Regular,
                     TextAlign::Center,
@@ -1342,7 +1342,7 @@ impl PlayerMenu {
                     radius: 6.0 * s,
                     width: if choice == chosen { 2.5 * s } else { 1.5 * s },
                     color: if choice == chosen {
-                        color::GOLD_BRIGHT
+                        color::ACCENT_BRIGHT
                     } else {
                         Color::new(1.0, 1.0, 1.0, 0.6)
                     },
@@ -1374,7 +1374,7 @@ impl PlayerMenu {
             frame.rect(LABEL_X, top + 28.0, SKIN_X - LABEL_X - 16.0, 20.0),
             15.0 * s,
             if skin.is_some() {
-                color::GOLD_BRIGHT
+                color::ACCENT_BRIGHT
             } else {
                 color::MUTED
             },
@@ -1427,7 +1427,7 @@ impl PlayerMenu {
             frame.rect(CONTROL_RIGHT - 420.0, ROWS_TOP - 4.0, 420.0, 28.0),
             17.0 * s,
             if dirty {
-                color::GOLD_BRIGHT
+                color::ACCENT_BRIGHT
             } else {
                 color::MUTED
             },
@@ -1453,8 +1453,8 @@ impl PlayerMenu {
         let chosen = self.force.allocation().side;
         let half = (COLUMN_WIDTH - GUTTER) * 0.5;
         for (index, (side, label, tint)) in [
-            (ForceSide::Light, "Light side", color::HOLO),
-            (ForceSide::Dark, "Dark side", color::EMBER),
+            (ForceSide::Light, "Light side", color::LINE),
+            (ForceSide::Dark, "Dark side", color::DANGER),
         ]
         .into_iter()
         .enumerate()
@@ -1600,7 +1600,7 @@ impl PlayerMenu {
             top + GROUP_HEADING * 0.5,
             width,
             "This server",
-            color::GOLD,
+            color::ACCENT,
         );
         let mut y = top + GROUP_HEADING + 4.0;
         // Each line wrapped to the column, 24 pixels a line, moving `y` on.
@@ -1664,13 +1664,13 @@ impl PlayerMenu {
                 &mut self.canvas,
                 &mut y,
                 &format!("{count} powers off, marked on their rows"),
-                color::EMBER,
+                color::DANGER,
             ),
             _ => line(
                 &mut self.canvas,
                 &mut y,
                 &format!("Off: {}", server_off_list(off)),
-                color::EMBER,
+                color::DANGER,
             ),
         }
         if server.gametype < GT_TEAM {
@@ -1718,7 +1718,7 @@ impl PlayerMenu {
             &mut self.canvas,
             COLUMN_X,
             COLUMN_WIDTH,
-            color::alpha(color::HOLO, 0.16),
+            color::alpha(color::LINE, 0.16),
         );
         let left = share(remaining);
         let cost = hovered.map_or(0, |(power, level)| self.force.cost_to(power, level));
@@ -1727,10 +1727,10 @@ impl PlayerMenu {
                 &mut self.canvas,
                 COLUMN_X,
                 left,
-                color::alpha(color::EMBER, 0.9),
+                color::alpha(color::DANGER, 0.9),
             );
         } else {
-            bar(&mut self.canvas, COLUMN_X, left, color::GOLD);
+            bar(&mut self.canvas, COLUMN_X, left, color::ACCENT);
             let taken = share(cost);
             bar(
                 &mut self.canvas,
@@ -1816,7 +1816,7 @@ impl PlayerMenu {
                 format_args!("{}", limit.tag()),
                 frame.rect(name_x, top + 24.0, marks_x - name_x - 6.0, 18.0),
                 13.0 * s,
-                color::alpha(color::EMBER, if usable { 0.95 } else { 0.6 }),
+                color::alpha(color::DANGER, if usable { 0.95 } else { 0.6 }),
                 FontWeight::Regular,
                 TextAlign::Start,
             );
@@ -1854,14 +1854,14 @@ impl PlayerMenu {
             canvas,
             centre(1),
             centre(3),
-            color::alpha(if usable { tint } else { color::HOLO }, 0.16),
+            color::alpha(if usable { tint } else { color::LINE }, 0.16),
         );
         if level > 1 {
             channel(canvas, centre(1), centre(level), color::alpha(tint, 0.8));
         }
         // A hovered level beyond the power's charges the channel up to it,
         // a spark running along it (drawn over the marks).
-        let charge = if affordable { tint } else { color::EMBER };
+        let charge = if affordable { tint } else { color::DANGER };
         let mut spark = None;
         if let Some(target) = target.filter(|target| *target > level) {
             let from = centre(level.max(1));
@@ -1916,8 +1916,8 @@ impl PlayerMenu {
                 }
                 (true, false, true) => {
                     dot(canvas, cx, DISC, color::alpha(color::SPACE, 0.85));
-                    ring(canvas, color::EMBER, 2.0);
-                    color::EMBER
+                    ring(canvas, color::DANGER, 2.0);
+                    color::DANGER
                 }
                 (true, false, false) => {
                     dot(canvas, cx, DISC, color::alpha(color::SPACE, 0.85));
@@ -1930,7 +1930,7 @@ impl PlayerMenu {
                 }
                 (false, false, _) => {
                     dot(canvas, cx, DISC, color::alpha(color::SPACE, 0.85));
-                    ring(canvas, color::alpha(color::HOLO, 0.16), 1.6);
+                    ring(canvas, color::alpha(color::LINE, 0.16), 1.6);
                     color::alpha(color::QUIET, 0.6)
                 }
             };
@@ -2105,15 +2105,15 @@ impl PlayerMenu {
             );
         }
         let (status, status_colour) = match self.force.next_level(index) {
-            NextLevel::Mastered => ("Mastered".to_owned(), color::GOLD_BRIGHT),
-            NextLevel::Free => ("Next level: free".to_owned(), color::GOLD_BRIGHT),
-            NextLevel::Costs(cost) => (format!("Next level: {cost} points"), color::GOLD_BRIGHT),
+            NextLevel::Mastered => ("Mastered".to_owned(), color::ACCENT_BRIGHT),
+            NextLevel::Free => ("Next level: free".to_owned(), color::ACCENT_BRIGHT),
+            NextLevel::Costs(cost) => (format!("Next level: {cost} points"), color::ACCENT_BRIGHT),
             NextLevel::Short(cost) => (
                 format!("Next level: {cost} points, too few left"),
-                color::EMBER,
+                color::DANGER,
             ),
             NextLevel::OtherSide => ("The other side's power".to_owned(), color::QUIET),
-            NextLevel::NeedsOffense => ("Needs Saber offense 1".to_owned(), color::EMBER),
+            NextLevel::NeedsOffense => ("Needs Saber offense 1".to_owned(), color::DANGER),
         };
         if let Some(limit) = self.force.server_limit(index) {
             text(
@@ -2122,7 +2122,7 @@ impl PlayerMenu {
                 format_args!("{}", limit.describe()),
                 frame.rect(x + 24.0, y + height - 72.0, width - 48.0, 26.0),
                 17.0 * s,
-                color::EMBER,
+                color::DANGER,
                 FontWeight::Semibold,
                 TextAlign::Start,
             );
@@ -2220,7 +2220,7 @@ impl PlayerMenu {
         );
         let _ = self.canvas.draw_list_mut().push(DrawCommand::SolidRect {
             rect: frame.rect(1_824.0 - 120.0, 850.0, 120.0, 1.5),
-            color: color::alpha(color::GOLD, 0.7),
+            color: color::alpha(color::ACCENT, 0.7),
         });
     }
 

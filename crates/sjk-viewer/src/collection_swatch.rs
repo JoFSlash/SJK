@@ -182,7 +182,7 @@ pub(crate) fn blade(
             rect: frame.rect(x, y, width, height),
             radius: 14.0 * s,
             width: 1.2 * s,
-            color: color::alpha(color::HOLO, if owned { 0.22 } else { 0.14 }),
+            color: color::alpha(color::LINE, if owned { 0.22 } else { 0.14 }),
         },
     );
     if !owned {
@@ -354,7 +354,7 @@ pub(crate) fn small_stock(canvas: &mut DrawList, frame: &Frame, rect: [f32; 4], 
             rect: frame.rect(x, y, width, height),
             radius: 14.0 * s,
             width: 1.2 * s,
-            color: color::alpha(color::HOLO, 0.22),
+            color: color::alpha(color::LINE, 0.22),
         },
     );
 }
@@ -825,7 +825,7 @@ fn hilt_at(canvas: &mut DrawList, frame: &Frame, start: f32, centre: f32, length
             rect: frame.rect(x + 66.0, centre - 10.5, 7.0, 4.0),
             radius: 1.5 * s,
             color: if lit {
-                color::GOLD
+                color::ACCENT
             } else {
                 color::alpha(color::QUIET, 0.8)
             },

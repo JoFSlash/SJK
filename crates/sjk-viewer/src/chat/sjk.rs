@@ -111,7 +111,7 @@ impl ChatOverlay {
         if !outcome.sent {
             self.receive(
                 ServerEventKind::Chat,
-                format!("^3SJK chat: {}", outcome.message),
+                format!("^3Global chat: {}", outcome.message),
                 None,
                 now,
             );
@@ -345,10 +345,13 @@ mod tests {
         chat.build(true, &font, [1920.0, 1080.0], 1_000);
         let runs: Vec<&str> = chat.ui.text_runs().collect();
         assert!(
-            !runs.contains(&"SJK"),
+            !runs.contains(&"SlashJK"),
             "the emblem, not the letters: {runs:?}"
         );
-        assert!(!runs.contains(&"SJK VERIFIED"), "the tick alone: {runs:?}");
+        assert!(
+            !runs.contains(&"SlashJK VERIFIED"),
+            "the tick alone: {runs:?}"
+        );
         let logos = chat
             .ui
             .draw_list()
@@ -359,7 +362,7 @@ mod tests {
                     if *texture == crate::ui_renderer::LOGO_TEXTURE)
             })
             .count();
-        assert_eq!(logos, 2, "each line has the SJK emblem");
+        assert_eq!(logos, 2, "each line has the SlashJK emblem");
     }
 
     #[test]
@@ -471,7 +474,7 @@ mod tests {
         chat.sjk_outcome(Some(&refused), now);
         assert_eq!(
             bodies(&chat),
-            ["^3SJK chat: you send messages too fast; wait a moment"]
+            ["^3Global chat: you send messages too fast; wait a moment"]
         );
         let sent = ReportOutcome {
             serial: 2,

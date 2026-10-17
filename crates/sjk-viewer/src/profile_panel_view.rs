@@ -45,8 +45,7 @@ const EMOJI_CELL: f32 = 56.0;
 const EMOJI_GAP: f32 = 6.0;
 
 /// What the page says when the player holds no medal yet.
-const NO_MEDALS: &str =
-    "No medals yet. The SJK team gives medals for testing, contributing and more.";
+const NO_MEDALS: &str = "No medals yet. The team gives medals for testing, contributing and more.";
 
 /// Who the player is, as the Profile tab's left column says it.
 struct Who {
@@ -76,7 +75,7 @@ fn who(inputs: &Inputs<'_>) -> Who {
         return plain(
             "Identity is off",
             &[
-                "Your profile lives on the SJK hub. Switch the identity on in Settings, Network, to show it to other players.",
+                "Your profile lives on the hub. Switch the identity on in Settings, Network, to show it to other players.",
                 "Your achievements are counted on this PC meanwhile.",
             ],
         );
@@ -88,7 +87,7 @@ fn who(inputs: &Inputs<'_>) -> Who {
         Status::Disabled => plain("Identity is off", &["The settings were just changed."]),
         Status::NoHub => plain(
             "No hub is set",
-            &["Set cl_hubUrl, or use the official hub: Settings, Network, SJK identity key."],
+            &["Set cl_hubUrl, or use the official hub: Settings, Network, online identity key."],
         ),
         Status::Registering => plain("Contacting the hub...", &[]),
         Status::Failed(error) => Who {
@@ -114,18 +113,18 @@ fn who(inputs: &Inputs<'_>) -> Who {
             let since = crate::medals::date_text(me.created);
             use sjk_identity::Trust;
             let badge = match (me.verified, me.trust) {
-                (true, _) => ("Verified by the SJK team".to_owned(), color::GOLD_BRIGHT),
+                (true, _) => ("Verified by the team".to_owned(), color::ACCENT_BRIGHT),
                 (false, Some(Trust::New)) => (
                     "New: green after 30 days and 10 hours of play".to_owned(),
                     color::QUIET,
                 ),
                 (false, Some(Trust::Trusted)) => (
-                    "Trusted: the SJK team may verify you".to_owned(),
+                    "Trusted: the team may verify you".to_owned(),
                     color::TRUSTED,
                 ),
                 (false, Some(Trust::Banned)) => (
-                    "Banned from the SJK chat: your 30 days start again".to_owned(),
-                    color::EMBER,
+                    "Banned from the global chat: your 30 days start again".to_owned(),
+                    color::DANGER,
                 ),
                 (false, _) => ("Not verified yet".to_owned(), color::QUIET),
             };
@@ -273,7 +272,7 @@ impl Panel {
             ),
             14.0 * s,
             if lit {
-                color::GOLD_BRIGHT
+                color::ACCENT_BRIGHT
             } else {
                 color::QUIET
             },
@@ -411,7 +410,7 @@ impl Panel {
                 format_args!("{}", standing.kind.name),
                 frame.rect(LEFT_X, y, LEFT_WIDTH - 140.0, 28.0),
                 21.0 * s,
-                color::GOLD_BRIGHT,
+                color::ACCENT_BRIGHT,
                 FontWeight::Regular,
                 TextAlign::Start,
             );
@@ -457,7 +456,7 @@ impl Panel {
             color: if focused {
                 Color::new(1.0, 1.0, 1.0, 0.7)
             } else {
-                color::alpha(color::HOLO, 0.4)
+                color::alpha(color::LINE, 0.4)
             },
         });
         self.ui.hit_region(BIO_TOKEN, rect);
@@ -475,7 +474,7 @@ impl Panel {
                 let prompt = if self.writable {
                     "Say something about yourself: your clan, your style, where you play."
                 } else {
-                    "Your bio is kept on the SJK hub: switch the identity on to write one."
+                    "Your bio is kept on the hub: switch the identity on to write one."
                 };
                 for (index, part) in wrap(prompt, 60).enumerate() {
                     text(
@@ -575,9 +574,9 @@ impl Panel {
                 frame.rect(MIDDLE_X, y, MIDDLE_WIDTH, 26.0),
                 17.0 * s,
                 if self.message == "Saved" {
-                    color::GOLD_BRIGHT
+                    color::ACCENT_BRIGHT
                 } else {
-                    color::EMBER
+                    color::DANGER
                 },
                 FontWeight::Regular,
                 TextAlign::Start,
@@ -675,7 +674,7 @@ impl Panel {
         let message = match &self.picture_message {
             Some(message) => Some(message.clone()),
             None if !self.writable => Some((
-                "Pictures need the SJK identity on and the SJK hub answering".to_owned(),
+                "Pictures need the online identity on and the hub answering".to_owned(),
                 false,
             )),
             None => None,
@@ -689,9 +688,9 @@ impl Panel {
                     frame.rect(side_x, y, side_width, 24.0),
                     16.0 * s,
                     if good {
-                        color::GOLD_BRIGHT
+                        color::ACCENT_BRIGHT
                     } else {
-                        color::EMBER
+                        color::DANGER
                     },
                     FontWeight::Regular,
                     TextAlign::Start,
@@ -741,7 +740,7 @@ impl Panel {
         let mut y = browse_y + 46.0 + 20.0;
         for line in [
             "A PNG, JPEG or TGA of up to 16 MB, 64 to 8192 pixels a side, at most four times as long as it is wide.",
-            "It is cropped to a square from its middle and made 128 pixels across. Everyone can see it, so keep it friendly: the SJK team takes down pictures that are not.",
+            "It is cropped to a square from its middle and made 128 pixels across. Everyone can see it, so keep it friendly: the team takes down pictures that are not.",
         ] {
             for part in wrap(line, 80) {
                 text(
@@ -870,7 +869,7 @@ impl Panel {
                     radius: 10.0 * s,
                     width: 1.5 * s,
                     color: if worn {
-                        color::GOLD_BRIGHT
+                        color::ACCENT_BRIGHT
                     } else {
                         color::TEXT
                     },
@@ -904,7 +903,7 @@ impl Panel {
         let message = match &self.emoji_message {
             Some(message) => Some(message.clone()),
             None if !self.writable => Some((
-                "The name emoji needs the SJK identity on and the SJK hub answering".to_owned(),
+                "The name emoji needs the online identity on and the hub answering".to_owned(),
                 false,
             )),
             None => None,
@@ -917,9 +916,9 @@ impl Panel {
                 frame.rect(MIDDLE_X, y, MIDDLE_WIDTH, 24.0),
                 16.0 * s,
                 if good {
-                    color::GOLD_BRIGHT
+                    color::ACCENT_BRIGHT
                 } else {
-                    color::EMBER
+                    color::DANGER
                 },
                 FontWeight::Regular,
                 TextAlign::Start,
@@ -1007,7 +1006,7 @@ impl Panel {
                 format_args!("{}", award.label()),
                 frame.rect(RIGHT_X + 98.0, y + 8.0, RIGHT_WIDTH - 98.0, 30.0),
                 23.0 * s,
-                color::GOLD_BRIGHT,
+                color::ACCENT_BRIGHT,
                 FontWeight::Semibold,
                 TextAlign::Start,
             );
@@ -1076,7 +1075,7 @@ impl Panel {
             } else {
                 unlocked as f32 / total as f32
             },
-            color::GOLD,
+            color::ACCENT,
         );
         kit::button(
             &mut self.ui,
@@ -1108,7 +1107,7 @@ impl Panel {
             )
         } else {
             (
-                "Medals, shaders, toys and more, kept on the SJK hub".to_owned(),
+                "Medals, shaders, toys and more, kept on the hub".to_owned(),
                 17.0,
                 color::MUTED,
             )
@@ -1157,7 +1156,7 @@ impl Panel {
             Some(1) => ("1 holocron".to_owned(), 30.0, color::TEXT),
             Some(total) => (format!("{total} holocrons"), 30.0, color::TEXT),
             None => (
-                "Found by playing, kept on the SJK hub".to_owned(),
+                "Found by playing, kept on the hub".to_owned(),
                 17.0,
                 color::MUTED,
             ),
@@ -1237,7 +1236,7 @@ fn bar(
     let _ = canvas.draw_list_mut().push(DrawCommand::RoundedRect {
         rect: frame.rect(x, y, width, height),
         radius: height * 0.5 * s,
-        color: color::alpha(color::HOLO, 0.12),
+        color: color::alpha(color::LINE, 0.12),
     });
     let fraction = fraction.clamp(0.0, 1.0);
     if fraction > 0.0 {
@@ -1293,7 +1292,7 @@ mod tests {
             name: "^1Ш^7Sol^3Vulpes^7 the Long Named".to_owned(),
             bio: format!(
                 "{}\n\nline three\n{}",
-                "Äöüß word ".repeat(30),
+                "Äöüß word ".repeat(30).trim_end(),
                 "x".repeat(60)
             ),
             verified: true,

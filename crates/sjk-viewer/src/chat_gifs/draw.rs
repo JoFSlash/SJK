@@ -125,7 +125,7 @@ pub(crate) fn paint(
             let _ = canvas.draw_list_mut().push(DrawCommand::RoundedRect {
                 rect,
                 radius: 6.0 * s,
-                color: faded(color::HOLO, 0.07),
+                color: faded(color::LINE, 0.07),
             });
             text(
                 canvas,

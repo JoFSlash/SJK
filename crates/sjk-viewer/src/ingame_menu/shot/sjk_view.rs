@@ -91,7 +91,7 @@ fn push(ui: &mut MenuCanvas, command: DrawCommand) {
 fn viewfinder(ui: &mut MenuCanvas, viewport: [f32; 2], s: f32) {
     let [width, height] = viewport;
     let line = (1.5 * s).max(1.0);
-    let corner = color::alpha(color::HOLO, 0.55);
+    let corner = color::alpha(color::LINE, 0.55);
     let (inset, arm) = (28.0 * s, 40.0 * s);
     for (x, y, right, bottom) in [
         (inset, inset, false, false),
@@ -118,7 +118,7 @@ fn viewfinder(ui: &mut MenuCanvas, viewport: [f32; 2], s: f32) {
             },
         );
     }
-    let mark = color::alpha(color::HOLO, 0.4);
+    let mark = color::alpha(color::LINE, 0.4);
     let reach = 9.0 * s;
     for x in [width / 3.0, width * 2.0 / 3.0] {
         for y in [height / 3.0, height * 2.0 / 3.0] {
@@ -203,7 +203,7 @@ fn header(ui: &mut MenuCanvas, frame: &Frame, panel: &Panel) {
             frame.rect(x, TABS_Y, width + 20.0, 34.0),
             26.0 * s,
             match (current, lit) {
-                (true, _) => color::GOLD_BRIGHT,
+                (true, _) => color::ACCENT_BRIGHT,
                 (false, true) => color::TEXT,
                 (false, false) => color::MUTED,
             },
@@ -216,7 +216,7 @@ fn header(ui: &mut MenuCanvas, frame: &Frame, panel: &Panel) {
                 DrawCommand::RoundedRect {
                     rect: frame.rect(x, TABS_Y + 38.0, width, 3.0),
                     radius: 1.5 * s,
-                    color: color::GOLD_BRIGHT,
+                    color: color::ACCENT_BRIGHT,
                 },
             );
         }
@@ -748,7 +748,7 @@ mod tests {
             colours[index]
         };
         // The page on show is gold; the other tab waits muted.
-        assert_eq!(colour_of("Camera"), color::GOLD_BRIGHT);
+        assert_eq!(colour_of("Camera"), color::ACCENT_BRIGHT);
         assert_eq!(colour_of("Sun"), color::MUTED);
         assert_eq!(colour_of("Camera control"), color::TEXT);
         // Hiding the panel is the one main action: a gold button.
@@ -756,7 +756,7 @@ mod tests {
         assert!(canvas.draw_list().commands().iter().any(|command| matches!(
             command,
             DrawCommand::RoundedRect { rect, color, .. }
-                if *rect == hide && *color == color::GOLD
+                if *rect == hide && *color == color::ACCENT
         )));
         // The column's ground is the UI's navy fading in from clear.
         let fades: Vec<_> = canvas

@@ -21,7 +21,7 @@ use crate::medals::{Award, Medal};
 pub(crate) const COMMAND: &str = "debug_medal";
 /// Its line in the command list and browser.
 pub(crate) const HELP: &str =
-    "Rehearse receiving SJK medals, nothing sent: debug_medal <id|all> [x<count>] [note]";
+    "Rehearse receiving SlashJK medals, nothing sent: debug_medal <id|all> [x<count>] [note]";
 /// The word that names every medal.
 const ALL: &str = "all";
 /// The most a rehearsed count may be.
@@ -31,7 +31,7 @@ const MOST: u32 = 999;
 pub(crate) fn listing() -> Vec<String> {
     let mut lines = vec![
         format!("usage: {COMMAND} <id|all> [x<count>] [note]"),
-        "Shows medals as if the SJK team had just given them: the pop-up on the main menu or the game menu (a centre print during a match), with its ceremony and sound. Nothing is sent to the SJK hub and medals_seen.txt is not changed.".to_owned(),
+        "Shows medals as if the team had just given them: the pop-up on the main menu or the game menu (a centre print during a match), with its ceremony and sound. Nothing is sent to the hub and medals_seen.txt is not changed.".to_owned(),
     ];
     for medal in Medal::ALL {
         let again = if medal.repeatable() {
@@ -107,7 +107,7 @@ pub(crate) fn queued(awards: &[Award]) -> Vec<String> {
     let names: Vec<String> = awards.iter().map(Award::label).collect();
     vec![
         format!("Rehearsing: {}.", names.join(", ")),
-        "It shows on the main menu or when the game menu opens (a centre print says so during a match). Nothing is sent to the SJK hub.".to_owned(),
+        "It shows on the main menu or when the game menu opens (a centre print says so during a match). Nothing is sent to the hub.".to_owned(),
     ]
 }
 

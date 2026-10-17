@@ -16,7 +16,7 @@ pub(crate) mod card;
 pub(crate) const COMMAND: &str = "help_fps";
 /// Help text for completion and `cmdlist`.
 pub(crate) const HELP: &str =
-    "Low FPS? Shows what SJK's lighting costs here and offers Vanilla graphics";
+    "Low FPS? Shows what SlashJK's lighting costs here and offers Vanilla graphics";
 /// Whether the card is offered when a map's lighting is heavy.
 pub(crate) const CVAR: &str = "cg_fpsHelp";
 
@@ -136,7 +136,7 @@ impl crate::GpuState {
         self.fps_help.finding = Some(finding);
         let heavy = finding.heavy();
         crate::log::progress(format_args!(
-            "fps help: frame {:.2} ms, SJK lighting {:.2} ms, target {} FPS: {}",
+            "fps help: frame {:.2} ms, SlashJK lighting {:.2} ms, target {} FPS: {}",
             sample.frame_ms,
             sample.light_ms,
             finding.target_fps,

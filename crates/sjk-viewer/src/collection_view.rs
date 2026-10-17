@@ -128,7 +128,7 @@ pub(crate) fn row_labels(
         illuminate: true,
         cardboard_box: false,
         name: "",
-        stock: color::HOLO,
+        stock: color::LINE,
         grid: false,
         options: "",
     };
@@ -344,9 +344,9 @@ impl Panel {
                     rect: frame.rect(x, 96.0, TICK[0], TICK[1]),
                     radius: 1.0 * s,
                     color: if index < held {
-                        color::GOLD_BRIGHT
+                        color::ACCENT_BRIGHT
                     } else {
-                        color::alpha(color::HOLO, 0.24)
+                        color::alpha(color::LINE, 0.24)
                     },
                 });
                 x += TICK[0] + TICK_GAP;

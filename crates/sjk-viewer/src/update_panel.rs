@@ -18,7 +18,7 @@ mod sjk;
 /// Console command that toggles the page.
 pub(crate) const COMMAND: &str = "update";
 /// Help text for completion and `cmdlist`.
-pub(crate) const HELP: &str = "Check for a newer SJK release and install it";
+pub(crate) const HELP: &str = "Check for a newer SlashJK release and install it";
 
 /// Pointer targets of the footer's actions.
 const PRIMARY_TOKEN: u16 = 920;
@@ -79,7 +79,7 @@ fn view(state: &State, installed: &str) -> View {
     match state {
         State::Idle => View {
             primary: Some("Check"),
-            ..plain("Not checked yet", format!("This is SJK {installed}."))
+            ..plain("Not checked yet", format!("This is SlashJK {installed}."))
         },
         State::Checking => plain(
             "Checking for updates...",
@@ -88,7 +88,7 @@ fn view(state: &State, installed: &str) -> View {
         State::UpToDate => View {
             primary: Some("Check again"),
             ..plain(
-                "SJK is up to date",
+                "SlashJK is up to date",
                 format!("Version {installed} is the latest release."),
             )
         },
@@ -134,7 +134,9 @@ fn view(state: &State, installed: &str) -> View {
             notes: true,
             ..plain(
                 &format!("Update available: {}", release.version),
-                format!("SJK cannot install it here: {reason}. Download it from the release page."),
+                format!(
+                    "SlashJK cannot install it here: {reason}. Download it from the release page."
+                ),
             )
         },
         State::Failed(message) => View {

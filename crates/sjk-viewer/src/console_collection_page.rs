@@ -15,7 +15,7 @@ use sjk_ui::InputEvent;
 /// The `collection` command.
 pub(crate) const COLLECTION_COMMAND: &str = "collection";
 pub(crate) const COLLECTION_HELP: &str =
-    "Open your SJK collection: medals, achievements, shaders, toys and nameplates";
+    "Open your SlashJK collection: medals, achievements, shaders, toys and nameplates";
 /// The `achievements` command.
 pub(crate) const ACHIEVEMENTS_COMMAND: &str = "achievements";
 pub(crate) const ACHIEVEMENTS_HELP: &str = "Open the Collection on your achievements";
@@ -361,7 +361,7 @@ mod tests {
         assert!(console.collection_panel.is_open());
         assert!(!console.profile_panel.is_open());
         assert_eq!(console.collection_tab(), Tab::Shaders);
-        assert!(console.sjk_page_open(), "drawn in the SJK UI's look");
+        assert!(console.sjk_page_open(), "drawn in the SlashJK look");
         assert!(console.covers_frame());
         assert!(console.collection_stage_wish().is_some());
         console.collection_panel_action(PanelAction::Wear("saber_sun"));

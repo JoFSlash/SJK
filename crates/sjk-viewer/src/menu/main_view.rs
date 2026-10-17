@@ -6,7 +6,7 @@ use crate::{TextVertex, UiFont};
 
 /// Build version ([`crate::build_info::VERSION`]), bottom right of the main
 /// menus; the console shows it too.
-pub(crate) const VERSION_LINE: &str = concat!("SJK ", env!("SJK_BUILD_VERSION"));
+pub(crate) const VERSION_LINE: &str = concat!("SlashJK ", env!("SJK_BUILD_VERSION"));
 
 /// The version line the menus show: the version, and a newer release the update
 /// check found.

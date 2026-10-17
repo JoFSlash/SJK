@@ -49,9 +49,9 @@ impl Gate {
     pub(crate) const fn reason(self) -> Option<&'static str> {
         match self {
             Self::Open => None,
-            Self::NoIdentity => Some("Reporting needs the SJK identity on (cl_identity 1)"),
-            Self::Offline => Some("Not connected to the SJK hub yet"),
-            Self::NotVerified => Some("Only verified SJK players can report players"),
+            Self::NoIdentity => Some("Reporting needs the online identity on (cl_identity 1)"),
+            Self::Offline => Some("Not connected to the hub yet"),
+            Self::NotVerified => Some("Only verified SlashJK players can report players"),
             Self::Local => Some("Players can be reported on online servers only"),
         }
     }
@@ -415,8 +415,8 @@ impl State {
             parts.push(format!("{ping} ms").into());
         }
         match &player.hub {
-            Some(hub) if hub.verified => parts.push("verified SJK player".into()),
-            Some(_) => parts.push("SJK player".into()),
+            Some(hub) if hub.verified => parts.push("verified SlashJK player".into()),
+            Some(_) => parts.push("SlashJK player".into()),
             None => {}
         }
         for (index, part) in parts.iter().enumerate() {
@@ -459,9 +459,9 @@ impl State {
                 .map_or_else(|| "your key".to_owned(), |key| format!("key {key}"))
         });
         self.info.push(match (&player.hub, key) {
-            (Some(hub), Some(key)) if hub.verified => format!("SJK hub  /  verified, {key}"),
-            (Some(_), Some(key)) => format!("SJK hub  /  {key}"),
-            _ => "SJK hub  /  not known to the hub".to_owned(),
+            (Some(hub), Some(key)) if hub.verified => format!("Hub  /  verified, {key}"),
+            (Some(_), Some(key)) => format!("Hub  /  {key}"),
+            _ => "Hub  /  not known to the hub".to_owned(),
         });
         if let Some(reason) = self.blocked() {
             self.info.push(format!("Report  /  {reason}"));
@@ -608,7 +608,7 @@ mod tests {
         assert_eq!(labels[0], "^2Sol^7  /  you, blue team, 30 points, 40 ms");
         assert_eq!(
             labels[1],
-            "^1Troll^7  /  red team, 12 points, 80 ms, SJK player"
+            "^1Troll^7  /  red team, 12 points, 80 ms, SlashJK player"
         );
         assert_eq!(labels[2], "Bot^7  /  bot, blue team, 3 points");
         assert_eq!(labels[3], "Late^7  /  spectating");
@@ -627,7 +627,7 @@ mod tests {
             [
                 "Player  /  ^1Troll",
                 "Place  /  slot 0, red team",
-                "SJK hub  /  key 0123456789abcdef"
+                "Hub  /  key 0123456789abcdef"
             ]
         );
         assert!(!state.choose(4), "Back is not a player");
@@ -643,12 +643,12 @@ mod tests {
         assert!(enabled[..Category::ALL.len()].iter().all(|on| !on));
         assert_eq!(
             hints[Category::ALL.len()],
-            "Only verified SJK players can report players"
+            "Only verified SlashJK players can report players"
         );
         assert_eq!(state.first_report_row(), Category::ALL.len());
         assert_eq!(
             state.info(Page::Players),
-            ["Reports  /  Only verified SJK players can report players"]
+            ["Reports  /  Only verified SlashJK players can report players"]
         );
         assert!(
             state

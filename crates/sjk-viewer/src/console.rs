@@ -865,7 +865,7 @@ impl ViewerConsole {
             "]cg_fov 110",
             "]con_style",
             "\"con_style\" is:\"auto^7\" default:\"auto^7\"",
-            "Console style: auto (the SJK UI's with its menus, else classic), sjk or classic (after EternalJK)",
+            "Console style: auto (the SlashJK with its menus, else classic), sjk or classic (after EternalJK)",
             "^1Unknown command \"saberthrow\"",
             "Kyle was cut in half by Sol's saber",
             "^3Bishop^7 entered the game",

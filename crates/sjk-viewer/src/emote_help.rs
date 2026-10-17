@@ -12,7 +12,8 @@ use winit::keyboard::{KeyCode, PhysicalKey};
 
 /// Console command that opens the card.
 pub(crate) const COMMAND: &str = "help_emotes";
-pub(crate) const HELP: &str = "Show how SJK emotes work: the sjkemote commands and the quick wheel";
+pub(crate) const HELP: &str =
+    "Show how SlashJK emotes work: the sjkemote commands and the quick wheel";
 /// `sjkemote help` opens it too.
 pub(crate) const WORD: &str = "help";
 
@@ -45,7 +46,7 @@ const COMMANDS: [(&str, &str); 7] = [
     ("sjkemote", "Lists the emotes you have installed."),
     (
         "sjkemote <id>",
-        "Plays one. The SJK players here see it when they have the same emote.",
+        "Plays one. The SlashJK players here see it when they have the same emote.",
     ),
     ("sjkemote stop", "Ends yours, for everyone."),
     (
@@ -71,7 +72,7 @@ const PARAGRAPHS: [&str; 3] = [
     "On the quick wheel: Settings > Quick wheel, pick a page, add choices from the Emotes \
      group (your emotes, Sync emote, Stop emote), then hold the wheel key (Q by default), \
      move towards one and let go.",
-    "Others see your emotes with the SJK identity on (cl_identity 1). Moving ends most \
+    "Others see your emotes with the online identity on (cl_identity 1). Moving ends most \
      emotes. Their music: Settings > Sound > Emotes.",
 ];
 
@@ -223,7 +224,7 @@ impl Card {
             format_args!("EMOTES"),
             frame.rect(TEXT_X, top + 30.0, TEXT_WIDTH, 30.0),
             22.0 * s,
-            color::GOLD_BRIGHT,
+            color::ACCENT_BRIGHT,
             FontWeight::Semibold,
             TextAlign::Start,
         );
@@ -246,7 +247,7 @@ impl Card {
                     format_args!("{command}"),
                     frame.rect(TEXT_X, y, COMMAND_WIDTH, LINE),
                     17.0 * s,
-                    color::GOLD_BRIGHT,
+                    color::ACCENT_BRIGHT,
                     FontWeight::Regular,
                     TextAlign::Start,
                 );

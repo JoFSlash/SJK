@@ -160,10 +160,10 @@ impl Display for LaunchError {
     fn fmt(&self, formatter: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::GameDataNotFound => formatter.write_str(concat!(
-                "Jedi Academy GameData was not found. Put SJK in the game's GameData ",
+                "Jedi Academy GameData was not found. Put SlashJK in the game's GameData ",
                 "folder beside base/ (containing assets0.pk3 through assets3.pk3), ",
                 "then launch it again. For a separate installation, set JKA_GAME_DATA, ",
-                "set fs_gameData in the SJK config, or pass GameData as the first argument."
+                "set fs_gameData in the SlashJK config, or pass GameData as the first argument."
             )),
             Self::InvalidGameData(path) => write!(
                 formatter,

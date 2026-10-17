@@ -643,7 +643,7 @@ impl SettingsMenu {
                     format_args!("{line}"),
                     frame.rect(DETAIL_X, y, DETAIL_WIDTH, 28.0),
                     17.0 * s,
-                    color::GOLD_BRIGHT,
+                    color::ACCENT_BRIGHT,
                     FontWeight::Regular,
                     TextAlign::Start,
                 );
@@ -716,7 +716,7 @@ impl SettingsMenu {
                 &mut y,
                 "Applies",
                 format_args!("{when}"),
-                color::GOLD_BRIGHT,
+                color::ACCENT_BRIGHT,
             );
         }
         if let Some(group) = found_in {
@@ -731,7 +731,7 @@ impl SettingsMenu {
             &mut y,
             source,
             format_args!("{}", setting.cvar),
-            color::HOLO,
+            color::LINE,
         );
         if self.section == Section::Group(Group::Quick) {
             y += 18.0;
@@ -994,7 +994,7 @@ pub(crate) fn draw_rail(
             frame.rect(RAIL_X + 88.0, top + 8.0, CATEGORY_WIDTH - 88.0, 36.0),
             26.0 * s,
             match (current, hovered) {
-                (true, _) => color::GOLD_BRIGHT,
+                (true, _) => color::ACCENT_BRIGHT,
                 (false, true) => color::TEXT,
                 (false, false) => color::MUTED,
             },
@@ -1034,7 +1034,7 @@ mod tests {
         assert_eq!(shown_value("1920x1080"), "1920x1080");
         assert_eq!(
             Choices("cg_example", &["off", "sjk", "strong"]).to_string(),
-            "Off, SJK, Strong"
+            "Off, SlashJK, Strong"
         );
         assert_eq!(
             Choices("cg_remaps", &["0", "1", "2"]).to_string(),

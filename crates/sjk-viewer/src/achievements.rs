@@ -312,7 +312,7 @@ pub(crate) const ALL: [Kind; 21] = [
     kind(
         "bug_reporter",
         "Bug Reporter",
-        "Send a bug report to the SJK team.",
+        "Send a bug report to the team.",
         1,
         Community,
         Hub,
@@ -320,7 +320,7 @@ pub(crate) const ALL: [Kind; 21] = [
     kind(
         "surveyor",
         "Surveyor",
-        "Pin 5 world notes for the SJK team.",
+        "Pin 5 world notes for the team.",
         5,
         Community,
         Hub,
@@ -328,7 +328,7 @@ pub(crate) const ALL: [Kind; 21] = [
     kind(
         "decorated",
         "Decorated",
-        "Receive a medal from the SJK team.",
+        "Receive a medal from the team.",
         1,
         Community,
         Hub,

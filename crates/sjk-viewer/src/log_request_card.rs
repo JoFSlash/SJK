@@ -86,7 +86,7 @@ impl Card {
             if !self.announced.contains(&request.id) {
                 self.announced.push(request.id);
                 lines.push(format!(
-                    "{} from the SJK team asks for your game's logs: open the menu to answer.",
+                    "{} from the team asks for your game's logs: open the menu to answer.",
                     from(request)
                 ));
             }
@@ -101,9 +101,9 @@ impl Card {
         }
         self.outcome_seen = outcome.serial;
         Some(match (outcome.sent, outcome.message.as_str()) {
-            (true, "logs sent") => "Your logs were sent to the SJK team. Thank you.".to_owned(),
-            (true, _) => "The SJK team was told you won't send your logs.".to_owned(),
-            (false, why) => format!("Your answer to the SJK team did not go: {why}"),
+            (true, "logs sent") => "Your logs were sent to the team. Thank you.".to_owned(),
+            (true, _) => "The team was told you won't send your logs.".to_owned(),
+            (false, why) => format!("Your answer to the team did not go: {why}"),
         })
     }
 
@@ -174,10 +174,10 @@ impl Card {
             format!("to look into a problem you have: \u{201c}{note}\u{201d}.")
         };
         format!(
-            "{} from the SJK team asks for your game's logs {why} They hold the console lines \
+            "{} from the team asks for your game's logs {why} They hold the console lines \
              of this session and the one before (no chat), your last crash report, and your \
              build, system and graphics card. Your Windows user name is left out. Only the \
-             SJK team reads them, and nothing is sent unless you choose Send logs.",
+             team reads them, and nothing is sent unless you choose Send logs.",
             from(request)
         )
     }
@@ -201,10 +201,10 @@ impl Card {
         text(
             ui,
             TextFamily::Display,
-            format_args!("SJK team"),
+            format_args!("team"),
             frame.rect(TEXT_X, CARD_TOP + 30.0, TEXT_WIDTH, 30.0),
             22.0 * s,
-            color::GOLD_BRIGHT,
+            color::ACCENT_BRIGHT,
             FontWeight::Semibold,
             TextAlign::Start,
         );
@@ -383,7 +383,7 @@ mod tests {
         assert_eq!(lines.len(), 2);
         assert_eq!(
             lines[0],
-            "Sol from the SJK team asks for your game's logs: open the menu to answer."
+            "Sol from the team asks for your game's logs: open the menu to answer."
         );
         assert!(card.wants());
         assert!(card.offer(&[request(3, ""), request(4, "")]).is_empty());
@@ -403,7 +403,7 @@ mod tests {
         let words = Card::words(&request(1, "^3your freeze on ffa3"));
         assert!(
             words.starts_with(
-                "Sol from the SJK team asks for your game's logs to look into a problem you \
+                "Sol from the team asks for your game's logs to look into a problem you \
                  have: \u{201c}your freeze on ffa3\u{201d}."
             ),
             "{words}"
@@ -416,7 +416,7 @@ mod tests {
             from: String::new(),
             ..request(1, "")
         });
-        assert!(plain.starts_with("Someone from the SJK team"), "{plain}");
+        assert!(plain.starts_with("Someone from the team"), "{plain}");
     }
 
     #[test]
@@ -429,7 +429,7 @@ mod tests {
         };
         assert_eq!(
             card.outcome_line(&outcome(1, true, "logs sent")).as_deref(),
-            Some("Your logs were sent to the SJK team. Thank you.")
+            Some("Your logs were sent to the team. Thank you.")
         );
         assert_eq!(card.outcome_line(&outcome(1, true, "logs sent")), None);
         assert!(

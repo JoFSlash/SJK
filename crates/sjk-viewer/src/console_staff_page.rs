@@ -10,7 +10,7 @@ use sjk_ui::InputEvent;
 
 /// The `staff` command.
 pub(crate) const STAFF_COMMAND: &str = "staff";
-pub(crate) const STAFF_HELP: &str = "Open the SJK staff tools (staff keys only)";
+pub(crate) const STAFF_HELP: &str = "Open the SlashJK staff tools (staff keys only)";
 
 impl ViewerConsole {
     /// `staff`: show the page, or close it; a key that is not staff is told so.
@@ -25,7 +25,7 @@ impl ViewerConsole {
     /// Show the page (the Profile page's Staff tools), and list the players seen lately.
     pub(crate) fn open_staff_panel(&mut self) {
         if !crate::player_identity::is_staff() {
-            self.push_log("^3staff: only SJK staff keys can open the staff tools");
+            self.push_log("^3staff: only SlashJK staff keys can open the staff tools");
             return;
         }
         let owns_console = !self.open;

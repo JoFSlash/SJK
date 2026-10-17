@@ -79,7 +79,7 @@ pub(crate) const PROMISES: [&str; 3] = [
     "I understand that SJK is a work in progress that may have bugs, that it comes with no \
      warranty, and that I am owed nothing.",
     "I won't DM Sol to ask how the game works: I will do my best to figure it out myself.",
-    "I won't DM Sol bugs or ideas: I will report them with Report a bug or on the SJK Discord.",
+    "I won't DM Sol bugs or ideas: I will report them with Report a bug or on the Discord.",
 ];
 
 /// What the player chose on the card.
@@ -252,7 +252,7 @@ impl Card {
             format_args!("Alpha build"),
             frame.rect(TEXT_X, top + 30.0, TEXT_WIDTH, 30.0),
             22.0 * s,
-            color::GOLD_BRIGHT,
+            color::ACCENT_BRIGHT,
             FontWeight::Semibold,
             TextAlign::Start,
         );
@@ -297,7 +297,7 @@ impl Card {
                 rect: ring,
                 radius: ring.height * 0.5,
                 width: 2.0 * s,
-                color: color::alpha(color::GOLD, 0.7),
+                color: color::alpha(color::ACCENT, 0.7),
             });
         }
         let name_x = TEXT_X + ROW_HEIGHT + 16.0;
@@ -307,7 +307,11 @@ impl Card {
             format_args!("Report a bug"),
             frame.rect(name_x, row + 2.0, 240.0, 28.0),
             22.0 * s,
-            if lit { color::GOLD_BRIGHT } else { color::TEXT },
+            if lit {
+                color::ACCENT_BRIGHT
+            } else {
+                color::TEXT
+            },
             FontWeight::Regular,
             TextAlign::Start,
         );
@@ -330,7 +334,7 @@ impl Card {
             ui,
             &frame,
             [right - DISCORD_WIDTH, row, DISCORD_WIDTH, ROW_HEIGHT],
-            "Join the SJK Discord",
+            "Join the Discord",
             false,
             true,
             false,
@@ -366,7 +370,7 @@ impl Card {
                     if ticked {
                         color::TEXT
                     } else {
-                        color::GOLD_BRIGHT
+                        color::ACCENT_BRIGHT
                     },
                     FontWeight::Regular,
                     TextAlign::Start,

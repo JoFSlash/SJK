@@ -83,7 +83,7 @@ impl std::fmt::Display for PictureError {
             ),
             Self::NotAPicture => write!(
                 f,
-                "That file is not a picture SJK can read: use a PNG, JPEG or TGA"
+                "That file is not a picture SlashJK can read: use a PNG, JPEG or TGA"
             ),
         }
     }

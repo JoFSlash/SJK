@@ -94,7 +94,7 @@ impl Entry {
     fn hint(self) -> &'static str {
         match self {
             Self::Resume => "Back to the match",
-            Self::Profile => "Character, saber and Force; your SJK profile",
+            Self::Profile => "Character, saber and Force; your SlashJK profile",
             Self::Collection => "Your medals, achievements, shaders and toys",
             Self::Players => "Everyone here; report a cheater or a troll",
             Self::Settings => "Every option and key, with search",
@@ -307,7 +307,7 @@ fn page_title(page: Page, siege: bool) -> Option<&'static str> {
         Page::VoteWarmup => "Warmup",
         Page::VoteTimeLimit => "Time limit, minutes",
         Page::VoteFragLimit => "Frag limit",
-        Page::Sjk => "SJK",
+        Page::Sjk => "SlashJK",
         Page::Leave => "Leave",
         Page::About => "Server info",
         Page::ConfirmLeave => "Leave the server?",
@@ -703,7 +703,7 @@ fn anchor(
         centre,
         EMBLEM_RING * s,
         turn,
-        color::alpha(color::HOLO, 0.55),
+        color::alpha(color::LINE, 0.55),
     );
     let half = EMBLEM_SIZE * 0.5 * s;
     emblem::draw(
@@ -726,7 +726,7 @@ fn anchor(
             width: width * s,
             start,
             sweep: end - start,
-            color: color::alpha(color::HOLO, alpha),
+            color: color::alpha(color::LINE, alpha),
             knockout: None,
         });
     };
@@ -764,7 +764,7 @@ fn anchor(
         width: 5.0 * s,
         start: mark - sweep * 0.5,
         sweep,
-        color: color::GOLD_BRIGHT,
+        color: color::ACCENT_BRIGHT,
         knockout: None,
     });
 }
@@ -799,7 +799,7 @@ fn entries(canvas: &mut MenuCanvas, frame: &Frame, view: &View<'_>, rows: &Rows<
             format_args!("{title}"),
             frame.rect(x, CENTRE[1] + offset - 15.0, 600.0, 30.0),
             24.0 * s,
-            color::alpha(color::HOLO, 0.85),
+            color::alpha(color::LINE, 0.85),
             FontWeight::Semibold,
             TextAlign::Start,
         );
@@ -810,8 +810,8 @@ fn entries(canvas: &mut MenuCanvas, frame: &Frame, view: &View<'_>, rows: &Rows<
         let hint = rows.hints.get(row).map_or("", String::as_str);
         let colour = match (chosen, enabled, tone(view.page, row, label)) {
             (true, true, _) if !lit => color::TEXT,
-            (true, true, Tone::Leaving) => color::EMBER,
-            (true, true, _) => color::GOLD_BRIGHT,
+            (true, true, Tone::Leaving) => color::DANGER,
+            (true, true, _) => color::ACCENT_BRIGHT,
             (true, false, _) => color::MUTED,
             (false, false, _) => color::alpha(color::QUIET, 0.6),
             (false, true, Tone::Back) => color::QUIET,
@@ -985,16 +985,13 @@ fn players_table(
         format_args!("Players"),
         frame.rect(TABLE_X, TABLE_TITLE_Y, 600.0, 34.0),
         30.0 * s,
-        color::alpha(color::HOLO, 0.9),
+        color::alpha(color::LINE, 0.9),
         FontWeight::Semibold,
         TextAlign::Start,
     );
     let (line, colour) = match roster.gate().reason() {
-        Some(reason) => (reason, color::EMBER),
-        None => (
-            "Choose a player to report them to the SJK team",
-            color::MUTED,
-        ),
+        Some(reason) => (reason, color::DANGER),
+        None => ("Choose a player to report them to the team", color::MUTED),
     };
     text(
         canvas,
@@ -1021,12 +1018,12 @@ fn players_table(
     head(canvas, TABLE_NAME, 400.0, "NAME", TextAlign::Start);
     head(canvas, TABLE_SCORE - 100.0, 100.0, "SCORE", TextAlign::End);
     head(canvas, TABLE_PING - 90.0, 90.0, "PING", TextAlign::End);
-    head(canvas, TABLE_HUB, 150.0, "SJK HUB", TextAlign::Start);
+    head(canvas, TABLE_HUB, 150.0, "SlashJK HUB", TextAlign::Start);
     fade_across(
         canvas,
         frame.rect(TABLE_X, TABLE_TOP - 6.0, TABLE_WIDTH, 1.0),
-        color::alpha(color::HOLO, 0.4),
-        color::alpha(color::HOLO, 0.05),
+        color::alpha(color::LINE, 0.4),
+        color::alpha(color::LINE, 0.05),
     );
     let shown = roster.shown();
     for (row, label) in rows.labels.iter().enumerate() {
@@ -1037,13 +1034,13 @@ fn players_table(
             fade_across(
                 canvas,
                 band,
-                color::alpha(color::GOLD, 0.2),
-                color::alpha(color::GOLD, 0.03),
+                color::alpha(color::ACCENT, 0.2),
+                color::alpha(color::ACCENT, 0.03),
             );
             let _ = canvas.draw_list_mut().push(DrawCommand::RoundedRect {
                 rect: frame.rect(TABLE_X, y + 4.0, 4.0, TABLE_PITCH - 11.0),
                 radius: 2.0 * s,
-                color: color::GOLD_BRIGHT,
+                color: color::ACCENT_BRIGHT,
             });
         }
         let cell = |x: f32, width: f32| frame.rect(TABLE_X + x, y + 2.0, width, TABLE_PITCH - 6.0);
@@ -1053,7 +1050,7 @@ fn players_table(
             }
             None => {
                 let colour = match (chosen, label.as_str()) {
-                    (true, _) => color::GOLD_BRIGHT,
+                    (true, _) => color::ACCENT_BRIGHT,
                     (false, "Back") => color::QUIET,
                     (false, _) => color::MUTED,
                 };
@@ -1093,7 +1090,7 @@ fn table_row(
         });
     }
     let name_colour = match (chosen, watching) {
-        (true, _) => color::GOLD_BRIGHT,
+        (true, _) => color::ACCENT_BRIGHT,
         (false, true) => color::MUTED,
         (false, false) => color::TEXT,
     };
@@ -1129,13 +1126,13 @@ fn table_row(
         (false, None) => number(canvas, TABLE_PING, 90.0, format_args!("-")),
     }
     let (hub, colour) = match (&player.hub, player.you) {
-        (Some(hub), true) if hub.verified => ("You, verified", color::GOLD_BRIGHT),
-        (Some(_), true) => ("You, SJK", color::HOLO),
+        (Some(hub), true) if hub.verified => ("You, verified", color::ACCENT_BRIGHT),
+        (Some(_), true) => ("You, SlashJK", color::LINE),
         (None, true) => ("You", color::QUIET),
-        (Some(hub), false) if hub.verified => ("Verified", color::GOLD_BRIGHT),
+        (Some(hub), false) if hub.verified => ("Verified", color::ACCENT_BRIGHT),
         (Some(hub), false) if hub.trust == Some(Trust::Trusted) => ("Trusted", color::TRUSTED),
-        (Some(hub), false) if hub.trust == Some(Trust::Banned) => ("Chat banned", color::EMBER),
-        (Some(_), false) => ("SJK", color::HOLO),
+        (Some(hub), false) if hub.trust == Some(Trust::Banned) => ("Chat banned", color::DANGER),
+        (Some(_), false) => ("SlashJK", color::LINE),
         (None, false) => ("", color::QUIET),
     };
     if !hub.is_empty() {
@@ -1168,8 +1165,8 @@ fn player_card(
         fade_across(
             canvas,
             frame.rect(CARD_X, y, CARD_WIDTH, 1.0),
-            color::alpha(color::HOLO, 0.45),
-            color::alpha(color::HOLO, 0.08),
+            color::alpha(color::LINE, 0.45),
+            color::alpha(color::LINE, 0.08),
         );
     };
     let body = |canvas: &mut MenuCanvas, y: f32, colour: Color, value: std::fmt::Arguments<'_>| {
@@ -1271,14 +1268,14 @@ fn player_card(
     rule(canvas, y);
     y += 22.0;
     let (hub, colour) = match &player.hub {
-        Some(hub) if hub.verified => ("Verified SJK player", color::GOLD_BRIGHT),
+        Some(hub) if hub.verified => ("Verified SlashJK player", color::ACCENT_BRIGHT),
         Some(hub) => match hub.trust {
-            Some(Trust::New) => ("New SJK player", color::HOLO),
-            Some(Trust::Trusted) => ("Trusted SJK player", color::TRUSTED),
-            Some(Trust::Banned) => ("SJK player, banned from the chat", color::EMBER),
-            _ => ("SJK player", color::HOLO),
+            Some(Trust::New) => ("New SlashJK player", color::LINE),
+            Some(Trust::Trusted) => ("Trusted SlashJK player", color::TRUSTED),
+            Some(Trust::Banned) => ("SlashJK player, banned from the chat", color::DANGER),
+            _ => ("SlashJK player", color::LINE),
         },
-        None => ("Not known to the SJK hub", color::MUTED),
+        None => ("Not known to the hub", color::MUTED),
     };
     text(
         canvas,
@@ -1374,12 +1371,12 @@ fn player_card(
     rule(canvas, y);
     y += 22.0;
     if open {
-        body(canvas, y, color::GOLD_BRIGHT, format_args!("{status}"));
+        body(canvas, y, color::ACCENT_BRIGHT, format_args!("{status}"));
     } else {
         let _ = canvas.draw_list_mut().push(DrawCommand::RoundedRect {
             rect: frame.rect(CARD_X, y + 4.0, 4.0, 16.0),
             radius: 2.0 * s,
-            color: color::EMBER,
+            color: color::DANGER,
         });
         text(
             canvas,
@@ -1638,8 +1635,8 @@ fn draw_card(canvas: &mut MenuCanvas, frame: &Frame, card: &Card, main: bool) {
         fade_across(
             canvas,
             frame.rect(CARD_X, y, CARD_WIDTH, 1.0),
-            color::alpha(color::HOLO, 0.45),
-            color::alpha(color::HOLO, 0.08),
+            color::alpha(color::LINE, 0.45),
+            color::alpha(color::LINE, 0.08),
         );
     };
     let body = |canvas: &mut MenuCanvas, y: f32, colour: Color, value: std::fmt::Arguments<'_>| {
@@ -1993,7 +1990,7 @@ mod tests {
                     lines: &CHAT,
                     online: 12,
                     live: true,
-                    notice: "Turn the SJK identity on to chat",
+                    notice: "Turn the online identity on to chat",
                     measure: None,
                 },
             }),

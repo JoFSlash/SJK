@@ -88,7 +88,7 @@ const COLLECTION_TABS: [Tab; 7] = [
     Tab::Holocrons,
     Tab::Cards,
 ];
-const PROFILE_LABELS: [&str; 4] = ["Character", "Saber", "Force", "SJK Profile"];
+const PROFILE_LABELS: [&str; 4] = ["Character", "Saber", "Force", "SlashJK Profile"];
 const COLLECTION_LABELS: [&str; 7] = [
     "Medals",
     "Achievements",
@@ -287,7 +287,7 @@ fn counted_tabs(
             frame.rect(x, ROW_Y, width + 20.0, 34.0),
             LABEL_SIZE * s,
             match (lit, hovered) {
-                (true, _) => color::GOLD_BRIGHT,
+                (true, _) => color::ACCENT_BRIGHT,
                 (false, true) => color::TEXT,
                 (false, false) => color::MUTED,
             },
@@ -301,7 +301,7 @@ fn counted_tabs(
                 format_args!("{value}"),
                 frame.rect(x + width + COUNT_GAP, ROW_Y - 6.0, count + 12.0, 24.0),
                 COUNT_SIZE * s,
-                if lit { color::GOLD } else { color::QUIET },
+                if lit { color::ACCENT } else { color::QUIET },
                 FontWeight::Regular,
                 TextAlign::Start,
             );
@@ -310,7 +310,7 @@ fn counted_tabs(
             let _ = canvas.draw_list_mut().push(DrawCommand::RoundedRect {
                 rect: frame.rect(x, ROW_Y + 38.0, width, 3.0),
                 radius: 1.5 * s,
-                color: color::GOLD_BRIGHT,
+                color: color::ACCENT_BRIGHT,
             });
         }
         let [x, y, width, height] = hit_area(labels, counts, index, widen);
@@ -697,7 +697,7 @@ mod tests {
             assert_eq!(tab.player_page().is_some(), player, "{tab:?}");
         }
         assert_eq!(Tab::of_player_page(2), Tab::Force);
-        assert_eq!(Tab::Profile.label(), "SJK Profile");
+        assert_eq!(Tab::Profile.label(), "SlashJK Profile");
         assert_eq!(Tab::Nameplates.label(), "Nameplates");
         assert_eq!(collection_tab_of(TOKEN + 2), Some(Tab::Shaders));
         assert_eq!(collection_tab_of(TOKEN + 5), Some(Tab::Holocrons));

@@ -264,7 +264,7 @@ fn summary(label: &str, rows: &[Row]) -> String {
     let failed = |row: &&Row| row.sjk != "ok";
     let reference_keeps = |row: &&Row| !row.reference.starts_with("rejects");
     let mut text = format!(
-        "{label}: {} model directories, {} rows, {} SJK failures, {} where the reference keeps the model ({} directories)\n",
+        "{label}: {} model directories, {} rows, {} SlashJK failures, {} where the reference keeps the model ({} directories)\n",
         models.len(),
         rows.len(),
         rows.iter().filter(failed).count(),

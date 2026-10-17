@@ -273,7 +273,7 @@ mod tests {
                     staff: false,
                     trust: None,
                     emoji: String::new(),
-                    text: "and this one goes through the SJK chat".to_owned(),
+                    text: "and this one goes through the global chat".to_owned(),
                     holocron: None,
                 };
                 gpu.chat

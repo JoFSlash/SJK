@@ -10,7 +10,7 @@ use sjk_ui::InputEvent;
 /// The `holocrons` command.
 pub(crate) const HOLOCRONS_COMMAND: &str = "holocrons";
 pub(crate) const HOLOCRONS_HELP: &str =
-    "Open your SJK holocrons: how many of each tier you hold, the recent ones and the odds";
+    "Open your SlashJK holocrons: how many of each tier you hold, the recent ones and the odds";
 
 impl ViewerConsole {
     /// `holocrons` in the classic menus: show the page, or close it.
@@ -67,7 +67,7 @@ impl ViewerConsole {
             PanelAction::Open(ids) => {
                 if !crate::player_identity::open_holocrons(ids) {
                     self.holocrons_panel.refused(
-                        "Holocrons need the SJK identity: switch it on in Settings, Network.",
+                        "Holocrons need the online identity: switch it on in Settings, Network.",
                         std::time::Instant::now(),
                     );
                 }
@@ -247,7 +247,7 @@ mod tests {
         console.toggle_holocrons_panel();
         assert!(console.holocrons_panel.is_open());
         assert!(!console.profile_panel.is_open());
-        assert!(console.sjk_page_open(), "drawn in the SJK UI's look");
+        assert!(console.sjk_page_open(), "drawn in the SlashJK look");
         assert!(console.covers_frame());
         let request = console
             .holocrons_stage()

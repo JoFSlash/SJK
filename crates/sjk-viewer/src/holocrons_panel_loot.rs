@@ -72,7 +72,7 @@ fn notes() -> [String; 5] {
             loot::one_in(chance)
         ),
         "The card is picked evenly among the cards of its rarity; a rarity with no card yet stays sealed.".to_owned(),
-        "Gifts from the SJK team are given, not found; they open the same way.".to_owned(),
+        "Gifts from the team are given, not found; they open the same way.".to_owned(),
     ]
 }
 
@@ -80,8 +80,8 @@ fn notes() -> [String; 5] {
 fn finish_colour(finish: &Finish) -> Color {
     match finish.index {
         0 => color::TEXT,
-        1 => color::HOLO,
-        _ => color::GOLD_BRIGHT,
+        1 => color::LINE,
+        _ => color::ACCENT_BRIGHT,
     }
 }
 
@@ -198,7 +198,7 @@ impl Panel {
             &mut self.ui,
             TextFamily::Body,
             format_args!(
-                "What a holocron is and what opening one gives. The SJK hub rolls each one with these odds."
+                "What a holocron is and what opening one gives. The hub rolls each one with these odds."
             ),
             frame.rect(LEFT, LINE_Y, WIDTH, 26.0),
             17.0 * s,
@@ -248,7 +248,7 @@ impl Panel {
             );
             let _ = self.ui.draw_list_mut().push(DrawCommand::SolidRect {
                 rect: frame.rect(x + 12.0, GROUP_Y + 26.0, width - 24.0, 1.0),
-                color: color::alpha(color::HOLO, 0.22),
+                color: color::alpha(color::LINE, 0.22),
             });
         }
         // The columns' names.
@@ -301,7 +301,7 @@ impl Panel {
             "Credits",
             CREDITS_X,
             CREDITS_WIDTH,
-            color::GOLD,
+            color::ACCENT,
         );
         // A row per tier.
         for (index, tier) in holocrons::TIERS.iter().enumerate() {
@@ -345,13 +345,13 @@ impl Panel {
         let y = ROWS_TOP + holocrons::COUNT as f32 * (ROW_HEIGHT + ROW_GAP) + ANY_GAP;
         let _ = self.ui.draw_list_mut().push(DrawCommand::SolidRect {
             rect: frame.rect(LEFT, y - ANY_GAP * 0.5 - 1.0, WIDTH, 1.0),
-            color: color::alpha(color::GOLD, 0.35),
+            color: color::alpha(color::ACCENT, 0.35),
         });
         self.loot_row_back(
             frame,
             y,
-            color::alpha(color::GOLD, 0.07),
-            color::GOLD_BRIGHT,
+            color::alpha(color::ACCENT, 0.07),
+            color::ACCENT_BRIGHT,
         );
         text(
             &mut self.ui,
@@ -359,7 +359,7 @@ impl Panel {
             format_args!("Any holocron found"),
             frame.rect(LEFT + 20.0, y + 12.0, TIER_WIDTH - 20.0, 28.0),
             22.0 * s,
-            color::GOLD_BRIGHT,
+            color::ACCENT_BRIGHT,
             FontWeight::Semibold,
             TextAlign::Start,
         );
@@ -415,7 +415,7 @@ impl Panel {
             range,
             [CREDITS_X, y + 5.0, CREDITS_WIDTH, 26.0],
             20.0,
-            color::GOLD_BRIGHT,
+            color::ACCENT_BRIGHT,
             TextFamily::Display,
             FontWeight::Semibold,
         );
@@ -536,7 +536,7 @@ impl Panel {
                     let _ = self.ui.draw_list_mut().push(DrawCommand::RoundedRect {
                         rect: frame.rect(NOTES_X, y + 9.0, 5.0, 5.0),
                         radius: 2.5 * s,
-                        color: color::alpha(color::HOLO, 0.7),
+                        color: color::alpha(color::LINE, 0.7),
                     });
                 }
                 text(

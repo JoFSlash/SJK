@@ -237,7 +237,7 @@ impl KeybindEditor {
             for (line, colour) in [
                 (
                     format!("Press the key for {}, as its {slot} key.", entry.label),
-                    color::GOLD_BRIGHT,
+                    color::ACCENT_BRIGHT,
                 ),
                 (
                     "Esc cancels; Backspace clears its keys.".to_owned(),
@@ -274,7 +274,7 @@ impl KeybindEditor {
         let facts: [(&str, String, Color); 3] = [
             ("Keys", shown_keys, color::TEXT),
             ("Default", default, color::TEXT),
-            ("Console", entry.command.to_owned(), color::HOLO),
+            ("Console", entry.command.to_owned(), color::LINE),
         ];
         for (name, value, colour) in facts {
             fact(&mut self.ui, frame, &mut y, name, &value, colour);
@@ -288,7 +288,7 @@ impl KeybindEditor {
                     format_args!("{part}"),
                     frame.rect(DETAIL_X, y, DETAIL_WIDTH, 28.0),
                     17.0 * s,
-                    color::EMBER,
+                    color::DANGER,
                     FontWeight::Regular,
                     TextAlign::Start,
                 );
@@ -354,21 +354,21 @@ fn cap(
     let radius = 8.0 * s;
     let (fill, edge, ink) = match slot {
         Slot::Waiting => (
-            color::GOLD,
-            color::GOLD_BRIGHT,
+            color::ACCENT,
+            color::ACCENT_BRIGHT,
             Color::new(0.078, 0.063, 0.02, 1.0),
         ),
         Slot::Key(_) => (
             color::alpha(color::SPACE, 0.6),
             color::alpha(
-                if focused { color::TEXT } else { color::HOLO },
+                if focused { color::TEXT } else { color::LINE },
                 if focused { 0.7 } else { 0.45 },
             ),
             color::TEXT,
         ),
         Slot::Empty => (
             color::alpha(color::SPACE, 0.3),
-            color::alpha(color::HOLO, 0.18),
+            color::alpha(color::LINE, 0.18),
             color::QUIET,
         ),
     };

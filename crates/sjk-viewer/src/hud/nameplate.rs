@@ -233,13 +233,13 @@ pub(super) fn register(cvars: &mut CvarRegistry) -> Result<(), sjk_shell::CvarEr
         "cg_nameplateShare",
         false,
         CvarFlags::ARCHIVE,
-        "Share your health, shield and Force with the other SJK players of your server; on whenever your nameplates show bars",
+        "Share your health, shield and Force with the other SlashJK players of your server; on whenever your nameplates show bars",
     ))?;
     cvars.register(CvarDefinition::new(
         "cg_nameplateEstimate",
         false,
         CvarFlags::ARCHIVE,
-        "Estimated bars on players without SJK, while the hub has yours (SJK players who do not share stay grey); turning it on shares your own, and the others are told",
+        "Estimated bars on players without SlashJK, while the hub has yours (SlashJK players who do not share stay grey); turning it on shares your own, and the others are told",
     ))?;
     cvars.register(CvarDefinition::new(
         "cg_nameplateWeapon",

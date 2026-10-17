@@ -432,7 +432,7 @@ mod tests {
     #[test]
     fn only_the_players_own_key_is_used() {
         assert_eq!(key("  mykey "), Some("mykey"));
-        assert_eq!(key("  "), None, "SJK has no key of its own");
+        assert_eq!(key("  "), None, "SlashJK has no key of its own");
         assert!(looks_like_key(" 0123456789abcdefABCDEF0123456789 "));
         assert!(!looks_like_key("short"));
         assert!(!looks_like_key("https://developers.giphy.com/dashboard/"));

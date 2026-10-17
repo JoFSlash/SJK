@@ -53,9 +53,9 @@ const SCRIM: f32 = 0.8;
 
 /// The SJK UI's colours for the ceremony.
 const PALETTE: Palette = Palette {
-    gold: color::GOLD,
-    bright: color::GOLD_BRIGHT,
-    line: color::HOLO,
+    gold: color::ACCENT,
+    bright: color::ACCENT_BRIGHT,
+    line: color::LINE,
 };
 
 impl MedalPopup {
@@ -167,7 +167,7 @@ fn words(ui: &mut MenuCanvas, frame: &Frame, body: &UiFont, view: &View<'_>, mom
                 format_args!("New medal \u{b7} {at} of {of}"),
                 KICKER_Y + rise,
                 KICKER_SIZE,
-                color::GOLD_BRIGHT,
+                color::ACCENT_BRIGHT,
                 FontWeight::Semibold,
             ),
             None => line(
@@ -177,7 +177,7 @@ fn words(ui: &mut MenuCanvas, frame: &Frame, body: &UiFont, view: &View<'_>, mom
                 format_args!("New medal"),
                 KICKER_Y + rise,
                 KICKER_SIZE,
-                color::GOLD_BRIGHT,
+                color::ACCENT_BRIGHT,
                 FontWeight::Semibold,
             ),
         }
@@ -185,7 +185,7 @@ fn words(ui: &mut MenuCanvas, frame: &Frame, body: &UiFont, view: &View<'_>, mom
             ui,
             frame,
             TextFamily::Body,
-            format_args!("From the SJK team"),
+            format_args!("From the team"),
             FROM_Y + rise,
             FROM_SIZE,
             color::MUTED,
@@ -205,7 +205,7 @@ fn words(ui: &mut MenuCanvas, frame: &Frame, body: &UiFont, view: &View<'_>, mom
                 format_args!("{name} x{count}"),
                 y,
                 NAME_SIZE,
-                color::GOLD_BRIGHT,
+                color::ACCENT_BRIGHT,
                 FontWeight::Semibold,
             );
         } else {
@@ -216,7 +216,7 @@ fn words(ui: &mut MenuCanvas, frame: &Frame, body: &UiFont, view: &View<'_>, mom
                 format_args!("{name}"),
                 y,
                 NAME_SIZE,
-                color::GOLD_BRIGHT,
+                color::ACCENT_BRIGHT,
                 FontWeight::Semibold,
             );
         }
@@ -445,7 +445,7 @@ mod tests {
             [button.x, button.y, button.width, button.height],
             [960.0 - 100.0, view_top, 200.0, 46.0]
         );
-        // The pill is gold: the screen's one main action.
+        // The pill is the accent: the screen's one main action.
         assert!(
             popup
                 .ui
@@ -455,7 +455,7 @@ mod tests {
                 .any(|command| matches!(
                     command,
                     DrawCommand::RoundedRect { rect, color, .. }
-                        if *rect == button && color.r > 0.9 && color.b < 0.6
+                        if *rect == button && color.b > 0.9 && color.r < 0.8
                 ))
         );
         let click = |popup: &mut MedalPopup, at: Vec2, now: Instant| {

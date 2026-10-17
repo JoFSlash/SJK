@@ -1,3 +1,18 @@
+## SlashJK redesign, first stage
+
+17/10/2026, `claude/stoic-ptolemy-5yzatq` (the fork owner's request): the client's
+menus are being rebranded as SlashJK with a modern look of their own
+([sjk-ui.md](sjk-ui.md)). Done: the palette (graphite, grey line-work, one violet
+accent; tokens renamed `ACCENT`, `LINE`, `DANGER`), Inter for both UI roles (Inter
+Bold added), the SlashJK wordmark, and the main page redrawn (no emblem or ring: a
+menu column, server cards); player-facing text says SlashJK, the hub, the online
+identity and the global chat instead of SJK (cvars, commands, paths, the hub's wire
+and the credits unchanged). Checked by the unit tests and CPU snapshots
+(`menu_snapshot::sjk_home_snapshot`, which now runs without game data over a
+made-up backdrop); not tried in the game. Still to redraw: Settings, Servers,
+loading, in-game menu, scoreboard, Profile, Collection, Credits and the pop-ups. The
+update check still points at SJK's releases.
+
 ## SJK chat messages up to 300 characters
 
 16/10/2026, `personal/chat-300` (Sol's request), with the hub's `chat-300` (deployed

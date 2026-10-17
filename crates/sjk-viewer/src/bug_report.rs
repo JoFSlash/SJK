@@ -15,7 +15,7 @@ use sjk_client::ServerEventKind;
 use std::time::Instant;
 
 /// Why a report cannot go while the identity service has not started.
-pub(crate) const IDENTITY_OFF: &str = "the SJK identity is off (cl_identity 1 turns it on)";
+pub(crate) const IDENTITY_OFF: &str = "the online identity is off (cl_identity 1 turns it on)";
 
 impl crate::GpuState {
     /// Report a bug: close the game menu and open the report dialog.

@@ -245,16 +245,16 @@ pub(crate) fn draw_rows(
             let _ = ui.draw_list_mut().push(DrawCommand::RoundedRect {
                 rect: chip,
                 radius: look.chip_radius * s,
-                color: color::alpha(color::HOLO, if hovered { 0.24 } else { 0.12 }),
+                color: color::alpha(color::LINE, if hovered { 0.24 } else { 0.12 }),
             });
             let _ = ui.draw_list_mut().push(DrawCommand::Border {
                 rect: chip,
                 radius: look.chip_radius * s,
                 width: s.max(1.0),
                 color: if hovered {
-                    color::GOLD_BRIGHT
+                    color::ACCENT_BRIGHT
                 } else {
-                    color::alpha(color::HOLO, 0.4)
+                    color::alpha(color::LINE, 0.4)
                 },
             });
             text(

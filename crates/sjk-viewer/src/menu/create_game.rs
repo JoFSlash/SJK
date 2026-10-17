@@ -50,7 +50,7 @@ pub(crate) const MAX_BOTS: u32 = 20;
 /// Longest server name.
 const HOSTNAME_BYTES: usize = 48;
 /// Name a new server gets.
-const DEFAULT_HOSTNAME: &str = "SJK local game";
+const DEFAULT_HOSTNAME: &str = "SlashJK local game";
 
 /// The archived cvars that remember the last choices: (name, default, help).
 pub(crate) const INTEGER_CVARS: [(&str, i64, &str); 6] = [

@@ -252,9 +252,9 @@ impl Unlock {
     fn hue(self) -> Color {
         match self {
             Self::Achievement(kind) => tint(kind.category),
-            Self::Medal { .. } => color::GOLD,
+            Self::Medal { .. } => color::ACCENT,
             Self::Holocron { tier, .. } => tier.colour,
-            Self::Update { .. } => color::HOLO,
+            Self::Update { .. } => color::LINE,
         }
     }
 
@@ -268,8 +268,8 @@ impl Unlock {
                 tier.colour.b * 0.5 + 0.5,
                 1.0,
             ),
-            Self::Update { .. } => color::HOLO,
-            _ => color::GOLD_BRIGHT,
+            Self::Update { .. } => color::LINE,
+            _ => color::ACCENT_BRIGHT,
         }
     }
 
@@ -277,8 +277,8 @@ impl Unlock {
     fn edge(self) -> Color {
         match self {
             Self::Holocron { tier, .. } => tier.colour,
-            Self::Update { .. } => color::HOLO,
-            _ => color::GOLD,
+            Self::Update { .. } => color::LINE,
+            _ => color::ACCENT,
         }
     }
 
@@ -305,7 +305,7 @@ impl fmt::Display for Name {
             }
             Unlock::Medal { medal, .. } => formatter.write_str(medal.name()),
             Unlock::Holocron { tier, .. } => formatter.write_str(tier.name),
-            Unlock::Update { version, .. } => write!(formatter, "SJK {}", version.as_str()),
+            Unlock::Update { version, .. } => write!(formatter, "SlashJK {}", version.as_str()),
         }
     }
 }
@@ -319,7 +319,7 @@ impl fmt::Display for Description {
         match self.0 {
             Unlock::Achievement(kind) => formatter.write_str(kind.description),
             Unlock::Medal { medal, .. } => formatter.write_str(medal.description()),
-            Unlock::Holocron { gift: true, .. } => formatter.write_str("A gift from the SJK team"),
+            Unlock::Holocron { gift: true, .. } => formatter.write_str("A gift from the team"),
             Unlock::Holocron { tier, .. } => write!(
                 formatter,
                 "Found while playing: {} of drops are {}",
@@ -327,7 +327,7 @@ impl fmt::Display for Description {
                 tier.label
             ),
             Unlock::Update { manual: false, .. } => {
-                formatter.write_str("Install it there; it starts when SJK restarts")
+                formatter.write_str("Install it there; it starts when SlashJK restarts")
             }
             Unlock::Update { manual: true, .. } => {
                 formatter.write_str("This folder cannot update itself: see its page")
@@ -763,7 +763,7 @@ fn draw(canvas: &mut MenuCanvas, unlock: Unlock, t: f32, viewport: [f32; 2]) {
         format_args!("{}", unlock.kicker()),
         column(12.0, 24.0),
         KICKER_SIZE * k,
-        color::GOLD,
+        color::ACCENT,
         KICKER_SPACING * k,
     );
     text(
@@ -868,7 +868,7 @@ fn emblem(canvas: &mut MenuCanvas, unlock: Unlock, centre: [f32; 2], radius: f32
         width: 3.0 * k,
         start: 0.0,
         sweep: TAU,
-        color: color::alpha(color::HOLO, 0.16),
+        color: color::alpha(color::LINE, 0.16),
         knockout: None,
     });
     if sweep > 0.0 {
@@ -948,7 +948,7 @@ impl crate::GpuState {
         }
         self.sync_cursor_policy();
         Ok(vec![format!(
-            "The update card for SJK {} is queued; nothing is checked or installed",
+            "The update card for SlashJK {} is queued; nothing is checked or installed",
             version.as_str()
         )])
     }
@@ -1201,7 +1201,7 @@ mod tests {
         toast.offer_update(now, 2, false, found);
         assert_eq!(toast.pending(), 1);
         assert!(toast.update(now, true, true));
-        assert_eq!(shown(&toast).as_deref(), Some("SJK 2026.1010.2"));
+        assert_eq!(shown(&toast).as_deref(), Some("SlashJK 2026.1010.2"));
         assert!(ui_cues::take_posted().is_empty(), "no chime for an update");
         // Checked again: the same release gives no second card; a newer one does.
         toast.offer_update(now, 3, false, found);
@@ -1245,7 +1245,7 @@ mod tests {
         };
         assert_eq!(update.kicker(), "UPDATE AVAILABLE");
         assert_eq!(update.tag(), UPDATE_HINT);
-        assert_eq!(update.name().to_string(), "SJK 2026.1010.2");
+        assert_eq!(update.name().to_string(), "SlashJK 2026.1010.2");
         assert!(!update.chimes() && kind("streak_5").chimes());
         let bug_hunter = medal(Medal::BugHunter, 3);
         assert_eq!(bug_hunter.kicker(), "NEW MEDAL");
@@ -1266,7 +1266,7 @@ mod tests {
             id: 1,
             gift: true,
         };
-        assert_eq!(gift.description().to_string(), "A gift from the SJK team");
+        assert_eq!(gift.description().to_string(), "A gift from the team");
         assert_eq!(kind("streak_5").tag(), "Combat");
     }
 

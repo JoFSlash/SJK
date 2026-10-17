@@ -472,7 +472,7 @@ impl Group {
                 ("com_maxfps", "Frame rate"),
                 ("cg_fov", "View"),
             ],
-            Self::Network => &[("cl_autoUpdate", "SJK online"), ("rate", "Connection")],
+            Self::Network => &[("cl_autoUpdate", "SlashJK online"), ("rate", "Connection")],
             Self::Advanced(Advanced::Sound) => &[
                 ("s_volume", "Game"),
                 (crate::emotes::VOLUME_CVAR, "Emotes"),
@@ -497,7 +497,7 @@ impl Group {
                 (crate::scoreboard::style::CVAR, "Scoreboard"),
             ],
             Self::Advanced(Advanced::Chat) => {
-                &[("cg_drawChat", "Chat box"), ("cl_sjkChat", "SJK chat")]
+                &[("cg_drawChat", "Chat box"), ("cl_sjkChat", "Global chat")]
             }
             Self::Advanced(Advanced::Mods) => &[
                 ("assetbrowser", "Packs"),
@@ -519,7 +519,7 @@ impl Group {
                 (crate::menu::style::CVAR, "Menus"),
                 (super::catalog::IMPORT_ROW, "From another client"),
                 ("jof.downloads", "JoF content"),
-                ("cl_autoUpdate", "SJK online"),
+                ("cl_autoUpdate", "SlashJK online"),
             ],
             // Its headings are its tabs' names ([`graphics_tabs`]).
             Self::Scoreboard | Self::Graphics | Self::Simple(_) => &[],
@@ -533,7 +533,7 @@ impl Group {
                 (crate::menu_hud::STYLE_CVAR, "HUD"),
                 ("cg_nameplate", "Nameplates"),
                 ("cg_auraShell", "Force shells"),
-                ("cl_autoUpdate", "SJK"),
+                ("cl_autoUpdate", "SlashJK"),
             ],
         }
     }

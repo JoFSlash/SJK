@@ -110,7 +110,7 @@ impl Panel {
             frame,
             [LEFT_X + 300.0, LEAD_Y + 16.0, 300.0, 6.0],
             fraction,
-            color::GOLD,
+            color::ACCENT,
         );
         for (row, (category, members)) in groups().into_iter().enumerate() {
             let top = WALL_TOP + row as f32 * GROUP_STEP;
@@ -159,7 +159,7 @@ impl Panel {
         centred_lines(
             &mut self.ui,
             frame,
-            "Counted on this PC in your matches on servers, and kept on the SJK hub with your identity on.",
+            "Counted on this PC in your matches on servers, and kept on the hub with your identity on.",
             [SHOWCASE_X, 950.0, SHOWCASE_WIDTH],
             96,
             1,
@@ -182,7 +182,14 @@ impl Panel {
         let done = standing.unlocked.is_some();
         let centre = [x + CELL * 0.5 - 4.0, top + RADIUS + 4.0];
         if done {
-            glow(&mut self.ui, frame, centre, RADIUS * 1.5, color::GOLD, 0.16);
+            glow(
+                &mut self.ui,
+                frame,
+                centre,
+                RADIUS * 1.5,
+                color::ACCENT,
+                0.16,
+            );
         }
         medallion::draw(
             &mut self.ui,
@@ -201,7 +208,7 @@ impl Panel {
                 width: 2.0 * s,
                 start: 0.0,
                 sweep: std::f32::consts::TAU,
-                color: color::GOLD_BRIGHT,
+                color: color::ACCENT_BRIGHT,
                 knockout: None,
             });
         }
@@ -214,7 +221,7 @@ impl Panel {
                 frame.rect(centre[0] - CELL * 0.5, y, CELL, 20.0),
                 15.0 * s,
                 match (chosen, done) {
-                    (true, _) => color::GOLD_BRIGHT,
+                    (true, _) => color::ACCENT_BRIGHT,
                     (false, true) => color::TEXT,
                     (false, false) => color::MUTED,
                 },
@@ -242,7 +249,7 @@ impl Panel {
             frame,
             centre,
             BIG_RADIUS * 2.0,
-            if done { color::GOLD } else { hue },
+            if done { color::ACCENT } else { hue },
             if done { 0.32 } else { 0.16 },
         );
         medallion::draw(
@@ -263,7 +270,7 @@ impl Panel {
             frame.rect(SHOWCASE_X, y, SHOWCASE_WIDTH, 56.0),
             50.0 * s,
             if done {
-                color::GOLD_BRIGHT
+                color::ACCENT_BRIGHT
             } else {
                 color::TEXT
             },
@@ -299,7 +306,7 @@ impl Panel {
             frame,
             [middle - width * 0.5, y, width, 6.0],
             standing.fraction(),
-            if done { color::GOLD } else { hue },
+            if done { color::ACCENT } else { hue },
         );
         let progress = format!(
             "{} / {}",
@@ -331,7 +338,7 @@ impl Panel {
             frame.rect(middle, y + 14.0, width * 0.5, 22.0),
             16.0 * s,
             if done {
-                color::GOLD_BRIGHT
+                color::ACCENT_BRIGHT
             } else {
                 color::MUTED
             },
@@ -414,7 +421,7 @@ fn bar(
     let _ = canvas.draw_list_mut().push(DrawCommand::RoundedRect {
         rect: frame.rect(x, y, width, height),
         radius: height * 0.5 * s,
-        color: color::alpha(color::HOLO, 0.14),
+        color: color::alpha(color::LINE, 0.14),
     });
     let filled = width * fraction.clamp(0.0, 1.0);
     if filled > 0.5 {

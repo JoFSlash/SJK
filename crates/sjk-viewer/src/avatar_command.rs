@@ -9,8 +9,7 @@ use std::path::PathBuf;
 /// Console command name.
 pub(crate) const COMMAND: &str = "sjkavatar";
 /// Help text for completion and `cmdlist`.
-pub(crate) const HELP: &str =
-    "Your SJK picture: sjkavatar <file> shows a picture to send, sjkavatar clear takes yours down";
+pub(crate) const HELP: &str = "Your SlashJK picture: sjkavatar <file> shows a picture to send, sjkavatar clear takes yours down";
 
 /// What the player asked for.
 #[derive(Debug, Eq, PartialEq)]
@@ -71,7 +70,7 @@ impl crate::GpuState {
             }
             Action::Clear => {
                 console.profile_remove_picture();
-                vec!["sjkavatar: asking the SJK hub to take your picture down".to_owned()]
+                vec!["sjkavatar: asking the hub to take your picture down".to_owned()]
             }
         };
         self.sync_cursor_policy();

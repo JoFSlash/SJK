@@ -11,7 +11,7 @@ use sjk_ui::InputEvent;
 
 /// The `profile` command.
 pub(crate) const PROFILE_COMMAND: &str = "profile";
-pub(crate) const PROFILE_HELP: &str = "Open your SJK profile: picture, bio and record";
+pub(crate) const PROFILE_HELP: &str = "Open your SlashJK profile: picture, bio and record";
 
 impl ViewerConsole {
     /// `profile` in the classic menus: show the page in front of the console, opening
@@ -171,20 +171,23 @@ impl ViewerConsole {
             }
             PanelAction::SetEmoji { emoji } => {
                 if !crate::player_identity::set_emoji(emoji) {
-                    self.profile_panel
-                        .emoji_failed("Not sent: turn the SJK identity on first (cl_identity 1)");
+                    self.profile_panel.emoji_failed(
+                        "Not sent: turn the online identity on first (cl_identity 1)",
+                    );
                 }
             }
             PanelAction::SetAvatar { png } => {
                 if !crate::player_identity::set_avatar(png) {
-                    self.profile_panel
-                        .picture_failed("Not sent: turn the SJK identity on first (cl_identity 1)");
+                    self.profile_panel.picture_failed(
+                        "Not sent: turn the online identity on first (cl_identity 1)",
+                    );
                 }
             }
             PanelAction::RemoveAvatar => {
                 if !crate::player_identity::remove_avatar() {
-                    self.profile_panel
-                        .picture_failed("Not sent: turn the SJK identity on first (cl_identity 1)");
+                    self.profile_panel.picture_failed(
+                        "Not sent: turn the online identity on first (cl_identity 1)",
+                    );
                 }
             }
         }

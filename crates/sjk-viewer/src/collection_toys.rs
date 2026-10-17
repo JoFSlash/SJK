@@ -36,7 +36,7 @@ const TOYS: [Toy; TOY_COUNT] = [
         icon: "illuminate",
         name: "Illuminate",
         title: "Illuminate holocron",
-        what: "A holocron floats by your left shoulder and lights the way in dark maps. Other SJK players on your server see it lit.",
+        what: "A holocron floats by your left shoulder and lights the way in dark maps. Other SlashJK players on your server see it lit.",
         how: "Bind a key to toy_illuminate, or use the quick wheel's Toys page.",
         switch: "Holocron lit",
         token: TOY_TOKEN,
@@ -45,7 +45,7 @@ const TOYS: [Toy; TOY_COUNT] = [
         icon: "cardboard_box",
         name: "Cardboard box",
         title: "Cardboard box",
-        what: "Hide in a carton: you crouch in it with its music. Other SJK players see the box; one who walks up and presses Use lifts it. Die in it and everyone hears.",
+        what: "Hide in a carton: you crouch in it with its music. Other SlashJK players see the box; one who walks up and presses Use lifts it. Die in it and everyone hears.",
         how: "Bind a key to toy_box, or use the quick wheel's Toys page.",
         switch: "In the box",
         token: BOX_TOKEN,
@@ -71,7 +71,7 @@ pub(super) fn room_for_more(
     while x < LEFT_X + 820.0 {
         let _ = canvas.draw_list_mut().push(DrawCommand::SolidRect {
             rect: frame.rect(x, y, 8.0, 1.0),
-            color: color::alpha(color::HOLO, 0.22),
+            color: color::alpha(color::LINE, 0.22),
         });
         x += 16.0;
     }
@@ -103,7 +103,7 @@ impl Panel {
             &mut self.ui,
             frame,
             716.0,
-            "More toys will stand here as SJK adds them.",
+            "More toys will stand here as SlashJK adds them.",
         );
         let on = if chosen == 1 {
             inputs.cardboard_box
@@ -124,7 +124,7 @@ impl Panel {
             frame,
             [x + size * 0.5, y + size * 0.55],
             size * 0.62,
-            color::GOLD,
+            color::ACCENT,
             0.42 * strength,
         );
         let rect = frame.rect(x, y, size, size);
@@ -133,9 +133,9 @@ impl Panel {
             radius: 14.0 * s,
             width: 2.0 * s,
             color: if chosen {
-                color::GOLD_BRIGHT
+                color::ACCENT_BRIGHT
             } else {
-                color::alpha(color::GOLD, 0.5)
+                color::alpha(color::ACCENT, 0.5)
             },
         });
         let art = size * 0.72;
@@ -146,7 +146,7 @@ impl Panel {
         });
         let _ = self.ui.draw_list_mut().push(DrawCommand::SolidRect {
             rect: frame.rect(x, y + size + 16.0, size, 2.0),
-            color: color::alpha(color::GOLD, strength),
+            color: color::alpha(color::ACCENT, strength),
         });
         text(
             &mut self.ui,
@@ -155,9 +155,9 @@ impl Panel {
             frame.rect(x, y + size + 30.0, size, 30.0),
             24.0 * s,
             if chosen {
-                color::GOLD_BRIGHT
+                color::ACCENT_BRIGHT
             } else {
-                color::GOLD
+                color::ACCENT
             },
             FontWeight::Semibold,
             TextAlign::Center,
@@ -168,7 +168,7 @@ impl Panel {
             format_args!("Everyone's"),
             frame.rect(x, y + size + 62.0, size, 22.0),
             15.0 * s,
-            color::GOLD,
+            color::ACCENT,
             FontWeight::Regular,
             TextAlign::Center,
         );
@@ -186,7 +186,7 @@ impl Panel {
                 frame,
                 [x + 110.0, 400.0],
                 150.0,
-                color::GOLD,
+                color::ACCENT,
                 0.3,
             );
             let _ = self.ui.draw_list_mut().push(DrawCommand::TexturedQuad {
@@ -202,7 +202,7 @@ impl Panel {
             format_args!("Toy"),
             frame.rect(x, y, width, 22.0),
             16.0 * s,
-            color::HOLO,
+            color::LINE,
             FontWeight::Semibold,
             TextAlign::Start,
         );
@@ -213,7 +213,7 @@ impl Panel {
             format_args!("{}", toy.title),
             frame.rect(x, y, width, 62.0),
             52.0 * s,
-            color::GOLD_BRIGHT,
+            color::ACCENT_BRIGHT,
             FontWeight::Semibold,
             TextAlign::Start,
         );

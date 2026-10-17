@@ -122,7 +122,7 @@ impl Panel {
             format_args!("{}", self.summary),
             frame.rect(RIGHT - 600.0, 62.0, 600.0, 30.0),
             24.0 * s,
-            color::GOLD_BRIGHT,
+            color::ACCENT_BRIGHT,
             FontWeight::Regular,
             TextAlign::End,
         );
@@ -196,7 +196,7 @@ impl Panel {
             let _ = self.ui.draw_list_mut().push(DrawCommand::RoundedRect {
                 rect: frame.rect(LIST_X, top, LIST_WIDTH, ROW_BAND),
                 radius: 10.0 * s,
-                color: color::alpha(color::HOLO, 0.045),
+                color: color::alpha(color::LINE, 0.045),
             });
         }
         self.ui
@@ -214,7 +214,7 @@ impl Panel {
         let title = entry.title.as_str();
         let cut = measure.fitting(title, room * s, ROW_TITLE_SIZE * s, TextFace::Regular);
         let colour = match (chosen, hovered, ticked) {
-            (true, _, _) => color::GOLD_BRIGHT,
+            (true, _, _) => color::ACCENT_BRIGHT,
             (false, true, _) => color::TEXT,
             (false, false, true) => color::QUIET,
             (false, false, false) => color::alpha(color::TEXT, 0.9),
@@ -256,7 +256,7 @@ impl Panel {
             format_args!("{}", entry.area),
             frame.rect(LIST_X + ROW_TEXT, top + 31.0, room, 20.0),
             ROW_AREA_SIZE * s,
-            if chosen { color::GOLD } else { color::QUIET },
+            if chosen { color::ACCENT } else { color::QUIET },
             FontWeight::Regular,
             TextAlign::Start,
         );
@@ -276,7 +276,7 @@ impl Panel {
             format_args!("{}", self.entries[index].area),
             frame.rect(DETAIL_X, y, DETAIL_WIDTH, 24.0),
             19.0 * s,
-            color::GOLD,
+            color::ACCENT,
             FontWeight::Regular,
             TextAlign::Start,
         );
@@ -330,7 +330,7 @@ impl Panel {
             frame.rect(end + 14.0, middle - 15.0, 140.0, 30.0),
             22.0 * s,
             if ticked {
-                color::GOLD_BRIGHT
+                color::ACCENT_BRIGHT
             } else {
                 color::TEXT
             },
@@ -380,12 +380,12 @@ impl Panel {
                 let _ = self.ui.draw_list_mut().push(DrawCommand::RoundedRect {
                     rect: band,
                     radius: 12.0 * s,
-                    color: color::alpha(color::GOLD, 0.08),
+                    color: color::alpha(color::ACCENT, 0.08),
                 });
                 let _ = self.ui.draw_list_mut().push(DrawCommand::RoundedRect {
                     rect: frame.rect(DETAIL_X - 16.0, y - 8.0, 4.0, height - 24.0),
                     radius: 2.0 * s,
-                    color: color::GOLD_BRIGHT,
+                    color: color::ACCENT_BRIGHT,
                 });
                 kit::heading_in(
                     &mut self.ui,
@@ -394,7 +394,7 @@ impl Panel {
                     y,
                     DETAIL_WIDTH,
                     heading,
-                    color::GOLD_BRIGHT,
+                    color::ACCENT_BRIGHT,
                 );
             } else {
                 kit::heading(&mut self.ui, frame, DETAIL_X, y, DETAIL_WIDTH, heading);
@@ -429,7 +429,7 @@ impl Panel {
                     match section {
                         Section::Changes => color::alpha(color::TEXT, 0.88),
                         Section::Tests => color::TEXT,
-                        Section::Notes => color::GOLD_BRIGHT,
+                        Section::Notes => color::ACCENT_BRIGHT,
                     },
                     FontWeight::Regular,
                     TextAlign::Start,
@@ -441,7 +441,7 @@ impl Panel {
                         format_args!("{}", item + 1),
                         frame.rect(DETAIL_X, y, INDENT - 6.0, line),
                         19.0 * s,
-                        color::GOLD,
+                        color::ACCENT,
                         FontWeight::Semibold,
                         TextAlign::Start,
                     );
@@ -543,7 +543,7 @@ impl Panel {
             Rect::new(x, y, room, 24.0 * s),
             15.0 * s,
             if self.status_error {
-                color::EMBER
+                color::DANGER
             } else {
                 color::MUTED
             },

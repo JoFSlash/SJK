@@ -128,7 +128,7 @@ mod tests {
         assert!(console.is_open());
         assert!(console.model_viewer_wish().is_some());
         assert!(console.model_viewer_needs_models());
-        assert!(console.sjk_page_open(), "drawn in the SJK UI's look");
+        assert!(console.sjk_page_open(), "drawn in the SlashJK look");
         assert!(console.covers_frame());
         console.set_model_viewer_models(vec![Entry {
             name: "kyle/default".into(),

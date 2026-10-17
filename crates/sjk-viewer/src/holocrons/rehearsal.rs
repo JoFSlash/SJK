@@ -33,7 +33,7 @@ pub(crate) const FIRST_ID: u64 = 4_000_000_000;
 pub(crate) fn listing() -> Vec<String> {
     let mut lines = vec![
         format!("usage: {COMMAND} <tier|all> [x<count>]"),
-        "Shows holocrons as if the hub had just dropped them: the pop-up on the main menu or the game menu (a centre print during a match), with its ceremony and sound. Nothing is sent to the SJK hub and holocrons_seen.txt is not changed.".to_owned(),
+        "Shows holocrons as if the hub had just dropped them: the pop-up on the main menu or the game menu (a centre print during a match), with its ceremony and sound. Nothing is sent to the hub and holocrons_seen.txt is not changed.".to_owned(),
     ];
     for tier in &TIERS {
         lines.push(format!(
@@ -102,7 +102,7 @@ pub(crate) fn queued(entries: &[Entry]) -> Vec<String> {
     let names: Vec<&str> = entries.iter().map(|entry| entry.tier.name).collect();
     vec![
         format!("Rehearsing: {}.", names.join(", ")),
-        "It shows on the main menu or when the game menu opens (a centre print says so during a match). Nothing is sent to the SJK hub.".to_owned(),
+        "It shows on the main menu or when the game menu opens (a centre print says so during a match). Nothing is sent to the hub.".to_owned(),
     ]
 }
 

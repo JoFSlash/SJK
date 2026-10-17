@@ -236,7 +236,7 @@ fn words(
         text(
             ui,
             place,
-            format_args!("From the SJK team"),
+            format_args!("From the team"),
             [x, y + rise, width, height],
             SMALL_SIZE,
             with_alpha(VALUE, 0.85),

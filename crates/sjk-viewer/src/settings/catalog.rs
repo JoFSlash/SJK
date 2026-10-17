@@ -262,7 +262,7 @@ pub(super) const HUD_OPTIONS: &[Setting] = &[
         kind: ValueKind::Choice(&crate::scoreboard::style::ScoreboardStyle::NAMES),
     },
     Setting {
-        label: "Compact SJK scoreboard",
+        label: "Compact scoreboard",
         cvar: crate::scoreboard::style::COMPACT_CVAR,
         kind: ValueKind::Bool,
     },
@@ -790,7 +790,7 @@ pub(super) const NETWORK: &[Setting] = &[
         kind: ValueKind::Bool,
     },
     Setting {
-        label: "SJK identity",
+        label: "Online identity",
         cvar: "cl_identity",
         kind: ValueKind::Bool,
     },
@@ -800,22 +800,22 @@ pub(super) const NETWORK: &[Setting] = &[
         kind: ValueKind::Bool,
     },
     Setting {
-        label: "SJK hub",
+        label: "Hub",
         cvar: "cl_hubUrl",
         kind: ValueKind::Text,
     },
     Setting {
-        label: "SJK chat",
+        label: "Global chat",
         cvar: "cl_sjkChat",
         kind: ValueKind::Bool,
     },
     Setting {
-        label: "SJK chat sound",
+        label: "Global chat sound",
         cvar: crate::sjk_chat_frame::SOUND_CVAR,
         kind: ValueKind::Bool,
     },
     Setting {
-        label: "SJK chat GIFs",
+        label: "Global chat GIFs",
         cvar: crate::chat_gifs::CVAR,
         kind: ValueKind::Bool,
     },
@@ -835,7 +835,7 @@ pub(super) const NETWORK: &[Setting] = &[
         kind: ValueKind::Bool,
     },
     Setting {
-        label: "SJK identity key",
+        label: "Online identity key",
         cvar: IDENTITY_ROW,
         kind: ValueKind::IdentityPage,
     },

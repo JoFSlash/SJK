@@ -65,9 +65,9 @@ impl Panel {
             (None, None) => Vec::new(),
         };
         let summary_colour = if info.alert.is_some() {
-            color::EMBER
+            color::DANGER
         } else {
-            color::GOLD
+            color::ACCENT
         };
         let explanation = wrapped(EXPLANATION, EXPLANATION_LINES);
         let origin_line = choice
@@ -124,7 +124,7 @@ impl Panel {
             format_args!("Gameplay FPS"),
             frame.rect(TEXT_X, CARD_TOP + 30.0, TEXT_WIDTH, 30.0),
             22.0 * s,
-            color::GOLD_BRIGHT,
+            color::ACCENT_BRIGHT,
             FontWeight::Semibold,
             TextAlign::Start,
         );
@@ -247,7 +247,7 @@ impl Panel {
                 format_args!("{}", choice.caption(index)),
                 frame.rect(x, top + TILE_HEIGHT + 4.0, width, 22.0),
                 15.0 * frame.s,
-                if chosen { color::GOLD } else { color::MUTED },
+                if chosen { color::ACCENT } else { color::MUTED },
                 FontWeight::Regular,
                 TextAlign::Center,
             );

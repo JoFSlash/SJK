@@ -150,7 +150,7 @@ impl Card {
     fn words(&self, facts: Facts) -> (&'static str, Vec<String>, &'static str) {
         let headline = match (self.mode, facts.vanilla) {
             (_, true) => "Vanilla graphics are on",
-            (Some(Mode::Offered), false) => "This map is heavy on SJK's lighting",
+            (Some(Mode::Offered), false) => "This map is heavy on SlashJK's lighting",
             _ => "Low FPS?",
         };
         let mut paragraphs = Vec::new();
@@ -214,7 +214,7 @@ impl Card {
             format_args!("FPS"),
             frame.rect(TEXT_X, CARD_TOP + 30.0, TEXT_WIDTH, 30.0),
             22.0 * s,
-            color::GOLD_BRIGHT,
+            color::ACCENT_BRIGHT,
             FontWeight::Semibold,
             TextAlign::Start,
         );
@@ -436,7 +436,7 @@ mod tests {
         let mut card = Card::default();
         card.show(Mode::Offered);
         let (headline, paragraphs, button) = card.words(heavy());
-        assert_eq!(headline, "This map is heavy on SJK's lighting");
+        assert_eq!(headline, "This map is heavy on SlashJK's lighting");
         assert!(paragraphs[0].contains("8.0 ms"), "{paragraphs:?}");
         assert!(paragraphs[0].contains("5.6 ms"), "{paragraphs:?}");
         assert!(paragraphs[0].ends_with("about 125 FPS."), "{paragraphs:?}");

@@ -20,7 +20,7 @@ use std::path::Path;
 
 /// The file, in the settings folder.
 pub(crate) const FILE: &str = "medals_seen.txt";
-const HEADER: &str = "# Medals SJK has shown this identity: \"<id> <count>\" a line.";
+const HEADER: &str = "# Medals SlashJK has shown this identity: \"<id> <count>\" a line.";
 
 /// The counts shown so far, for one key.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]

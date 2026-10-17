@@ -146,7 +146,7 @@ impl SettingsMenu {
         let s = frame.s;
         let _ = self.ui.draw_list_mut().push(DrawCommand::SolidRect {
             rect: frame.rect(CARD[0] + 24.0, FOOT_RULE, CARD[2] - 48.0, 1.0),
-            color: color::alpha(color::HOLO, 0.2),
+            color: color::alpha(color::LINE, 0.2),
         });
         let pinned = self.classic.as_ref().and_then(|classic| classic.pinned);
         if let Some(row) = pinned {

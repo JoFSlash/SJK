@@ -339,7 +339,7 @@ impl Panel {
             }
             None if now.saturating_duration_since(since) >= ANSWER_WAIT => {
                 self.refreshed = None;
-                self.refused("The SJK hub did not answer. Try again later.", now);
+                self.refused("The hub did not answer. Try again later.", now);
             }
             None => {}
         }
@@ -673,7 +673,7 @@ impl Panel {
             frame.rect(CARD_X - 500.0, TITLE_Y, 1_000.0, 50.0),
             42.0 * s,
             fade(if card.finish.index == 2 {
-                color::GOLD_BRIGHT
+                color::ACCENT_BRIGHT
             } else {
                 card.rarity.colour
             }),
@@ -844,7 +844,7 @@ impl Panel {
         // The marker: a gold line with a point above and below.
         let [mx, top] = frame.point(CARD_X, STRIP_Y - 36.0);
         let [_, bottom] = frame.point(CARD_X, STRIP_Y + STRIP_HEIGHT + 36.0);
-        let gold = color::alpha(color::GOLD_BRIGHT, 0.9);
+        let gold = color::alpha(color::ACCENT_BRIGHT, 0.9);
         let _ = self.ui.draw_list_mut().push(DrawCommand::Line {
             from: [mx, top],
             to: [mx, bottom],
@@ -952,7 +952,7 @@ impl Panel {
                     rect,
                     radius: 14.0 * s,
                     width: (2.0 + near) * s,
-                    color: color::alpha(color::GOLD, 0.7 + 0.3 * near),
+                    color: color::alpha(color::ACCENT, 0.7 + 0.3 * near),
                 });
                 text(
                     &mut self.ui,
@@ -960,7 +960,7 @@ impl Panel {
                     format_args!("?"),
                     frame.rect(x, y + height * 0.5 - 40.0, strip::TILE, 70.0),
                     60.0 * s,
-                    color::GOLD,
+                    color::ACCENT,
                     FontWeight::Semibold,
                     TextAlign::Center,
                 );
@@ -1054,7 +1054,7 @@ impl Panel {
             TextAlign::Center,
         );
         let kind = found.skin.map_or_else(
-            || "A saber shader new to this version of SJK".to_owned(),
+            || "A saber shader new to this version of SlashJK".to_owned(),
             |skin| format!("{} {} saber shader", skin.tier.symbol(), skin.tier.label()),
         );
         text(
@@ -1073,7 +1073,7 @@ impl Panel {
             format_args!(
                 "{}",
                 found.skin.map_or(
-                    "It is yours: update SJK to see it in your Collection and wear it.",
+                    "It is yours: update SlashJK to see it in your Collection and wear it.",
                     |skin| skin.description
                 )
             ),
@@ -1205,7 +1205,7 @@ pub(super) fn credits_line(
     let words_width = crate::text::display_width(words, size) * crate::text::style::current().scale;
     let total = cards::mark::width(mark) + gap + words_width;
     let left = x - total * 0.5;
-    let gold = Color::new(color::GOLD.r, color::GOLD.g, color::GOLD.b, alpha);
+    let gold = Color::new(color::ACCENT.r, color::ACCENT.g, color::ACCENT.b, alpha);
     let [mx, my] = frame.point(left, y + (size * 1.25 - mark) * 0.5);
     cards::mark::draw(canvas.draw_list_mut(), [mx, my], mark * s, gold);
     text(
@@ -1220,9 +1220,9 @@ pub(super) fn credits_line(
         ),
         size * s,
         Color::new(
-            color::GOLD_BRIGHT.r,
-            color::GOLD_BRIGHT.g,
-            color::GOLD_BRIGHT.b,
+            color::ACCENT_BRIGHT.r,
+            color::ACCENT_BRIGHT.g,
+            color::ACCENT_BRIGHT.b,
             alpha,
         ),
         FontWeight::Semibold,

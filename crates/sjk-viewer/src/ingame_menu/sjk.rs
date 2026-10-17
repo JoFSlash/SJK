@@ -15,11 +15,11 @@ pub(crate) struct Entry {
 pub(crate) const ENTRIES: [Entry; 7] = [
     Entry {
         label: "Changelog",
-        hint: "What changed in each SJK release, and who made it",
+        hint: "What changed in each SlashJK release, and who made it",
     },
     Entry {
         label: "Credits",
-        hint: "The people who make SJK",
+        hint: "The people who make SlashJK",
     },
     Entry {
         label: "Profile",
@@ -27,19 +27,19 @@ pub(crate) const ENTRIES: [Entry; 7] = [
     },
     Entry {
         label: "Identity",
-        hint: "Your SJK key and profile, and the players the hub knows here",
+        hint: "Your SlashJK key and profile, and the players the hub knows here",
     },
     Entry {
         label: "Report a bug",
-        hint: "Tell the SJK team what went wrong; it goes to the SJK hub",
+        hint: "Tell the team what went wrong; it goes to the hub",
     },
     Entry {
         label: "Report a player",
-        hint: "Everyone here; tell the SJK team about a cheater or a troll",
+        hint: "Everyone here; tell the team about a cheater or a troll",
     },
     Entry {
-        label: "SJK chat",
-        hint: "Talk with every SJK player, on any server or in the menus",
+        label: "Global chat",
+        hint: "Talk with everyone online, on any server or in the menus",
     },
 ];
 

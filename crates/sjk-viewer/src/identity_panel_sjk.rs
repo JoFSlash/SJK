@@ -80,7 +80,7 @@ impl Panel {
         text(
             &mut self.ui,
             TextFamily::Body,
-            format_args!("Share my identity with the SJK hub"),
+            format_args!("Share my identity with the hub"),
             frame.rect(COLUMN_X + 22.0, y + 14.0, 600.0, 28.0),
             19.0 * s,
             if focused {
@@ -204,7 +204,7 @@ impl Panel {
                 format_args!("{message}"),
                 frame.rect(x + 8.0, top + 12.0, COLUMN_X + COLUMN_WIDTH - x - 8.0, 26.0),
                 17.0 * s,
-                color::EMBER,
+                color::DANGER,
                 FontWeight::Regular,
                 TextAlign::Start,
             );
@@ -258,7 +258,7 @@ impl Panel {
                     format_args!("Verified"),
                     frame.rect(COLUMN_X + COLUMN_WIDTH - 140.0, row_y, 130.0, 30.0),
                     19.0 * s,
-                    color::GOLD_BRIGHT,
+                    color::ACCENT_BRIGHT,
                     FontWeight::Regular,
                     TextAlign::End,
                 );

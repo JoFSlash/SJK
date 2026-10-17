@@ -54,14 +54,14 @@ impl Panel {
             format_args!("Update"),
             frame.rect(TEXT_X, CARD_TOP + 30.0, TEXT_WIDTH, 30.0),
             22.0 * s,
-            color::GOLD_BRIGHT,
+            color::ACCENT_BRIGHT,
             FontWeight::Semibold,
             TextAlign::Start,
         );
         text(
             &mut self.ui,
             TextFamily::Body,
-            format_args!("This is SJK {installed}"),
+            format_args!("This is SlashJK {installed}"),
             frame.rect(TEXT_X, CARD_TOP + 33.0, TEXT_WIDTH, 26.0),
             16.0 * s,
             color::MUTED,
@@ -101,7 +101,7 @@ impl Panel {
                 .push(sjk_ui::DrawCommand::RoundedRect {
                     rect: track,
                     radius: track.height * 0.5,
-                    color: color::alpha(color::HOLO, 0.2),
+                    color: color::alpha(color::LINE, 0.2),
                 });
             let filled = frame.rect(TEXT_X, y, TRACK_WIDTH * progress, 6.0);
             let _ = self
@@ -110,7 +110,7 @@ impl Panel {
                 .push(sjk_ui::DrawCommand::RoundedRect {
                     rect: filled,
                     radius: filled.height * 0.5,
-                    color: color::GOLD,
+                    color: color::ACCENT,
                 });
             text(
                 &mut self.ui,
@@ -118,7 +118,7 @@ impl Panel {
                 format_args!("{:.0} %", progress * 100.0),
                 frame.rect(TEXT_X + TRACK_WIDTH + 20.0, y - 13.0, 100.0, 30.0),
                 22.0 * s,
-                color::GOLD_BRIGHT,
+                color::ACCENT_BRIGHT,
                 FontWeight::Regular,
                 TextAlign::Start,
             );

@@ -40,7 +40,10 @@ impl BanOutcome {
     /// The line the player reads about it.
     pub fn line(&self) -> String {
         match &self.result {
-            Ok(ban) => format!("Banned from SJK chat until {}", local_day_time(ban.until)),
+            Ok(ban) => format!(
+                "Banned from global chat until {}",
+                local_day_time(ban.until)
+            ),
             Err(error) => refusal(error).to_owned(),
         }
     }
@@ -68,7 +71,7 @@ fn day_time<T: TimeZone>(time: &DateTime<T>) -> String {
 /// until `until` (unix seconds).
 pub fn banned_message(until: i64) -> String {
     format!(
-        "A verified player banned you from SJK chat until {}",
+        "A verified player banned you from global chat until {}",
         local_day_time(until)
     )
 }
@@ -77,7 +80,7 @@ pub fn banned_message(until: i64) -> String {
 pub fn refusal(error: &HubError) -> &'static str {
     match error {
         HubError::Rejected { code, .. } => match code.as_str() {
-            "not_verified" => "Only verified players can ban from SJK chat",
+            "not_verified" => "Only verified players can ban from global chat",
             "target_verified" => "Verified players and staff cannot be banned",
             "target_trusted" => "Only staff can ban a trusted player",
             "not_found" => "The hub does not know this player",
@@ -92,9 +95,9 @@ pub fn refusal(error: &HubError) -> &'static str {
         HubError::Protocol(why)
             if why.starts_with("status 404") || why.starts_with("status 405") =>
         {
-            "This SJK hub cannot ban from the chat yet"
+            "This hub cannot ban from the chat yet"
         }
-        HubError::Network(_) => "Cannot reach the SJK hub",
+        HubError::Network(_) => "Cannot reach the hub",
         HubError::Protocol(_) => "The hub did not take the ban",
     }
 }
@@ -126,7 +129,7 @@ mod tests {
         assert_eq!(day_time(&early), "11/10 03:21");
         assert!(
             banned_message(1_792_240_320)
-                .starts_with("A verified player banned you from SJK chat until ")
+                .starts_with("A verified player banned you from global chat until ")
         );
     }
 
@@ -138,7 +141,7 @@ mod tests {
         );
         assert_eq!(
             refusal(&rejected("not_verified")),
-            "Only verified players can ban from SJK chat"
+            "Only verified players can ban from global chat"
         );
         assert_eq!(refusal(&rejected("bad_target")), "You cannot ban yourself");
         assert_eq!(
@@ -151,7 +154,7 @@ mod tests {
         );
         assert_eq!(
             refusal(&HubError::Protocol("status 404, not JSON".to_owned())),
-            "This SJK hub cannot ban from the chat yet"
+            "This hub cannot ban from the chat yet"
         );
         let banned = BanOutcome {
             serial: 1,
@@ -161,6 +164,6 @@ mod tests {
                 address: true,
             }),
         };
-        assert!(banned.line().starts_with("Banned from SJK chat until "));
+        assert!(banned.line().starts_with("Banned from global chat until "));
     }
 }

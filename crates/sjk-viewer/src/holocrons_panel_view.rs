@@ -280,15 +280,15 @@ impl Panel {
         let (headline, line): (String, &str) = match (self.data.state, self.data.total()) {
             (State::IdentityOff, _) => (
                 "Identity is off".to_owned(),
-                "Holocrons need the SJK identity: switch it on in Settings, Network.",
+                "Holocrons need the online identity: switch it on in Settings, Network.",
             ),
             (State::NoHub, _) => (
                 "No hub is set".to_owned(),
-                "Holocrons are kept on the SJK hub (cl_hubUrl).",
+                "Holocrons are kept on the hub (cl_hubUrl).",
             ),
             (State::Waiting, _) | (State::Known, None) => (
                 "Contacting the hub...".to_owned(),
-                "Your holocrons show once the SJK hub has answered.",
+                "Your holocrons show once the hub has answered.",
             ),
             (State::Known, Some(0)) => (
                 "No holocrons yet".to_owned(),
@@ -339,7 +339,7 @@ impl Panel {
             format_args!("{words}"),
             frame.rect(right - width - 8.0, HEAD_Y + 4.0, width + 8.0, 38.0),
             size * s,
-            color::GOLD_BRIGHT,
+            color::ACCENT_BRIGHT,
             FontWeight::Semibold,
             TextAlign::End,
         );
@@ -348,7 +348,7 @@ impl Panel {
             right - width - 8.0 - 10.0 - crate::cards::mark::width(mark),
             HEAD_Y + 10.0,
         );
-        crate::cards::mark::draw(self.ui.draw_list_mut(), [x, y], mark * s, color::GOLD);
+        crate::cards::mark::draw(self.ui.draw_list_mut(), [x, y], mark * s, color::ACCENT);
         text(
             &mut self.ui,
             TextFamily::Body,
@@ -391,7 +391,7 @@ impl Panel {
                 } else if hovered {
                     tier.colour_alpha(0.55)
                 } else {
-                    color::alpha(color::HOLO, 0.16)
+                    color::alpha(color::LINE, 0.16)
                 },
             });
             let _ = list.push(DrawCommand::RoundedRect {
@@ -513,7 +513,7 @@ impl Panel {
             format_args!("{}", crate::cards::inside(self.selected)),
             frame.rect(RIGHT_X, ABOUT_Y + 52.0, RIGHT_WIDTH - LOOT_WIDTH, 24.0),
             15.0 * s,
-            color::GOLD,
+            color::ACCENT,
             FontWeight::Regular,
             TextAlign::Start,
         );
@@ -534,7 +534,7 @@ impl Panel {
         );
         let _ = self.ui.draw_list_mut().push(DrawCommand::SolidRect {
             rect: frame.rect(RIGHT_X, RULE_Y, RIGHT_WIDTH, 1.0),
-            color: color::alpha(color::HOLO, 0.18),
+            color: color::alpha(color::LINE, 0.18),
         });
     }
 
@@ -577,13 +577,13 @@ impl Panel {
             let _ = list.push(DrawCommand::RoundedRect {
                 rect: frame.rect(RIGHT_X, BAR_Y, RIGHT_WIDTH, 6.0),
                 radius: 3.0 * s,
-                color: color::alpha(color::HOLO, 0.14),
+                color: color::alpha(color::LINE, 0.14),
             });
             if fraction > 0.0 {
                 let _ = list.push(DrawCommand::RoundedRect {
                     rect: frame.rect(RIGHT_X, BAR_Y, (RIGHT_WIDTH * fraction).max(6.0), 6.0),
                     radius: 3.0 * s,
-                    color: color::GOLD,
+                    color: color::ACCENT,
                 });
             }
         }
@@ -675,10 +675,10 @@ impl Panel {
                     text(
                         &mut self.ui,
                         TextFamily::Body,
-                        format_args!("Gift from the SJK team"),
+                        format_args!("Gift from the team"),
                         frame.rect(x + 38.0, y + 22.0, RECENT_WIDTH - 50.0, 16.0),
                         13.0 * s,
-                        color::GOLD_BRIGHT,
+                        color::ACCENT_BRIGHT,
                         FontWeight::Regular,
                         TextAlign::Start,
                     );
@@ -686,10 +686,10 @@ impl Panel {
                     text(
                         &mut self.ui,
                         TextFamily::Body,
-                        format_args!("Gift from the SJK team: \u{201c}{}\u{201d}", cut(note, 38)),
+                        format_args!("Gift from the team: \u{201c}{}\u{201d}", cut(note, 38)),
                         frame.rect(x + 38.0, y + 22.0, RECENT_WIDTH - 50.0, 16.0),
                         13.0 * s,
-                        color::GOLD_BRIGHT,
+                        color::ACCENT_BRIGHT,
                         FontWeight::Regular,
                         TextAlign::Start,
                     );
@@ -861,7 +861,7 @@ pub(super) fn tier_card(index: usize, data: &Data) -> crate::menu::sjk::hover::C
             "Found by playing on a server: one holocron every {minutes} minutes of active play, at most {cap} a day."
         )),
         Line::status(format!(
-            "{} of drops are {}. The SJK team can also give one.",
+            "{} of drops are {}. The team can also give one.",
             tier.odds(),
             tier.label
         )),
@@ -897,7 +897,7 @@ mod tests {
         );
         assert_eq!(
             card.lines[1].words,
-            "28% of drops are Rare. The SJK team can also give one."
+            "28% of drops are Rare. The team can also give one."
         );
         assert_eq!(card.lines[2].words, "None held yet");
         assert_eq!(tier_card(0, &data).lines[2].words, "You hold 3");

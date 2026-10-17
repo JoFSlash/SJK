@@ -93,9 +93,9 @@ pub(super) fn icon_row(canvas: &mut MenuCanvas, frame: &Frame, extras: &Extras<'
                 radius: ring.height * 0.5,
                 width: 2.0 * s,
                 color: if focused {
-                    color::GOLD_BRIGHT
+                    color::ACCENT_BRIGHT
                 } else {
-                    color::alpha(color::GOLD, 0.7)
+                    color::alpha(color::ACCENT, 0.7)
                 },
             });
         }
@@ -113,7 +113,7 @@ pub(super) fn icon_row(canvas: &mut MenuCanvas, frame: &Frame, extras: &Extras<'
         format_args!("{label}"),
         frame.rect(ROW_X, LABEL_Y, label_width + 20.0, 30.0),
         24.0 * s,
-        color::GOLD_BRIGHT,
+        color::ACCENT_BRIGHT,
         FontWeight::Regular,
         TextAlign::Start,
     );
@@ -161,7 +161,7 @@ pub(super) fn card_controls(
             format_args!("A vote is on"),
             frame.rect(CARD_X, VOTE_TOP, CARD_WIDTH, 28.0),
             22.0 * s,
-            color::GOLD_BRIGHT,
+            color::ACCENT_BRIGHT,
             FontWeight::Semibold,
             TextAlign::Start,
         );
@@ -286,7 +286,7 @@ pub(super) fn card_controls(
             frame.rect(CARD_X, y, width + 20.0, 28.0),
             21.0 * s,
             if lit {
-                color::GOLD_BRIGHT
+                color::ACCENT_BRIGHT
             } else {
                 color::MUTED
             },
@@ -297,7 +297,7 @@ pub(super) fn card_controls(
             let _ = canvas.draw_list_mut().push(DrawCommand::RoundedRect {
                 rect: frame.rect(CARD_X, y + 27.0, width, 2.0),
                 radius: 1.0 * s,
-                color: color::GOLD_BRIGHT,
+                color: color::ACCENT_BRIGHT,
             });
         }
         text(

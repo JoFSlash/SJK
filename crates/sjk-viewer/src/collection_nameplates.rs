@@ -125,8 +125,8 @@ impl Panel {
     /// goes, its name and place under it.
     fn empty_place(&mut self, frame: &Frame, index: usize, x: f32, name: &str, place: &str) {
         let s = frame.s;
-        let line = color::alpha(color::HOLO, 0.55);
-        let faint = color::alpha(color::HOLO, 0.28);
+        let line = color::alpha(color::LINE, 0.55);
+        let faint = color::alpha(color::LINE, 0.28);
         dashed_rect(&mut self.ui, frame, [x, PLACES_TOP, PLACE, PLACE], faint);
         let middle = [x + PLACE * 0.5, PLACES_TOP + PLACE * 0.5];
         let bar = |canvas: &mut crate::menu_widgets::MenuCanvas, rect: [f32; 4]| {
@@ -213,7 +213,7 @@ impl Panel {
                         width: 2.0 * s,
                         start: PI * 0.25,
                         sweep: PI * 0.5,
-                        color: color::alpha(color::HOLO, alpha),
+                        color: color::alpha(color::LINE, alpha),
                         knockout: None,
                     });
                 }
@@ -221,7 +221,7 @@ impl Panel {
         }
         let _ = self.ui.draw_list_mut().push(DrawCommand::SolidRect {
             rect: frame.rect(x, PLACES_TOP + PLACE + 16.0, PLACE, 2.0),
-            color: color::alpha(color::HOLO, 0.22),
+            color: color::alpha(color::LINE, 0.22),
         });
         text(
             &mut self.ui,
@@ -266,7 +266,7 @@ impl Panel {
     fn nameplate(&mut self, frame: &Frame, inputs: &Inputs<'_>, at: [f32; 2]) {
         let s = frame.s;
         let [x, bottom] = at;
-        let mark = color::alpha(color::HOLO, 0.8);
+        let mark = color::alpha(color::LINE, 0.8);
         // Under the plate, the trail's place.
         dashed_arc(
             &mut self.ui,
@@ -346,7 +346,7 @@ impl Panel {
             format_args!("Nameplate"),
             frame.rect(x, y, width, 22.0),
             16.0 * s,
-            color::HOLO,
+            color::LINE,
             FontWeight::Semibold,
             TextAlign::Start,
         );
@@ -365,7 +365,7 @@ impl Panel {
         y = left_lines(
             &mut self.ui,
             frame,
-            "What every SJK player sees over your head in a match: your name, then your shield, health and Force.",
+            "What everyone online sees over your head in a match: your name, then your shield, health and Force.",
             [x, y, width],
             (52, 3),
             18.0,

@@ -246,12 +246,9 @@ impl TextDialog {
 fn heading(ui: &mut MenuCanvas, frame: &Frame, display: &UiFont, view: &View<'_>) {
     let s = frame.s;
     let (title, bound) = match view.kind {
-        Kind::Report => ("Report a bug", "To the SJK team, signed with your identity"),
+        Kind::Report => ("Report a bug", "To the team, signed with your identity"),
         Kind::Note { .. } => ("Note for Claude", "Kept on this PC with a screenshot"),
-        Kind::PlayerReport { .. } => (
-            "Report a player",
-            "To the SJK team, signed with your identity",
-        ),
+        Kind::PlayerReport { .. } => ("Report a player", "To the team, signed with your identity"),
     };
     text(
         ui,
@@ -259,7 +256,7 @@ fn heading(ui: &mut MenuCanvas, frame: &Frame, display: &UiFont, view: &View<'_>
         format_args!("{title}"),
         frame.rect(TEXT_X, view.geometry.eyebrow_y(), TEXT_WIDTH, 30.0),
         22.0 * s,
-        color::GOLD_BRIGHT,
+        color::ACCENT_BRIGHT,
         FontWeight::Semibold,
         TextAlign::Start,
     );
@@ -318,10 +315,10 @@ fn heading(ui: &mut MenuCanvas, frame: &Frame, display: &UiFont, view: &View<'_>
             "What did they do? The report names them with the server, the map and the match clock."
         }
         (Phase::Sending, _) => {
-            "Your report is on its way to the SJK team. You can close this card: the answer then shows on screen."
+            "Your report is on its way to the team. You can close this card: the answer then shows on screen."
         }
         (Phase::Sent(stored), _) => {
-            detail(0, &format_args!("The SJK team has it as {stored}."));
+            detail(0, &format_args!("The team has it as {stored}."));
             return;
         }
         (Phase::Failed(why), _) => {
@@ -365,7 +362,7 @@ fn model_row(ui: &mut MenuCanvas, frame: &Frame, body: &UiFont, view: &View<'_>)
         format_args!("MODEL"),
         frame.rect(TEXT_X, middle - 12.0, 80.0, 24.0),
         17.0 * s,
-        color::GOLD_BRIGHT,
+        color::ACCENT_BRIGHT,
         FontWeight::Semibold,
         TextAlign::Start,
     );
@@ -446,9 +443,9 @@ fn field(
     });
     let edge = match (focused, writing && hovered) {
         (true, _) => Color::new(1.0, 1.0, 1.0, 0.7),
-        (false, true) => color::alpha(color::HOLO, 0.6),
-        _ if writing => color::alpha(color::HOLO, 0.4),
-        _ => color::alpha(color::HOLO, 0.2),
+        (false, true) => color::alpha(color::LINE, 0.6),
+        _ if writing => color::alpha(color::LINE, 0.4),
+        _ => color::alpha(color::LINE, 0.2),
     };
     let _ = ui.draw_list_mut().push(DrawCommand::Border {
         rect,
@@ -513,7 +510,7 @@ fn field(
         let height = (24.0 * style.scale).min(LINE - 2.0) * s;
         let _ = ui.draw_list_mut().push(DrawCommand::SolidRect {
             rect: caret_rect(line_rect, caret_x, height, s),
-            color: color::GOLD_BRIGHT,
+            color: color::ACCENT_BRIGHT,
         });
     }
     // A click chooses the field while writing, and edits a failed report.
@@ -565,7 +562,7 @@ fn info(ui: &mut MenuCanvas, frame: &Frame, view: &View<'_>) {
         ),
         18.0 * s,
         if count >= limit {
-            color::GOLD_BRIGHT
+            color::ACCENT_BRIGHT
         } else {
             color::MUTED
         },
@@ -631,16 +628,11 @@ fn foot(ui: &mut MenuCanvas, frame: &Frame, view: &View<'_>) {
         Phase::Sending => {
             let seconds = crate::menu::art::motion::seconds();
             crate::menu::sjk::loading::activity(ui, frame, TEXT_X + 10.0, middle, seconds);
-            status(ui, TEXT_X + 32.0, "Waiting for the SJK hub", color::MUTED);
+            status(ui, TEXT_X + 32.0, "Waiting for the hub", color::MUTED);
         }
         Phase::Sent(_) => {
             let right = kit::tick(ui, frame, TEXT_X, middle, true, false);
-            status(
-                ui,
-                right + 14.0,
-                "Stored by the SJK hub",
-                color::GOLD_BRIGHT,
-            );
+            status(ui, right + 14.0, "Stored by the hub", color::ACCENT_BRIGHT);
         }
         Phase::Failed(_) => {
             status(
@@ -882,7 +874,7 @@ mod tests {
     fn the_text_wraps_inside_the_field() {
         let fonts = fonts();
         let mut dialog = sjk(Kind::Report);
-        typed(&mut dialog, &"wonderful ".repeat(60));
+        typed(&mut dialog, &"WOMBAT MMMM ".repeat(50));
         draw(&mut dialog, &fonts, [1920.0, 1080.0]);
         let field = dialog.ui.rect_for(FIELD_TOKEN).expect("the field");
         let size = TEXT_SIZE;
@@ -914,8 +906,8 @@ mod tests {
     #[test]
     fn a_reason_reads_as_a_sentence() {
         assert_eq!(
-            Sentence("the SJK identity is off (cl_identity 1 turns it on)").to_string(),
-            "The SJK identity is off (cl_identity 1 turns it on)"
+            Sentence("the online identity is off (cl_identity 1 turns it on)").to_string(),
+            "The online identity is off (cl_identity 1 turns it on)"
         );
         assert_eq!(
             Sentence("too many reports").to_string(),
@@ -1102,7 +1094,7 @@ mod tests {
             .iter()
             .find_map(|command| match command {
                 DrawCommand::SolidRect { rect, color }
-                    if *color == color::GOLD_BRIGHT && rect.width < 6.0 =>
+                    if *color == color::ACCENT_BRIGHT && rect.width < 6.0 =>
                 {
                     Some(*rect)
                 }

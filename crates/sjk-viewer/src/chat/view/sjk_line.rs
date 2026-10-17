@@ -471,7 +471,10 @@ mod tests {
         // Emblem, name, tick, colon and message, left to right on the name's row.
         assert_eq!(name.y, body.y, "the message stays on the name's row");
         assert!(tag.right() < name.x && name.right() <= colon.x && colon.x < body.x);
-        assert!(!texts.iter().any(|(text, ..)| text == "SJK"), "no letters");
+        assert!(
+            !texts.iter().any(|(text, ..)| text == "SlashJK"),
+            "no letters"
+        );
         let tick = ticks(&chat);
         assert_eq!(tick.len(), 1);
         assert!(tick[0].x >= name.x && tick[0].right() <= colon.x);
@@ -545,7 +548,7 @@ mod tests {
         assert_eq!(name.y, body.y, "one flowing line");
         assert_ne!(rgb(*colour), rgb(GOLD), "a game line keeps its colours");
         let logo = logos(&chat);
-        assert_eq!(logo.len(), 1, "SJK's emblem");
+        assert_eq!(logo.len(), 1, "SlashJK's emblem");
         let tick = ticks(&chat);
         assert_eq!(tick.len(), 1, "the verified tick");
         assert!(logo[0].right() < name.x && tick[0].x >= name.x && tick[0].right() <= colon.x);

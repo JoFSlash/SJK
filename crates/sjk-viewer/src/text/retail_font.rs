@@ -43,7 +43,7 @@ pub(crate) struct RetailFace {
 
 /// SJK Menu, in place of `ergoec` (`FONT_MEDIUM`): `mHeight` 22, `mAscender` 17.
 pub(crate) const MENU: RetailFace = RetailFace {
-    name: "SJK Menu",
+    name: "SlashJK Menu",
     bytes: include_bytes!("../../assets/fonts/SJKMenu.ttf"),
     height: 22.0,
     baseline: 17.0,
@@ -52,7 +52,7 @@ pub(crate) const MENU: RetailFace = RetailFace {
 
 /// SJK Chat, in place of `ocr_a` (`FONT_SMALL`): `mHeight` 21, `mAscender` 17.
 pub(crate) const CHAT: RetailFace = RetailFace {
-    name: "SJK Chat",
+    name: "SlashJK Chat",
     bytes: include_bytes!("../../assets/fonts/SJKChat.ttf"),
     height: 21.0,
     baseline: 17.0,
@@ -62,7 +62,7 @@ pub(crate) const CHAT: RetailFace = RetailFace {
 /// SJK HUD, in place of `arialnb`, the classic status HUD's font. Its header
 /// is empty, so the line is the 14-point size with the baseline on its bottom.
 pub(crate) const HUD: RetailFace = RetailFace {
-    name: "SJK HUD",
+    name: "SlashJK HUD",
     bytes: include_bytes!("../../assets/fonts/SJKHud.ttf"),
     height: 14.0,
     baseline: 14.0,

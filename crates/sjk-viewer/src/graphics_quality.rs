@@ -98,7 +98,7 @@ impl Level {
     pub(crate) fn label(self) -> &'static str {
         match self {
             Self::Vanilla => "Vanilla style",
-            Self::Sjk => "SJK (recommended)",
+            Self::Sjk => "SlashJK (recommended)",
             Self::Experimental => "Experimental",
         }
     }
@@ -431,7 +431,7 @@ mod tests {
         assert_eq!(Level::current(&console), Some(Level::Experimental));
         command(&mut console, &["ejk".to_owned()]).unwrap();
         assert!(vanilla(&console));
-        command(&mut console, &["SJK (recommended)".to_owned()]).unwrap();
+        command(&mut console, &["SlashJK (recommended)".to_owned()]).unwrap();
         assert_eq!(Level::current(&console), Some(Level::Sjk));
         command(&mut console, &["Vanilla style".to_owned()]).unwrap();
         assert!(vanilla(&console));
@@ -489,12 +489,12 @@ mod tests {
         let (_directory, mut console) = console();
         apply_new_profile(&mut console);
         assert_eq!(Level::current(&console), Some(Level::Sjk));
-        assert_eq!(shown(&console), "SJK (recommended)");
+        assert_eq!(shown(&console), "SlashJK (recommended)");
         assert_eq!(row_default(&console, "r_sceneHdr"), Some("1"));
         assert_eq!(row_default(&console, "r_dayNight"), Some("0"));
         assert_eq!(row_default(&console, "cg_fov"), None);
         let lines = renderer_command(&mut console, &[]).unwrap();
-        assert!(lines[0].contains("SJK (recommended)"), "{lines:?}");
+        assert!(lines[0].contains("SlashJK (recommended)"), "{lines:?}");
         renderer_command(&mut console, &["vanilla".to_owned()]).unwrap();
         assert!(vanilla(&console));
         assert_eq!(row_default(&console, "r_sceneHdr"), Some("0"));

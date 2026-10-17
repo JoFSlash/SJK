@@ -116,7 +116,7 @@ fn owned_line(grant: &sjk_identity::Unlock) -> String {
         .as_deref()
         .and_then(crate::medals::Medal::from_id)
         .map_or_else(
-            || "from the SJK team".to_owned(),
+            || "from the team".to_owned(),
             |medal| format!("with your {} medal", medal.name()),
         );
     let held = if grant.count > 1 {
@@ -187,7 +187,7 @@ impl Row {
     fn frame_colour(self) -> sjk_ui::Color {
         match self.tier() {
             Some(tier) => color::alpha(tier.colour(), if self.owned { 0.9 } else { 0.45 }),
-            None => color::alpha(color::HOLO, 0.3),
+            None => color::alpha(color::LINE, 0.3),
         }
     }
 
@@ -262,19 +262,19 @@ impl Panel {
                 shown_words.as_str()
             }
             unlockables::Holdings::IdentityOff => {
-                "Shaders are kept on the SJK hub: switch the identity on in Settings, Network."
+                "Shaders are kept on the hub: switch the identity on in Settings, Network."
             }
             unlockables::Holdings::NoHub => {
-                "Shaders are kept on the SJK hub: no hub is set (cl_hubUrl)."
+                "Shaders are kept on the hub: no hub is set (cl_hubUrl)."
             }
-            unlockables::Holdings::Waiting => "Waiting for the SJK hub to say which are yours.",
+            unlockables::Holdings::Waiting => "Waiting for the hub to say which are yours.",
             unlockables::Holdings::Known(held)
                 if held.iter().any(crate::debug_collectibles::added) =>
             {
                 "Debug collectibles is on: every shader is shown as yours, on this PC only."
             }
             unlockables::Holdings::Known(_) => {
-                "How your blade looks and sounds, for every SJK player on your server."
+                "How your blade looks and sounds, for everyone online on your server."
             }
         };
         self.lead(frame, &headline, line);
@@ -337,7 +337,7 @@ impl Panel {
             (
                 FILTER_TIER_BASE,
                 "All".to_owned(),
-                color::HOLO,
+                color::LINE,
                 self.shader_filter.tier.is_none(),
                 56.0,
             ),
@@ -349,7 +349,7 @@ impl Panel {
             (
                 FILTER_OWNED_TOKEN,
                 "Owned".to_owned(),
-                color::GOLD,
+                color::ACCENT,
                 self.shader_filter.owned,
                 84.0,
             ),
@@ -397,9 +397,9 @@ impl Panel {
             radius: 8.0 * s,
             width: 1.2 * s,
             color: if focused {
-                color::GOLD
+                color::ACCENT
             } else {
-                color::alpha(color::HOLO, 0.3)
+                color::alpha(color::LINE, 0.3)
             },
         });
         let caret = (self.epoch.elapsed().as_millis() / 500).is_multiple_of(2);
@@ -442,14 +442,14 @@ impl Panel {
         let _ = self.ui.draw_list_mut().push(DrawCommand::RoundedRect {
             rect: frame.rect(x, RACK_TOP, 4.0, height),
             radius: 2.0 * s,
-            color: color::alpha(color::HOLO, 0.14),
+            color: color::alpha(color::LINE, 0.14),
         });
         let thumb = height * RACK_SHOWN as f32 / rows as f32;
         let top = RACK_TOP + (height - thumb) * first as f32 / (rows - RACK_SHOWN) as f32;
         let _ = self.ui.draw_list_mut().push(DrawCommand::RoundedRect {
             rect: frame.rect(x, top, 4.0, thumb),
             radius: 2.0 * s,
-            color: color::GOLD,
+            color: color::ACCENT,
         });
     }
 
@@ -464,14 +464,14 @@ impl Panel {
         let _ = self.ui.draw_list_mut().push(DrawCommand::RoundedRect {
             rect: frame.rect(x, RACK_TOP, 4.0, height),
             radius: 2.0 * s,
-            color: color::alpha(color::HOLO, 0.14),
+            color: color::alpha(color::LINE, 0.14),
         });
         let thumb = height * GRID_LINES_SHOWN as f32 / lines as f32;
         let top = RACK_TOP + (height - thumb) * first as f32 / (lines - GRID_LINES_SHOWN) as f32;
         let _ = self.ui.draw_list_mut().push(DrawCommand::RoundedRect {
             rect: frame.rect(x, top, 4.0, thumb),
             radius: 2.0 * s,
-            color: color::GOLD,
+            color: color::ACCENT,
         });
     }
 
@@ -492,7 +492,7 @@ impl Panel {
                 let _ = self.ui.draw_list_mut().push(DrawCommand::RoundedRect {
                     rect,
                     radius: 9.0 * s,
-                    color: color::alpha(color::GOLD, if lit { 0.16 } else { 0.08 }),
+                    color: color::alpha(color::ACCENT, if lit { 0.16 } else { 0.08 }),
                 });
             }
             let _ = self.ui.draw_list_mut().push(DrawCommand::Border {
@@ -500,13 +500,13 @@ impl Panel {
                 radius: 9.0 * s,
                 width: 1.2 * s,
                 color: if lit {
-                    color::GOLD
+                    color::ACCENT
                 } else {
-                    color::alpha(color::HOLO, 0.3)
+                    color::alpha(color::LINE, 0.3)
                 },
             });
             let ink = if lit {
-                color::GOLD_BRIGHT
+                color::ACCENT_BRIGHT
             } else {
                 color::QUIET
             };
@@ -667,7 +667,7 @@ impl Panel {
             frame.rect(x + 10.0, y + 152.0, width - 20.0, 20.0),
             14.0 * s,
             if row.worn || (row.owned && row.skin.is_some()) {
-                color::GOLD
+                color::ACCENT
             } else {
                 color::QUIET
             },
@@ -705,9 +705,9 @@ impl Panel {
                 radius: 18.0 * s,
                 width: 1.2 * s,
                 color: if lit {
-                    color::GOLD
+                    color::ACCENT
                 } else {
-                    color::alpha(color::HOLO, 0.25)
+                    color::alpha(color::LINE, 0.25)
                 },
             });
             text(
@@ -717,7 +717,7 @@ impl Panel {
                 frame.rect(left + 18.0, y + 5.0, 70.0, 26.0),
                 19.0 * s,
                 if lit {
-                    color::GOLD_BRIGHT
+                    color::ACCENT_BRIGHT
                 } else {
                     color::QUIET
                 },
@@ -730,7 +730,7 @@ impl Panel {
                 format_args!("{count}"),
                 frame.rect(left + 70.0, y + 7.0, width - 84.0, 22.0),
                 14.0 * s,
-                if lit { color::GOLD } else { color::QUIET },
+                if lit { color::ACCENT } else { color::QUIET },
                 FontWeight::Regular,
                 TextAlign::End,
             );
@@ -763,7 +763,7 @@ impl Panel {
             let _ = self.ui.draw_list_mut().push(DrawCommand::RoundedRect {
                 rect: frame.rect(LEFT_X - 12.0, y + 14.0, 3.0, ROW_HEIGHT - 28.0),
                 radius: 1.5 * s,
-                color: color::GOLD_BRIGHT,
+                color: color::ACCENT_BRIGHT,
             });
         }
         let rect = [
@@ -835,7 +835,7 @@ impl Panel {
             frame.rect(name[0], name[1], name[2], name[3]),
             28.0 * s,
             match (chosen, row.owned) {
-                (true, _) => color::GOLD_BRIGHT,
+                (true, _) => color::ACCENT_BRIGHT,
                 (false, true) => color::TEXT,
                 (false, false) => color::MUTED,
             },
@@ -849,7 +849,7 @@ impl Panel {
             frame.rect(status[0], status[1], status[2], status[3]),
             15.0 * s,
             if row.worn || (row.owned && row.skin.is_some()) {
-                color::GOLD
+                color::ACCENT
             } else {
                 color::QUIET
             },
@@ -895,7 +895,7 @@ impl Panel {
                 rect,
                 radius: 17.0 * s,
                 width: 1.2 * s,
-                color: color::alpha(color::HOLO, 0.6),
+                color: color::alpha(color::LINE, 0.6),
             });
             text(
                 &mut self.ui,
@@ -903,7 +903,7 @@ impl Panel {
                 format_args!("Preview on your saber: not yours yet"),
                 frame.rect(x, 238.0, 360.0, 22.0),
                 15.0 * s,
-                color::HOLO,
+                color::LINE,
                 FontWeight::Semibold,
                 TextAlign::Center,
             );
@@ -965,7 +965,7 @@ impl Panel {
             ),
             frame.rect(kind_x, y, x + width - kind_x, 22.0),
             16.0 * s,
-            color::HOLO,
+            color::LINE,
             FontWeight::Semibold,
             TextAlign::Start,
         );
@@ -1006,7 +1006,11 @@ impl Panel {
             format_args!("{name}"),
             frame.rect(name_rect[0], name_rect[1], name_rect[2], name_rect[3]),
             56.0 * s,
-            if lit { color::GOLD_BRIGHT } else { color::TEXT },
+            if lit {
+                color::ACCENT_BRIGHT
+            } else {
+                color::TEXT
+            },
             FontWeight::Semibold,
             TextAlign::Start,
         );
@@ -1016,7 +1020,7 @@ impl Panel {
                 rect,
                 radius: 13.0 * s,
                 width: 1.2 * s,
-                color: if lit { color::GOLD } else { color::QUIET },
+                color: if lit { color::ACCENT } else { color::QUIET },
             });
             text(
                 &mut self.ui,
@@ -1024,7 +1028,7 @@ impl Panel {
                 format_args!("{tag}"),
                 frame.rect(tag_x, tag_y + 2.0, tag_width, 22.0),
                 15.0 * s,
-                if lit { color::GOLD } else { color::QUIET },
+                if lit { color::ACCENT } else { color::QUIET },
                 FontWeight::Semibold,
                 TextAlign::Center,
             );
@@ -1039,7 +1043,7 @@ impl Panel {
                 format_args!("Saber smith: {}", skin.smith),
                 frame.rect(x, y, width, 24.0),
                 16.0 * s,
-                color::HOLO,
+                color::LINE,
                 FontWeight::Semibold,
                 TextAlign::End,
             );
@@ -1063,7 +1067,7 @@ impl Panel {
         let (line, colour) = match (row.skin, grant) {
             (None, _) if row.worn => ("What you hold now: no shader on.".to_owned(), color::MUTED),
             (None, _) => ("Wearing it takes your shader off.".to_owned(), color::MUTED),
-            (Some(_), Some(grant)) => (owned_line(grant), color::GOLD),
+            (Some(_), Some(grant)) => (owned_line(grant), color::ACCENT),
             (Some(skin), None) => (format!("How to get it: {}", skin.how_to_get), color::MUTED),
         };
         text(
@@ -1147,7 +1151,7 @@ impl Panel {
             format_args!("Parts"),
             frame.rect(x, y, STAGE_TEXT_WIDTH, 22.0),
             16.0 * s,
-            color::HOLO,
+            color::LINE,
             FontWeight::Semibold,
             TextAlign::Start,
         );
@@ -1205,14 +1209,14 @@ mod tests {
             count: 1,
             medal: medal.map(str::to_owned),
         };
-        assert_eq!(owned_line(&grant(None)), "Yours, from the SJK team");
+        assert_eq!(owned_line(&grant(None)), "Yours, from the team");
         assert_eq!(
             owned_line(&grant(Some("bug_hunter"))),
             "Yours, with your Bug Hunter medal"
         );
         assert_eq!(
             owned_line(&grant(Some("from_the_future"))),
-            "Yours, from the SJK team"
+            "Yours, from the team"
         );
         let dated = sjk_identity::Unlock {
             granted: 1_791_000_000,
@@ -1223,7 +1227,7 @@ mod tests {
             count: 3,
             ..grant(None)
         };
-        assert_eq!(owned_line(&twice), "Yours, from the SJK team, 3 held");
+        assert_eq!(owned_line(&twice), "Yours, from the team, 3 held");
         assert_eq!(held_words("Yours", 1), "Yours");
         assert_eq!(held_words("Worn", 2), "Worn x2");
         assert!(owned_line(&dated).ends_with(", with your Early Tester medal"));

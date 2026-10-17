@@ -263,7 +263,7 @@ impl TextDialog {
         }
 
         let send_help = if report {
-            "Send the report to the SJK hub, signed with your SJK identity."
+            "Send the report to the hub, signed with your online identity."
         } else {
             "Save the note and its screenshot."
         };

@@ -301,7 +301,7 @@ fn draw_flat(
         color: if card.edition.is_empty() {
             Color::new(0.0, 0.0, 0.0, 0.0)
         } else {
-            color::alpha(color::GOLD, 0.16)
+            color::alpha(color::ACCENT, 0.16)
         },
     });
     // The finish over everything, inside the card.
@@ -351,7 +351,7 @@ fn draw_flat(
             format_args!("{}", card.edition),
             frame.rect(stamp[0], stamp[1] + 2.0 * unit, stamp[2], 18.0 * unit),
             12.0 * unit * s,
-            faded(color::GOLD_BRIGHT, ink),
+            faded(color::ACCENT_BRIGHT, ink),
             FontWeight::Semibold,
             TextAlign::Center,
         );
@@ -405,7 +405,7 @@ fn face(
         ),
         radius: width * 0.016 * s,
         width: (width * 0.0032 * s).max(1.0),
-        color: color::GOLD_BRIGHT,
+        color: color::ACCENT_BRIGHT,
     });
     let lore_box = [
         across(0.0413),
@@ -500,7 +500,7 @@ fn face(
         format_args!("{}{finish}", card.edition),
         frame.rect(x + width * 0.45, strip_y, width * 0.501, width * 0.036),
         small * s,
-        faded(color::GOLD_BRIGHT, ink),
+        faded(color::ACCENT_BRIGHT, ink),
         FontWeight::Semibold,
         TextAlign::End,
     );

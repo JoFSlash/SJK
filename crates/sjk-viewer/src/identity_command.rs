@@ -9,12 +9,12 @@ use sjk_identity::{Snapshot, Status};
 /// Console command name.
 pub(crate) const COMMAND: &str = "identity";
 /// Help text for completion and `cmdlist`.
-pub(crate) const HELP: &str = "Your SJK identity: open its page; bio, key and who subcommands";
+pub(crate) const HELP: &str = "Your online identity: open its page; bio, key and who subcommands";
 
 const USAGE: &str = "identity [bio <text> | key | who [slot]]";
 /// The answer to `identity name`, which no longer exists.
 const NAME_FROM_GAME: &str =
-    "Your SJK name is the name you play under: change it with /name <text>.";
+    "Your SlashJK name is the name you play under: change it with /name <text>.";
 
 /// What the player asked for.
 #[derive(Debug, Eq, PartialEq)]
@@ -100,7 +100,7 @@ pub(crate) fn who_lines(snapshot: &Snapshot, slot: Option<u8>) -> Vec<String> {
     if lines.is_empty() {
         lines.push(match slot {
             Some(slot) => format!("The hub knows nobody in slot {slot} here."),
-            None => "The hub knows no SJK players on this server.".to_owned(),
+            None => "The hub knows no SlashJK players on this server.".to_owned(),
         });
     }
     lines
@@ -253,7 +253,7 @@ mod tests {
         empty.players.clear();
         assert_eq!(
             who_lines(&empty, None),
-            ["The hub knows no SJK players on this server."]
+            ["The hub knows no SlashJK players on this server."]
         );
     }
 

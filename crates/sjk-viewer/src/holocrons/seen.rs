@@ -16,7 +16,8 @@ use std::path::Path;
 
 /// The file, in the settings folder.
 pub(crate) const FILE: &str = "holocrons_seen.txt";
-const HEADER: &str = "# Holocrons SJK has shown this identity: the highest holocron number shown.";
+const HEADER: &str =
+    "# Holocrons SlashJK has shown this identity: the highest holocron number shown.";
 
 /// What has been shown to one key.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]

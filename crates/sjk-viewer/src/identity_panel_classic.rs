@@ -236,7 +236,7 @@ impl Panel {
         text(
             &mut self.ui,
             place,
-            format_args!("SJK IDENTITY"),
+            format_args!("SlashJK IDENTITY"),
             [TITLE[0], TITLE[1] + 3.0, TITLE[2], TITLE[3] - 6.0],
             12.5,
             LABEL,
@@ -268,14 +268,14 @@ impl Panel {
         }
         if hovered {
             *hint = Some(
-                "Share your in-game name and the server you play on with the SJK hub, or switch it all off.",
+                "Share your in-game name and the server you play on with the hub, or switch it all off.",
             );
         }
         let [x, y, width, height] = row;
         text(
             &mut self.ui,
             place,
-            format_args!("{}", Caps("Share my identity with the SJK hub")),
+            format_args!("{}", Caps("Share my identity with the hub")),
             [x + 8.0, y, width * 0.7, height],
             11.0,
             if on { view::focus_pulse() } else { OPTION },
@@ -467,7 +467,7 @@ impl Panel {
                 "Use the official hub",
                 [x + 344.0, y, 180.0, height],
                 focus == Focus::Hub,
-                "Use SJK's own hub (sjk.dfox.app) again.",
+                "Use SlashJK's own hub (sjk.dfox.app) again.",
                 hint,
             );
         }

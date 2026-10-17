@@ -236,7 +236,7 @@ impl Browser {
                 if self.disabled.contains(&pack.key) {
                     color::MUTED
                 } else {
-                    color::GOLD_BRIGHT
+                    color::ACCENT_BRIGHT
                 },
                 FontWeight::Regular,
                 TextAlign::End,
@@ -262,7 +262,7 @@ impl Browser {
             format_args!("{}", self.status),
             frame.rect(452.0, 784.0, 960.0, 28.0),
             18.0 * frame.s,
-            color::GOLD_BRIGHT,
+            color::ACCENT_BRIGHT,
             FontWeight::Regular,
             TextAlign::Start,
         );

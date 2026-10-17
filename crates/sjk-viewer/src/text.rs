@@ -43,10 +43,8 @@ const MODERN_RASTER_SCALE: f32 = 3.0;
 pub(crate) const ATLAS_MIP_LEVELS: u32 = 4;
 const INTER_REGULAR: &[u8] = include_bytes!("../assets/fonts/Inter-Regular.ttf");
 const INTER_SEMIBOLD: &[u8] = include_bytes!("../assets/fonts/Inter-SemiBold.ttf");
-const RAJDHANI_SEMIBOLD: &[u8] = include_bytes!("../assets/fonts/Rajdhani-SemiBold.ttf");
+const INTER_BOLD: &[u8] = include_bytes!("../assets/fonts/Inter-Bold.ttf");
 pub(crate) const RAJDHANI_BOLD: &[u8] = include_bytes!("../assets/fonts/Rajdhani-Bold.ttf");
-const EXO2_REGULAR: &[u8] = include_bytes!("../assets/fonts/Exo2-Regular.ttf");
-const EXO2_SEMIBOLD: &[u8] = include_bytes!("../assets/fonts/Exo2-SemiBold.ttf");
 
 /// One family of the vector UI atlas: its [`TextFace::Regular`] and
 /// [`TextFace::Semibold`] fonts, and fonts of the same weights lending the
@@ -57,6 +55,10 @@ pub(crate) struct Family {
     fallback: Option<[&'static [u8]; 2]>,
     /// Fonts lending each face the characters beyond its code-page slots.
     wide: [&'static [wide::Source]; 2],
+    /// The glyphs' size in the line box, 1 for the font's own: Inter's letters are
+    /// set smaller in the UI's families, so a layout's line of text keeps about the
+    /// room it was measured for.
+    glyph_scale: f32,
 }
 
 /// Inter, the HUD's, chat's and SJK's own screens' font.
@@ -65,25 +67,27 @@ pub(crate) const INTER: Family = Family {
     faces: [INTER_REGULAR, INTER_SEMIBOLD],
     fallback: None,
     wide: wide::INTER,
+    glyph_scale: 1.0,
 };
 
-/// The SJK UI's display family, as on SJK's site: Rajdhani SemiBold and Bold
-/// for navigation and titles. It has no superscripts, fractions or ordinals,
-/// so those come from Exo 2 SemiBold.
+/// The UI's display family: Inter SemiBold and Bold for navigation, titles and
+/// numbers, its letters set at 0.84 of the line box.
 pub(crate) const DISPLAY: Family = Family {
-    name: "Rajdhani",
-    faces: [RAJDHANI_SEMIBOLD, RAJDHANI_BOLD],
-    fallback: Some([EXO2_SEMIBOLD, EXO2_SEMIBOLD]),
-    wide: [wide::EXO2[1], wide::EXO2[1]],
+    name: "Inter Display",
+    faces: [INTER_SEMIBOLD, INTER_BOLD],
+    fallback: None,
+    wide: [wide::INTER[1], wide::INTER[1]],
+    glyph_scale: 0.84,
 };
 
-/// The SJK UI's body family, as on SJK's site: Exo 2 Regular and SemiBold
-/// (static instances of the variable font), covering all of Windows-1252.
+/// The UI's body family: Inter Regular and SemiBold for details, descriptions and
+/// everything else, its letters set at 0.94 of the line box.
 pub(crate) const BODY: Family = Family {
-    name: "Exo 2",
-    faces: [EXO2_REGULAR, EXO2_SEMIBOLD],
+    name: "Inter Text",
+    faces: [INTER_REGULAR, INTER_SEMIBOLD],
     fallback: None,
-    wide: wide::EXO2,
+    wide: wide::INTER,
+    glyph_scale: 0.94,
 };
 
 /// Font weight available in the modern UI atlas.
@@ -284,7 +288,7 @@ pub(crate) fn load_modern(
     load_family(&INTER, dpi_scale, logo)
 }
 
-/// How wide `text` is in the display family's regular face (Rajdhani SemiBold) at
+/// How wide `text` is in the display family's regular face ([`DISPLAY`]) at
 /// `size`, the line height the SJK UI sets its text at, from the font's own
 /// advances: for a layout made before the glyph atlas is at hand (the Profile
 /// screen's tabs). The font is read once; 0 if it cannot be.
@@ -293,7 +297,7 @@ pub(crate) fn display_width(text: &str, size: f32) -> f32 {
     const READ_AT: f32 = 100.0;
     static FONT: std::sync::OnceLock<Option<(Font, f32)>> = std::sync::OnceLock::new();
     let Some((font, line)) = FONT.get_or_init(|| {
-        let font = Font::from_bytes(RAJDHANI_SEMIBOLD, FontSettings::default()).ok()?;
+        let font = Font::from_bytes(DISPLAY.faces[0], FontSettings::default()).ok()?;
         let line = font.horizontal_line_metrics(READ_AT)?.new_line_size;
         Some((font, line))
     }) else {
@@ -303,7 +307,7 @@ pub(crate) fn display_width(text: &str, size: f32) -> f32 {
         .chars()
         .map(|character| font.metrics(character, READ_AT).advance_width)
         .sum();
-    advances / line * size
+    advances * DISPLAY.glyph_scale / line * size
 }
 
 /// Rasterize `family`'s two faces at the current monitor DPI into one atlas,
@@ -364,13 +368,19 @@ pub(crate) fn load_family(
     let (image, rectangles) = paint_atlas(&rasterized);
     let mut glyphs = [[FontGlyph::default(); GLYPH_COUNT]; 2];
     for (glyph, uv) in rasterized.iter().zip(rectangles) {
-        let top = (line_metrics.ascent - (glyph.metrics.ymin as f32 + glyph.metrics.height as f32))
+        // A smaller glyph scale keeps the line box and centres the letters' own
+        // (smaller) line in it.
+        let k = family.glyph_scale;
+        let line = line_metrics.new_line_size;
+        let top = (line_metrics.ascent * k
+            - (glyph.metrics.ymin as f32 + glyph.metrics.height as f32) * k
+            + line * (1.0 - k) * 0.5)
             / MODERN_RASTER_SCALE;
         glyphs[glyph.face][glyph.byte] = FontGlyph {
-            width: glyph.metrics.width as f32 / MODERN_RASTER_SCALE,
-            height: glyph.metrics.height as f32 / MODERN_RASTER_SCALE,
-            advance: glyph.metrics.advance_width / MODERN_RASTER_SCALE,
-            offset_x: glyph.metrics.xmin as f32 / MODERN_RASTER_SCALE,
+            width: glyph.metrics.width as f32 * k / MODERN_RASTER_SCALE,
+            height: glyph.metrics.height as f32 * k / MODERN_RASTER_SCALE,
+            advance: glyph.metrics.advance_width * k / MODERN_RASTER_SCALE,
+            offset_x: glyph.metrics.xmin as f32 * k / MODERN_RASTER_SCALE,
             offset_y: top,
             uv,
         };

@@ -804,7 +804,7 @@ impl SettingsMenu {
             part(facts, format_args!("{note}"));
         }
         if self.alpha && super::renderer_setting(setting.cvar) {
-            part(facts, format_args!("SJK renderer: alpha"));
+            part(facts, format_args!("SlashJK renderer: alpha"));
         }
         if self.section == Section::Search
             && let Some(group) = search::group(self.selected)
@@ -962,8 +962,12 @@ pub(super) fn choice_label<'a>(cvar: &str, value: &'a str) -> &'a str {
     if let Some(name) = help::choice_name(cvar, value) {
         return name;
     }
-    // Client names stay in capitals: the menu style's "sjk", the camera style's.
-    ["SJK", "EJK"]
+    // Client names keep their spelling: the menu style's "sjk" (shown as the
+    // client's own name), the camera style's.
+    if value.eq_ignore_ascii_case("sjk") {
+        return crate::menu::sjk::brand::NAME;
+    }
+    ["EJK"]
         .into_iter()
         .find(|name| value.eq_ignore_ascii_case(name))
         .unwrap_or(value)
@@ -1215,11 +1219,11 @@ mod tests {
         let mut menu = SettingsMenu::new();
         menu.open_tab(&console, SettingsMenu::tab_index("VIDEO").unwrap());
         let row = row_of(&menu, ROW_NAME);
-        assert_eq!(menu.values[row], "SJK (recommended)");
+        assert_eq!(menu.values[row], "SlashJK (recommended)");
         assert_eq!(
             menu.defaults[row],
             RowDefault {
-                text: Some("SJK (recommended)".to_owned()),
+                text: Some("SlashJK (recommended)".to_owned()),
                 changed: false
             }
         );
@@ -1247,7 +1251,7 @@ mod tests {
         assert!(row_default(&console, shadows).changed);
         menu.selected = row;
         menu.adjust(&mut console, -1);
-        assert_eq!(menu.values[row], "SJK (recommended)");
+        assert_eq!(menu.values[row], "SlashJK (recommended)");
         menu.adjust(&mut console, -1);
         assert_eq!(menu.values[row], "Vanilla style");
         assert!(crate::graphics_quality::vanilla(&console));

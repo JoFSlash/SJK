@@ -60,11 +60,11 @@ const PROFILE_HINT: &str = "Name, model, saber and Force";
 const SETTINGS_HINT: &str = "Key bindings and every option, with search";
 const SJK_HINT: &str = "Changelog, credits and updates";
 const EXIT_HINT: &str = "Leave the game";
-const CREDITS_HINT: &str = "The people who make SJK";
-const CHANGELOG_HINT: &str = "What changed in each SJK release, and who made it";
-const UPDATE_HINT: &str = "Check for a newer SJK release and install it";
-const IDENTITY_HINT: &str = "Your SJK identity: your key and the SJK hub";
-const SJK_PROFILE_HINT: &str = "Your SJK profile: medals, bio, record and achievements";
+const CREDITS_HINT: &str = "The people who make SlashJK";
+const CHANGELOG_HINT: &str = "What changed in each SlashJK release, and who made it";
+const UPDATE_HINT: &str = "Check for a newer SlashJK release and install it";
+const IDENTITY_HINT: &str = "Your online identity: your key and the hub";
+const SJK_PROFILE_HINT: &str = "Your SlashJK profile: medals, bio, record and achievements";
 const BACK_HINT: &str = "Return to the main menu";
 
 /// Retail `main.menu`: two columns either side of the centre window, Exit
@@ -97,7 +97,7 @@ const MAIN: [Slot; 5] = [
     ),
     button(
         Entry::Sjk,
-        "SJK",
+        "SlashJK",
         SJK_HINT,
         [521.0, 322.0],
         190.0,
@@ -143,7 +143,7 @@ const fn nav_row() -> [Slot; 4] {
         ),
         button(
             Entry::Sjk,
-            "SJK",
+            "SlashJK",
             SJK_HINT,
             [567.0, 138.0],
             130.0,
@@ -205,13 +205,13 @@ const PLAY: [Slot; 11] = {
         centre_row(
             Entry::PlayDemo,
             "PLAY DEMO",
-            "Not in SJK yet: use the demo console command",
+            "Not in SlashJK yet: use the demo console command",
             296.0,
         ),
         centre_row(
             Entry::Rules,
             "RULES",
-            "Not in SJK yet: no rules pages",
+            "Not in SlashJK yet: no rules pages",
             331.0,
         ),
         back,

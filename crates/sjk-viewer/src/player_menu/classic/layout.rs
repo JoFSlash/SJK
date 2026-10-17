@@ -119,7 +119,7 @@ impl Item {
             Self::NavPlay => "PLAY",
             Self::NavProfile => "PROFILE",
             Self::NavControls => "SETTINGS",
-            Self::NavSetup => "SJK",
+            Self::NavSetup => "SlashJK",
             Self::Name => "Name:",
             Self::Team => "Team Color:",
             Self::Search => "Search:",

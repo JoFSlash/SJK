@@ -21,7 +21,7 @@ pub(crate) const BAN: &str = "Ban 24 h";
 pub(crate) const CONFIRM: &str = "Confirm ban";
 pub(crate) const BANNING: &str = "Banning...";
 /// The line under an armed button.
-pub(crate) const ARMED_LINE: &str = "Click again: no SJK chat for them for 24 hours";
+pub(crate) const ARMED_LINE: &str = "Click again: no global chat for them for 24 hours";
 
 /// What a Ban button shows for a player.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -268,7 +268,7 @@ mod tests {
         let shown = bans.shown(TROLL, t0);
         assert_eq!(shown.label, BAN);
         let (line, banned) = shown.line.unwrap();
-        assert!(line.starts_with("Banned from SJK chat until "), "{line}");
+        assert!(line.starts_with("Banned from global chat until "), "{line}");
         assert!(banned);
         assert_eq!(bans.shown("0123456789abcdef", t0).line, None);
         // A refusal is worded for players.

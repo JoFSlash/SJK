@@ -52,11 +52,11 @@ fn headline(inputs: &Inputs<'_>, stacks: Option<&[Stack]>) -> (String, &'static 
     match (inputs.enabled, stacks) {
         (false, _) => (
             "Identity is off".to_owned(),
-            "Your cards are kept on the SJK hub: switch the identity on in Settings, Network, to see them.",
+            "Your cards are kept on the hub: switch the identity on in Settings, Network, to see them.",
         ),
         (true, None) => (
             "Contacting the hub...".to_owned(),
-            "Your cards show once the SJK hub has answered.",
+            "Your cards show once the hub has answered.",
         ),
         (true, Some([])) => (
             "No cards yet".to_owned(),
@@ -108,7 +108,7 @@ impl Panel {
                 rect: frame.rect(LEFT_X, GRID_TOP, CARD_WIDTH, CARD_WIDTH * look::ASPECT),
                 radius: CARD_WIDTH * 0.07 * frame.s,
                 width: 1.5 * frame.s,
-                color: color::alpha(color::HOLO, 0.22),
+                color: color::alpha(color::LINE, 0.22),
             });
             return;
         }
@@ -159,7 +159,7 @@ impl Panel {
             format_args!("{words}"),
             frame.rect(right - width - 8.0, LEAD_Y, width + 8.0, 40.0),
             size * s,
-            color::GOLD_BRIGHT,
+            color::ACCENT_BRIGHT,
             FontWeight::Semibold,
             TextAlign::End,
         );
@@ -168,7 +168,7 @@ impl Panel {
             right - width - 8.0 - 10.0 - cards::mark::width(mark),
             LEAD_Y + 8.0,
         );
-        cards::mark::draw(self.ui.draw_list_mut(), [x, y], mark * s, color::GOLD);
+        cards::mark::draw(self.ui.draw_list_mut(), [x, y], mark * s, color::ACCENT);
         text(
             &mut self.ui,
             TextFamily::Body,
@@ -275,9 +275,9 @@ impl Panel {
             frame.rect(LEFT_X, REVEAL_Y + 54.0, 900.0, 24.0),
             16.0 * frame.s,
             if outcome.message.is_empty() {
-                color::GOLD_BRIGHT
+                color::ACCENT_BRIGHT
             } else {
-                color::EMBER
+                color::DANGER
             },
             FontWeight::Regular,
             TextAlign::Start,
@@ -304,7 +304,7 @@ impl Panel {
                 rect: frame.rect(x - 5.0, y - 5.0, CARD_WIDTH + 10.0, height + 10.0),
                 radius: (CARD_WIDTH * 0.07 + 5.0) * s,
                 width: 2.0 * s,
-                color: color::GOLD_BRIGHT,
+                color: color::ACCENT_BRIGHT,
             });
         }
         let tilt = self.card_tilt(frame, [x, y, CARD_WIDTH], index + 1, seconds);
@@ -330,7 +330,7 @@ impl Panel {
             frame.rect(x, y + height + 6.0, CARD_WIDTH * 0.5, 24.0),
             19.0 * s,
             if chosen {
-                color::GOLD_BRIGHT
+                color::ACCENT_BRIGHT
             } else {
                 color::TEXT
             },
@@ -349,7 +349,7 @@ impl Panel {
             ),
             14.0 * s,
             if stack.finish.index == 2 {
-                color::GOLD
+                color::ACCENT
             } else {
                 color::MUTED
             },
@@ -402,7 +402,7 @@ impl Panel {
             frame.rect(SHOWCASE_X, y, SHOWCASE_WIDTH, 40.0),
             32.0 * s,
             if stack.finish.index == 2 {
-                color::GOLD_BRIGHT
+                color::ACCENT_BRIGHT
             } else {
                 stack.rarity.colour
             },

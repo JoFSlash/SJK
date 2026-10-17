@@ -111,8 +111,8 @@ impl HudPicker {
             return self.choices[index].label.clone();
         }
         match self.selected.style {
-            Some(HudStyle::Classic) => "SJK classic",
-            Some(HudStyle::Radial) => "SJK radial",
+            Some(HudStyle::Classic) => "SlashJK classic",
+            Some(HudStyle::Radial) => "SlashJK radial",
             _ => "Game HUD",
         }
         .to_owned()
@@ -526,10 +526,12 @@ impl SettingsMenu {
                 None
             }
             (None, false, _) => Some(match choice.style {
-                HudStyle::Classic => "SJK's classic layout: drawn by SJK, no game files needed.",
-                _ => "SJK's radial layout: drawn by SJK, no game files needed.",
+                HudStyle::Classic => {
+                    "SlashJK's classic layout: drawn by SlashJK, no game files needed."
+                }
+                _ => "SlashJK's radial layout: drawn by SlashJK, no game files needed.",
             }),
-            (None, true, true) => Some("No preview: these files describe no HUD SJK can draw."),
+            (None, true, true) => Some("No preview: these files describe no HUD SlashJK can draw."),
             (None, true, false) => Some("Drawing the preview..."),
         };
         if let Some(note) = note {
@@ -696,7 +698,7 @@ mod tests {
         for _ in 0..2 {
             menu.adjust(&mut console, 1);
         }
-        assert_eq!(menu.values[row], "SJK radial");
+        assert_eq!(menu.values[row], "SlashJK radial");
         assert_eq!(console.text_value(STYLE_CVAR), Some("radial"));
         // SJK's classic layout, then round to the first.
         for _ in 0..2 {
@@ -707,7 +709,7 @@ mod tests {
         assert_eq!(console.text_value(PACK_CVAR), Some("assets1.pk3"));
         assert_eq!(console.text_value(FILES_CVAR), Some("ui/jahud.txt"));
         menu.adjust(&mut console, -1);
-        assert_eq!(menu.values[row], "SJK classic");
+        assert_eq!(menu.values[row], "SlashJK classic");
         assert_eq!(console.text_value(STYLE_CVAR), Some("classic"));
     }
 

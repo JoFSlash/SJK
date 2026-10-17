@@ -517,7 +517,7 @@ pub(crate) fn card_from(info: &[u8], hub: Option<HubInfo>, shader: Option<&'stat
         .unwrap_or_default();
     if let Some(hub) = &hub {
         card.texts[T_HUB] = if hub.name.is_empty() {
-            "SJK player".to_owned()
+            "SlashJK player".to_owned()
         } else {
             hub.name.clone()
         };
@@ -539,7 +539,7 @@ pub(crate) fn card_from(info: &[u8], hub: Option<HubInfo>, shader: Option<&'stat
         }
         if let Some(facts) = &hub.profile {
             if facts.staff {
-                card.texts[T_STAFF] = "SJK TEAM".to_owned();
+                card.texts[T_STAFF] = "TEAM".to_owned();
             }
             if let Some(tier) = facts
                 .holocron
@@ -557,7 +557,7 @@ pub(crate) fn card_from(info: &[u8], hub: Option<HubInfo>, shader: Option<&'stat
             card.texts[T_BIO] = facts.bio.clone();
             let date = crate::medals::date_text(facts.created);
             if !date.is_empty() {
-                card.texts[T_SINCE] = format!("In SJK since {date}");
+                card.texts[T_SINCE] = format!("In SlashJK since {date}");
             }
             for (index, kind) in facts.rarest.iter().enumerate() {
                 card.texts[T_GOAL + index] =
@@ -1752,7 +1752,7 @@ mod tests {
             }),
             None,
         );
-        assert_eq!(unnamed.texts[T_HUB], "SJK player");
+        assert_eq!(unnamed.texts[T_HUB], "SlashJK player");
         assert!(unnamed.texts[T_VERIFIED].is_empty());
     }
 
@@ -1914,11 +1914,11 @@ mod tests {
         assert_eq!(rarest, ["kills_1000", "kills_100", "duel_wins_10"]);
         assert_eq!(facts.holocron, Some(2), "legendary is the rarest held");
         let card = full_card(None);
-        assert_eq!(card.texts[T_STAFF], "SJK TEAM");
+        assert_eq!(card.texts[T_STAFF], "TEAM");
         assert_eq!(card.texts[T_HOLOCRON], "Legendary Holocron");
         assert_eq!(card.texts[T_ACHIEVEMENTS], "Achievements  4 / 21");
         assert_eq!(card.texts[T_BIO], "Fox of the JoF, maker of SJK.");
-        assert!(card.texts[T_SINCE].starts_with("In SJK since "));
+        assert!(card.texts[T_SINCE].starts_with("In SlashJK since "));
         assert_eq!(card.texts[T_GOAL], "1K");
         assert_eq!(card.texts[T_VITALS], "Sees your health, shield and Force");
         // An older hub's profile, or none yet: no marks, no lines.

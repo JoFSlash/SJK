@@ -53,10 +53,10 @@ impl Panel {
         if token == TOY_TOKEN {
             return Some(Card {
                 title: "Illuminate holocron".to_owned(),
-                colour: color::GOLD_BRIGHT,
+                colour: color::ACCENT_BRIGHT,
                 lines: vec![
                     Line::how(
-                        "Every SJK player has it. Light it here, from the quick wheel's Toys \
+                        "Every player online has it. Light it here, from the quick wheel's Toys \
                          page or with a key bound to toy_illuminate.",
                     ),
                     Line::status(crate::editions::name(crate::editions::ALPHA)),
@@ -67,10 +67,10 @@ impl Panel {
         if token == BOX_TOKEN {
             return Some(Card {
                 title: "Cardboard box".to_owned(),
-                colour: color::GOLD_BRIGHT,
+                colour: color::ACCENT_BRIGHT,
                 lines: vec![
                     Line::how(
-                        "Every SJK player has it. Get in here, from the quick wheel's Toys \
+                        "Every player online has it. Get in here, from the quick wheel's Toys \
                          page or with a key bound to toy_box.",
                     ),
                     Line::status(crate::editions::name(crate::editions::ALPHA)),
@@ -105,7 +105,7 @@ fn medal_card(showing: &medals::Showing) -> Card {
     });
     Card {
         title: medal.name().to_owned(),
-        colour: color::GOLD_BRIGHT,
+        colour: color::ACCENT_BRIGHT,
         lines,
     }
 }
@@ -116,8 +116,8 @@ fn achievement_card(
     standing: Option<&crate::achievements::Standing>,
 ) -> Card {
     let counted = match kind.source {
-        Source::Client(_) => "Counted by SJK in your matches on servers.",
-        Source::Hub => "Counted by the SJK hub.",
+        Source::Client(_) => "Counted by SlashJK in your matches on servers.",
+        Source::Hub => "Counted by the hub.",
     };
     let counted = format!("{counted} {}.", crate::editions::name(kind.edition));
     let status = match standing {
@@ -137,7 +137,7 @@ fn achievement_card(
     Card {
         title: kind.name.to_owned(),
         colour: if done {
-            color::GOLD_BRIGHT
+            color::ACCENT_BRIGHT
         } else {
             crate::achievements::medallion::tint(kind.category)
         },
@@ -163,7 +163,7 @@ fn shader_card(
     let Some(skin) = skin else {
         return Card {
             title: "Stock blade".to_owned(),
-            colour: color::HOLO,
+            colour: color::LINE,
             lines: vec![
                 Line::how("Every player has it: the plain blade, in your saber's colour."),
                 Line::held("Yours"),
@@ -259,7 +259,7 @@ mod tests {
     fn every_medal_says_how_it_is_given() {
         for medal in crate::medals::Medal::ALL {
             let card = medal_card(&medals::Showing { medal, award: None });
-            assert!(card.lines[0].words.starts_with("Given by the SJK team"));
+            assert!(card.lines[0].words.starts_with("Given by the team"));
             let names_a_blade = card.lines.iter().any(|line| line.words.contains("blade"));
             assert_eq!(names_a_blade, medal.blade().is_some(), "{medal:?}");
             assert_eq!(card.lines.last().unwrap().words, "Not given to you yet");
@@ -290,7 +290,7 @@ mod tests {
         };
         let card = achievement_card(kind, Some(&done));
         assert_eq!(card.lines[2].words, "Unlocked 10/10/2026");
-        assert_eq!(card.colour, color::GOLD_BRIGHT);
+        assert_eq!(card.colour, color::ACCENT_BRIGHT);
     }
 
     #[test]

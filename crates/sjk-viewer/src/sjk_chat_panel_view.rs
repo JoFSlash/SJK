@@ -264,7 +264,14 @@ impl Panel {
         std::mem::swap(&mut self.shown.people, &mut self.previous_people);
         self.ui.begin_transparent(viewport);
         crate::settings::sjk_view::backdrop(&mut self.ui, viewport);
-        top_bar(&mut self.ui, &frame, "Back", BACK_TOKEN, "SJK chat", None);
+        top_bar(
+            &mut self.ui,
+            &frame,
+            "Back",
+            BACK_TOKEN,
+            "Global chat",
+            None,
+        );
         inputs.giphy_key.clone_into(&mut self.giphy_key);
         let has_key = crate::chat_gifs::search::key(inputs.giphy_key).is_some();
         if self.gifs.key_card_due(has_key) {
@@ -314,20 +321,20 @@ impl Panel {
         let s = frame.s;
         let (line, colour) = match inputs.chat {
             _ if !inputs.enabled => (
-                "SJK chat is off (Settings > Network > SJK chat)".to_owned(),
-                color::EMBER,
+                "Global chat is off (Settings > Network > Global chat)".to_owned(),
+                color::DANGER,
             ),
             None => (
-                "The SJK identity is off: turn it on to chat (Settings > Network)".to_owned(),
-                color::EMBER,
+                "The online identity is off: turn it on to chat (Settings > Network)".to_owned(),
+                color::DANGER,
             ),
-            Some(chat) if !chat.live => ("Connecting to the SJK hub...".to_owned(), color::MUTED),
+            Some(chat) if !chat.live => ("Connecting to the hub...".to_owned(), color::MUTED),
             Some(chat) if chat.online == 1 => {
-                ("1 SJK player reading".to_owned(), color::GOLD_BRIGHT)
+                ("1 SlashJK player reading".to_owned(), color::ACCENT_BRIGHT)
             }
             Some(chat) => (
-                format!("{} SJK players reading", chat.online),
-                color::GOLD_BRIGHT,
+                format!("{} SlashJK players reading", chat.online),
+                color::ACCENT_BRIGHT,
             ),
         };
         text(
@@ -344,7 +351,7 @@ impl Panel {
             &mut self.ui,
             TextFamily::Body,
             format_args!(
-                "Every SJK player reads this, in game and in the menus. The hub keeps the last 200 messages, in memory only."
+                "Every SlashJK player reads this, in game and in the menus. The hub keeps the last 200 messages, in memory only."
             ),
             frame.rect(LIST_X, TOP + 26.0, LIST_WIDTH, 22.0),
             15.0 * s,
@@ -552,7 +559,7 @@ impl Panel {
             frame.rect(LIST_X + LIST_WIDTH - 420.0, y + 2.0, 420.0, NAME_ROW - 6.0),
             META_SIZE * s,
             if laid.staff {
-                color::GOLD_BRIGHT
+                color::ACCENT_BRIGHT
             } else {
                 color::QUIET
             },
@@ -625,7 +632,7 @@ impl Panel {
         });
         // Where each part goes, so the window can be drawn round them first.
         let online_note = match chat {
-            None => Some("Shows once the SJK hub answers."),
+            None => Some("Shows once the hub answers."),
             Some(_) if !listed.listed => Some("This hub counts them but does not say who."),
             Some(_) if listed.online.is_empty() => Some("Nobody else."),
             Some(_) => None,
@@ -651,13 +658,13 @@ impl Panel {
         let _ = self.ui.draw_list_mut().push(DrawCommand::RoundedRect {
             rect,
             radius: 14.0 * s,
-            color: color::alpha(color::HOLO, 0.05),
+            color: color::alpha(color::LINE, 0.05),
         });
         let _ = self.ui.draw_list_mut().push(DrawCommand::Border {
             rect,
             radius: 14.0 * s,
             width: 1.0 * s,
-            color: color::alpha(color::HOLO, 0.25),
+            color: color::alpha(color::LINE, 0.25),
         });
         let online = match chat {
             Some(_) => format!("Online  \u{b7}  {}", listed.count),
@@ -813,13 +820,13 @@ impl Panel {
             }
         }
         let (ring, width) = if lit {
-            (color::GOLD_BRIGHT, 2.0 * s)
+            (color::ACCENT_BRIGHT, 2.0 * s)
         } else if row.muted {
             (color::alpha(color::QUIET, 0.35), 1.5 * s)
         } else if online {
-            (color::alpha(color::HOLO, 0.5), 1.5 * s)
+            (color::alpha(color::LINE, 0.5), 1.5 * s)
         } else {
-            (color::alpha(color::HOLO, 0.25), 1.5 * s)
+            (color::alpha(color::LINE, 0.25), 1.5 * s)
         };
         let _ = self.ui.draw_list_mut().push(DrawCommand::Arc {
             center: centre,
@@ -836,7 +843,7 @@ impl Panel {
             let dot = if row.muted {
                 color::QUIET
             } else {
-                color::GOLD_BRIGHT
+                color::ACCENT_BRIGHT
             };
             for (size, colour) in [(7.0 * s, color::alpha(color::SPACE, 0.95)), (5.0 * s, dot)] {
                 let _ = self.ui.draw_list_mut().push(DrawCommand::RoundedRect {
@@ -878,7 +885,7 @@ impl Panel {
         let _ = self.ui.draw_list_mut().push(DrawCommand::RoundedRect {
             rect: square,
             radius: r,
-            color: color::alpha(color::HOLO, 0.12),
+            color: color::alpha(color::LINE, 0.12),
         });
         let width = 1.5 * s;
         let _ = self.ui.draw_list_mut().push(DrawCommand::Arc {
@@ -887,7 +894,7 @@ impl Panel {
             width,
             start: 0.0,
             sweep: std::f32::consts::TAU,
-            color: color::alpha(color::HOLO, 0.35),
+            color: color::alpha(color::LINE, 0.35),
             knockout: None,
         });
         text(
@@ -912,7 +919,7 @@ impl Panel {
             let tail: String = self.draft.chars().skip(count - 93).collect();
             format!("...{tail}")
         } else if self.draft.is_empty() && !focused {
-            "Say something to every SJK player".to_owned()
+            "Say something to everyone online".to_owned()
         } else {
             self.draft.clone()
         };
@@ -973,7 +980,7 @@ impl Panel {
             frame.rect(LIST_X + 4.0, FIELD_Y + 54.0, FIELD_WIDTH, 20.0),
             14.0 * s,
             if notice.is_some() {
-                color::EMBER
+                color::DANGER
             } else {
                 color::QUIET
             },
@@ -1121,8 +1128,8 @@ impl Panel {
                     BAN_TOKEN,
                 );
                 let (said, colour) = match shown.line {
-                    Some((said, true)) => (said, color::GOLD_BRIGHT),
-                    Some((said, false)) => (said, color::EMBER),
+                    Some((said, true)) => (said, color::ACCENT_BRIGHT),
+                    Some((said, false)) => (said, color::DANGER),
                     None => (quiet, color::QUIET),
                 };
                 text(
@@ -1210,9 +1217,9 @@ impl Panel {
             .and_then(|(state, after)| {
                 if state.serial > after {
                     Some(if state.failed {
-                        (format!("Not done: {}", state.message), color::EMBER)
+                        (format!("Not done: {}", state.message), color::DANGER)
                     } else {
-                        (format!("Done: {}", state.message), color::GOLD_BRIGHT)
+                        (format!("Done: {}", state.message), color::ACCENT_BRIGHT)
                     })
                 } else {
                     state
@@ -1234,7 +1241,7 @@ impl Panel {
         );
         let _ = self.ui.draw_list_mut().push(DrawCommand::SolidRect {
             rect: frame.rect(SIDE_X - 30.0, LIST_TOP - 20.0, 1.0, LIST_BOTTOM - LIST_TOP),
-            color: color::alpha(color::HOLO, 0.25),
+            color: color::alpha(color::LINE, 0.25),
         });
     }
 
@@ -1677,7 +1684,7 @@ mod tests {
             panel
                 .ui
                 .text_runs()
-                .any(|run| run.starts_with("The SJK identity is off"))
+                .any(|run| run.starts_with("The online identity is off"))
         );
         off.enabled = false;
         panel.build_with(&off, &fonts.font, [1920.0, 1080.0]);
@@ -1685,14 +1692,14 @@ mod tests {
             panel
                 .ui
                 .text_runs()
-                .any(|run| run.starts_with("SJK chat is off"))
+                .any(|run| run.starts_with("Global chat is off"))
         );
         panel.build_with(&inputs(&state, &[], false), &fonts.font, [1920.0, 1080.0]);
         assert!(
             panel
                 .ui
                 .text_runs()
-                .any(|run| run == "9 SJK players reading")
+                .any(|run| run == "9 SlashJK players reading")
         );
     }
 
@@ -1721,7 +1728,7 @@ mod tests {
                     color,
                 } if (*radius - 14.0 * s).abs() < 0.01
                     && (*width - s).abs() < 0.01
-                    && *color == color::alpha(color::HOLO, 0.25)
+                    && *color == color::alpha(color::LINE, 0.25)
                     && rect.y > 150.0 * s =>
                 {
                     Some(*rect)
@@ -1858,7 +1865,7 @@ mod tests {
             .iter()
             .filter(|command| {
                 matches!(command, DrawCommand::RoundedRect { color, rect, .. }
-                    if *color == color::GOLD_BRIGHT && inside(*rect, window))
+                    if *color == color::ACCENT_BRIGHT && inside(*rect, window))
             })
             .count();
         assert_eq!(dots, 2);
@@ -1967,7 +1974,7 @@ mod tests {
         assert!(panel.ui.draw_list().commands().iter().any(|command| matches!(
             command,
             DrawCommand::Arc { color, center, .. }
-                if *color == color::GOLD_BRIGHT && (center[0] - centre(shown[0])[0]).abs() < 0.01
+                if *color == color::ACCENT_BRIGHT && (center[0] - centre(shown[0])[0]).abs() < 0.01
         )));
         // Between two faces: no card.
         point_at(
@@ -2129,7 +2136,7 @@ mod tests {
         quiet.live = false;
         panel.build_with(&inputs_for(&quiet), &fonts.font, [1920.0, 1080.0]);
         let drawn = texts(&panel);
-        found(&drawn, "Shows once the SJK hub answers.");
+        found(&drawn, "Shows once the hub answers.");
         found(&drawn, "Online");
         assert!(!drawn.iter().any(|(text, ..)| text == "Recently active"));
         assert!(panel.shown.people.is_empty());

@@ -1,19 +1,19 @@
-//! The SJK UI's main page: SJK's emblem in its turning holo ring over the live
-//! map, the menu on an arc round the ring's right side, and the servers the
-//! player joined last in a column on the right, each joined with one click.
+//! The main page: the SlashJK wordmark top left, the menu in a column under it
+//! over a dark fade on the live map, and the servers the player joined last as
+//! cards on the right, each joined with one click.
 //!
-//! The ring's gold arc points at the chosen entry. Play, SJK and Quit open
-//! pages of their own on the same ring (the arc swaps to their entries, as
-//! retail's pages swapped inside one frame); Profile and Settings open their
-//! screens. Escape leaves a page for the main one, and on the main one asks to
-//! quit.
+//! The chosen entry sits on a soft pill with an accent bar and says what it
+//! opens. Play, About and Quit open pages of their own in the same column (the
+//! list swaps to their entries, under the page's name); Profile and Settings
+//! open their screens. Escape leaves a page for the main one, and on the main
+//! one asks to quit.
 //!
 //! Under the servers, the SJK chat is docked (`docs/hub-chat.md`): its last lines,
 //! who is online, a field to type in and Open chat for its page. Top left, the donation
 //! goal (`crate::donation_goal`): how much of the month's goal came in, a bar and Donate,
 //! which opens SJK's Ko-fi page in the browser (`ui_donationGoal 0` hides it).
 //!
-//! Keys: Up and Down move along the arc, Enter takes the entry, Right (or Tab)
+//! Keys: Up and Down move through the menu, Enter takes the entry, Right (or Tab)
 //! moves to the servers and Left (or Escape) back; Down past the last server
 //! reaches the chat, where Enter starts typing (Enter sends, Escape stops). The
 //! pointer chooses by hovering and acts with a click.
@@ -24,9 +24,8 @@
 
 use super::chat_dock::{self, Dock, DockAction};
 use super::recent::Ago;
-use super::{Frame, color, fade, fade_across, key_hint, key_hint_width, text};
+use super::{Frame, brand, color, fade, fade_across, key_hint, key_hint_width, text};
 use crate::menu::MainDestination;
-use crate::menu::emblem::{self, EmblemLayer};
 use crate::menu_widgets::{MenuCanvas, TextFamily};
 use sjk_ui::{DrawCommand, FontWeight, Rect, TextAlign};
 use winit::keyboard::KeyCode;
@@ -34,7 +33,7 @@ use winit::keyboard::KeyCode;
 /// The JoF community's server, suggested while the player has joined none.
 pub(crate) const JOF_SERVER: &str = "135.125.145.49:29070";
 
-/// Pointer tokens: the arc's entries, then the servers, then the chat's field and
+/// Pointer tokens: the menu's entries, then the servers, then the chat's field and
 /// its Open chat.
 const ENTRY_TOKEN: u16 = 0;
 const SERVER_TOKEN: u16 = 20;
@@ -60,7 +59,7 @@ const DOCK_TOKENS: chat_dock::Tokens = chat_dock::Tokens {
     ban: SENDER_BAN_TOKEN,
 };
 
-/// The pages the ring shows.
+/// The pages the menu shows.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum Page {
     Main,
@@ -93,7 +92,7 @@ impl Page {
         match self {
             Self::Main => None,
             Self::Play => Some("Play"),
-            Self::Sjk => Some("SJK"),
+            Self::Sjk => Some("About"),
             Self::Quit => Some("Quit"),
         }
     }
@@ -130,7 +129,7 @@ pub(crate) enum Action {
     Quit,
 }
 
-/// One entry of the arc.
+/// One entry of the menu.
 #[derive(Clone, Copy, Debug)]
 struct Entry {
     label: &'static str,
@@ -154,7 +153,7 @@ const MAIN: [Entry; 6] = [
     ),
     entry(
         "Profile",
-        "Character, Force and SJK profile",
+        "Character, Force and your profile",
         open(MainDestination::Player),
     ),
     entry(
@@ -168,11 +167,11 @@ const MAIN: [Entry; 6] = [
         open(MainDestination::Settings { tab: 0 }),
     ),
     entry(
-        "SJK",
+        "About",
         "What's new, updates and credits",
         Step::Page(Page::Sjk),
     ),
-    entry("Quit", "Leave SJK", Step::Page(Page::Quit)),
+    entry("Quit", "Close the game", Step::Page(Page::Quit)),
 ];
 const PLAY: [Entry; 3] = [
     entry(
@@ -195,12 +194,12 @@ const SJK: [Entry; 4] = [
     ),
     entry(
         "Update",
-        "Check for a newer SJK",
+        "Check for a newer version",
         open(MainDestination::Update),
     ),
     entry(
         "Credits",
-        "The people who make SJK",
+        "The people behind the game",
         open(MainDestination::Credits),
     ),
     entry("Back", "", Step::Back),
@@ -237,7 +236,6 @@ pub(crate) struct HomeView<'a> {
     pub(crate) version: &'a str,
     /// A newer release the update check found.
     pub(crate) update: Option<&'a str>,
-    pub(crate) seconds: f64,
     /// The SJK chat, docked under the servers; `None` while it is off.
     pub(crate) chat: Option<ChatDock<'a>>,
     /// What the profile card says of the player's SJK profile.
@@ -253,7 +251,7 @@ pub(crate) use super::chat_dock::DockLine;
 /// Where the keyboard is.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum Focus {
-    Arc,
+    Menu,
     Server(usize),
     /// The SJK chat's field.
     Chat,
@@ -261,18 +259,13 @@ enum Focus {
     Card,
 }
 
-/// The page's state: which page of the ring, its chosen entry, the keyboard's
-/// place, and the gold arc's motion.
+/// The page's state: which page of the menu, its chosen entry and the
+/// keyboard's place.
 #[derive(Debug)]
 pub(crate) struct Home {
     page: Page,
     entry: usize,
     focus: Focus,
-    /// Where the gold arc points (radians, clockwise from the right), easing
-    /// towards its target; `None` until the first frame.
-    arc: Option<f32>,
-    /// Menu time of the last frame, for the arc's easing.
-    last: f64,
     /// Whether the last frame docked the chat.
     dock: bool,
     /// The docked chat's field and sender card.
@@ -284,9 +277,7 @@ impl Default for Home {
         Self {
             page: Page::Main,
             entry: 0,
-            focus: Focus::Arc,
-            arc: None,
-            last: 0.0,
+            focus: Focus::Menu,
             dock: false,
             chat: Dock::default(),
         }
@@ -301,13 +292,13 @@ impl Home {
         Self {
             page,
             entry,
-            focus: server.map_or(Focus::Arc, Focus::Server),
+            focus: server.map_or(Focus::Menu, Focus::Server),
             ..Self::default()
         }
     }
 
     /// `draft` typed in the dock's field, the keyboard there; without one, the keyboard
-    /// on the arc (world shots).
+    /// in the menu (world shots).
     #[cfg(test)]
     pub(crate) fn chat_for_shot(&mut self, draft: Option<&str>) {
         match draft {
@@ -316,17 +307,17 @@ impl Home {
                 self.chat.type_for_shot(draft);
             }
             None => {
-                self.focus = Focus::Arc;
+                self.focus = Focus::Menu;
                 self.chat.stop_typing();
             }
         }
     }
 
-    /// Back on the main page's first entry, the keyboard on the arc.
+    /// Back on the main page's first entry, the keyboard in the menu.
     pub(crate) fn reset(&mut self) {
         self.page = Page::Main;
         self.entry = 0;
-        self.focus = Focus::Arc;
+        self.focus = Focus::Menu;
         self.chat.stop_typing();
     }
 
@@ -374,7 +365,7 @@ impl Home {
     fn show(&mut self, page: Page, entry: usize) {
         self.page = page;
         self.entry = entry.min(page.entries().len() - 1);
-        self.focus = Focus::Arc;
+        self.focus = Focus::Menu;
     }
 
     /// Take the chosen entry.
@@ -399,16 +390,16 @@ impl Home {
     pub(crate) fn key(&mut self, key: KeyCode, servers: usize) -> Option<Action> {
         let count = self.entries().len();
         match (key, self.focus) {
-            (KeyCode::ArrowUp | KeyCode::KeyW, Focus::Arc) => {
+            (KeyCode::ArrowUp | KeyCode::KeyW, Focus::Menu) => {
                 self.entry = (self.entry + count - 1) % count;
             }
-            (KeyCode::ArrowDown | KeyCode::KeyS, Focus::Arc) => {
+            (KeyCode::ArrowDown | KeyCode::KeyS, Focus::Menu) => {
                 self.entry = (self.entry + 1) % count;
             }
-            (KeyCode::ArrowRight | KeyCode::KeyD | KeyCode::Tab, Focus::Arc) if servers > 0 => {
+            (KeyCode::ArrowRight | KeyCode::KeyD | KeyCode::Tab, Focus::Menu) if servers > 0 => {
                 self.focus = Focus::Server(0);
             }
-            (KeyCode::ArrowLeft | KeyCode::KeyA, Focus::Arc) => self.focus = Focus::Card,
+            (KeyCode::ArrowLeft | KeyCode::KeyA, Focus::Menu) => self.focus = Focus::Card,
             (KeyCode::Enter | KeyCode::NumpadEnter | KeyCode::Space, Focus::Card) => {
                 return Some(Action::Open(MainDestination::Profile));
             }
@@ -420,7 +411,7 @@ impl Home {
                 | KeyCode::Tab
                 | KeyCode::Escape,
                 Focus::Card,
-            ) => self.focus = Focus::Arc,
+            ) => self.focus = Focus::Menu,
             (KeyCode::ArrowUp | KeyCode::KeyW, Focus::Server(index)) => {
                 self.focus = Focus::Server((index + servers - 1) % servers);
             }
@@ -436,7 +427,7 @@ impl Home {
                 self.focus = Focus::Server(servers.saturating_sub(1));
             }
             (KeyCode::ArrowLeft | KeyCode::KeyA | KeyCode::Tab | KeyCode::Escape, Focus::Chat) => {
-                self.focus = Focus::Arc;
+                self.focus = Focus::Menu;
             }
             (KeyCode::Enter | KeyCode::NumpadEnter | KeyCode::Space, Focus::Chat) => {
                 self.chat.start_typing();
@@ -445,18 +436,18 @@ impl Home {
                 KeyCode::ArrowLeft | KeyCode::KeyA | KeyCode::Tab | KeyCode::Escape,
                 Focus::Server(_),
             ) => {
-                self.focus = Focus::Arc;
+                self.focus = Focus::Menu;
             }
             (KeyCode::Enter | KeyCode::NumpadEnter | KeyCode::Space, Focus::Server(index)) => {
                 return (index < servers).then_some(Action::Join(index));
             }
-            (KeyCode::Enter | KeyCode::NumpadEnter | KeyCode::Space, Focus::Arc) => {
+            (KeyCode::Enter | KeyCode::NumpadEnter | KeyCode::Space, Focus::Menu) => {
                 return self.take();
             }
-            (KeyCode::Escape | KeyCode::Backspace, Focus::Arc) if self.page != Page::Main => {
+            (KeyCode::Escape | KeyCode::Backspace, Focus::Menu) if self.page != Page::Main => {
                 self.back();
             }
-            (KeyCode::Escape, Focus::Arc) => self.show(Page::Quit, 1),
+            (KeyCode::Escape, Focus::Menu) => self.show(Page::Quit, 1),
             _ => {}
         }
         None
@@ -468,7 +459,7 @@ impl Home {
         let entries = ENTRY_TOKEN..ENTRY_TOKEN + self.entries().len() as u16;
         if entries.contains(&token) {
             self.entry = usize::from(token - ENTRY_TOKEN);
-            self.focus = Focus::Arc;
+            self.focus = Focus::Menu;
             return if activate { self.take() } else { None };
         }
         if self.dock
@@ -498,34 +489,21 @@ impl Home {
         self.focus = Focus::Server(index);
         activate.then_some(Action::Join(index))
     }
-
-    /// Where the gold arc points this frame, eased towards `target` since the
-    /// last frame at menu time `seconds`.
-    fn arc_towards(&mut self, target: f32, seconds: f64) -> f32 {
-        let elapsed = (seconds - self.last).clamp(0.0, 0.1) as f32;
-        self.last = seconds;
-        let current = self.arc.unwrap_or(target);
-        let mut off = (target - current).rem_euclid(std::f32::consts::TAU);
-        if off > std::f32::consts::PI {
-            off -= std::f32::consts::TAU;
-        }
-        let next = current + off * (1.0 - (-elapsed * 9.0).exp());
-        self.arc = Some(next);
-        next
-    }
 }
 
-/// The ring's centre, its radius and the arc's radius, in frame pixels.
-const RING: [f32; 2] = [620.0, 540.0];
-const RING_RADIUS: f32 = 312.0;
-const ARC_RADIUS: f32 = 440.0;
-/// Degrees between entries along the arc; closer for six, so the ends keep clear of
-/// the ring ([`arc_step`]).
-const ARC_STEP: f32 = 16.0;
-const ARC_STEP_SIX: f32 = 12.5;
-/// The servers' column: its rule's x, its text's x and width, its top and the
-/// height of one server.
-const COLUMN_RULE: f32 = 1470.0;
+/// The wordmark's top left and its line's size, in frame pixels.
+const WORDMARK: [f32; 3] = [96.0, 84.0, 34.0];
+/// The menu's column: its left edge, the top of its first row, a row's height
+/// and the chosen row's pill width.
+const MENU_X: f32 = 96.0;
+const MENU_TOP: f32 = 312.0;
+const ROW_HEIGHT: f32 = 78.0;
+const PILL_WIDTH: f32 = 520.0;
+/// The size of an entry's label, and of the chosen one's.
+const LABEL_SIZE: f32 = 34.0;
+const LABEL_SIZE_CHOSEN: f32 = 38.0;
+/// The servers' column: its text's x and width, its top and the height of one
+/// server's card with the gap under it.
 const COLUMN_X: f32 = 1500.0;
 const COLUMN_WIDTH: f32 = 324.0;
 const COLUMN_TOP: f32 = 236.0;
@@ -540,24 +518,9 @@ const DOCK: chat_dock::Place = chat_dock::Place {
     card_floor: KEYS_Y - 24.0,
 };
 
-/// Degrees between entries along an arc of `count`.
-fn arc_step(count: usize) -> f32 {
-    if count > 5 { ARC_STEP_SIX } else { ARC_STEP }
-}
-
-/// Angle (radians) of entry `index` of `count` round the ring.
-fn entry_angle(index: usize, count: usize) -> f32 {
-    ((index as f32 - (count as f32 - 1.0) * 0.5) * arc_step(count)).to_radians()
-}
-
-/// Where entry `index` of `count` starts, in frame pixels: on the arc, at its
-/// vertical middle.
-fn entry_point(index: usize, count: usize) -> [f32; 2] {
-    let angle = entry_angle(index, count);
-    [
-        RING[0] + ARC_RADIUS * angle.cos(),
-        RING[1] + ARC_RADIUS * angle.sin(),
-    ]
+/// The top of row `index` of the menu, in frame pixels.
+fn row_top(index: usize) -> f32 {
+    MENU_TOP + index as f32 * ROW_HEIGHT
 }
 
 /// Build the page into `canvas` at `reveal` opacity.
@@ -570,135 +533,100 @@ pub(crate) fn build(
 ) {
     let frame = Frame::new(viewport);
     let s = frame.s;
-    let seconds = view.seconds;
     canvas.begin_transparent(viewport);
     canvas.push_opacity(reveal);
     scrims(canvas, viewport, &frame);
 
-    // The emblem in its ring, the sunburst's warmth behind it.
-    let centre = frame.point(RING[0], RING[1]);
-    let turn = (seconds * std::f64::consts::TAU / 240.0) as f32;
-    emblem::rays(
-        canvas,
-        EmblemLayer::Sunburst,
-        centre,
-        420.0 * s,
-        -turn * 0.6,
-        color::alpha(color::GOLD, 0.18),
-    );
-    emblem::rays(
-        canvas,
-        EmblemLayer::Ring,
-        centre,
-        RING_RADIUS * s,
-        turn,
-        color::alpha(color::HOLO, 0.9),
-    );
-    emblem::draw(
-        canvas,
-        Rect::new(
-            centre[0] - 190.0 * s,
-            centre[1] - 190.0 * s,
-            380.0 * s,
-            380.0 * s,
-        ),
-        seconds,
-    );
+    let [mark_x, mark_y, mark_size] = WORDMARK;
+    brand::wordmark(canvas, &frame, mark_x, mark_y, mark_size);
 
-    // The gold arc points at the chosen entry, or at the servers.
     home.dock = view.chat.is_some();
     if !home.dock {
         home.chat.hide();
         if home.focus == Focus::Chat {
-            home.focus = Focus::Arc;
+            home.focus = Focus::Menu;
         }
     }
     let entries = home.entries();
-    let target = match home.focus {
-        Focus::Arc => entry_angle(home.entry, entries.len()),
-        Focus::Server(index) => {
-            let y = COLUMN_TOP + 64.0 + (index as f32 + 0.5) * SERVER_HEIGHT;
-            (y - RING[1]).atan2(COLUMN_X - RING[0])
-        }
-        Focus::Chat => (DOCK.field_top() + 16.0 - RING[1]).atan2(COLUMN_X - RING[0]),
-        Focus::Card => {
-            let centre = crate::profile_card::PICTURE[1] + crate::profile_card::PICTURE_SIZE * 0.5;
-            (centre - RING[1]).atan2(crate::profile_card::PICTURE[0] + 200.0 - RING[0])
-        }
-    };
-    let arc = home.arc_towards(target, seconds);
-    let sweep = 0.42;
-    let _ = canvas.draw_list_mut().push(DrawCommand::Arc {
-        center: centre,
-        radius: (RING_RADIUS + 6.0) * s,
-        width: 6.0 * s,
-        start: arc - sweep * 0.5,
-        sweep,
-        color: color::GOLD_BRIGHT,
-        knockout: None,
-    });
-    // A short beam from the arc towards its entry.
-    if home.focus == Focus::Arc {
-        let inner = RING_RADIUS + 12.0;
-        let outer = ARC_RADIUS - 18.0;
-        let steps = 12;
-        for step in 0..steps {
-            let t = step as f32 / steps as f32;
-            let r = inner + (outer - inner) * t;
-            let _ = canvas.draw_list_mut().push(DrawCommand::RoundedRect {
-                rect: Rect::new(
-                    centre[0] + r * arc.cos() * s - 1.2 * s,
-                    centre[1] + r * arc.sin() * s - 1.2 * s,
-                    2.4 * s,
-                    2.4 * s,
-                ),
-                radius: 1.2 * s,
-                color: color::alpha(color::GOLD_BRIGHT, 0.85 * (1.0 - t)),
-            });
-        }
-    }
-
     page_title(canvas, &frame, home);
     for (index, entry) in entries.iter().enumerate() {
+        let token = ENTRY_TOKEN + index as u16;
         let chosen = index == home.entry;
-        let lit = chosen && home.focus == Focus::Arc;
-        let size = if chosen { 68.0 } else { 44.0 };
+        let lit = chosen && home.focus == Focus::Menu;
+        let hovered = !chosen && canvas.token_hovered(token);
+        let top = row_top(index);
+        let leaving = matches!(entry.step, Step::Act(Action::Quit));
+        let accent = if leaving {
+            color::DANGER
+        } else {
+            color::ACCENT
+        };
+        if chosen {
+            let _ = canvas.draw_list_mut().push(DrawCommand::RoundedRect {
+                rect: frame.rect(MENU_X - 20.0, top, PILL_WIDTH, ROW_HEIGHT - 8.0),
+                radius: 16.0 * s,
+                color: if lit {
+                    color::alpha(accent, 0.16)
+                } else {
+                    color::alpha(color::LINE, 0.06)
+                },
+            });
+            if lit {
+                let _ = canvas.draw_list_mut().push(DrawCommand::RoundedRect {
+                    rect: frame.rect(MENU_X - 20.0, top + 16.0, 4.0, ROW_HEIGHT - 40.0),
+                    radius: 2.0 * s,
+                    color: accent,
+                });
+            }
+        } else if hovered {
+            let _ = canvas.draw_list_mut().push(DrawCommand::RoundedRect {
+                rect: frame.rect(MENU_X - 20.0, top, PILL_WIDTH, ROW_HEIGHT - 8.0),
+                radius: 16.0 * s,
+                color: color::alpha(color::LINE, 0.04),
+            });
+        }
         let colour = match (lit, chosen, entry.step) {
-            // Leaving is the one thing in ember.
-            (true, _, Step::Act(Action::Quit)) => color::EMBER,
-            (true, _, _) => color::GOLD_BRIGHT,
-            (false, true, _) => color::TEXT,
-            (false, false, Step::Back) => color::QUIET,
-            (false, false, Step::Page(Page::Quit)) => color::QUIET,
+            (true, _, Step::Act(Action::Quit)) => color::DANGER,
+            (true, _, _) | (false, true, _) => color::TEXT,
+            (false, false, Step::Back | Step::Page(Page::Quit)) => color::QUIET,
             (false, false, _) => color::MUTED,
         };
-        let [x, y] = entry_point(index, entries.len());
+        let has_hint = chosen && !entry.hint.is_empty();
+        let size = if chosen {
+            LABEL_SIZE_CHOSEN
+        } else {
+            LABEL_SIZE
+        };
+        let label_top = if has_hint { top + 8.0 } else { top + 14.0 };
         text(
             canvas,
             TextFamily::Display,
             format_args!("{}", entry.label),
-            frame.rect(x, y - size * 0.62, 640.0, size * 1.2),
+            frame.rect(MENU_X + 8.0, label_top, PILL_WIDTH - 48.0, 42.0),
             size * s,
             colour,
             FontWeight::Regular,
             TextAlign::Start,
         );
-        if chosen && !entry.hint.is_empty() {
+        if has_hint {
             text(
                 canvas,
                 TextFamily::Body,
                 format_args!("{}", entry.hint),
-                frame.rect(x + 2.0, y + 32.0, 520.0, 24.0),
-                18.0 * s,
-                color::MUTED,
+                frame.rect(MENU_X + 9.0, top + 46.0, PILL_WIDTH - 48.0, 20.0),
+                16.0 * s,
+                if lit {
+                    color::alpha(color::ACCENT_BRIGHT, 0.9)
+                } else {
+                    color::MUTED
+                },
                 FontWeight::Regular,
                 TextAlign::Start,
             );
         }
-        let pitch = ARC_RADIUS * arc_step(entries.len()).to_radians();
         canvas.hit_region(
-            ENTRY_TOKEN + index as u16,
-            frame.rect(x - 16.0, y - pitch * 0.5, COLUMN_RULE - x - 40.0, pitch),
+            token,
+            frame.rect(MENU_X - 20.0, top, PILL_WIDTH, ROW_HEIGHT - 8.0),
         );
     }
 
@@ -744,7 +672,7 @@ pub(crate) fn build(
     }
     canvas.pop_opacity();
     let selected = match home.focus {
-        Focus::Arc => ENTRY_TOKEN + home.entry as u16,
+        Focus::Menu => ENTRY_TOKEN + home.entry as u16,
         Focus::Server(index) => SERVER_TOKEN + index as u16,
         Focus::Chat => CHAT_TOKEN,
         Focus::Card => CARD_TOKEN,
@@ -752,20 +680,20 @@ pub(crate) fn build(
     canvas.finish(selected);
 }
 
-/// Fades keeping text readable over any map: dark on the left behind the ring
-/// and the arc, lighter in the middle, dark again behind the servers, and at
-/// the top and bottom.
+/// Fades keeping text readable over any map: dark on the left behind the menu,
+/// clear in the middle, dark again behind the servers, and at the top and
+/// bottom.
 fn scrims(canvas: &mut MenuCanvas, viewport: [f32; 2], frame: &Frame) {
     let [width, height] = viewport;
     let space = |alpha| color::alpha(color::SPACE, alpha);
     // The frame's stops, stretched to the window's edges.
     let x = |frame_x: f32| frame.point(frame_x, 0.0)[0];
     let stops = [
-        (0.0, 0.92),
-        (x(730.0), 0.78),
-        (x(1190.0), 0.35),
-        (x(1400.0), 0.62),
-        (width, 0.78),
+        (0.0, 0.94),
+        (x(560.0), 0.86),
+        (x(980.0), 0.18),
+        (x(1360.0), 0.5),
+        (width, 0.86),
     ];
     for pair in stops.windows(2) {
         let ((left, from), (right, to)) = (pair[0], pair[1]);
@@ -780,34 +708,36 @@ fn scrims(canvas: &mut MenuCanvas, viewport: [f32; 2], frame: &Frame) {
     }
     fade(
         canvas,
-        Rect::new(0.0, 0.0, width, height * 0.22),
-        space(0.55),
+        Rect::new(0.0, 0.0, width, height * 0.24),
+        space(0.6),
         space(0.0),
     );
     fade(
         canvas,
-        Rect::new(0.0, height * 0.72, width, height * 0.28),
+        Rect::new(0.0, height * 0.7, width, height * 0.3),
         space(0.0),
-        space(0.85),
+        space(0.9),
     );
 }
 
-/// A sub-page's name over its first entry.
+/// A sub-page's name over its first entry: a short accent line and the name.
 fn page_title(canvas: &mut MenuCanvas, frame: &Frame, home: &Home) {
     let Some(title) = home.page.title() else {
         return;
     };
-    let count = home.entries().len();
-    let angle = entry_angle(0, count) - (arc_step(count) * 1.1).to_radians();
-    let x = RING[0] + ARC_RADIUS * angle.cos();
-    let y = RING[1] + ARC_RADIUS * angle.sin();
+    let top = MENU_TOP - 48.0;
+    let _ = canvas.draw_list_mut().push(DrawCommand::RoundedRect {
+        rect: frame.rect(MENU_X + 8.0, top + 13.0, 20.0, 3.0),
+        radius: 1.5 * frame.s,
+        color: color::ACCENT,
+    });
     text(
         canvas,
         TextFamily::Display,
         format_args!("{title}"),
-        frame.rect(x, y - 16.0, 400.0, 30.0),
-        24.0 * frame.s,
-        color::alpha(color::HOLO, 0.85),
+        frame.rect(MENU_X + 40.0, top, 400.0, 30.0),
+        22.0 * frame.s,
+        color::MUTED,
         FontWeight::Semibold,
         TextAlign::Start,
     );
@@ -816,32 +746,10 @@ fn page_title(canvas: &mut MenuCanvas, frame: &Frame, home: &Home) {
 /// The servers' column: the ones joined last, or the suggested JoF server.
 fn servers(canvas: &mut MenuCanvas, frame: &Frame, home: &Home, view: &HomeView<'_>) {
     let s = frame.s;
-    let count = view.servers.len();
     let suggested = view
         .servers
         .first()
         .is_some_and(|server| server.played.is_none());
-    let bottom = COLUMN_TOP + 64.0 + count.max(1) as f32 * SERVER_HEIGHT;
-    let rule = color::alpha(color::HOLO, 0.6);
-    let clear = color::alpha(color::HOLO, 0.0);
-    let rule_top = COLUMN_TOP - 10.0;
-    let height = bottom - rule_top;
-    fade(
-        canvas,
-        frame.rect(COLUMN_RULE, rule_top, 2.0, height * 0.18),
-        clear,
-        rule,
-    );
-    let _ = canvas.draw_list_mut().push(DrawCommand::SolidRect {
-        rect: frame.rect(COLUMN_RULE, rule_top + height * 0.18, 2.0, height * 0.64),
-        color: rule,
-    });
-    fade(
-        canvas,
-        frame.rect(COLUMN_RULE, rule_top + height * 0.82, 2.0, height * 0.18),
-        rule,
-        clear,
-    );
     text(
         canvas,
         TextFamily::Display,
@@ -853,10 +761,10 @@ fn servers(canvas: &mut MenuCanvas, frame: &Frame, home: &Home, view: &HomeView<
                 "Recent servers"
             }
         ),
-        frame.rect(COLUMN_X, COLUMN_TOP, COLUMN_WIDTH, 34.0),
-        28.0 * s,
-        color::TEXT,
-        FontWeight::Regular,
+        frame.rect(COLUMN_X - 16.0, COLUMN_TOP + 4.0, COLUMN_WIDTH, 30.0),
+        22.0 * s,
+        color::MUTED,
+        FontWeight::Semibold,
         TextAlign::Start,
     );
     for (index, server) in view.servers.iter().enumerate() {
@@ -864,39 +772,50 @@ fn servers(canvas: &mut MenuCanvas, frame: &Frame, home: &Home, view: &HomeView<
         let token = SERVER_TOKEN + index as u16;
         let focused = home.focus == Focus::Server(index) || canvas.token_hovered(token);
         let target = frame.rect(
-            COLUMN_X - 14.0,
-            top - 8.0,
-            COLUMN_WIDTH + 24.0,
-            SERVER_HEIGHT - 8.0,
+            COLUMN_X - 18.0,
+            top - 10.0,
+            COLUMN_WIDTH + 30.0,
+            SERVER_HEIGHT - 10.0,
         );
-        if focused {
+        let _ = canvas.draw_list_mut().push(DrawCommand::RoundedRect {
+            rect: target,
+            radius: 14.0 * s,
+            color: if focused {
+                color::alpha(color::ACCENT, 0.16)
+            } else {
+                color::alpha(color::SPACE, 0.55)
+            },
+        });
+        let _ = canvas.draw_list_mut().push(DrawCommand::Border {
+            rect: target,
+            radius: 14.0 * s,
+            width: s.max(1.0),
+            color: if focused {
+                color::alpha(color::ACCENT, 0.7)
+            } else {
+                color::alpha(color::LINE, 0.1)
+            },
+        });
+        // A live server's dot: green while the list answers for it.
+        if server.live.is_some() {
             let _ = canvas.draw_list_mut().push(DrawCommand::RoundedRect {
-                rect: target,
-                radius: 10.0 * s,
-                color: color::alpha(color::HOLO, 0.1),
-            });
-            let _ = canvas.draw_list_mut().push(DrawCommand::RoundedRect {
-                rect: frame.rect(COLUMN_X - 14.0, top - 2.0, 3.0, SERVER_HEIGHT - 20.0),
-                radius: 1.5 * s,
-                color: color::GOLD_BRIGHT,
+                rect: frame.rect(COLUMN_X + COLUMN_WIDTH - 8.0, top + 8.0, 8.0, 8.0),
+                radius: 4.0 * s,
+                color: color::TRUSTED,
             });
         }
         text(
             canvas,
             TextFamily::Display,
             format_args!("{}", server.name),
-            frame.rect(COLUMN_X, top, COLUMN_WIDTH, 32.0),
-            27.0 * s,
-            if focused {
-                color::GOLD_BRIGHT
-            } else {
-                color::TEXT
-            },
+            frame.rect(COLUMN_X, top, COLUMN_WIDTH - 20.0, 30.0),
+            24.0 * s,
+            color::TEXT,
             FontWeight::Regular,
             TextAlign::Start,
         );
-        let detail = frame.rect(COLUMN_X, top + 34.0, COLUMN_WIDTH, 22.0);
-        let quiet = frame.rect(COLUMN_X, top + 56.0, COLUMN_WIDTH, 20.0);
+        let detail = frame.rect(COLUMN_X, top + 32.0, COLUMN_WIDTH, 22.0);
+        let quiet = frame.rect(COLUMN_X, top + 54.0, COLUMN_WIDTH, 20.0);
         let body = |canvas: &mut MenuCanvas, rect, colour, value: std::fmt::Arguments<'_>| {
             text(
                 canvas,
@@ -932,17 +851,18 @@ fn servers(canvas: &mut MenuCanvas, frame: &Frame, home: &Home, view: &HomeView<
                 canvas,
                 quiet,
                 color::QUIET,
-                format_args!("The JoF community's server"),
+                format_args!("A good place to start"),
             ),
         }
         canvas.hit_region(token, target);
     }
 }
 
-/// The donation goal's place, top left: its left edge, its top and its width.
-const DONATION: [f32; 3] = [96.0, 58.0, 420.0];
+/// The donation goal's place, top right above the servers: its left edge, its top
+/// and its width.
+const DONATION: [f32; 3] = [1404.0, 58.0, 420.0];
 
-/// The donation goal, top left, clear of the ring: "Support SJK" and Donate, then how
+/// The donation goal, top right, above the servers: "Support SJK" and Donate, then how
 /// much of the goal came in and its bar, then what a donation over 1 euro brings.
 fn donation(canvas: &mut MenuCanvas, frame: &Frame, card: crate::donation_goal::Card) {
     use crate::donation_goal::Amount;
@@ -952,7 +872,7 @@ fn donation(canvas: &mut MenuCanvas, frame: &Frame, card: crate::donation_goal::
     text(
         canvas,
         TextFamily::Display,
-        format_args!("Support SJK"),
+        format_args!("Support SlashJK"),
         frame.rect(x, top + 4.0, width - button - 12.0, 32.0),
         26.0 * s,
         color::TEXT,
@@ -1005,14 +925,14 @@ fn donation(canvas: &mut MenuCanvas, frame: &Frame, card: crate::donation_goal::
             let _ = canvas.draw_list_mut().push(DrawCommand::RoundedRect {
                 rect: frame.rect(x, y, width, 8.0),
                 radius: 4.0 * s,
-                color: color::alpha(color::HOLO, 0.16),
+                color: color::alpha(color::LINE, 0.16),
             });
             let fill = numbers.fill();
             if fill > 0.0 {
                 let _ = canvas.draw_list_mut().push(DrawCommand::RoundedRect {
                     rect: frame.rect(x, y, (width * fill).max(8.0), 8.0),
                     radius: 4.0 * s,
-                    color: color::GOLD_BRIGHT,
+                    color: color::ACCENT_BRIGHT,
                 });
             }
             y += 18.0;
@@ -1023,7 +943,7 @@ fn donation(canvas: &mut MenuCanvas, frame: &Frame, card: crate::donation_goal::
                 y,
                 17.0,
                 color::MUTED,
-                format_args!("Help fund SJK's development on Ko-fi"),
+                format_args!("Help fund SlashJK's development on Ko-fi"),
             );
             y += 28.0;
         }
@@ -1040,21 +960,21 @@ fn donation(canvas: &mut MenuCanvas, frame: &Frame, card: crate::donation_goal::
 /// The keys of the page, bottom centre.
 fn hints(canvas: &mut MenuCanvas, frame: &Frame, home: &Home, servers: bool) {
     let s = frame.s;
-    let arc_back = if home.page == Page::Main {
+    let menu_back = if home.page == Page::Main {
         "quit"
     } else {
         "back"
     };
     let rows: [(&[&str], &str); 3] = match home.focus {
-        Focus::Arc if servers => [
-            (&["Up", "Down"], "turn the ring"),
+        Focus::Menu if servers => [
+            (&["Up", "Down"], "choose"),
             (&["Enter"], "open"),
             (&["Right"], "servers"),
         ],
-        Focus::Arc => [
-            (&["Up", "Down"], "turn the ring"),
+        Focus::Menu => [
+            (&["Up", "Down"], "choose"),
             (&["Enter"], "open"),
-            (&["Esc"], arc_back),
+            (&["Esc"], menu_back),
         ],
         Focus::Server(_) => [
             (&["Up", "Down"], "choose"),
@@ -1096,10 +1016,10 @@ fn version(canvas: &mut MenuCanvas, frame: &Frame, view: &HomeView<'_>) {
     text(
         canvas,
         TextFamily::Display,
-        format_args!("SJK {}", view.version),
+        format_args!("{} {}", brand::NAME, view.version),
         frame.rect(1224.0, 962.0, 600.0, 28.0),
-        22.0 * s,
-        color::TEXT,
+        18.0 * s,
+        color::MUTED,
         FontWeight::Regular,
         TextAlign::End,
     );
@@ -1107,10 +1027,10 @@ fn version(canvas: &mut MenuCanvas, frame: &Frame, view: &HomeView<'_>) {
         text(
             canvas,
             TextFamily::Body,
-            format_args!("SJK {update} is ready to install"),
+            format_args!("{update} is ready to install"),
             frame.rect(1224.0, 994.0, 600.0, 22.0),
             16.0 * s,
-            color::GOLD_BRIGHT,
+            color::ACCENT_BRIGHT,
             FontWeight::Regular,
             TextAlign::End,
         );
@@ -1148,18 +1068,15 @@ mod tests {
         assert_eq!(Frame::new([1_440.0, 1_080.0]).s, 0.75);
     }
 
+    // The menu's title sits under the wordmark, and its pill short of the servers.
+    const _: () = assert!(MENU_TOP - 48.0 > WORDMARK[1] + WORDMARK[2] * 1.05 + 40.0);
+    const _: () = assert!(MENU_X - 20.0 + PILL_WIDTH < COLUMN_X - 400.0);
+
     #[test]
-    fn the_arc_clears_the_ring_and_the_column() {
+    fn the_menu_ends_above_the_profile_card() {
         for page in [Page::Main, Page::Play, Page::Sjk, Page::Quit] {
             let count = page.entries().len();
-            for index in 0..count {
-                let [x, y] = entry_point(index, count);
-                assert!(x > RING[0] + RING_RADIUS + 60.0, "{page:?} {index}");
-                // The widest label at the chosen size ("Quit to desktop", about
-                // 400 pixels of Rajdhani at 68) stays short of the column.
-                assert!(x + 400.0 < COLUMN_RULE, "{page:?} {index}");
-                assert!(y > 120.0 && y < 900.0, "{page:?} {index}");
-            }
+            assert!(row_top(count) < crate::profile_card::PICTURE[1] - 40.0, "{page:?}");
         }
     }
 
@@ -1210,15 +1127,15 @@ mod tests {
     #[test]
     fn the_keyboard_and_pointer_reach_the_servers() {
         let mut home = Home::default();
-        // No servers: Right stays on the arc.
+        // No servers: Right stays in the menu.
         home.key(KeyCode::ArrowRight, 0);
-        assert_eq!(home.focus, Focus::Arc);
+        assert_eq!(home.focus, Focus::Menu);
         home.key(KeyCode::ArrowRight, 3);
         assert_eq!(home.focus, Focus::Server(0));
         home.key(KeyCode::ArrowUp, 3);
         assert_eq!(home.key(KeyCode::Enter, 3), Some(Action::Join(2)));
         home.key(KeyCode::Escape, 3);
-        assert_eq!(home.focus, Focus::Arc);
+        assert_eq!(home.focus, Focus::Menu);
         assert_eq!(
             home.page,
             Page::Main,
@@ -1234,7 +1151,7 @@ mod tests {
         assert_eq!(home.pointer(SERVER_TOKEN + 3, true, 3), None);
         // Hovering an entry chooses it; a click on SJK opens its page.
         home.pointer(ENTRY_TOKEN + 4, false, 3);
-        assert_eq!((home.entry, home.focus), (4, Focus::Arc));
+        assert_eq!((home.entry, home.focus), (4, Focus::Menu));
         assert_eq!(home.pointer(ENTRY_TOKEN + 4, true, 3), None);
         assert_eq!(home.page, Page::Sjk);
         assert_eq!(
@@ -1285,18 +1202,17 @@ mod tests {
             servers,
             version: "2026.1008.1",
             update: Some("2026.1009.1"),
-            seconds: 1.0,
             chat,
             summary: &crate::profile_card::NOBODY,
             donation: None,
         }
     }
 
-    // The donation goal's lowest line stays above the ring's top.
-    const _: () = assert!(DONATION[1] + 48.0 + 30.0 + 18.0 + 20.0 < RING[1] - RING_RADIUS - 40.0);
+    // The donation goal's lowest line stays above the servers' heading.
+    const _: () = assert!(DONATION[1] + 48.0 + 30.0 + 18.0 + 20.0 < COLUMN_TOP - 20.0);
 
     #[test]
-    fn the_donation_goal_clears_the_ring_and_its_button_donates() {
+    fn the_donation_goal_clears_the_servers_and_its_button_donates() {
         let mut home = Home::default();
         let servers = [server("JoF")];
         let mut with = view(&servers, None);
@@ -1333,12 +1249,12 @@ mod tests {
             home.key(KeyCode::Enter, 1),
             Some(Action::Open(MainDestination::Profile))
         );
-        // Escape on the card goes back to the arc; it does not ask to quit.
+        // Escape on the card goes back to the menu; it does not ask to quit.
         home.key(KeyCode::Escape, 1);
-        assert_eq!((home.focus, home.page), (Focus::Arc, Page::Main));
+        assert_eq!((home.focus, home.page), (Focus::Menu, Page::Main));
         home.key(KeyCode::ArrowLeft, 1);
         home.key(KeyCode::ArrowRight, 1);
-        assert_eq!(home.focus, Focus::Arc);
+        assert_eq!(home.focus, Focus::Menu);
         // Hovering chooses it, a click opens the profile.
         assert_eq!(home.pointer(CARD_TOKEN, false, 1), None);
         assert_eq!(home.focus, Focus::Card);
@@ -1354,7 +1270,7 @@ mod tests {
     fn the_profile_card_has_its_corner_to_itself() {
         let servers = [server("JoF")];
         for viewport in VIEWPORTS {
-            for focus in [Focus::Arc, Focus::Card, Focus::Server(0), Focus::Chat] {
+            for focus in [Focus::Menu, Focus::Card, Focus::Server(0), Focus::Chat] {
                 let mut canvas = MenuCanvas::new();
                 let mut home = Home {
                     focus,
@@ -1459,7 +1375,7 @@ mod tests {
             1.0,
         );
         let runs: Vec<&str> = canvas.text_runs().collect();
-        assert!(runs.contains(&"SJK chat"), "{runs:?}");
+        assert!(runs.contains(&"Global chat"), "{runs:?}");
         assert!(runs.contains(&"7 online"), "{runs:?}");
         assert!(runs.contains(&"^2Sol"), "{runs:?}");
         assert!(runs.contains(&"gg all"), "{runs:?}");
@@ -1491,7 +1407,11 @@ mod tests {
         canvas.pointer(InputEvent::PointerMove(centre(name)));
         draw(&mut canvas, &mut home);
         let runs: Vec<&str> = canvas.text_runs().collect();
-        for wanted in ["SJK player, SJK staff", "Key 0123456789abcdef", "Mute"] {
+        for wanted in [
+            "SlashJK player, SlashJK staff",
+            "Key 0123456789abcdef",
+            "Mute",
+        ] {
             assert!(runs.contains(&wanted), "{wanted:?} in {runs:?}");
         }
         let card = canvas.rect_for(SENDER_CARD_TOKEN).expect("the card");
@@ -1549,7 +1469,7 @@ mod tests {
                 draw(&mut canvas, &mut home);
                 assert_eq!(
                     home.focus,
-                    Focus::Arc,
+                    Focus::Menu,
                     "{viewport:?}: hovering moves no focus"
                 );
                 let sender = canvas.rect_for(SENDER_CARD_TOKEN).expect("the sender card");
@@ -1803,15 +1723,5 @@ mod tests {
             Some(Action::OpenChat)
         );
         assert!(!home.is_typing(), "the page takes the typing");
-    }
-
-    #[test]
-    fn the_arc_eases_the_short_way_round() {
-        let mut home = Home::default();
-        assert_eq!(home.arc_towards(1.0, 10.0), 1.0);
-        let next = home.arc_towards(2.0, 10.05);
-        assert!(next > 1.0 && next < 2.0);
-        home.arc = Some(3.0);
-        assert!(home.arc_towards(-3.0, 10.1) > 3.0);
     }
 }

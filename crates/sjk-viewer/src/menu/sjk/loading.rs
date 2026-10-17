@@ -659,7 +659,7 @@ fn draw_block(ui: &mut MenuCanvas, frame: &Frame, view: &View<'_>) {
             format_args!("{address}"),
             frame.rect(LEFT + 2.0, 912.0, 700.0, 28.0),
             18.0 * s,
-            color::HOLO,
+            color::LINE,
             FontWeight::Regular,
             TextAlign::Start,
         );
@@ -797,7 +797,7 @@ fn line(ui: &mut MenuCanvas, frame: &Frame, at: [f32; 3], progress: f32) {
         ui,
         DrawCommand::SolidRect {
             rect: frame.rect(x, y, width, BAR_HEIGHT),
-            color: color::alpha(color::HOLO, 0.22),
+            color: color::alpha(color::LINE, 0.22),
         },
     );
     let lit = width * progress.clamp(0.0, 1.0);
@@ -807,7 +807,7 @@ fn line(ui: &mut MenuCanvas, frame: &Frame, at: [f32; 3], progress: f32) {
             DrawCommand::RoundedRect {
                 rect: frame.rect(x, y, lit, BAR_HEIGHT),
                 radius: BAR_HEIGHT * 0.5 * frame.s,
-                color: color::GOLD,
+                color: color::ACCENT,
             },
         );
     }
@@ -869,7 +869,7 @@ pub(crate) fn activity(ui: &mut MenuCanvas, frame: &Frame, x: f32, y: f32, secon
             width: 2.0 * s,
             start: 0.0,
             sweep: std::f32::consts::TAU,
-            color: color::alpha(color::HOLO, 0.22),
+            color: color::alpha(color::LINE, 0.22),
             knockout: None,
         },
     );
@@ -883,7 +883,7 @@ pub(crate) fn activity(ui: &mut MenuCanvas, frame: &Frame, x: f32, y: f32, secon
             width: 2.2 * s,
             start,
             sweep: std::f32::consts::FRAC_PI_2 * 1.2,
-            color: color::GOLD_BRIGHT,
+            color: color::ACCENT_BRIGHT,
             knockout: None,
         },
     );

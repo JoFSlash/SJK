@@ -60,7 +60,7 @@ impl Icon {
             Self::WhatsNew => "What's new",
             Self::Credits => "Credits",
             Self::ReportBug => "Report a bug",
-            Self::Chat => "SJK chat",
+            Self::Chat => "Global chat",
             Self::Staff => "Staff tools",
         }
     }
@@ -70,10 +70,10 @@ impl Icon {
         match self {
             Self::Camera => "Frame shots: the camera and the sun",
             Self::WhatsNew => "Every release and who made it",
-            Self::Credits => "The people who make SJK",
-            Self::ReportBug => "Tell the SJK team what went wrong",
-            Self::Chat => "Talk with every SJK player",
-            Self::Staff => "Medals, unlockables and players, for the SJK team",
+            Self::Credits => "The people who make SlashJK",
+            Self::ReportBug => "Tell the team what went wrong",
+            Self::Chat => "Talk with everyone online",
+            Self::Staff => "Medals, unlockables and players, for the team",
         }
     }
 

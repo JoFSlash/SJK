@@ -39,7 +39,7 @@ impl HudChoice {
     fn own(label: &str, style: HudStyle) -> Self {
         Self {
             label: label.to_owned(),
-            origin: "SJK's own layout".to_owned(),
+            origin: "SlashJK's own layout".to_owned(),
             style,
             files: String::new(),
             pack: String::new(),
@@ -96,8 +96,8 @@ pub(crate) fn list(vfs: &VirtualFileSystem) -> Vec<HudChoice> {
         "1",
         "",
     ));
-    choices.push(HudChoice::own("SJK radial", HudStyle::Radial));
-    choices.push(HudChoice::own("SJK classic", HudStyle::Classic));
+    choices.push(HudChoice::own("SlashJK radial", HudStyle::Radial));
+    choices.push(HudChoice::own("SlashJK classic", HudStyle::Classic));
     choices
 }
 
@@ -275,8 +275,8 @@ pub(crate) mod tests {
                 "TheRisqe Radial HUD",
                 "Elegance HUD",
                 "Text only",
-                "SJK radial",
-                "SJK classic",
+                "SlashJK radial",
+                "SlashJK classic",
             ]
         );
         assert_eq!(choices[0].pack, "assets1.pk3");

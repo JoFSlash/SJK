@@ -1186,10 +1186,7 @@ impl Notes {
         self.sent_serial = outcome.serial;
         self.sent_waiting = false;
         Some(if outcome.sent {
-            format!(
-                "Note sent to the SJK team ({}). Thank you!",
-                outcome.message
-            )
+            format!("Note sent to the team ({}). Thank you!", outcome.message)
         } else {
             format!("Note kept on this PC, not sent: {}", outcome.message)
         })

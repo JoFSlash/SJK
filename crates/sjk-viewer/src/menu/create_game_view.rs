@@ -132,7 +132,7 @@ impl CreateGameMenu {
             let _ = self.ui.draw_list_mut().push(DrawCommand::RoundedRect {
                 rect: frame.rect(ROWS_X, top, ROWS_WIDTH, LINE),
                 radius: 10.0 * frame.s,
-                color: color::alpha(color::HOLO, 0.05),
+                color: color::alpha(color::LINE, 0.05),
             });
         }
         let mode = MODES[self.draft.mode];
@@ -490,7 +490,7 @@ pub(super) fn draw_picture(
         rect: area,
         radius: 0.0,
         width: s.max(1.0),
-        color: color::alpha(color::HOLO, 0.25),
+        color: color::alpha(color::LINE, 0.25),
     });
     text(
         ui,

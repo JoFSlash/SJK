@@ -13,7 +13,7 @@ use sjk_ui::DrawCommand;
 
 /// What the page says when the player holds no medal yet.
 pub(super) const NONE_YET: &str =
-    "No medals yet. The SJK team gives medals for testing, contributing and more.";
+    "No medals yet. The team gives medals for testing, contributing and more.";
 
 /// The SJK UI's medal column, right of the page's (reference units).
 const SJK_X: f32 = 1_460.0;
@@ -132,7 +132,7 @@ impl Panel {
                 format_args!("{}", medal.award.label()),
                 frame.rect(text_x, line_y, text_width, SJK_NAME_LINE),
                 24.0 * s,
-                color::GOLD_BRIGHT,
+                color::ACCENT_BRIGHT,
                 FontWeight::Semibold,
                 TextAlign::Start,
             );

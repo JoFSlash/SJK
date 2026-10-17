@@ -6,7 +6,7 @@ fn settings(map: String) -> HostSettings {
     HostSettings {
         map,
         gametype: "ffa",
-        hostname: "SJK development".into(),
+        hostname: "SlashJK development".into(),
         bots: Vec::new(),
         bot_skill: 3,
         fraglimit: 0,

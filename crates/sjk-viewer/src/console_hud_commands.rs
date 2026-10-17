@@ -50,7 +50,7 @@ pub(super) fn execute(
     let bit: u32 = value.parse().map_err(|_| "Expected an option number")?;
     if !entries.iter().any(|(index, _)| *index == bit) {
         return Err(format!(
-            "{command}: option {bit} is not supported by SJK's display"
+            "{command}: option {bit} is not supported by SlashJK's display"
         ));
     }
     let next = toggled(command, old, bit);

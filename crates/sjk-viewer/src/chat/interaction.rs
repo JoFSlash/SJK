@@ -344,9 +344,9 @@ impl crate::GpuState {
             .as_ref()
             .is_some_and(|console| console.bool_cvar("cl_sjkChat") == Some(false));
         let why = if off {
-            Some("^3SJK chat is off (cl_sjkChat 1 turns it on)")
+            Some("^3Global chat is off (cl_sjkChat 1 turns it on)")
         } else if !crate::player_identity::chat(text) {
-            Some("^3SJK chat needs the SJK identity (cl_identity 1)")
+            Some("^3Global chat needs the online identity (cl_identity 1)")
         } else {
             None
         };

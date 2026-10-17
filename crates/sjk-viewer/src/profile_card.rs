@@ -210,11 +210,11 @@ impl std::fmt::Display for HubLine<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let summary = self.0;
         match summary.hub {
-            HubState::Off => f.write_str("SJK identity off")?,
+            HubState::Off => f.write_str("Online identity off")?,
             HubState::Starting => f.write_str("Connecting to the hub")?,
-            HubState::Offline => f.write_str("SJK hub out of reach")?,
+            HubState::Offline => f.write_str("Hub out of reach")?,
             HubState::Online if summary.verified => f.write_str("Verified")?,
-            HubState::Online => f.write_str("SJK player")?,
+            HubState::Online => f.write_str("Online")?,
         }
         match summary.medals {
             0 => {}
@@ -298,7 +298,7 @@ pub(crate) fn draw(canvas: &mut MenuCanvas, frame: &Frame, card: &Card<'_>, toke
             rect: area,
             radius: 18.0 * s,
             width: 1.5 * s,
-            color: color::alpha(color::GOLD, 0.6),
+            color: color::alpha(color::ACCENT, 0.6),
         });
     }
     let radius = PICTURE_SIZE * 0.5;
@@ -338,7 +338,7 @@ pub(crate) fn draw(canvas: &mut MenuCanvas, frame: &Frame, card: &Card<'_>, toke
         frame.rect(TEXT_X, PICTURE[1] + 30.0, TEXT_WIDTH, 22.0),
         16.0 * s,
         if card.summary.verified {
-            color::GOLD_BRIGHT
+            color::ACCENT_BRIGHT
         } else {
             color::MUTED
         },
@@ -348,7 +348,7 @@ pub(crate) fn draw(canvas: &mut MenuCanvas, frame: &Frame, card: &Card<'_>, toke
     let (detail, tone) = if card.lit {
         (
             Detail::Line("Open your profile: picture, bio and record"),
-            color::GOLD_BRIGHT,
+            color::ACCENT_BRIGHT,
         )
     } else {
         (card.detail, color::QUIET)
@@ -425,11 +425,11 @@ pub(crate) fn avatar(canvas: &mut MenuCanvas, centre: [f32; 2], radius: f32, ava
         }
     }
     let ring = if avatar.lit {
-        color::GOLD_BRIGHT
+        color::ACCENT_BRIGHT
     } else if avatar.verified {
-        color::alpha(color::GOLD, 0.9)
+        color::alpha(color::ACCENT, 0.9)
     } else {
-        color::alpha(color::HOLO, 0.55)
+        color::alpha(color::LINE, 0.55)
     };
     let width = (radius * 0.055).max(1.5);
     let _ = canvas.draw_list_mut().push(DrawCommand::Arc {
@@ -609,7 +609,7 @@ mod tests {
         let summary = summarise("Sol", String::new(), true, Some(&plain), &standings);
         assert_eq!(
             HubLine(&summary).to_string(),
-            format!("SJK player \u{b7} 3/{total} achievements")
+            format!("Online \u{b7} 3/{total} achievements")
         );
         let failed = snapshot(Status::Failed("down".into()), Some(me()));
         let summary = summarise("Sol", String::new(), true, Some(&failed), &standings);
@@ -621,7 +621,7 @@ mod tests {
         assert!(
             HubLine(&summary)
                 .to_string()
-                .starts_with("SJK hub out of reach")
+                .starts_with("Hub out of reach")
         );
         let off = summarise("Sol", String::new(), false, Some(&online), &standings);
         assert_eq!(
@@ -631,7 +631,7 @@ mod tests {
         assert!(
             HubLine(&off)
                 .to_string()
-                .starts_with("SJK identity off \u{b7} 3/")
+                .starts_with("Online identity off \u{b7} 3/")
         );
         let starting = snapshot(Status::Registering, None);
         let summary = summarise("Sol", String::new(), true, Some(&starting), &standings);

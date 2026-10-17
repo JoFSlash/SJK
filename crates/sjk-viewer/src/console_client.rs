@@ -68,7 +68,7 @@ pub(super) const COMMANDS: &[(&str, &str)] = &[
     ),
     (
         "messagemode5",
-        "Compose SJK chat, which every SJK player shares through the SJK hub",
+        "Compose global chat, which everyone online shares through the hub",
     ),
     (crate::am_color::COMMAND, crate::am_color::HELP),
     (
@@ -480,7 +480,7 @@ impl crate::GpuState {
         }
         if !crate::player_identity::emote(id, None) {
             return Err(
-                "Played here only: other SJK players see emotes with the SJK identity (cl_identity 1)"
+                "Played here only: other SlashJK players see emotes with the online identity (cl_identity 1)"
                     .to_owned(),
             );
         }
@@ -624,7 +624,9 @@ impl crate::GpuState {
             };
         }
         let Some(key) = key else {
-            return Err(format!("{name} is not an SJK player: they send no emotes"));
+            return Err(format!(
+                "{name} is not an SlashJK player: they send no emotes"
+            ));
         };
         state.muted.insert(key, name.clone());
         state.active.stop(slot);
@@ -723,7 +725,7 @@ impl crate::GpuState {
         }
         if !crate::player_identity::emote(emote, Some(leader)) {
             return Err(
-                "Played here only: other SJK players see emotes with the SJK identity (cl_identity 1)"
+                "Played here only: other SlashJK players see emotes with the online identity (cl_identity 1)"
                     .to_owned(),
             );
         }

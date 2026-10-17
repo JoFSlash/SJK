@@ -41,7 +41,7 @@ pub(crate) fn register(cvars: &mut CvarRegistry) -> Result<(), sjk_shell::CvarEr
         SWITCH,
         false,
         archive,
-        "Load JoF content (JoF's maps, skins, hilts and packs) from SJK's JoF folder; off by default; jof.downloads chooses and fetches them",
+        "Load JoF content (JoF's maps, skins, hilts and packs) from SlashJK's JoF folder; off by default; jof.downloads chooses and fetches them",
     ))?;
     cvars.register(CvarDefinition::new(
         GROUPS,
@@ -65,7 +65,7 @@ pub(crate) fn register(cvars: &mut CvarRegistry) -> Result<(), sjk_shell::CvarEr
         FOLDER,
         "",
         archive,
-        "Folder for JoF content; empty is the jof folder beside SJK's settings",
+        "Folder for JoF content; empty is the jof folder beside SlashJK's settings",
     ))?;
     Ok(())
 }

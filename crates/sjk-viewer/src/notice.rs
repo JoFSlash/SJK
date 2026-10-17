@@ -7,7 +7,7 @@
 /// Copyright line: SJK's authors, and those of the code it began from (`NOTICE`).
 /// The version is the build's ([`crate::build_info::VERSION`]).
 pub(crate) const COPYRIGHT: &str = concat!(
-    "Sol JK (SJK) ",
+    "Sol JK (SlashJK) ",
     env!("SJK_BUILD_VERSION"),
     ", Copyright (C) 2026 Sol-Vulpes, Bishop-R and the JKR contributors"
 );

@@ -93,7 +93,7 @@ impl CreateGameMenu {
         );
         let _ = ui.draw_list_mut().push(DrawCommand::SolidRect {
             rect: frame.rect(LIST_X, HEADER_TOP + HEADER_HEIGHT, LIST_WIDTH, 1.0),
-            color: color::alpha(color::HOLO, 0.22),
+            color: color::alpha(color::LINE, 0.22),
         });
         let (first, selected) = (self.picker.first(), self.picker.selected());
         for slot in 0..VISIBLE.min(shown.saturating_sub(first)) {
@@ -110,7 +110,7 @@ impl CreateGameMenu {
                 let _ = ui.draw_list_mut().push(DrawCommand::RoundedRect {
                     rect: frame.rect(LIST_X, top, LIST_WIDTH, ROW),
                     radius: 10.0 * s,
-                    color: color::alpha(color::HOLO, 0.05),
+                    color: color::alpha(color::LINE, 0.05),
                 });
             }
             if entry.name == self.draft.map {

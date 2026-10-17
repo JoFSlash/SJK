@@ -212,7 +212,7 @@ fn secondary_buttons(favourite: bool) -> [Button; 5] {
     [
         button(
             "PASSWORD",
-            "SJK asks for the password when you join a locked server.",
+            "SlashJK asks for the password when you join a locked server.",
             10.0,
             PASSWORD_TOKEN,
         ),
@@ -245,7 +245,7 @@ fn secondary_buttons(favourite: bool) -> [Button; 5] {
         ),
         button(
             "FIND PLAYER",
-            "Searching for players is not available in SJK yet.",
+            "Searching for players is not available in SlashJK yet.",
             510.0,
             FIND_PLAYER_TOKEN,
         ),

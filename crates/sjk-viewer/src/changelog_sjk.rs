@@ -111,7 +111,7 @@ impl Panel {
                 frame.rect(RAIL_X + 28.0, top + 2.0, RAIL_WIDTH - 28.0, 30.0),
                 24.0 * s,
                 match (chosen, hovered) {
-                    (true, _) => color::GOLD_BRIGHT,
+                    (true, _) => color::ACCENT_BRIGHT,
                     (false, true) => color::TEXT,
                     (false, false) => color::MUTED,
                 },
@@ -133,7 +133,7 @@ impl Panel {
                 frame.rect(RAIL_X + 28.0, top + 32.0, RAIL_WIDTH - 28.0, 22.0),
                 15.0 * s,
                 if unreleased {
-                    color::GOLD
+                    color::ACCENT
                 } else {
                     color::QUIET
                 },
@@ -155,7 +155,7 @@ impl Panel {
                 format_args!("{error}"),
                 frame.rect(NOTES_X, NOTES_TOP, NOTES_WIDTH, 30.0),
                 19.0 * s,
-                color::EMBER,
+                color::DANGER,
                 FontWeight::Regular,
                 TextAlign::Start,
             );
@@ -180,7 +180,7 @@ impl Panel {
             ),
             frame.rect(NOTES_X, NOTES_TOP, NOTES_WIDTH, 24.0),
             17.0 * s,
-            color::GOLD_BRIGHT,
+            color::ACCENT_BRIGHT,
             FontWeight::Regular,
             TextAlign::Start,
         );
@@ -238,7 +238,7 @@ impl Panel {
                             .push(sjk_ui::DrawCommand::RoundedRect {
                                 rect: dot,
                                 radius: dot.width * 0.5,
-                                color: color::GOLD,
+                                color: color::ACCENT,
                             });
                     }
                     inline_code::draw_rows(
@@ -261,7 +261,7 @@ impl Panel {
                     format_args!("{}", line.text),
                     frame.rect(NOTES_X + INDENT, y + 1.0, NOTES_WIDTH - INDENT, height),
                     17.0 * s,
-                    color::alpha(color::GOLD, 0.85),
+                    color::alpha(color::ACCENT, 0.85),
                     FontWeight::Regular,
                     TextAlign::Start,
                 ),

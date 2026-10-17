@@ -72,7 +72,7 @@ impl Tab {
     /// Retail caption; Siege swaps two buttons as retail does.
     pub(crate) fn label(self, siege: bool) -> &'static str {
         match (self, siege) {
-            (Self::Sjk, _) => "SJK",
+            (Self::Sjk, _) => "SlashJK",
             (Self::About, _) => "About",
             (Self::Join, _) => "Join",
             (Self::Profile, false) => "Profile",
@@ -89,9 +89,9 @@ impl Tab {
     /// Why the button does nothing in SJK yet, if it does nothing.
     pub(crate) fn unavailable(self, siege: bool) -> Option<&'static str> {
         match (self, siege) {
-            (Self::Profile, true) => Some("Not in SJK yet: no Siege objectives page"),
-            (Self::AddBot, false) => Some("Not in SJK yet: choose bots in Create game"),
-            (Self::AddBot, true) => Some("Not in SJK yet: no voice chat menu"),
+            (Self::Profile, true) => Some("Not in SlashJK yet: no Siege objectives page"),
+            (Self::AddBot, false) => Some("Not in SlashJK yet: choose bots in Create game"),
+            (Self::AddBot, true) => Some("Not in SlashJK yet: no voice chat menu"),
             _ => None,
         }
     }
@@ -152,7 +152,7 @@ pub(crate) const NO: usize = 1;
 
 /// Note under the exit pop-up's Restart Match, which only a listen server
 /// (the retail client hosting the game itself) could do.
-const RESTART_NOTE: &str = "Not in SJK yet: call a vote to restart (Call Vote)";
+const RESTART_NOTE: &str = "Not in SlashJK yet: call a vote to restart (Call Vote)";
 
 /// Row count of `page` where the classic menu has rows of its own.
 pub(crate) fn row_count(page: Page, team_game: bool) -> Option<usize> {
@@ -272,7 +272,7 @@ mod tests {
         assert_eq!(
             labels,
             [
-                "SJK",
+                "SlashJK",
                 "About",
                 "Join",
                 "Profile",

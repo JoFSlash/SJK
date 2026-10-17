@@ -69,7 +69,7 @@ fn pack_file_system(directory: &Path) -> VirtualFileSystem {
     for pack in cached(directory) {
         if let Err(error) = packs.mount_pk3(&pack) {
             crate::log::progress(format_args!(
-                "SJK packs: skipping {}: {error}",
+                "SlashJK packs: skipping {}: {error}",
                 pack.display()
             ));
         }
@@ -88,7 +88,7 @@ pub(crate) fn mount(directory: &Path) -> Arc<LoadedSkins> {
     let skins = Arc::new(LoadedSkins::load(packs, generation));
     if count > 0 {
         crate::log::progress(format_args!(
-            "SJK packs: {count} from {}, blade skins: {}",
+            "SlashJK packs: {count} from {}, blade skins: {}",
             directory.display(),
             skins.ids().collect::<Vec<_>>().join(", ")
         ));
@@ -107,7 +107,7 @@ pub(crate) fn mount_below_game_data(vfs: &mut VirtualFileSystem) {
     for pack in cached(directory) {
         if let Err(error) = vfs.mount_pk3(&pack) {
             crate::log::progress(format_args!(
-                "warning: skipping SJK pack {}: {error}",
+                "warning: skipping SlashJK pack {}: {error}",
                 pack.display()
             ));
         }
@@ -122,7 +122,7 @@ pub(crate) fn follow_identity(revision: u64, note: Option<String>) {
     if let Some(note) = note {
         let mut last = NOTE.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
         if last.as_deref() != Some(note.as_str()) {
-            crate::log::progress(format_args!("SJK packs: {note}"));
+            crate::log::progress(format_args!("SlashJK packs: {note}"));
             *last = Some(note);
         }
     }

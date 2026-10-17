@@ -40,11 +40,11 @@ impl ApplicationHandler for ViewerApplication {
             .as_ref()
             .is_some_and(|menu| menu.is_visible())
         {
-            "SJK"
+            "SlashJK"
         } else if self.live_session.is_some() {
-            "SJK live client"
+            "SlashJK live client"
         } else {
-            "SJK world viewer"
+            "SlashJK world viewer"
         };
         let attributes = window_icon::with_icons(
             WindowAttributes::default()

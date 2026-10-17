@@ -493,7 +493,7 @@ impl PlayerMenu {
             format_args!("{}  ·  {count}{found}", category.title()),
             frame.rect(x + 22.0, top + 6.0, 330.0, 28.0),
             22.0 * s,
-            color::HOLO,
+            color::LINE,
             FontWeight::Regular,
             TextAlign::Start,
         );
@@ -697,13 +697,13 @@ impl PlayerMenu {
                         format_args!("{name}  ·  {members}"),
                         frame.rect(x + 4.0, y + 4.0, 320.0, 24.0),
                         18.0 * s,
-                        color::GOLD,
+                        color::ACCENT,
                         FontWeight::Regular,
                         TextAlign::Start,
                     );
                     let _ = self.canvas.draw_list_mut().push(DrawCommand::SolidRect {
                         rect: frame.rect(x + 210.0, y + 16.0, width - 210.0, 1.0),
-                        color: color::alpha(color::GOLD, 0.35),
+                        color: color::alpha(color::ACCENT, 0.35),
                     });
                     y += HEADING;
                 }
@@ -853,7 +853,7 @@ impl PlayerMenu {
                     rect,
                     18.0 * s,
                     if chosen {
-                        color::GOLD_BRIGHT
+                        color::ACCENT_BRIGHT
                     } else {
                         color::alpha(color::TEXT, if lit { 1.0 } else { 0.85 })
                     },
@@ -869,7 +869,7 @@ impl PlayerMenu {
                 radius: 8.0 * s,
                 width: if chosen { 2.5 * s } else { 1.5 * s },
                 color: if chosen {
-                    color::GOLD_BRIGHT
+                    color::ACCENT_BRIGHT
                 } else {
                     Color::new(1.0, 1.0, 1.0, 0.6)
                 },

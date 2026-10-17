@@ -141,9 +141,9 @@ impl Tier {
         match self.index {
             0 => "The commonest holocron: about 6 in 10 drops.",
             1 => "About 3 in 10 drops.",
-            2 => "About 1 in 10 drops. Every SJK player sees it in chat when one drops.",
+            2 => "About 1 in 10 drops. Every SlashJK player sees it in chat when one drops.",
             _ => {
-                "About 1 in 67 drops, at most 1 a day for a player. Every SJK player sees it in chat when one drops."
+                "About 1 in 67 drops, at most 1 a day for a player. Every SlashJK player sees it in chat when one drops."
             }
         }
     }
@@ -218,8 +218,8 @@ impl Entry {
     pub(crate) fn when(&self) -> String {
         let date = when_text(self.dropped);
         match (self.gift, date.is_empty()) {
-            (true, true) => "A gift from the SJK team".to_owned(),
-            (true, false) => format!("A gift from the SJK team, {date}"),
+            (true, true) => "A gift from the team".to_owned(),
+            (true, false) => format!("A gift from the team, {date}"),
             (false, true) => String::new(),
             (false, false) => format!("Found {date}"),
         }
@@ -382,10 +382,7 @@ mod tests {
         assert!(!entries[0].gift && entries[1].gift);
         assert_eq!(entries[1].note, "For the fog bug");
         assert_eq!(entries[0].when(), "Found 10/10/2026 14:05");
-        assert_eq!(
-            entries[1].when(),
-            "A gift from the SJK team, 10/10/2026 14:05"
-        );
+        assert_eq!(entries[1].when(), "A gift from the team, 10/10/2026 14:05");
         let undated = Entry {
             dropped: 0,
             ..entries[0].clone()
@@ -395,7 +392,7 @@ mod tests {
             dropped: 0,
             ..entries[1].clone()
         };
-        assert_eq!(undated_gift.when(), "A gift from the SJK team");
+        assert_eq!(undated_gift.when(), "A gift from the team");
     }
 
     #[test]

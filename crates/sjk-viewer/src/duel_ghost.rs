@@ -70,7 +70,7 @@ fn plain_tga(rgb: [u8; 3]) -> Vec<u8> {
 /// Mount the shader and its plain colours, below game data like SJK's other content.
 pub(crate) fn mount(vfs: &mut VirtualFileSystem) -> Result<(), VfsError> {
     vfs.mount_memory(
-        "SJK duel ghost",
+        "SlashJK duel ghost",
         [
             (
                 "shaders/sjk_duel_ghost.shader",

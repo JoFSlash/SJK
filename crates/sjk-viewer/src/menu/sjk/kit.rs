@@ -57,7 +57,7 @@ fn edge(focused: bool) -> Color {
     if focused {
         Color::new(1.0, 1.0, 1.0, 0.7)
     } else {
-        color::alpha(color::HOLO, 0.4)
+        color::alpha(color::LINE, 0.4)
     }
 }
 
@@ -70,7 +70,7 @@ pub(crate) fn band(canvas: &mut MenuCanvas, frame: &Frame, rect: [f32; 4]) {
         DrawCommand::RoundedRect {
             rect: frame.rect(x, y, width, height),
             radius: 10.0 * s,
-            color: color::alpha(color::HOLO, 0.09),
+            color: color::alpha(color::LINE, 0.09),
         },
     );
     push(
@@ -78,7 +78,7 @@ pub(crate) fn band(canvas: &mut MenuCanvas, frame: &Frame, rect: [f32; 4]) {
         DrawCommand::RoundedRect {
             rect: frame.rect(x, y + height * 0.2, 4.0, height * 0.6),
             radius: 2.0 * s,
-            color: color::GOLD_BRIGHT,
+            color: color::ACCENT_BRIGHT,
         },
     );
 }
@@ -123,7 +123,7 @@ pub(crate) fn card(canvas: &mut MenuCanvas, frame: &Frame, rect: [f32; 4]) {
             rect: frame.rect(x, y, width, height),
             radius: 18.0 * s,
             width: 1.5 * s,
-            color: color::alpha(color::HOLO, 0.45),
+            color: color::alpha(color::LINE, 0.45),
         },
     );
 }
@@ -148,7 +148,7 @@ pub(crate) fn tick(
             DrawCommand::RoundedRect {
                 rect,
                 radius: 6.0 * s,
-                color: color::GOLD,
+                color: color::ACCENT,
             },
         );
         // The tick, a short stroke down then a long one up, laid as
@@ -191,7 +191,7 @@ pub(crate) fn tick(
                 rect,
                 radius: 6.0 * s,
                 width: 1.5 * s,
-                color: color::alpha(color::HOLO, 0.7),
+                color: color::alpha(color::LINE, 0.7),
             },
         );
     }
@@ -224,10 +224,10 @@ pub(crate) fn switch(
     let x = right - label_width - 12.0 - SWITCH[0];
     let track = [x, y - SWITCH[1] * 0.5, SWITCH[0], SWITCH[1]];
     if on {
-        pill(canvas, frame, track, color::GOLD);
+        pill(canvas, frame, track, color::ACCENT);
     } else {
         pill(canvas, frame, track, color::alpha(color::SPACE, 0.85));
-        outline(canvas, frame, track, color::alpha(color::HOLO, 0.45));
+        outline(canvas, frame, track, color::alpha(color::LINE, 0.45));
     }
     if focused {
         let [tx, ty, tw, th] = track;
@@ -286,14 +286,14 @@ pub(crate) fn slider(
         canvas,
         frame,
         [x, y - TRACK * 0.5, width, TRACK],
-        color::alpha(color::HOLO, 0.22),
+        color::alpha(color::LINE, 0.22),
     );
     if ratio > 0.0 {
         pill(
             canvas,
             frame,
             [x, y - TRACK * 0.5, width * ratio, TRACK],
-            color::GOLD,
+            color::ACCENT,
         );
     }
     let knob = x + width * ratio;
@@ -307,7 +307,7 @@ pub(crate) fn slider(
                 KNOB + 10.0,
                 KNOB + 10.0,
             ],
-            color::alpha(color::GOLD, 0.35),
+            color::alpha(color::ACCENT, 0.35),
         );
     }
     pill(
@@ -360,9 +360,9 @@ pub(crate) fn segments(
         let segment = [x, top + inset, width, CONTROL_HEIGHT - inset * 2.0];
         let hovered = canvas.token_hovered(token);
         if index == current {
-            pill(canvas, frame, segment, color::GOLD);
+            pill(canvas, frame, segment, color::ACCENT);
         } else if hovered {
-            pill(canvas, frame, segment, color::alpha(color::HOLO, 0.16));
+            pill(canvas, frame, segment, color::alpha(color::LINE, 0.16));
         }
         let colour = match (index == current, hovered) {
             (true, _) => Color::new(0.078, 0.063, 0.02, 1.0),
@@ -402,7 +402,7 @@ pub(crate) fn field(
         // Ctrl+A: the field's text is selected.
         let _ = canvas.draw_list_mut().push(DrawCommand::SolidRect {
             rect: frame.rect(x + 10.0, y + 6.0, width - 20.0, height - 12.0),
-            color: color::alpha(color::HOLO, 0.32),
+            color: color::alpha(color::LINE, 0.32),
         });
     }
     text(
@@ -572,9 +572,9 @@ pub(crate) fn chips(
                 frame,
                 [centre - ring * 0.5, middle - ring * 0.5, ring, ring],
                 if focused {
-                    color::GOLD_BRIGHT
+                    color::ACCENT_BRIGHT
                 } else {
-                    color::GOLD
+                    color::ACCENT
                 },
             );
             let gap = size + 4.0;
@@ -616,9 +616,9 @@ pub(crate) fn button(
             frame,
             rect,
             if focused || hovered {
-                color::GOLD_BRIGHT
+                color::ACCENT_BRIGHT
             } else {
-                color::GOLD
+                color::ACCENT
             },
         );
     } else {
@@ -627,7 +627,7 @@ pub(crate) fn button(
             frame,
             rect,
             color::alpha(
-                color::HOLO,
+                color::LINE,
                 if enabled && (focused || hovered) {
                     0.14
                 } else {
@@ -642,7 +642,7 @@ pub(crate) fn button(
             if enabled {
                 edge(focused || hovered)
             } else {
-                color::alpha(color::HOLO, 0.18)
+                color::alpha(color::LINE, 0.18)
             },
         );
     }
@@ -685,9 +685,9 @@ pub(crate) fn pips(
                 frame,
                 rect,
                 if available {
-                    color::GOLD_BRIGHT
+                    color::ACCENT_BRIGHT
                 } else {
-                    color::alpha(color::GOLD, 0.35)
+                    color::alpha(color::ACCENT, 0.35)
                 },
             );
         } else {
@@ -695,7 +695,7 @@ pub(crate) fn pips(
                 canvas,
                 frame,
                 rect,
-                color::alpha(color::HOLO, if available { 0.45 } else { 0.2 }),
+                color::alpha(color::LINE, if available { 0.45 } else { 0.2 }),
             );
         }
     }
@@ -739,7 +739,7 @@ pub(crate) fn list(
             rect: frame.rect(x, y, width, height),
             radius: 14.0 * s,
             width: 1.5 * s,
-            color: color::alpha(color::HOLO, 0.45),
+            color: color::alpha(color::LINE, 0.45),
         },
     );
     for (index, label) in labels.iter().enumerate() {
@@ -752,7 +752,7 @@ pub(crate) fn list(
                 DrawCommand::RoundedRect {
                     rect: frame.rect(x + 6.0, top, width - 12.0, row),
                     radius: 8.0 * s,
-                    color: color::alpha(color::HOLO, 0.12),
+                    color: color::alpha(color::LINE, 0.12),
                 },
             );
         }
@@ -761,12 +761,12 @@ pub(crate) fn list(
                 canvas,
                 frame,
                 [x + width - 26.0, top + row * 0.5 - 4.0, 8.0, 8.0],
-                color::GOLD_BRIGHT,
+                color::ACCENT_BRIGHT,
             );
         }
         let colour = match (index == highlighted || hovered, index == current) {
             (true, _) => color::TEXT,
-            (false, true) => color::GOLD_BRIGHT,
+            (false, true) => color::ACCENT_BRIGHT,
             (false, false) => color::MUTED,
         };
         text(
@@ -794,7 +794,7 @@ pub(crate) fn reset(canvas: &mut MenuCanvas, frame: &Frame, x: f32, y: f32, toke
             canvas,
             frame,
             [x - 16.0, y - 16.0, 32.0, 32.0],
-            color::alpha(color::GOLD, 0.22),
+            color::alpha(color::ACCENT, 0.22),
         );
     }
     let centre = frame.point(x, y);
@@ -804,7 +804,7 @@ pub(crate) fn reset(canvas: &mut MenuCanvas, frame: &Frame, x: f32, y: f32, toke
     let colour = if hovered {
         color::TEXT
     } else {
-        color::GOLD_BRIGHT
+        color::ACCENT_BRIGHT
     };
     push(
         canvas,
@@ -847,7 +847,7 @@ pub(crate) fn changed_dot(canvas: &mut MenuCanvas, frame: &Frame, x: f32, y: f32
         canvas,
         frame,
         [x - r, y - r, r * 2.0, r * 2.0],
-        color::GOLD_BRIGHT,
+        color::ACCENT_BRIGHT,
     );
 }
 
@@ -860,7 +860,7 @@ pub(crate) fn heading(
     width: f32,
     label: &str,
 ) {
-    heading_in(canvas, frame, x, y, width, label, color::HOLO);
+    heading_in(canvas, frame, x, y, width, label, color::LINE);
 }
 
 /// [`heading`] in `colour` (its rule too, fainter).
@@ -922,7 +922,7 @@ pub(crate) fn search(
             canvas,
             DrawCommand::SolidRect {
                 rect: frame.rect(x + 42.0, y + 6.0, width - 160.0, height - 12.0),
-                color: color::alpha(color::HOLO, 0.32),
+                color: color::alpha(color::LINE, 0.32),
             },
         );
     }
@@ -936,7 +936,7 @@ pub(crate) fn search(
             width: 2.0 * s,
             start: 0.0,
             sweep: std::f32::consts::TAU,
-            color: color::HOLO,
+            color: color::LINE,
             knockout: None,
         },
     );
@@ -953,7 +953,7 @@ pub(crate) fn search(
             DrawCommand::RoundedRect {
                 rect: dot,
                 radius: dot.width * 0.5,
-                color: color::HOLO,
+                color: color::LINE,
             },
         );
     }
@@ -991,7 +991,7 @@ pub(crate) fn search(
             if found == 0 {
                 color::QUIET
             } else {
-                color::GOLD_BRIGHT
+                color::ACCENT_BRIGHT
             },
             FontWeight::Regular,
             TextAlign::End,
@@ -1015,8 +1015,8 @@ pub(crate) fn rail(
     lit: Option<f32>,
 ) {
     let height = bottom - top;
-    let line = color::alpha(color::HOLO, 0.5);
-    let clear = color::alpha(color::HOLO, 0.0);
+    let line = color::alpha(color::LINE, 0.5);
+    let clear = color::alpha(color::LINE, 0.0);
     super::fade(canvas, frame.rect(x, top, 2.0, height * 0.08), clear, line);
     push(
         canvas,
@@ -1036,7 +1036,7 @@ pub(crate) fn rail(
             canvas,
             frame,
             [x - 3.0, y - 20.0, 8.0, 40.0],
-            color::GOLD_BRIGHT,
+            color::ACCENT_BRIGHT,
         );
     }
 }

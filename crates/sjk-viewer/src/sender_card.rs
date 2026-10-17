@@ -62,12 +62,12 @@ impl Person {
     fn status(&self) -> &'static str {
         use sjk_identity::Trust;
         match (self.key_id.is_some(), self.staff, self.trust) {
-            (true, true, _) => "SJK player, SJK staff",
-            (true, false, Some(Trust::New)) => "SJK player, new",
-            (true, false, Some(Trust::Trusted)) => "SJK player, trusted",
-            (true, false, Some(Trust::Banned)) => "SJK player, banned from the chat",
-            (true, false, _) => "SJK player",
-            (false, ..) => "Not known to the SJK hub",
+            (true, true, _) => "SlashJK player, SlashJK staff",
+            (true, false, Some(Trust::New)) => "SlashJK player, new",
+            (true, false, Some(Trust::Trusted)) => "SlashJK player, trusted",
+            (true, false, Some(Trust::Banned)) => "SlashJK player, banned from the chat",
+            (true, false, _) => "SlashJK player",
+            (false, ..) => "Not known to the hub",
         }
     }
     /// The key id the card prints: none for the player's own.
@@ -173,7 +173,7 @@ pub(crate) fn draw(
         rect: card,
         radius: 10.0 * u,
         width: 1.5 * u,
-        color: color::alpha(color::HOLO, 0.45),
+        color: color::alpha(color::LINE, 0.45),
     });
     let x = card.x + PAD * u;
     let inner = width - 2.0 * PAD * u;
@@ -255,7 +255,7 @@ pub(crate) fn draw(
         Rect::new(head_x, y, head_width, 15.0 * u * 1.35),
         15.0 * u,
         if person.key_id.is_some() {
-            color::GOLD_BRIGHT
+            color::ACCENT_BRIGHT
         } else {
             color::MUTED
         },
@@ -333,7 +333,7 @@ pub(crate) fn draw(
         u,
         tokens.mute,
         if muted { "Unmute" } else { "Mute" },
-        color::GOLD,
+        color::ACCENT,
     );
     let ban_button = Rect::new(x + inner - 150.0 * u, y, 150.0 * u, 38.0 * u);
     let quiet = |muted: bool| {
@@ -358,14 +358,14 @@ pub(crate) fn draw(
                 tokens.ban,
                 shown.label,
                 if shown.armed {
-                    color::EMBER
+                    color::DANGER
                 } else {
-                    color::HOLO
+                    color::LINE
                 },
             );
             let (said, colour) = match shown.line {
-                Some((said, true)) => (said, color::GOLD_BRIGHT),
-                Some((said, false)) => (said, color::EMBER),
+                Some((said, true)) => (said, color::ACCENT_BRIGHT),
+                Some((said, false)) => (said, color::DANGER),
                 None => (quiet(muted), color::QUIET),
             };
             line(canvas, under, 13.0 * u, colour, format_args!("{said}"));
@@ -426,7 +426,11 @@ fn card_button(
         format_args!("{label}"),
         Rect::new(button.x, button.y + 9.0 * u, button.width, 22.0 * u),
         17.0 * u,
-        if lit { color::GOLD_BRIGHT } else { color::TEXT },
+        if lit {
+            color::ACCENT_BRIGHT
+        } else {
+            color::TEXT
+        },
         FontWeight::Semibold,
         0.0,
         TextAlign::Center,
@@ -506,7 +510,7 @@ mod tests {
     fn the_card_says_who_they_are_and_offers_mute() {
         let (canvas, rect, texts, ticks) = drawn(&sol(), false);
         assert!(texts.contains(&"^2Sol".to_owned()), "{texts:?}");
-        assert!(texts.contains(&"SJK player".to_owned()), "{texts:?}");
+        assert!(texts.contains(&"SlashJK player".to_owned()), "{texts:?}");
         assert!(
             texts.contains(&"Key 0123456789abcdef".to_owned()),
             "{texts:?}"
@@ -575,7 +579,7 @@ mod tests {
         assert!(texts.contains(&"Unmute".to_owned()), "{texts:?}");
         assert!(texts.contains(&"F".to_owned()), "their initial: {texts:?}");
         assert!(
-            texts.contains(&"Not known to the SJK hub".to_owned()),
+            texts.contains(&"Not known to the hub".to_owned()),
             "{texts:?}"
         );
         assert!(

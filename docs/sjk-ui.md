@@ -1,5 +1,15 @@
 # SJK UI
 
+**SlashJK (17/10/2026).** This fork rebrands the client as SlashJK and is
+redesigning this menu style screen by screen into its own modern look: one
+neutral palette with a violet accent, Inter for all text, and SlashJK's wordmark
+instead of SJK's emblem ([Design](#design), [Main page](#main-page)). The cvar
+values and code names (`ui_menuStyle sjk`, `menu::sjk`) stay, so saved profiles
+keep working; what players read says SlashJK, the hub, the online identity and
+the global chat. Pages not yet redrawn keep their SJK layout in the new colours
+and type. The credits, `NOTICE` and the startup copyright line keep naming Sol
+JK (SJK), on which SlashJK is based.
+
 The SJK UI (`ui_menuStyle sjk`) is SJK's own menu style: SJK's menus redesigned
 from the ground up, drawn over the live map in SJK's own type. It keeps the
 feeling of Jedi Academy's menus (gold for what you choose, holo blue line-work,
@@ -59,60 +69,58 @@ Principles:
 
 ### Colours
 
+SlashJK's palette (17/10/2026, the SlashJK redesign): a neutral graphite ground,
+quiet grey line-work and one violet accent instead of SJK's gold and holo blue.
 Display values, like all 2D colours ([rendering.md](rendering.md)), in
 `menu::sjk::color`:
 
 | Token | Value | Use |
 | --- | --- | --- |
-| Space | `#060A14` | The ground and the fades; never pure black |
-| Holo | `#A8CFFF` | Line-work: rules, ticks, outlines, the ring |
-| Gold | `#E8B84A` | What is chosen; the screen's one main action |
-| Gold bright | `#FFD97A` | Chosen text and marks |
-| Text | `#E2E9F6` | Text |
-| Muted | `#A9B5CB` | Secondary text |
-| Quiet | `#8792AC` | An item that ends the session |
-| Ember | `#FF7A3D` | Leaving: Quit |
+| Space | `#0A0C10` | The ground and the fades; never pure black |
+| Line | `#D6DCE8` | Line-work, drawn faint: rules, outlines, tracks, card edges |
+| Accent | `#8B7BFF` | What is chosen; the screen's one main action |
+| Accent bright | `#BCB2FF` | Chosen text and marks |
+| Text | `#EDF0F5` | Text |
+| Muted | `#A1A8B6` | Secondary text |
+| Quiet | `#747C8C` | An item that ends the session |
+| Danger | `#FF5A6E` | Leaving: Quit |
 
 ### Type
 
-Two bundled vector families, as on SJK's site, both under the SIL Open Font
-License (licences beside the fonts in `crates/sjk-viewer/assets/fonts`):
+One bundled family, Inter (SIL Open Font License, licence beside the fonts in
+`crates/sjk-viewer/assets/fonts`), in two roles (`crate::text::DISPLAY`,
+`crate::text::BODY`):
 
-- **Rajdhani** (SemiBold, Bold), the display family: navigation, titles, key caps,
-  numbers. It lacks a few symbols (superscripts, fractions, ordinals, ¤, µ),
-  which come from Exo 2 SemiBold.
-- **Exo 2** (Regular, SemiBold), the body family: details, descriptions,
-  everything else. Its static weights are instances of the variable font
-  (`fonttools varLib.instancer`), since the rasterizer reads only a variable
-  font's default instance.
+- **Display**: Inter SemiBold and Bold, for navigation, titles, key caps and
+  numbers. Its letters are set at 0.84 of the line box (`Family::glyph_scale`),
+  so a layout measured for the old narrow display face keeps its room.
+- **Body**: Inter Regular and SemiBold, for details, descriptions and everything
+  else, at 0.94 of the line box.
 
-Sizes are in pixels of a 1080-line screen and scale with the window's height:
-the main page's entries 44 (chosen 68), server names 27, the player's name 26,
-details 16 to 18, key hints 15 to 17; on Settings, its name 48, the categories
-26, sub-headings 22, row names and descriptions 19, the detail's title 32 and
-its facts 17.
+Rajdhani and Exo 2 stay bundled for the parts that still use them (the brush
+view's tile numbers, Exo 2's wide glyphs), not for the menus.
+
+Sizes are in pixels of a 1080-line screen (the line box) and scale with the
+window's height.
 
 Names keep their colour codes (`^1`...), drawn in a palette lifted to read on
-the navy ground (`text::CodePalette::Legible`, which every text in the UI's
-families uses): black shows as grey, and red, green, blue and magenta are
-lighter with the same hue; the other colours are the game's.
+the dark ground (`text::CodePalette::Legible`, which every text in the UI's
+families uses).
 
-`ui_gameFont` (classic game fonts) does not change the SJK UI's type; it keeps
+`ui_gameFont` (classic game fonts) does not change the UI's type; it keeps
 applying to the classic screens and the in-game text.
 
 Text is centred on its rectangle's middle line (`menu::sjk::text`): the
 renderer sets a run's line box from the rectangle's top, so the helper places
 it from each family's measured metrics, the middle of the capitals leaning a
-quarter toward the lower case (0.489 of the size down the line box for
-Rajdhani, 0.563 for Exo 2; a test checks them against the bundled fonts).
-Every SJK UI text goes through it, so a control's text rectangle is simply the
+quarter toward the lower case (0.515 of the size down the line box for the
+display role, 0.517 for the body; a test checks them against the bundled fonts).
+Every UI text goes through it, so a control's text rectangle is simply the
 control's own.
 
 ### Motion
 
-The ring turns once every four minutes and the sunburst behind the emblem
-slowly the other way; the gold arc eases towards the chosen entry (about 0.3 s);
-the camera behind glides through its tour (The map behind); on the loading
+The camera behind glides through its tour (The map behind); on the loading
 screen a gold arc turns once every three seconds and the destination's
 levelshot fades in (0.45 s); on Credits the sun (its sunburst, god rays and
 sparks) keeps turning and rising, and the page's rows rise into place as it
@@ -153,30 +161,31 @@ the thrown saber floating between the camera and the model.
 ## Main page
 
 [home.rs](../crates/sjk-viewer/src/menu/sjk/home.rs), drawn over the live map,
-which is mp/duel6 when the client starts in the SJK UI
+which is mp/duel6 when the client starts in this menu style
 (`MenuStyle::boot_map`). It is laid out on a 16:9 frame of 1080-line pixels
 centred in the window: a wider window shows more map at its sides, a narrower
-one (4:3, 5:4) scales the frame down to its width.
+one (4:3, 5:4) scales the frame down to its width. Redesigned for SlashJK on
+17/10/2026: SJK's emblem, its turning ring and the arc of entries are gone.
 
-- **Ring:** SJK's emblem (380 across) in a ring of tick marks, 312 in radius,
-  centred at (620, 540). The ring is a light picture drawn by the emblem worker
-  (`EmblemLayer::Ring`), tinted holo; a gold arc (24 degrees) on it points at the
-  chosen entry, a dotted gold beam reaching towards it, and turns to the servers
-  while they have the keyboard.
-- **Arc:** the page's entries on an arc of radius 440 round the ring's right
-  side, 16 degrees apart (12.5 for six, so the ends keep clear of the ring); the
-  chosen one gold and larger, with a line saying what it opens. The pages:
+- **Wordmark:** top left at (96, 84), [brand.rs](../crates/sjk-viewer/src/menu/sjk/brand.rs):
+  a rounded accent square with a slash through it, then "Slash" in the text's
+  colour and "JK" in the accent, the display face at 34. Drawn from shapes and
+  text, no picture.
+- **Menu:** a column from x 96, its first row at y 312, 78 a row. The chosen
+  entry sits on a pill 520 wide (the accent at 16 % with a 4-pixel accent bar on
+  its left while the keyboard is in the menu, a faint grey one otherwise), its
+  label larger (38 against 34) and a line under it saying what it opens; a
+  hovered entry gets a fainter pill. Quit's chosen entry is in the danger colour.
+  The pages:
   - Main: Play, Profile (the [Profile screen](#profile-screen) on its Character
-    tab; it read Character until 09/10/2026), Collection (the
-    [Collection](#collection), since 10/10/2026), Settings (the settings screen),
-    SJK, Quit.
+    tab), Collection (the [Collection](#collection)), Settings, About, Quit.
   - Play: Join a server (the browser), Create a game, Back.
-  - SJK: What's new (the changelog), Update, Credits, Back (the Profile screen is
-    the main page's Profile, and its profile card). The arc holds six entries (a
-    seventh curls back into the ring); the identity's key is in Settings, Network.
-  - Quit: Quit to desktop (ember when chosen), Stay. It opens on Stay.
-  A page's name stands small over its first entry.
-- **Recent servers:** a column on the right (its rule at x 1470) of the servers
+  - About: What's new (the changelog), Update, Credits, Back.
+  - Quit: Quit to desktop, Stay. It opens on Stay.
+  A sub-page's name stands over its first entry, after a short accent line.
+- **Recent servers:** a column of cards on the right (from x 1482, each a
+  rounded card on the dark ground with a faint edge, the accent's when chosen,
+  and a green dot while the server list answers for it) of the servers
   the player joined last, newest first, up to four, kept in
   `recent_servers.json` beside `favorites.json` ([recent.rs](../crates/sjk-viewer/src/menu/sjk/recent.rs)):
   a server is recorded when a join reaches the game, with its name and map,
@@ -201,10 +210,9 @@ one (4:3, 5:4) scales the frame down to its width.
   the profile card bottom left in every window
   (`the_sender_card_keeps_clear_of_the_profile_card`); its
   targets are the page's own (60 to 64 the names, 70 the card, 71 Mute).
-  Down past the last server reaches the field
-  (the gold arc turns to it); Enter types and every key goes to the field until Enter
+  Down past the last server reaches the field; Enter types and every key goes to the field until Enter
   sends or Escape stops. Not shown with `cl_sjkChat 0`.
-- **Donation goal** (shelved since 14/10/2026, never shown; [sjk.md](sjk.md#donations)): top left, clear of the ring (x 96 to 516, from y 58;
+- **Donation goal** (shelved since 14/10/2026, never shown; [sjk.md](sjk.md#donations)): top right, above the servers (x 1404 to 1824, from y 58;
   [donation_goal.rs](../crates/sjk-viewer/src/donation_goal.rs), since 13/10/2026,
   Sol's request): "Support SJK" with a gold Donate pill at its right, then "80 € of
   200 € this month" and a gold bar on a holo track, then "More than 1 € brings the
@@ -221,11 +229,11 @@ one (4:3, 5:4) scales the frame down to its width.
 - **Corners:** the player's [profile card](#profile-card), bottom left; the keys
   of the page, bottom centre; the version and a newer release found, bottom right.
 
-Keys: Up and Down move along the arc; Enter takes the entry; Right (or Tab)
+Keys: Up and Down move through the menu; Enter takes the entry; Right (or Tab)
 moves to the servers, Up and Down choose one, Enter joins it, Left or Escape
-returns to the arc. Left from the arc chooses the profile card (the gold arc turns
-to it), Enter opens the Profile screen on its SJK Profile tab, and Right, Up, Tab or
-Escape return to the arc. Escape on a page returns to the main page, on the entry that
+returns to the menu. Left from the menu chooses the profile card, Enter opens the
+Profile screen on its Profile tab, and Right, Up, Tab or Escape return to the
+menu. Escape on a page returns to the main page, on the entry that
 opened it; on the main page it opens Quit's page. The pointer chooses by
 hovering and acts with a click. A server with a password opens the browser's
 password prompt.

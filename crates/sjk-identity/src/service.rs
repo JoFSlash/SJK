@@ -541,7 +541,7 @@ fn older_hub(error: HubError) -> HubError {
             HubError::Rejected {
                 status: 404,
                 code: "no_pictures".to_owned(),
-                message: "this SJK hub does not take pictures yet".to_owned(),
+                message: "this hub does not take pictures yet".to_owned(),
             }
         }
         other => other,
@@ -562,7 +562,7 @@ fn opening_refusal(error: &HubError) -> String {
         HubError::Protocol(why)
             if why.starts_with("status 404") || why.starts_with("status 405") =>
         {
-            "This SJK hub cannot open holocrons yet.".to_owned()
+            "This hub cannot open holocrons yet.".to_owned()
         }
         other => other.to_string(),
     }
@@ -576,7 +576,7 @@ fn reveal_refusal(error: &HubError) -> String {
         HubError::Protocol(why)
             if why.starts_with("status 404") || why.starts_with("status 405") =>
         {
-            "This SJK hub cannot reveal cards yet.".to_owned()
+            "This hub cannot reveal cards yet.".to_owned()
         }
         other => other.to_string(),
     }
@@ -778,7 +778,7 @@ impl Worker {
             }),
             Ok(text) if !vouched && crate::chat::has_link(&text) => refused(
                 "chat_links",
-                "Only verified players can send links and GIFs in SJK chat".to_owned(),
+                "Only verified players can send links and GIFs in global chat".to_owned(),
             ),
             Ok(_) if let Some(wait) = wait => refused(
                 "chat_quota",
@@ -814,7 +814,7 @@ impl Worker {
             (Some(_), true, false) => Err(HubError::Rejected {
                 status: 403,
                 code: "not_verified".to_owned(),
-                message: "only verified SJK players can ban from the chat".to_owned(),
+                message: "only verified SlashJK players can ban from the chat".to_owned(),
             }),
             _ => Err(not_connected()),
         };
@@ -1116,7 +1116,7 @@ impl Worker {
             (Some(_), true, false) => Err(HubError::Rejected {
                 status: 403,
                 code: "not_verified".to_owned(),
-                message: "only verified SJK players can report players".to_owned(),
+                message: "only verified SlashJK players can report players".to_owned(),
             }),
             _ => Err(HubError::Protocol(
                 "not connected to the hub (is identity on, cl_identity 1?)".to_owned(),
@@ -1296,7 +1296,7 @@ impl Worker {
             (Some(_), true, _) => Err(HubError::Rejected {
                 status: 403,
                 code: "not_staff".to_owned(),
-                message: "only SJK staff can do this".to_owned(),
+                message: "only staff can do this".to_owned(),
             }),
             _ => Err(HubError::Protocol(
                 "not connected to the hub (is identity on, cl_identity 1?)".to_owned(),
@@ -1354,7 +1354,7 @@ impl Worker {
             (Some(_), true, false) => Err(HubError::Rejected {
                 status: 403,
                 code: "not_staff".to_owned(),
-                message: "only SJK staff can do this".to_owned(),
+                message: "only staff can do this".to_owned(),
             }),
             _ => Err(not_connected()),
         };
@@ -3253,7 +3253,7 @@ mod tests {
         let before = fake.log().len();
         worker.handle(Command::StaffQuery(StaffQuery::CrashGroups), t0);
         assert_eq!(fake.log().len(), before);
-        assert_eq!(staff.lock().unwrap().message, "only SJK staff can do this");
+        assert_eq!(staff.lock().unwrap().message, "only staff can do this");
     }
 
     #[test]
@@ -4197,7 +4197,7 @@ mod tests {
         worker.handle(Command::Staff(StaffRequest::Search(String::new())), t0);
         assert_eq!(fake.log().len(), before);
         assert!(state().failed);
-        assert_eq!(state().message, "only SJK staff can do this");
+        assert_eq!(state().message, "only staff can do this");
     }
 
     /// A worker told to keep the asset packs in a fresh folder and switched on; the

@@ -242,7 +242,7 @@ fn view(inputs: &Inputs<'_>, revealed: bool) -> View {
             "Identity is off",
             &[
                 "No key is made and nothing is sent anywhere.",
-                "Switch it on below to let other SJK players see your name.",
+                "Switch it on below to let other SlashJK players see your name.",
             ],
         );
     }
@@ -360,7 +360,8 @@ fn online(snapshot: &Snapshot, key: String, backup: [String; 2]) -> View {
     };
     lines.extend(backup);
     lines.push(
-        "Your SJK name is the name you play under; the hub keeps the names you wear.".to_owned(),
+        "Your SlashJK name is the name you play under; the hub keeps the names you wear."
+            .to_owned(),
     );
     lines
         .push("The hub gets your public key, your in-game name and the server and slot".to_owned());

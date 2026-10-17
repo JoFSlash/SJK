@@ -12,15 +12,15 @@ use sjk_ui::InputEvent;
 /// The `sjkchat` command.
 pub(crate) const SJK_CHAT_COMMAND: &str = "sjkchat";
 pub(crate) const SJK_CHAT_HELP: &str =
-    "Open the SJK chat, which every SJK player shares through the SJK hub";
+    "Open the global chat, which everyone online shares through the hub";
 /// `sjksay <text>`: say it in the SJK chat.
 pub(crate) const SJK_SAY_COMMAND: &str = "sjksay";
 pub(crate) const SJK_SAY_HELP: &str =
-    "Say something in the SJK chat, as a bind can: sjksay <text> (for a GIF, sjkgif)";
+    "Say something in the global chat, as a bind can: sjksay <text> (for a GIF, sjkgif)";
 /// `sjkgif <favourite number | GIPHY id> [text]`: send a GIF to the SJK chat.
 pub(crate) const SJK_GIF_COMMAND: &str = "sjkgif";
 pub(crate) const SJK_GIF_HELP: &str =
-    "Send a GIF to the SJK chat: sjkgif <favourite number, 1 the newest, or GIPHY id> [text]";
+    "Send a GIF to the global chat: sjkgif <favourite number, 1 the newest, or GIPHY id> [text]";
 
 /// The words of `args` as the SJK chat takes them ([`crate::sjk_chat_field::paste_into`]:
 /// spaces made one, characters the chat refuses left out, 300 characters at most).
@@ -41,9 +41,8 @@ fn gif_for(which: &str, favourites: &[GifId]) -> Result<GifId, String> {
             .and_then(|at| favourites.get(at))
             .cloned()
             .ok_or_else(|| match favourites.len() {
-                0 => {
-                    "sjkgif: no favourite GIFs yet (star some in SJK chat's GIF picker)".to_owned()
-                }
+                0 => "sjkgif: no favourite GIFs yet (star some in global chat's GIF picker)"
+                    .to_owned(),
                 count => format!("sjkgif: favourites go from 1 to {count}"),
             });
     }
@@ -120,10 +119,10 @@ impl ViewerConsole {
     /// Send `text` to the SJK chat, as the page's Send does.
     fn say_in_sjk_chat(&mut self, text: String) -> Result<Vec<String>, String> {
         if self.bool_cvar("cl_sjkChat") == Some(false) {
-            return Err("SJK chat is off (cl_sjkChat 1 turns it on)".to_owned());
+            return Err("Global chat is off (cl_sjkChat 1 turns it on)".to_owned());
         }
         if !crate::player_identity::chat(text) {
-            return Err("the SJK identity is off (cl_identity 1)".to_owned());
+            return Err("the online identity is off (cl_identity 1)".to_owned());
         }
         Ok(Vec::new())
     }
@@ -140,9 +139,9 @@ impl ViewerConsole {
             PanelAction::Close => self.close_sjk_chat_panel(),
             PanelAction::Send(text) => {
                 if self.bool_cvar("cl_sjkChat") == Some(false) {
-                    self.push_log("^3sjkchat: SJK chat is off (cl_sjkChat 1 turns it on)");
+                    self.push_log("^3sjkchat: global chat is off (cl_sjkChat 1 turns it on)");
                 } else if !crate::player_identity::chat(text) {
-                    self.push_log("^3sjkchat: the SJK identity is off (cl_identity 1)");
+                    self.push_log("^3sjkchat: the online identity is off (cl_identity 1)");
                 }
             }
             PanelAction::Mute {

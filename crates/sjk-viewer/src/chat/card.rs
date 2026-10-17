@@ -277,7 +277,7 @@ mod tests {
         assert_eq!(card.person.key_id.as_deref(), Some(KEY));
         assert!(card.person.verified && card.person.staff && !card.muted);
         let texts = texts(&chat);
-        for wanted in ["^2Sol", "SJK player, SJK staff", "Mute"] {
+        for wanted in ["^2Sol", "SlashJK player, SlashJK staff", "Mute"] {
             assert!(
                 texts.iter().any(|text| text == wanted),
                 "{wanted:?} in {texts:?}"

@@ -61,7 +61,7 @@ const CARD_PAD: f32 = 56.0;
 /// The key card's steps: what to do on GIPHY's site, one line each.
 const KEY_STEPS: [&str; 3] = [
     "Open GIPHY's developer site, then log in or sign up: it's free.",
-    "Press Create an API Key, choose API, and give it any name, such as SJK chat.",
+    "Press Create an API Key, choose API, and give it any name, such as global chat.",
     "Copy the key GIPHY shows, paste it below with Ctrl+V, and press Save key.",
 ];
 
@@ -487,7 +487,7 @@ impl Panel {
                 Tab::Favourites => {
                     "Your favourite GIFs, kept on this PC. F or the star removes one."
                 }
-                _ => "GIFs posted in SJK chat lately, newest first. F or the star keeps one.",
+                _ => "GIFs posted in global chat lately, newest first. F or the star keeps one.",
             };
             text(
                 &mut self.ui,
@@ -533,7 +533,7 @@ impl Panel {
         let _ = self.ui.draw_list_mut().push(DrawCommand::RoundedRect {
             rect: area,
             radius: 8.0 * s,
-            color: color::alpha(color::HOLO, if lit { 0.16 } else { 0.05 }),
+            color: color::alpha(color::LINE, if lit { 0.16 } else { 0.05 }),
         });
         let inner = Rect::new(
             area.x + 4.0 * s,
@@ -584,7 +584,7 @@ impl Panel {
             ] {
                 let _ = self.ui.draw_list_mut().push(DrawCommand::SolidRect {
                     rect: bar,
-                    color: color::GOLD,
+                    color: color::ACCENT,
                 });
             }
         }
@@ -605,7 +605,7 @@ impl Panel {
                 star.height * 0.64,
             );
             let colour = match (favourite, self.ui.token_hovered(star_token)) {
-                (true, _) => color::GOLD_BRIGHT,
+                (true, _) => color::ACCENT_BRIGHT,
                 (false, true) => color::TEXT,
                 (false, false) => color::alpha(color::TEXT, 0.55),
             };
@@ -646,7 +646,7 @@ impl Panel {
             Tab::Favourites => {
                 "No favourite GIFs yet: star one in Search or Seen in chat, or choose a message with a GIF and Add to favourites.".to_owned()
             }
-            Tab::Seen => "No GIFs in SJK chat yet.".to_owned(),
+            Tab::Seen => "No GIFs in global chat yet.".to_owned(),
             Tab::Search => match &picker.results.failure {
                 Some(failure) => failure.message(),
                 None if picker.results.loading => "Asking GIPHY...".to_owned(),
@@ -655,7 +655,7 @@ impl Panel {
             },
         };
         let colour = if picker.results.failure.is_some() {
-            color::EMBER
+            color::DANGER
         } else {
             color::QUIET
         };
@@ -678,9 +678,9 @@ impl Panel {
         let picker = &self.gifs;
         let count = picker.ids.len();
         let (line, colour) = if let Some(notice) = picker.notice {
-            (notice.to_owned(), color::EMBER)
+            (notice.to_owned(), color::DANGER)
         } else if let Some(failure) = picker.results.failure.as_ref().filter(|_| count > 0) {
-            (failure.message(), color::EMBER)
+            (failure.message(), color::DANGER)
         } else if count > TILES {
             let first = picker.row * COLUMNS + 1;
             let last = ((picker.row + ROWS) * COLUMNS).min(count);
@@ -772,7 +772,7 @@ impl Panel {
             let _ = self.ui.draw_list_mut().push(DrawCommand::RoundedRect {
                 rect: mark,
                 radius: mark.width * 0.5,
-                color: color::alpha(color::GOLD, 0.18),
+                color: color::alpha(color::ACCENT, 0.18),
             });
             text(
                 &mut self.ui,
@@ -780,7 +780,7 @@ impl Panel {
                 format_args!("{}", step + 1),
                 frame.rect(x, y + 4.0, 34.0, 26.0),
                 20.0 * s,
-                color::GOLD_BRIGHT,
+                color::ACCENT_BRIGHT,
                 FontWeight::Regular,
                 TextAlign::Center,
             );
@@ -834,7 +834,7 @@ impl Panel {
         self.order.push(KEY_FIELD_TOKEN);
         y += 60.0;
         let (line, colour) = match notice {
-            Some(notice) => (notice, color::EMBER),
+            Some(notice) => (notice, color::DANGER),
             None => (
                 "Kept on this PC only, in Settings > Network > GIPHY key. It allows 100 searches an hour.",
                 color::QUIET,

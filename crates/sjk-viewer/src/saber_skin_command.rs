@@ -156,7 +156,7 @@ pub(crate) fn answer(choice: Choice, holdings: Holdings<'_>) -> String {
         }
         Choice::Skin(unlockable) => match holdings.reason() {
             Some(reason) => format!(
-                "Chose the {}; it shows only once your SJK profile holds it. {reason}",
+                "Chose the {}; it shows only once your SlashJK profile holds it. {reason}",
                 unlockable.name
             ),
             None => format!(
@@ -282,15 +282,15 @@ mod tests {
         assert!(!lines[1].contains("worn"));
         let lines = listing(" SABER_SUN ", Holdings::Known(&[]));
         assert!(
-            lines[1].contains("locked^7, chosen: shows once unlocked (Given by the SJK team.)"),
+            lines[1].contains("locked^7, chosen: shows once unlocked (Given by the team.)"),
             "{}",
             lines[1]
         );
         let lines = listing("saber_moon", Holdings::IdentityOff);
-        assert!(lines[1].contains("locked^7: Given by the SJK team."));
+        assert!(lines[1].contains("locked^7: Given by the team."));
         assert!(lines[1 + skins].contains("\"saber_moon\", which this client does not know"));
         assert!(
-            lines[2 + skins].contains("need the SJK identity"),
+            lines[2 + skins].contains("need the online identity"),
             "{}",
             lines[2 + skins]
         );
@@ -317,7 +317,7 @@ mod tests {
             "You wear the Sun blade."
         );
         assert!(answer(sun, Holdings::Known(&[])).contains("shows only once unlocked"));
-        assert!(answer(sun, Holdings::IdentityOff).contains("need the SJK identity"));
+        assert!(answer(sun, Holdings::IdentityOff).contains("need the online identity"));
         assert_eq!(
             answer(Choice::Stock, Holdings::IdentityOff),
             "You wear the stock blade."
@@ -331,7 +331,7 @@ mod tests {
             ViewerConsole::new(directory.path().join("config.cfg")).expect("a console");
         let lines = run(&mut console, &words("saber_SUN"), None, no_parts).unwrap();
         assert_eq!(console.text_cvar(SABER_SKIN_CVAR).unwrap(), "saber_sun");
-        assert!(lines[0].contains("only once your SJK profile holds it"));
+        assert!(lines[0].contains("only once your SlashJK profile holds it"));
         let lines = run(&mut console, &[], None, no_parts).unwrap();
         assert!(lines[1].contains("chosen"));
         run(&mut console, &words("none"), None, no_parts).unwrap();

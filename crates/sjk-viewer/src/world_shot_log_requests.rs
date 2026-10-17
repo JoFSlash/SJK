@@ -96,7 +96,7 @@ fn staff_state(players: Vec<sjk_identity::Profile>) -> sjk_identity::StaffState 
                 "11ee11ee11ee11ee",
                 "unclean",
                 "",
-                "SJK stopped without reporting an error (killed, an abort, a stack overflow or the graphics driver)",
+                "SlashJK stopped without reporting an error (killed, an abort, a stack overflow or the graphics driver)",
                 4,
                 3,
             ),

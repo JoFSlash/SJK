@@ -196,7 +196,7 @@ pub(crate) fn draw(canvas: &mut MenuCanvas, ring: &Ring<'_>) {
         hairline,
         0.0,
         TAU,
-        color::alpha(color::HOLO, 0.38),
+        color::alpha(color::LINE, 0.38),
     );
     arc(
         canvas,
@@ -205,7 +205,7 @@ pub(crate) fn draw(canvas: &mut MenuCanvas, ring: &Ring<'_>) {
         hairline,
         0.0,
         TAU,
-        color::alpha(color::HOLO, 0.34),
+        color::alpha(color::LINE, 0.34),
     );
     if count > 1 {
         for index in 0..count {
@@ -216,7 +216,7 @@ pub(crate) fn draw(canvas: &mut MenuCanvas, ring: &Ring<'_>) {
                 12.0 * u,
                 angle(index, count) + step * 0.5 + turn,
                 2.0 / OUTER,
-                color::alpha(color::HOLO, 0.5 * arrived),
+                color::alpha(color::LINE, 0.5 * arrived),
             );
         }
     }
@@ -229,13 +229,13 @@ pub(crate) fn draw(canvas: &mut MenuCanvas, ring: &Ring<'_>) {
             canvas,
             spot,
             (ICON_LIT + 34.0) * fit * u,
-            color::alpha(color::GOLD, 0.07),
+            color::alpha(color::ACCENT, 0.07),
         );
         disc(
             canvas,
             spot,
             (ICON_LIT + 16.0) * fit * u,
-            color::alpha(color::GOLD, 0.12),
+            color::alpha(color::ACCENT, 0.12),
         );
         // At most a choice's share of a full ring of eight, so a page of two
         // does not light half the ring.
@@ -246,7 +246,7 @@ pub(crate) fn draw(canvas: &mut MenuCanvas, ring: &Ring<'_>) {
             4.0 * u,
             at,
             (step * 0.72).min(TAU / 8.0 * 0.72),
-            color::GOLD_BRIGHT,
+            color::ACCENT_BRIGHT,
         );
     }
     // The pointer: a gold arc on the disc's rim, brighter as it leaves the middle.
@@ -258,7 +258,7 @@ pub(crate) fn draw(canvas: &mut MenuCanvas, ring: &Ring<'_>) {
             4.0 * u,
             direction,
             0.46,
-            color::alpha(color::GOLD, 0.3 + 0.7 * strength.min(1.0)),
+            color::alpha(color::ACCENT, 0.3 + 0.7 * strength.min(1.0)),
         );
     }
     canvas.push_opacity(0.2 + 0.8 * arrived);
@@ -275,7 +275,7 @@ pub(crate) fn draw(canvas: &mut MenuCanvas, ring: &Ring<'_>) {
                 2.5 * u,
                 0.0,
                 TAU,
-                color::GOLD_BRIGHT,
+                color::ACCENT_BRIGHT,
             );
         }
         let rect = Rect::new(spot[0] - size * 0.5, spot[1] - size * 0.5, size, size);
@@ -309,7 +309,7 @@ pub(crate) fn draw(canvas: &mut MenuCanvas, ring: &Ring<'_>) {
                 canvas,
                 towards(centre, at, (OUTER + 14.0) * u),
                 9.0 * u,
-                color::GOLD_BRIGHT,
+                color::ACCENT_BRIGHT,
             );
         }
     }
@@ -360,9 +360,9 @@ fn name_disc(canvas: &mut MenuCanvas, label: &str, rect: Rect, lit: bool, u: f32
             radius: rect.width * 0.5,
             width: (1.5 * u).max(1.0),
             color: if lit {
-                color::GOLD_BRIGHT
+                color::ACCENT_BRIGHT
             } else {
-                color::alpha(color::HOLO, 0.55)
+                color::alpha(color::LINE, 0.55)
             },
         },
     );
@@ -391,7 +391,11 @@ fn name_disc(canvas: &mut MenuCanvas, label: &str, rect: Rect, lit: bool, u: f32
                 line,
             ),
             size,
-            if lit { color::GOLD_BRIGHT } else { color::TEXT },
+            if lit {
+                color::ACCENT_BRIGHT
+            } else {
+                color::TEXT
+            },
             FontWeight::Semibold,
             TextAlign::Center,
         );
@@ -427,7 +431,7 @@ fn middle(canvas: &mut MenuCanvas, ring: &Ring<'_>, arrived: f32) {
             format_args!("{label}"),
             Rect::new(x - width * 0.5, y - 20.0 * u, width, 40.0 * u),
             30.0 * u,
-            color::GOLD_BRIGHT,
+            color::ACCENT_BRIGHT,
             FontWeight::Semibold,
             TextAlign::Center,
         ),
@@ -467,7 +471,7 @@ fn middle(canvas: &mut MenuCanvas, ring: &Ring<'_>, arrived: f32) {
                     DrawCommand::RoundedRect {
                         rect: Rect::new(left, dots_y - dot * 0.5, lit, dot),
                         radius: dot * 0.5,
-                        color: color::GOLD_BRIGHT,
+                        color: color::ACCENT_BRIGHT,
                     },
                 );
                 left += lit + gap - dot;
@@ -476,7 +480,7 @@ fn middle(canvas: &mut MenuCanvas, ring: &Ring<'_>, arrived: f32) {
                     canvas,
                     [left + dot * 0.5, dots_y],
                     dot,
-                    color::alpha(color::HOLO, 0.5),
+                    color::alpha(color::LINE, 0.5),
                 );
                 left += gap;
             }

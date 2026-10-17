@@ -60,7 +60,7 @@ impl Line {
     pub(crate) fn held(words: impl Into<String>) -> Self {
         Self {
             words: words.into(),
-            colour: color::GOLD_BRIGHT,
+            colour: color::ACCENT_BRIGHT,
         }
     }
 }
@@ -299,7 +299,7 @@ mod tests {
     fn long_lines_wrap_and_new_lines_start_after_a_gap() {
         let card = Card {
             title: "Rare card".to_owned(),
-            colour: color::HOLO,
+            colour: color::LINE,
             lines: vec![
                 Line::how(
                     "Opening a holocron gives one sealed card; this kind comes in about one holocron in fifty.",

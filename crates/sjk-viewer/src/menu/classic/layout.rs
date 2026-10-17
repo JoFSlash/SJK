@@ -671,7 +671,7 @@ mod tests {
                 assert!(!slot.hint.is_empty(), "{:?}", slot.entry);
                 assert_eq!(
                     !slot.enabled(),
-                    slot.hint.starts_with("Not in SJK yet"),
+                    slot.hint.starts_with("Not in SlashJK yet"),
                     "{:?}",
                     slot.entry
                 );

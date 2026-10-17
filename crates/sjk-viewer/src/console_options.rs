@@ -115,7 +115,7 @@ pub(super) fn register(cvars: &mut CvarRegistry) -> Result<(), sjk_shell::CvarEr
         STYLE_CVAR,
         ConsoleStyle::DEFAULT_NAME,
         CvarFlags::ARCHIVE,
-        "Console style: auto (the SJK UI's with its menus, else classic), sjk or classic \
+        "Console style: auto (the SlashJK look with its menus, else classic), sjk or classic \
          (after EternalJK)",
     ))?;
     cvars.register(CvarDefinition::new(

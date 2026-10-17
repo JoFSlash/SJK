@@ -35,7 +35,7 @@ const MOST: u32 = sjk_identity::OPEN_MAX as u32;
 pub(crate) fn listing() -> Vec<String> {
     let mut lines = vec![
         format!("usage: {COMMAND} <tier|all> [x<count>] [normal|holo|solar|shader]"),
-        "Plays the Holocrons tab's opening as if the hub had opened holocrons: the burst, the sealed card, its finish and the credits. Nothing is sent to the SJK hub and nothing is kept.".to_owned(),
+        "Plays the Holocrons tab's opening as if the hub had opened holocrons: the burst, the sealed card, its finish and the credits. Nothing is sent to the hub and nothing is kept.".to_owned(),
     ];
     for (index, tier) in TIERS.iter().enumerate() {
         let (least, most) = crate::loot_odds::current().credits[index];

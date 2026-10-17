@@ -325,7 +325,7 @@ fn words(
             ),
         }
         let from = if view.entry.gift {
-            "A gift from the SJK team"
+            "A gift from the team"
         } else {
             "Dropped while you played"
         };

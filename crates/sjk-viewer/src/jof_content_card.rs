@@ -34,7 +34,7 @@ const HEADER_TOKEN: u16 = 804;
 const TICK_BASE: u16 = 100;
 /// Whose the files are (Sol's request, 16/10/2026): JoF chooses them, SJK
 /// only fetches what the player picks.
-pub(crate) const NOTICE: &str = "JoF chooses and publishes these files and is responsible for them; SJK only downloads what you pick and is not responsible for their content.";
+pub(crate) const NOTICE: &str = "JoF chooses and publishes these files and is responsible for them; SlashJK only downloads what you pick and is not responsible for their content.";
 /// The card, in frame pixels.
 const CARD: [f32; 4] = [360.0, 96.0, 1200.0, 888.0];
 const LEFT: f32 = 404.0;
@@ -502,7 +502,7 @@ impl Card {
             format_args!("JoF content"),
             frame.rect(LEFT, 126.0, 700.0, 50.0),
             36.0 * s,
-            color::GOLD_BRIGHT,
+            color::ACCENT_BRIGHT,
             FontWeight::Semibold,
             TextAlign::Start,
         );
@@ -562,7 +562,7 @@ impl Card {
         );
         kit::switch(ui, &frame, RIGHT, top + 27.0, self.on, switch_focused);
         let explained = if self.on {
-            "On: SJK loads these files from its JoF folder, from the next map. Off leaves them on disk unused."
+            "On: SlashJK loads these files from its JoF folder, from the next map. Off leaves them on disk unused."
         } else {
             "Off by default. Turn it on to download and load JoF's files; nothing is fetched until you press Download."
         };
@@ -683,7 +683,7 @@ impl Card {
                         )
                     } else {
                         format!(
-                            "{} for JoF's own client, not used by SJK",
+                            "{} for JoF's own client, not used by SlashJK",
                             summary.elsewhere
                         )
                     };
@@ -729,9 +729,9 @@ impl Card {
                     RIGHT - LEFT,
                     &back,
                     if ui.token_hovered(GROUPS_TOKEN) {
-                        color::GOLD_BRIGHT
+                        color::ACCENT_BRIGHT
                     } else {
-                        color::HOLO
+                        color::LINE
                     },
                 );
                 ui.hit_region(GROUPS_TOKEN, frame.rect(LEFT - 8.0, 330.0, 560.0, 32.0));
@@ -1001,7 +1001,7 @@ impl Card {
                     human_size(*done),
                     human_size(*total)
                 ),
-                color::GOLD_BRIGHT,
+                color::ACCENT_BRIGHT,
                 ratio(*done, *total),
             ),
             Phase::Finished(outcome) if outcome.synced => self.finished(outcome),
@@ -1010,7 +1010,7 @@ impl Card {
                     "JoF's repository could not be reached: {}",
                     shorten(reason, 80)
                 ),
-                color::EMBER,
+                color::DANGER,
                 None,
             ),
             Phase::Cancelled => (
@@ -1031,7 +1031,7 @@ impl Card {
                     outcome.failures.len(),
                     shorten(first, 70)
                 ),
-                color::EMBER,
+                color::DANGER,
                 None,
             );
         }
@@ -1046,7 +1046,7 @@ impl Card {
         } else {
             " Turn on Use JoF content to load them."
         });
-        (done, color::GOLD_BRIGHT, None)
+        (done, color::ACCENT_BRIGHT, None)
     }
 
     fn ready(&self) -> String {
@@ -1120,7 +1120,7 @@ fn summaries(snapshot: &Snapshot, selection: &Selection) -> Vec<Summary> {
 /// The group's state on the right of its row.
 fn group_state(summary: &Summary) -> (String, Color) {
     if summary.files == 0 {
-        return ("Not for SJK".into(), color::QUIET);
+        return ("Not for SlashJK".into(), color::QUIET);
     }
     if summary.wanted == 0 {
         return if summary.ours > 0 {
@@ -1143,7 +1143,7 @@ fn group_state(summary: &Summary) -> (String, Color) {
     let whole = summary.wanted == summary.files;
     match (whole, summary.missing) {
         (true, 0) if summary.here == summary.files => {
-            (format!("All {} here", summary.files), color::GOLD_BRIGHT)
+            (format!("All {} here", summary.files), color::ACCENT_BRIGHT)
         }
         (true, missing) => (
             format!(
@@ -1159,7 +1159,7 @@ fn group_state(summary: &Summary) -> (String, Color) {
                 "{} of {} chosen  ·  all here",
                 summary.wanted, summary.files
             ),
-            color::GOLD_BRIGHT,
+            color::ACCENT_BRIGHT,
         ),
         (false, missing) => (
             format!(
@@ -1184,13 +1184,13 @@ fn file_state(
         return ("JoF's client only", color::QUIET);
     }
     match (state, wanted) {
-        (AssetState::Installed, true) => ("Here", color::GOLD_BRIGHT),
-        (AssetState::InGameFolder, true) => ("In game folder", color::GOLD_BRIGHT),
+        (AssetState::Installed, true) => ("Here", color::ACCENT_BRIGHT),
+        (AssetState::InGameFolder, true) => ("In game folder", color::ACCENT_BRIGHT),
         (AssetState::InGameFolder, false) => ("In game folder", color::MUTED),
         (AssetState::Missing, true) => ("To download", color::TEXT),
         (AssetState::Outdated, true) => ("To update", color::TEXT),
         (AssetState::Installed | AssetState::Outdated, false) if downloaded => {
-            ("To remove", color::EMBER)
+            ("To remove", color::DANGER)
         }
         (AssetState::Installed | AssetState::Outdated, false) => ("Here, not chosen", color::MUTED),
         _ => ("Not chosen", color::QUIET),
@@ -1204,14 +1204,14 @@ fn bar(canvas: &mut MenuCanvas, frame: &Frame, rect: [f32; 4], ratio: f32) {
     let _ = canvas.draw_list_mut().push(DrawCommand::RoundedRect {
         rect: frame.rect(x, y, width, height),
         radius,
-        color: color::alpha(color::HOLO, 0.12),
+        color: color::alpha(color::LINE, 0.12),
     });
     let fill = width * ratio.clamp(0.0, 1.0);
     if fill > 0.0 {
         let _ = canvas.draw_list_mut().push(DrawCommand::RoundedRect {
             rect: frame.rect(x, y, fill.max(height), height),
             radius,
-            color: color::GOLD,
+            color: color::ACCENT,
         });
     }
 }

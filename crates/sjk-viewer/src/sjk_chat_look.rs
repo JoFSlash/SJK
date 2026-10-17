@@ -300,7 +300,7 @@ mod tests {
             }
         }
         // Nor the SJK UI's accent gold, which its tag and the menus' marks use.
-        let accent = crate::menu::sjk::color::GOLD;
+        let accent = crate::menu::sjk::color::ACCENT;
         assert!(distance([accent.r, accent.g, accent.b, 1.0]) > 0.05);
     }
 

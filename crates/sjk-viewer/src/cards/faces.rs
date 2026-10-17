@@ -251,7 +251,7 @@ pub(crate) fn install(vfs: &VirtualFileSystem, generation: u64) {
     });
     if !faces.list.is_empty() {
         crate::log::progress(format_args!(
-            "SJK packs: card faces: {}",
+            "SlashJK packs: card faces: {}",
             faces
                 .list
                 .iter()

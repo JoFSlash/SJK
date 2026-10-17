@@ -129,10 +129,10 @@ impl Medal {
     /// What it is for, in a sentence.
     pub(crate) const fn description(self) -> &'static str {
         match self {
-            Self::EarlyTester => "Helped test SJK in its early days.",
-            Self::EarlyContributor => "Contributed to SJK's code in its early days.",
+            Self::EarlyTester => "Helped test SlashJK in its early days.",
+            Self::EarlyContributor => "Contributed to SlashJK's code in its early days.",
             Self::BugHunter => "Found bugs that got fixed.",
-            Self::Supporter => "Donated to SJK's development.",
+            Self::Supporter => "Donated to SlashJK's development.",
         }
     }
 
@@ -140,16 +140,16 @@ impl Medal {
     pub(crate) const fn how_to_get(self) -> &'static str {
         match self {
             Self::EarlyTester => {
-                "Given by the SJK team to players who helped test SJK in its early days."
+                "Given by the team to players who helped test SlashJK in its early days."
             }
             Self::EarlyContributor => {
-                "Given by the SJK team to players who contributed to SJK's code in its early days."
+                "Given by the team to players who contributed to SlashJK's code in its early days."
             }
             Self::BugHunter => {
-                "Given by the SJK team when a bug you found gets fixed; it can be given again."
+                "Given by the team when a bug you found gets fixed; it can be given again."
             }
             Self::Supporter => {
-                "Given by the SJK team to players who donate more than 1 euro to SJK, through the SJK site."
+                "Given by the team to players who donate more than 1 euro to SlashJK, through the SlashJK site."
             }
         }
     }

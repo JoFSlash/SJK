@@ -112,7 +112,7 @@ pub(crate) const ALL: [Unlockable; 51] = [
         edition: crate::editions::ALPHA,
         smith: SOL,
         description: "A white-gold core in an orange corona: flares, prominences arching off it, sparks, a glint at its tip and heat haze.",
-        how_to_get: "Given by the SJK team.",
+        how_to_get: "Given by the team.",
     },
     Unlockable {
         id: "saber_storm",
@@ -124,7 +124,7 @@ pub(crate) const ALL: [Unlockable; 51] = [
         edition: crate::editions::ALPHA,
         smith: SOL,
         description: "A white-blue core crackling with lightning that leaps off it, sparks at its tip.",
-        how_to_get: "Given by the SJK team.",
+        how_to_get: "Given by the team.",
     },
     Unlockable {
         id: "saber_void",
@@ -136,7 +136,7 @@ pub(crate) const ALL: [Unlockable; 51] = [
         edition: crate::editions::ALPHA,
         smith: SOL,
         description: "A dark core in a violet rim, star specks drifting into it, and a deep hum.",
-        how_to_get: "Given by the SJK team.",
+        how_to_get: "Given by the team.",
     },
     Unlockable {
         id: "saber_frost",
@@ -148,7 +148,7 @@ pub(crate) const ALL: [Unlockable; 51] = [
         edition: crate::editions::ALPHA,
         smith: SOL,
         description: "A pale ice core with a pointed tip, frost shards trailing it, and a chiming hum.",
-        how_to_get: "Given by the SJK team.",
+        how_to_get: "Given by the team.",
     },
     Unlockable {
         id: "saber_prism",
@@ -160,7 +160,7 @@ pub(crate) const ALL: [Unlockable; 51] = [
         edition: crate::editions::ALPHA,
         smith: SOL,
         description: "A white core in a corona whose colours run through the rainbow, slowly turning.",
-        how_to_get: "Given by the SJK team.",
+        how_to_get: "Given by the team.",
     },
     Unlockable {
         id: "saber_unstable",
@@ -172,7 +172,7 @@ pub(crate) const ALL: [Unlockable; 51] = [
         edition: crate::editions::ALPHA,
         smith: SOL,
         description: "A raw red core that crackles and sputters, its edge ragged and its length faltering.",
-        how_to_get: "Given by the SJK team.",
+        how_to_get: "Given by the team.",
     },
     Unlockable {
         id: "saber_molten",
@@ -184,7 +184,7 @@ pub(crate) const ALL: [Unlockable; 51] = [
         edition: crate::editions::ALPHA,
         smith: SOL,
         description: "A dark rock core split by glowing lava cracks, embers dripping off it and falling.",
-        how_to_get: "Given by the SJK team.",
+        how_to_get: "Given by the team.",
     },
     Unlockable {
         id: "saber_spectral",
@@ -196,7 +196,7 @@ pub(crate) const ALL: [Unlockable; 51] = [
         edition: crate::editions::ALPHA,
         smith: SOL,
         description: "A pale, see-through blade: wisps rise off it, souls drift round it, an echo sways beside it and afterimages trail its swings.",
-        how_to_get: "Given by the SJK team.",
+        how_to_get: "Given by the team.",
     },
     Unlockable {
         id: "saber_glitch",
@@ -244,7 +244,7 @@ pub(crate) const ALL: [Unlockable; 51] = [
         edition: crate::editions::ALPHA,
         smith: SOL,
         description: "A blade that takes the colour of the light where it is, changing from map to map.",
-        how_to_get: "Given by the SJK team.",
+        how_to_get: "Given by the team.",
     },
     Unlockable {
         id: "saber_banner",
@@ -256,7 +256,7 @@ pub(crate) const ALL: [Unlockable; 51] = [
         edition: crate::editions::ALPHA,
         smith: SOL,
         description: "Your team's colour in team games, rippling like a flag; silver outside them.",
-        how_to_get: "Given by the SJK team.",
+        how_to_get: "Given by the team.",
     },
     Unlockable {
         id: "saber_heartbeat",
@@ -268,7 +268,7 @@ pub(crate) const ALL: [Unlockable; 51] = [
         edition: crate::editions::ALPHA,
         smith: SOL,
         description: "A warm, deep blade that pulses with a slow double heartbeat, its light beating with it.",
-        how_to_get: "Given by the SJK team.",
+        how_to_get: "Given by the team.",
     },
     Unlockable {
         id: "saber_tidal",
@@ -280,7 +280,7 @@ pub(crate) const ALL: [Unlockable; 51] = [
         edition: crate::editions::ALPHA,
         smith: CREYON,
         description: "A teal blade with a wave of brighter light surging from hilt to tip on a slow loop.",
-        how_to_get: "Given by the SJK team.",
+        how_to_get: "Given by the team.",
     },
     Unlockable {
         id: "saber_circuit",
@@ -292,7 +292,7 @@ pub(crate) const ALL: [Unlockable; 51] = [
         edition: crate::editions::ALPHA,
         smith: CREYON,
         description: "A thin cyan blade with sharp data pulses racing along it.",
-        how_to_get: "Given by the SJK team.",
+        how_to_get: "Given by the team.",
     },
     Unlockable {
         id: "saber_aurora",
@@ -304,7 +304,7 @@ pub(crate) const ALL: [Unlockable; 51] = [
         edition: crate::editions::ALPHA,
         smith: CREYON,
         description: "Slow ribbons of green, teal and violet drifting along the blade.",
-        how_to_get: "Given by the SJK team.",
+        how_to_get: "Given by the team.",
     },
     Unlockable {
         id: "saber_echo",
@@ -316,7 +316,7 @@ pub(crate) const ALL: [Unlockable; 51] = [
         edition: crate::editions::ALPHA,
         smith: CREYON,
         description: "A sky-blue blade with a bright ring rippling along it and fading away.",
-        how_to_get: "Given by the SJK team.",
+        how_to_get: "Given by the team.",
     },
     Unlockable {
         id: "saber_nebula",
@@ -328,7 +328,7 @@ pub(crate) const ALL: [Unlockable; 51] = [
         edition: crate::editions::ALPHA,
         smith: CREYON,
         description: "Deep indigo with tiny stars twinkling inside, a slice of galaxy.",
-        how_to_get: "Given by the SJK team.",
+        how_to_get: "Given by the team.",
     },
     Unlockable {
         id: "saber_cinder",
@@ -340,7 +340,7 @@ pub(crate) const ALL: [Unlockable; 51] = [
         edition: crate::editions::ALPHA,
         smith: CREYON,
         description: "A dull coal-orange blade that flickers and sheds glowing embers.",
-        how_to_get: "Given by the SJK team.",
+        how_to_get: "Given by the team.",
     },
     Unlockable {
         id: "saber_venom",
@@ -352,7 +352,7 @@ pub(crate) const ALL: [Unlockable; 51] = [
         edition: crate::editions::ALPHA,
         smith: CREYON,
         description: "Acid green with droplets that bead up and drip off the blade.",
-        how_to_get: "Given by the SJK team.",
+        how_to_get: "Given by the team.",
     },
     Unlockable {
         id: "saber_sakura",
@@ -364,7 +364,7 @@ pub(crate) const ALL: [Unlockable; 51] = [
         edition: crate::editions::ALPHA,
         smith: CREYON,
         description: "A soft pink blade shedding blossom petals that drift away.",
-        how_to_get: "Given by the SJK team.",
+        how_to_get: "Given by the team.",
     },
     Unlockable {
         id: "saber_firefly",
@@ -376,7 +376,7 @@ pub(crate) const ALL: [Unlockable; 51] = [
         edition: crate::editions::ALPHA,
         smith: CREYON,
         description: "A soft warm-green blade with fireflies blinking around it.",
-        how_to_get: "Given by the SJK team.",
+        how_to_get: "Given by the team.",
     },
     Unlockable {
         id: "saber_slate",
@@ -388,7 +388,7 @@ pub(crate) const ALL: [Unlockable; 51] = [
         edition: crate::editions::ALPHA,
         smith: CREYON,
         description: "A cool steel-grey blade with a faint, slow shimmer, plain and sturdy.",
-        how_to_get: "Given by the SJK team.",
+        how_to_get: "Given by the team.",
     },
     Unlockable {
         id: "saber_amber",
@@ -400,7 +400,7 @@ pub(crate) const ALL: [Unlockable; 51] = [
         edition: crate::editions::ALPHA,
         smith: CREYON,
         description: "A warm honey-gold blade with a soft glow that swells and settles.",
-        how_to_get: "Given by the SJK team.",
+        how_to_get: "Given by the team.",
     },
     Unlockable {
         id: "saber_lilac",
@@ -412,7 +412,7 @@ pub(crate) const ALL: [Unlockable; 51] = [
         edition: crate::editions::ALPHA,
         smith: CREYON,
         description: "A gentle lilac blade whose colour drifts a little as it moves.",
-        how_to_get: "Given by the SJK team.",
+        how_to_get: "Given by the team.",
     },
     Unlockable {
         id: "saber_mint",
@@ -424,7 +424,7 @@ pub(crate) const ALL: [Unlockable; 51] = [
         edition: crate::editions::ALPHA,
         smith: CREYON,
         description: "A pale, fresh green blade with a cool wave of light running along it.",
-        how_to_get: "Given by the SJK team.",
+        how_to_get: "Given by the team.",
     },
     Unlockable {
         id: "saber_coral",
@@ -436,7 +436,7 @@ pub(crate) const ALL: [Unlockable; 51] = [
         edition: crate::editions::ALPHA,
         smith: CREYON,
         description: "A salmon-pink blade with a warm pulse travelling from hilt to tip.",
-        how_to_get: "Given by the SJK team.",
+        how_to_get: "Given by the team.",
     },
     Unlockable {
         id: "saber_ivory",
@@ -448,7 +448,7 @@ pub(crate) const ALL: [Unlockable; 51] = [
         edition: crate::editions::ALPHA,
         smith: CREYON,
         description: "A creamy, near-white blade with a soft golden fringe.",
-        how_to_get: "Given by the SJK team.",
+        how_to_get: "Given by the team.",
     },
     Unlockable {
         id: "saber_glacier",
@@ -460,7 +460,7 @@ pub(crate) const ALL: [Unlockable; 51] = [
         edition: crate::editions::ALPHA,
         smith: CREYON,
         description: "Ice-blue with tiny crystals of frost glittering inside.",
-        how_to_get: "Given by the SJK team.",
+        how_to_get: "Given by the team.",
     },
     Unlockable {
         id: "saber_dusk",
@@ -472,7 +472,7 @@ pub(crate) const ALL: [Unlockable; 51] = [
         edition: crate::editions::ALPHA,
         smith: CREYON,
         description: "Orange sinking into violet, the colour of the sky after sunset, slowly turning.",
-        how_to_get: "Given by the SJK team.",
+        how_to_get: "Given by the team.",
     },
     Unlockable {
         id: "saber_ruby",
@@ -484,7 +484,7 @@ pub(crate) const ALL: [Unlockable; 51] = [
         edition: crate::editions::ALPHA,
         smith: CREYON,
         description: "A deep red blade shedding bright sparks as it burns.",
-        how_to_get: "Given by the SJK team.",
+        how_to_get: "Given by the team.",
     },
     Unlockable {
         id: "saber_amethyst",
@@ -496,7 +496,7 @@ pub(crate) const ALL: [Unlockable; 51] = [
         edition: crate::editions::ALPHA,
         smith: CREYON,
         description: "Rich purple with tiny flecks of light twinkling in the crystal.",
-        how_to_get: "Given by the SJK team.",
+        how_to_get: "Given by the team.",
     },
     Unlockable {
         id: "saber_jade",
@@ -508,7 +508,7 @@ pub(crate) const ALL: [Unlockable; 51] = [
         edition: crate::editions::ALPHA,
         smith: CREYON,
         description: "A calm sea-green blade whose hue slowly shifts, with specks of light inside.",
-        how_to_get: "Given by the SJK team.",
+        how_to_get: "Given by the team.",
     },
     Unlockable {
         id: "saber_moonlight",
@@ -520,7 +520,7 @@ pub(crate) const ALL: [Unlockable; 51] = [
         edition: crate::editions::ALPHA,
         smith: CREYON,
         description: "Silver-blue with pale motes drifting along it like dust in moonlight.",
-        how_to_get: "Given by the SJK team.",
+        how_to_get: "Given by the team.",
     },
     Unlockable {
         id: "saber_neon",
@@ -532,7 +532,7 @@ pub(crate) const ALL: [Unlockable; 51] = [
         edition: crate::editions::ALPHA,
         smith: CREYON,
         description: "A glass neon tube, gas glowing inside, one of its six sections stuttering out now and then like an old bar sign.",
-        how_to_get: "Given by the SJK team.",
+        how_to_get: "Given by the team.",
     },
     Unlockable {
         id: "saber_peppermint",
@@ -544,7 +544,7 @@ pub(crate) const ALL: [Unlockable; 51] = [
         edition: crate::editions::ALPHA,
         smith: CREYON,
         description: "A candy cane: red and white stripes winding up the blade, sugar glinting off it.",
-        how_to_get: "Given by the SJK team.",
+        how_to_get: "Given by the team.",
     },
     Unlockable {
         id: "saber_bubble",
@@ -556,7 +556,7 @@ pub(crate) const ALL: [Unlockable; 51] = [
         edition: crate::editions::ALPHA,
         smith: CREYON,
         description: "Soap film: rainbow swirls sliding round a nearly clear blade, bubbles drifting off it.",
-        how_to_get: "Given by the SJK team.",
+        how_to_get: "Given by the team.",
     },
     Unlockable {
         id: "saber_lavalamp",
@@ -568,7 +568,7 @@ pub(crate) const ALL: [Unlockable; 51] = [
         edition: crate::editions::ALPHA,
         smith: CREYON,
         description: "A violet glass column where glowing wax rises in blobs, merging and splitting on the way.",
-        how_to_get: "Given by the SJK team.",
+        how_to_get: "Given by the team.",
     },
     Unlockable {
         id: "saber_reactor",
@@ -580,7 +580,7 @@ pub(crate) const ALL: [Unlockable; 51] = [
         edition: crate::editions::ALPHA,
         smith: CREYON,
         description: "Plasma squeezed by containment rings marching up the blade; now and then it overheats orange and vents sparks.",
-        how_to_get: "Given by the SJK team.",
+        how_to_get: "Given by the team.",
     },
     Unlockable {
         id: "saber_bleeding",
@@ -592,7 +592,7 @@ pub(crate) const ALL: [Unlockable; 51] = [
         edition: crate::editions::ALPHA,
         smith: CREYON,
         description: "A pure white blade fighting a red corruption that cracks its way up from the hilt and is pushed back.",
-        how_to_get: "Given by the SJK team.",
+        how_to_get: "Given by the team.",
     },
     Unlockable {
         id: "saber_sketch",
@@ -604,7 +604,7 @@ pub(crate) const ALL: [Unlockable; 51] = [
         edition: crate::editions::ALPHA,
         smith: CREYON,
         description: "A blade drawn in pencil: wobbly outlines and hatching redrawn eight times a second, like a flipbook.",
-        how_to_get: "Given by the SJK team.",
+        how_to_get: "Given by the team.",
     },
     Unlockable {
         id: "saber_hourglass",
@@ -616,7 +616,7 @@ pub(crate) const ALL: [Unlockable; 51] = [
         edition: crate::editions::ALPHA,
         smith: CREYON,
         description: "Two glass chambers pinched at the middle, glowing sand pouring through until it runs out and flips.",
-        how_to_get: "Given by the SJK team.",
+        how_to_get: "Given by the team.",
     },
     Unlockable {
         id: "saber_fiber",
@@ -628,7 +628,7 @@ pub(crate) const ALL: [Unlockable; 51] = [
         edition: crate::editions::ALPHA,
         smith: CREYON,
         description: "A bundle of glass fibres fanning out from the hilt, each ending in its own slowly changing point of light.",
-        how_to_get: "Given by the SJK team.",
+        how_to_get: "Given by the team.",
     },
     Unlockable {
         id: "saber_serpent",
@@ -640,7 +640,7 @@ pub(crate) const ALL: [Unlockable; 51] = [
         edition: crate::editions::ALPHA,
         smith: CREYON,
         description: "A golden serpent coiled round an emerald blade, slithering in place, its head by the tip hissing now and then.",
-        how_to_get: "Given by the SJK team.",
+        how_to_get: "Given by the team.",
     },
     Unlockable {
         id: "saber_monarch",
@@ -652,7 +652,7 @@ pub(crate) const ALL: [Unlockable; 51] = [
         edition: crate::editions::ALPHA,
         smith: CREYON,
         description: "A warm amber blade where monarch butterflies rest, open their wings and now and then fly off and come back.",
-        how_to_get: "Given by the SJK team.",
+        how_to_get: "Given by the team.",
     },
     Unlockable {
         id: "saber_phoenix",
@@ -664,7 +664,7 @@ pub(crate) const ALL: [Unlockable; 51] = [
         edition: crate::editions::ALPHA,
         smith: CREYON,
         description: "Living flame rolling up the blade, burning feathers falling as ash, wings of fire unfolding from the hilt.",
-        how_to_get: "Given by the SJK team.",
+        how_to_get: "Given by the team.",
     },
     Unlockable {
         id: "saber_quantum",
@@ -676,7 +676,7 @@ pub(crate) const ALL: [Unlockable; 51] = [
         edition: crate::editions::ALPHA,
         smith: CREYON,
         description: "A blade in superposition: ghost copies at other angles drift apart and collapse back into it with a flash.",
-        how_to_get: "Given by the SJK team.",
+        how_to_get: "Given by the team.",
     },
     Unlockable {
         id: "saber_comic",
@@ -688,7 +688,7 @@ pub(crate) const ALL: [Unlockable; 51] = [
         edition: crate::editions::ALPHA,
         smith: CREYON,
         description: "A cel-shaded blade: flat colour, a thick black outline and its glow printed in halftone dots. It takes your saber colour.",
-        how_to_get: "Given by the SJK team.",
+        how_to_get: "Given by the team.",
     },
     Unlockable {
         id: "saber_quicksilver",
@@ -700,7 +700,7 @@ pub(crate) const ALL: [Unlockable; 51] = [
         edition: crate::editions::ALPHA,
         smith: CREYON,
         description: "A blade of liquid mirror: ripples run up its chrome, beads roll to the tip and drip off; it barely glows.",
-        how_to_get: "Given by the SJK team.",
+        how_to_get: "Given by the team.",
     },
     Unlockable {
         id: "saber_obsidian",
@@ -712,7 +712,7 @@ pub(crate) const ALL: [Unlockable; 51] = [
         edition: crate::editions::ALPHA,
         smith: CREYON,
         description: "A flat, pointed blade of black volcanic glass with a white-hot edge crackling along it.",
-        how_to_get: "Given by the SJK team.",
+        how_to_get: "Given by the team.",
     },
 ];
 
@@ -809,10 +809,10 @@ impl<'a> Holdings<'a> {
     pub(crate) fn reason(&self) -> Option<&'static str> {
         match self {
             Self::IdentityOff => {
-                Some("Unlockables need the SJK identity: switch it on in Identity settings.")
+                Some("Unlockables need the online identity: switch it on in Identity settings.")
             }
-            Self::NoHub => Some("No hub is set: unlockables are kept on the SJK hub (cl_hubUrl)."),
-            Self::Waiting => Some("Waiting for the SJK hub to answer."),
+            Self::NoHub => Some("No hub is set: unlockables are kept on the hub (cl_hubUrl)."),
+            Self::Waiting => Some("Waiting for the hub to answer."),
             Self::Known(_) => None,
         }
     }
@@ -1100,7 +1100,7 @@ mod tests {
             Holdings::IdentityOff
                 .reason()
                 .unwrap()
-                .contains("SJK identity")
+                .contains("online identity")
         );
         assert_eq!(Holdings::Waiting.unlock("saber_sun"), None);
     }

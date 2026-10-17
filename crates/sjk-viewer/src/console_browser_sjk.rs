@@ -61,7 +61,7 @@ const _: () = assert!(DETAIL_BOTTOM < BUTTONS_Y && BUTTONS_Y + 44.0 < KEYS_Y - 2
 const FILTERS: [&str; TABS.len()] = ["All", "Commands", "Cvars", "Changed"];
 
 /// Selected text: gold, translucent so the text stays readable.
-const HIGHLIGHT: Color = color::alpha(color::GOLD, 0.34);
+const HIGHLIGHT: Color = color::alpha(color::ACCENT, 0.34);
 
 /// Measures text as the families draw it in the player's menu text style.
 #[derive(Clone, Copy)]
@@ -165,7 +165,7 @@ impl Browser {
                 frame.rect(RAIL_X + 28.0, top + 2.0, RAIL_WIDTH - 28.0, 32.0),
                 26.0 * s,
                 match (current, hovered) {
-                    (true, _) => color::GOLD_BRIGHT,
+                    (true, _) => color::ACCENT_BRIGHT,
                     (false, true) => color::TEXT,
                     (false, false) => color::MUTED,
                 },
@@ -219,7 +219,7 @@ impl Browser {
                 frame.rect(ROWS_X + 22.0, top + 4.0, name_room, 26.0),
                 19.0 * s,
                 if chosen {
-                    color::GOLD_BRIGHT
+                    color::ACCENT_BRIGHT
                 } else {
                     color::TEXT
                 },
@@ -262,7 +262,7 @@ impl Browser {
                             frame.rect(value[0], value[1], value[2], value[3]),
                             22.0 * s,
                             if changed {
-                                color::GOLD_BRIGHT
+                                color::ACCENT_BRIGHT
                             } else {
                                 color::TEXT
                             },
@@ -389,7 +389,7 @@ impl Browser {
         );
         let _ = ui.draw_list_mut().push(sjk_ui::DrawCommand::SolidRect {
             rect: frame.rect(DETAIL_X, DETAIL_TOP + 80.0, DETAIL_WIDTH, 1.0),
-            color: color::alpha(color::HOLO, 0.22),
+            color: color::alpha(color::LINE, 0.22),
         });
         let mut y = DETAIL_TOP + 98.0;
         if let Kind::Cvar { value, default, .. } = &entry.kind {
@@ -423,7 +423,7 @@ impl Browser {
                     TextFamily::Display,
                     24.0,
                     if entry.changed() {
-                        color::GOLD_BRIGHT
+                        color::ACCENT_BRIGHT
                     } else {
                         color::TEXT
                     },
@@ -552,7 +552,7 @@ impl Browser {
                 if self.status_error {
                     Color::new(1.0, 0.56, 0.5, 1.0)
                 } else {
-                    color::GOLD_BRIGHT
+                    color::ACCENT_BRIGHT
                 },
                 FontWeight::Regular,
                 TextAlign::Start,

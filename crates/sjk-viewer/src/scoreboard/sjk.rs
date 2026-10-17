@@ -1073,7 +1073,7 @@ impl Painter<'_> {
         ));
         let of_left = self.right_run(of.as_str(), RIGHT, 28.0, color::MUTED);
         let placed = Short::of(format_args!("{place}{}", ordinal(place)));
-        self.right_run(placed.as_str(), of_left - 10.0, 60.0, color::GOLD_BRIGHT)
+        self.right_run(placed.as_str(), of_left - 10.0, 60.0, color::ACCENT_BRIGHT)
     }
 
     /// `value` in the display family, ending at `right` on the header line;
@@ -1373,7 +1373,7 @@ impl Painter<'_> {
             width,
             score_size,
             if local {
-                color::GOLD_BRIGHT
+                color::ACCENT_BRIGHT
             } else {
                 color::TEXT
             },
@@ -1408,9 +1408,9 @@ impl Painter<'_> {
         self.push(DrawCommand::SolidRect {
             rect: rule,
             color: if local {
-                color::GOLD
+                color::ACCENT
             } else {
-                color::alpha(color::HOLO, 0.3)
+                color::alpha(color::LINE, 0.3)
             },
         });
     }
@@ -1430,7 +1430,7 @@ impl Painter<'_> {
             SPECTATORS_Y,
             label_width + 8.0,
             20.0,
-            color::HOLO,
+            color::LINE,
             FontWeight::Semibold,
             TextAlign::Start,
         );
@@ -1573,7 +1573,7 @@ impl Painter<'_> {
         let rule = self.frame.rect(columns.x, top - 6.0, columns.width, 1.0);
         self.push(DrawCommand::SolidRect {
             rect: rule,
-            color: color::alpha(color::HOLO, 0.22),
+            color: color::alpha(color::LINE, 0.22),
         });
     }
 
@@ -1606,7 +1606,7 @@ impl Painter<'_> {
                 .rect(columns.x, y + height - 1.0, columns.width, 1.0);
             self.push(DrawCommand::SolidRect {
                 rect: rule,
-                color: color::alpha(color::HOLO, 0.06),
+                color: color::alpha(color::LINE, 0.06),
             });
         }
         let (name_size, number_size) = text_sizes(self.header.compact, height);
@@ -1620,7 +1620,7 @@ impl Painter<'_> {
                 60.0,
                 number_size,
                 if local {
-                    color::GOLD_BRIGHT
+                    color::ACCENT_BRIGHT
                 } else {
                     color::MUTED
                 },
@@ -1714,7 +1714,7 @@ impl Painter<'_> {
                 middle,
                 60.0,
                 14.0,
-                color::GOLD,
+                color::ACCENT,
                 FontWeight::Regular,
                 TextAlign::Start,
             );
@@ -1723,7 +1723,7 @@ impl Painter<'_> {
             for &(stat, right) in &columns.stats[..columns.count] {
                 let first = stat == Stat::Score || stat == Stat::Record;
                 let colour = match (first, local) {
-                    (true, true) => color::GOLD_BRIGHT,
+                    (true, true) => color::ACCENT_BRIGHT,
                     (true, false) if !quiet => color::TEXT,
                     _ => color::MUTED,
                 };
@@ -1783,7 +1783,7 @@ impl Painter<'_> {
                     columns.ping - columns.bars - 30.0,
                     number_size * 0.86,
                     if local {
-                        color::GOLD_BRIGHT
+                        color::ACCENT_BRIGHT
                     } else {
                         color::MUTED
                     },
@@ -2103,7 +2103,7 @@ mod tests {
             .iter()
             .filter_map(|command| match command {
                 DrawCommand::SolidRect { rect, color }
-                    if *color == color::alpha(color::HOLO, 0.22) =>
+                    if *color == color::alpha(color::LINE, 0.22) =>
                 {
                     Some(*rect)
                 }
@@ -2401,7 +2401,7 @@ mod tests {
         let ui = draw(&rows, &header(TEAM, 31), [1920.0, 1080.0]);
         // Your row's band: the gold bar of the kit's band.
         let gold = ui.draw_list().commands().iter().any(|command| {
-            matches!(command, DrawCommand::RoundedRect { color, .. } if *color == color::GOLD_BRIGHT)
+            matches!(command, DrawCommand::RoundedRect { color, .. } if *color == color::ACCENT_BRIGHT)
         });
         assert!(gold, "your row is drawn on its band");
     }

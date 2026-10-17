@@ -687,7 +687,7 @@ fn draw_side(ui: &mut MenuCanvas, frame: &Frame, browser: &ServerBrowser, focus:
             frame.rect(SIDE_X + 34.0, top, SIDE_WIDTH - 110.0, SOURCE_HEIGHT),
             26.0 * s,
             match (index == current, hovered) {
-                (true, _) => color::GOLD_BRIGHT,
+                (true, _) => color::ACCENT_BRIGHT,
                 (false, true) => color::TEXT,
                 (false, false) => color::MUTED,
             },
@@ -811,7 +811,7 @@ fn draw_list(ui: &mut MenuCanvas, frame: &Frame, browser: &ServerBrowser) {
         let active = column.sort == sort;
         let hovered = ui.token_hovered(token);
         let colour = match (active, hovered) {
-            (true, _) => color::GOLD_BRIGHT,
+            (true, _) => color::ACCENT_BRIGHT,
             (false, true) => color::TEXT,
             (false, false) => color::MUTED,
         };
@@ -849,7 +849,7 @@ fn draw_list(ui: &mut MenuCanvas, frame: &Frame, browser: &ServerBrowser) {
         ui,
         DrawCommand::SolidRect {
             rect: frame.rect(LIST_X, HEADER_TOP + HEADER_HEIGHT, LIST_WIDTH, 1.0),
-            color: color::alpha(color::HOLO, 0.22),
+            color: color::alpha(color::LINE, 0.22),
         },
     );
     ui.scroll_region(
@@ -946,7 +946,7 @@ fn draw_row(
             DrawCommand::RoundedRect {
                 rect: frame.rect(LIST_X, top, LIST_WIDTH, ROW),
                 radius: 10.0 * s,
-                color: color::alpha(color::HOLO, 0.05),
+                color: color::alpha(color::LINE, 0.05),
             },
         );
     }
@@ -976,7 +976,7 @@ fn draw_row(
             frame,
             NAME.x + NAME.width - 10.0,
             middle,
-            color::GOLD_BRIGHT,
+            color::ACCENT_BRIGHT,
         );
     }
     let quiet = if selected { color::TEXT } else { color::MUTED };
@@ -1001,7 +1001,7 @@ fn draw_row(
                     rect: frame.rect(x, middle - 11.0, width, 22.0),
                     radius: 11.0 * s,
                     width: s.max(1.0),
-                    color: color::alpha(color::HOLO, 0.4),
+                    color: color::alpha(color::LINE, 0.4),
                 },
             );
             text(
@@ -1010,7 +1010,7 @@ fn draw_row(
                 format_args!("{tag}"),
                 frame.rect(x, middle - 11.0, width, 22.0),
                 14.0 * s,
-                color::HOLO,
+                color::LINE,
                 FontWeight::Semibold,
                 TextAlign::Center,
             );
@@ -1112,9 +1112,9 @@ pub(crate) fn signal(
                 rect,
                 radius: 1.5 * frame.s,
                 color: match (bar < lit, selected) {
-                    (true, true) => color::GOLD_BRIGHT,
-                    (true, false) => color::HOLO,
-                    (false, _) => color::alpha(color::HOLO, 0.2),
+                    (true, true) => color::ACCENT_BRIGHT,
+                    (true, false) => color::LINE,
+                    (false, _) => color::alpha(color::LINE, 0.2),
                 },
             },
         );
@@ -1205,7 +1205,7 @@ fn draw_detail(
             rect,
             radius: 0.0,
             width: s.max(1.0),
-            color: color::alpha(color::HOLO, 0.25),
+            color: color::alpha(color::LINE, 0.25),
         },
     );
     text(
@@ -1291,7 +1291,7 @@ fn draw_detail(
         format_args!("{}", entry.address),
         frame.rect(DETAIL_X, ADDRESS_Y, 260.0, 24.0),
         16.0 * s,
-        color::HOLO,
+        color::LINE,
         FontWeight::Regular,
         TextAlign::Start,
     );
@@ -1302,7 +1302,7 @@ fn draw_detail(
             format_args!("Needs a password"),
             frame.rect(DETAIL_X + 220.0, ADDRESS_Y, DETAIL_WIDTH - 220.0, 24.0),
             16.0 * s,
-            color::GOLD_BRIGHT,
+            color::ACCENT_BRIGHT,
             FontWeight::Regular,
             TextAlign::End,
         );
@@ -1420,7 +1420,7 @@ fn draw_detail(
                     ui,
                     DrawCommand::SolidRect {
                         rect: frame.rect(DETAIL_X + DETAIL_WIDTH - 4.0, top, 3.0, track),
-                        color: color::alpha(color::HOLO, 0.15),
+                        color: color::alpha(color::LINE, 0.15),
                     },
                 );
                 push(
@@ -1432,7 +1432,7 @@ fn draw_detail(
                             3.0,
                             track * PLAYER_LINES as f32 / total,
                         ),
-                        color: color::alpha(color::HOLO, 0.7),
+                        color: color::alpha(color::LINE, 0.7),
                     },
                 );
             }
@@ -1663,7 +1663,7 @@ fn draw_dialog(ui: &mut MenuCanvas, frame: &Frame, viewport: [f32; 2], dialog: &
             format_args!("{error}"),
             frame.rect(x + 40.0, y + 214.0, width - 80.0, 26.0),
             16.0 * s,
-            color::GOLD_BRIGHT,
+            color::ACCENT_BRIGHT,
             FontWeight::Regular,
             TextAlign::Start,
         );

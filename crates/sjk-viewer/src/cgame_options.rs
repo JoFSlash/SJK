@@ -32,7 +32,7 @@ pub(crate) fn register(cvars: &mut CvarRegistry) -> Result<(), sjk_shell::CvarEr
         (
             crate::chat::reply::REMEMBER_CVAR,
             1,
-            "The chat key opens on the channel of the last message sent (All, Team, SJK or a whisper)",
+            "The chat key opens on the channel of the last message sent (All, Team, SlashJK or a whisper)",
         ),
         (
             crate::chat::emoji::CVAR,

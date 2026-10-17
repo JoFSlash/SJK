@@ -957,7 +957,7 @@ mod sjk_tests {
         );
         menu.send_chat();
         assert!(!menu.chat_typing());
-        assert_eq!(menu.chat_cache.local, "Turn the SJK identity on to chat");
+        assert_eq!(menu.chat_cache.local, "Turn the online identity on to chat");
         // Escape stops typing first, the keyboard staying on the field.
         menu.focus = sjk_focus::Focus::Chat;
         menu.start_chat_typing();

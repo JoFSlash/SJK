@@ -1356,7 +1356,7 @@ fn identity_page(shots: &Snapshot, art: ArtSet) {
             name: "identity-online",
             enabled: true,
             snapshot: Some(&online),
-            bio: "I make SJK and I play on JA+ servers. Come say hi, I am usually around in the evening and I love a good duel.",
+            bio: "I make SlashJK and I play on JA+ servers. Come say hi, I am usually around in the evening and I love a good duel.",
             focus: "bio",
             message: "",
             hub_url: "https://sjk.dfox.app",
@@ -1543,7 +1543,7 @@ fn player_card_profile(shots: &mut Snapshot) {
         key_id: "0123456789abcdef".to_owned(),
         key: String::new(),
         name: "Sol".to_owned(),
-        bio: "Fox of the JoF and maker of SJK, the fast clean JKA client.".to_owned(),
+        bio: "Fox of the JoF and maker of SlashJK, the fast clean JKA client.".to_owned(),
         verified: true,
         staff: true,
         trust: None,
@@ -1618,16 +1618,15 @@ fn player_card_profile(shots: &mut Snapshot) {
 /// pages, a server focused, the JoF suggestion of a first start, and at 4:3, each
 /// with the SJK chat docked under the servers.
 #[test]
-#[ignore = "reads the installed game data named by JKA_GAME_DATA"]
+#[ignore = "writes snapshots; reads the game data named by JKA_GAME_DATA when set"]
 fn sjk_home_snapshot() {
     use crate::game_font::SjkFonts;
     use crate::menu::sjk::home::{self, ChatDock, DockLine, Home, HomeView, Page, ServerItem};
     use crate::menu::sjk::recent::Ago;
     use crate::menu_widgets::MenuCanvas;
-    let (_, vfs) = art();
-    let display = crate::text::load_family(&crate::text::DISPLAY, 1.0, None).expect("Rajdhani");
-    let body = crate::text::load_family(&crate::text::BODY, 1.0, None).expect("Exo 2");
-    let backdrop = decode(&vfs, "levelshots/mp/duel6.jpg").expect("the duel6 levelshot");
+    let display = crate::text::load_family(&crate::text::DISPLAY, 1.0, None).expect("display");
+    let body = crate::text::load_family(&crate::text::BODY, 1.0, None).expect("body");
+    let backdrop = sjk_backdrop();
     let recent = [
         ServerItem {
             name: "^5JoF^7 Jedi of Freedom",
@@ -1730,7 +1729,6 @@ fn sjk_home_snapshot() {
             servers,
             version: "2026.1007.1",
             update: Some("2026.1008.1"),
-            seconds: 12.0,
             chat: Some(ChatDock {
                 lines: &chat,
                 online: 12,
@@ -1777,6 +1775,46 @@ fn sjk_home_snapshot() {
     }
 }
 
+/// The ground of an SJK UI snapshot: the mp/duel6 levelshot of the installation in
+/// `JKA_GAME_DATA`, or without one a made-up dusk scene (a sky, a horizon and soft
+/// shapes standing for the map), so the layout can be looked at without game data.
+fn sjk_backdrop() -> RgbaImage {
+    if std::env::var_os("JKA_GAME_DATA").is_some() {
+        let (_, vfs) = art();
+        return decode(&vfs, "levelshots/mp/duel6.jpg").expect("the duel6 levelshot");
+    }
+    let (width, height) = (1280u32, 720u32);
+    let mix = |a: [f32; 3], b: [f32; 3], t: f32| -> [f32; 3] {
+        [
+            a[0] + (b[0] - a[0]) * t,
+            a[1] + (b[1] - a[1]) * t,
+            a[2] + (b[2] - a[2]) * t,
+        ]
+    };
+    let blobs: [(f32, f32, f32, [f32; 3]); 5] = [
+        (0.30, 0.55, 0.22, [0.36, 0.42, 0.30]),
+        (0.62, 0.48, 0.12, [0.70, 0.62, 0.48]),
+        (0.80, 0.62, 0.20, [0.28, 0.34, 0.26]),
+        (0.50, 0.30, 0.25, [0.80, 0.70, 0.55]),
+        (0.15, 0.80, 0.25, [0.22, 0.20, 0.18]),
+    ];
+    RgbaImage::from_fn(width, height, |x, y| {
+        let (u, v) = (x as f32 / width as f32, y as f32 / height as f32);
+        let mut colour = if v < 0.52 {
+            mix([0.36, 0.48, 0.62], [0.78, 0.70, 0.60], v / 0.52)
+        } else {
+            mix([0.40, 0.38, 0.32], [0.16, 0.15, 0.14], (v - 0.52) / 0.48)
+        };
+        for (bx, by, radius, tint) in blobs {
+            let distance = ((u - bx).powi(2) * 3.0 + (v - by).powi(2)).sqrt();
+            let weight = (1.0 - distance / radius).clamp(0.0, 1.0).powi(2) * 0.7;
+            colour = mix(colour, tint, weight);
+        }
+        let byte = |value: f32| (value.clamp(0.0, 1.0) * 255.0) as u8;
+        Rgba([byte(colour[0]), byte(colour[1]), byte(colour[2]), 255])
+    })
+}
+
 /// The text of an SJK UI snapshot, each family's vertices with its atlas.
 struct SjkShotFonts<'a> {
     display: (&'a [crate::text::TextVertex], &'a RgbaImage),
@@ -1819,15 +1857,14 @@ fn save_sjk_shot(
 /// slider focused (its dot and reset arrow), Display with a list open, a
 /// search's results, Graphics scrolled to its weather, and at 4:3.
 #[test]
-#[ignore = "reads the installed game data named by JKA_GAME_DATA"]
+#[ignore = "writes snapshots; reads the game data named by JKA_GAME_DATA when set"]
 fn sjk_settings_snapshot() {
     use crate::game_font::SjkFonts;
     use crate::menu::sjk::TextTarget;
     use crate::settings::mode::SettingsMode;
-    let (_, vfs) = art();
-    let display = crate::text::load_family(&crate::text::DISPLAY, 1.0, None).expect("Rajdhani");
-    let body = crate::text::load_family(&crate::text::BODY, 1.0, None).expect("Exo 2");
-    let backdrop = decode(&vfs, "levelshots/mp/duel6.jpg").expect("the duel6 levelshot");
+    let display = crate::text::load_family(&crate::text::DISPLAY, 1.0, None).expect("display");
+    let body = crate::text::load_family(&crate::text::BODY, 1.0, None).expect("body");
+    let backdrop = sjk_backdrop();
     let mut icons = HashMap::new();
     for (index, (_, bytes)) in crate::settings_icons::ICONS.iter().enumerate() {
         let icon = image::load_from_memory(bytes).expect("a settings icon");
@@ -2021,7 +2058,7 @@ fn settings_panel_snapshot() {
         ),
         (
             "-gamefont",
-            crate::text::retail_font::load(&crate::text::retail_font::MENU).expect("SJK Menu"),
+            crate::text::retail_font::load(&crate::text::retail_font::MENU).expect("SlashJK Menu"),
         ),
     ];
     let cases: [(&str, Page, Entry, Frame, &str); 5] = [

@@ -41,7 +41,7 @@ struct NoteView {
 }
 
 fn read_notes(game_data: &std::path::Path) -> Vec<NoteView> {
-    let path = game_data.join("SJK").join("notes.jsonl");
+    let path = game_data.join("SlashJK").join("notes.jsonl");
     let Ok(text) = std::fs::read_to_string(&path) else {
         eprintln!("no notes at {}", path.display());
         return Vec::new();
@@ -111,7 +111,7 @@ fn read_notes(game_data: &std::path::Path) -> Vec<NoteView> {
 /// so the shots are lit as the notes were seen.
 fn renderer_settings(game_data: &std::path::Path) -> Vec<(String, String)> {
     let text =
-        std::fs::read_to_string(game_data.join("SJK").join("config.cfg")).unwrap_or_default();
+        std::fs::read_to_string(game_data.join("SlashJK").join("config.cfg")).unwrap_or_default();
     text.lines()
         .filter_map(|line| {
             let mut words = line.split_whitespace();
@@ -151,7 +151,7 @@ fn chosen_notes() -> (Vec<NoteView>, Vec<(String, String)>) {
     // older pack left in `base` instead of the installed one. `SJK_NOTES_GENERATED`
     // names another client folder (whose `generated` holds the packs) to compare.
     let client_folder = std::env::var_os("SJK_NOTES_GENERATED")
-        .map_or_else(|| game_data.join("SJK"), PathBuf::from);
+        .map_or_else(|| game_data.join("SlashJK"), PathBuf::from);
     crate::assets::generated::locate_at_start(&client_folder);
     let mut settings = renderer_settings(&game_data);
     // `SJK_NOTES_CVARS=r_weather=1,r_weatherFog=2` overrides settings for a comparison.

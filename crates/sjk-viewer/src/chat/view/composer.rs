@@ -14,7 +14,7 @@ impl ChatOverlay {
         for (token, label, channel, offset) in [
             (GLOBAL, "All", Channel::Global, 0.0),
             (TEAM, "Team", Channel::Team, 58.0),
-            (SJK, "SJK", Channel::Sjk, 116.0),
+            (SJK, "SlashJK", Channel::Sjk, 116.0),
         ] {
             let rect = Rect::new(g.left + offset * g.scale, y, 50.0 * g.scale, 26.0 * g.scale);
             let selected = input.channel == channel;

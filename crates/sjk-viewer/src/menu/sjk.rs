@@ -18,6 +18,7 @@
 //! of a 1080-line screen and scale with the window's height
 //! ([`crate::ui_scale::height_scale`]).
 
+pub(crate) mod brand;
 pub(crate) mod browser;
 pub(crate) mod chat_dock;
 pub(crate) mod home;
@@ -211,7 +212,6 @@ impl ClientMenu {
                 servers: &servers[..count],
                 version: env!("SJK_BUILD_VERSION"),
                 update: update.as_deref(),
-                seconds: super::art::motion::seconds(),
                 chat,
                 summary,
                 donation: crate::donation_goal::card(console),
@@ -398,29 +398,30 @@ impl ClientMenu {
     }
 }
 
-/// The SJK UI's colours, as on SJK's site. They are display values, like all
-/// 2D colours (`crate::ui_target`).
+/// The UI's colours: a neutral graphite ground, quiet grey line-work and one
+/// violet accent for what is chosen. They are display values, like all 2D
+/// colours (`crate::ui_target`).
 pub(crate) mod color {
     use sjk_ui::Color;
 
-    /// The ground: deep space navy, never pure black.
-    pub(crate) const SPACE: Color = Color::new(0.024, 0.039, 0.078, 1.0);
-    /// Line-work: rules, ticks, outlines.
-    pub(crate) const HOLO: Color = Color::new(0.659, 0.812, 1.0, 1.0);
-    /// What you choose: the selection, the one main action of a screen.
-    pub(crate) const GOLD: Color = Color::new(0.91, 0.722, 0.29, 1.0);
-    /// Gold lit: the chosen item's text and marks.
-    pub(crate) const GOLD_BRIGHT: Color = Color::new(1.0, 0.851, 0.478, 1.0);
+    /// The ground: graphite, never pure black (`#0A0C10`).
+    pub(crate) const SPACE: Color = Color::new(0.039, 0.047, 0.063, 1.0);
+    /// Line-work: rules, outlines, tracks; mostly drawn faint (`#D6DCE8`).
+    pub(crate) const LINE: Color = Color::new(0.839, 0.863, 0.91, 1.0);
+    /// The accent: the selection, the one main action of a screen (`#8B7BFF`).
+    pub(crate) const ACCENT: Color = Color::new(0.545, 0.482, 1.0, 1.0);
+    /// The accent lit: the chosen item's text and marks (`#BCB2FF`).
+    pub(crate) const ACCENT_BRIGHT: Color = Color::new(0.737, 0.698, 1.0, 1.0);
     /// A trusted player's green (the trust mark's, `ui_renderer::trust_texture`).
     pub(crate) const TRUSTED: Color = Color::new(0.42, 0.86, 0.45, 1.0);
-    /// Text.
-    pub(crate) const TEXT: Color = Color::new(0.886, 0.914, 0.965, 1.0);
-    /// Secondary text.
-    pub(crate) const MUTED: Color = Color::new(0.663, 0.71, 0.796, 1.0);
-    /// Quieter still: an item that ends the session.
-    pub(crate) const QUIET: Color = Color::new(0.53, 0.573, 0.675, 1.0);
-    /// Only for leaving: Quit.
-    pub(crate) const EMBER: Color = Color::new(1.0, 0.478, 0.239, 1.0);
+    /// Text (`#EDF0F5`).
+    pub(crate) const TEXT: Color = Color::new(0.929, 0.941, 0.961, 1.0);
+    /// Secondary text (`#A1A8B6`).
+    pub(crate) const MUTED: Color = Color::new(0.631, 0.659, 0.714, 1.0);
+    /// Quieter still: an item that ends the session (`#747C8C`).
+    pub(crate) const QUIET: Color = Color::new(0.455, 0.486, 0.549, 1.0);
+    /// Only for leaving and destructive actions: Quit (`#FF5A6E`).
+    pub(crate) const DANGER: Color = Color::new(1.0, 0.353, 0.431, 1.0);
 
     /// `color` at `alpha`.
     pub(crate) const fn alpha(color: Color, alpha: f32) -> Color {
@@ -460,8 +461,8 @@ pub(crate) fn fade_across(canvas: &mut MenuCanvas, rect: Rect, left: Color, righ
 /// the bundled fonts (`letters_centre_on_the_middle_of_their_rectangle`):
 /// Rajdhani's capitals centre at 0.476 and its x-height at 0.529, Exo 2's at
 /// 0.542 and 0.629.
-pub(crate) const DISPLAY_CENTRE: f32 = 0.489;
-pub(crate) const BODY_CENTRE: f32 = 0.563;
+pub(crate) const DISPLAY_CENTRE: f32 = 0.515;
+pub(crate) const BODY_CENTRE: f32 = 0.517;
 /// The code family's (JetBrains Mono, set in the console's cell): measured as
 /// the others.
 pub(crate) const CODE_CENTRE: f32 = 0.511;
@@ -522,7 +523,7 @@ pub(crate) fn key_hint(
             rect: cap,
             radius: 5.0 * s,
             width: s.max(1.0),
-            color: color::alpha(color::HOLO, 0.45),
+            color: color::alpha(color::LINE, 0.45),
         });
         text(
             canvas,

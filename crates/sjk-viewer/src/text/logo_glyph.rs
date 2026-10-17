@@ -61,7 +61,7 @@ impl LogoGlyph {
         let (metrics, coverage) = font.rasterize(char::from(BYTE), size);
         let cap_height = font.metrics(CAP, size).height as f32;
         if metrics.width == 0 || metrics.height == 0 || cap_height <= 0.0 {
-            return Err("SJK Menu has no logo at 0xAC".into());
+            return Err("SlashJK Menu has no logo at 0xAC".into());
         }
         Ok(Self {
             width: metrics.width as f32,

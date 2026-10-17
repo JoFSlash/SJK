@@ -508,7 +508,7 @@ mod tests {
             [1920.0, 1080.0],
         );
         board.ui.finish(u16::MAX);
-        let rule = crate::menu::sjk::color::alpha(crate::menu::sjk::color::HOLO, 0.22);
+        let rule = crate::menu::sjk::color::alpha(crate::menu::sjk::color::LINE, 0.22);
         board
             .ui
             .draw_list()

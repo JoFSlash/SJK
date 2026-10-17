@@ -50,14 +50,13 @@ pub(crate) const SOUNDS_CVAR: &str = "cg_wheelSounds";
 /// ([`gif_pages`]); let go on one, it goes to the SJK chat (`sjkgif`).
 pub(crate) const GIF_OPEN_COMMAND: &str = "+gifwheel";
 pub(crate) const GIF_RUN_COMMAND: &str = "-gifwheel";
-pub(crate) const GIF_OPEN_HELP: &str =
-    "Hold to open the GIF wheel on your favourite GIFs; let go on one to send it to the SJK chat";
+pub(crate) const GIF_OPEN_HELP: &str = "Hold to open the GIF wheel on your favourite GIFs; let go on one to send it to the global chat";
 pub(crate) const GIF_RUN_HELP: &str =
-    "Send the GIF wheel's highlighted GIF to the SJK chat and close it";
+    "Send the GIF wheel's highlighted GIF to the global chat and close it";
 /// What the GIF wheel says without favourites.
 const GIFS_EMPTY: [&str; 2] = [
     "No favourite GIFs yet",
-    "Star some in SJK chat's GIF picker",
+    "Star some in global chat's GIF picker",
 ];
 
 /// Mouse counts from the middle before a choice is highlighted, and the farthest the
