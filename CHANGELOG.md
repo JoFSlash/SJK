@@ -23,6 +23,9 @@ tests check this file):
 - ASCII only, as the menu font draws bytes.
 Add each release's notes here when it is tagged (docs/sjk.md "Releases").
 -->
+## Unreleased
+
+- New graphics preset FPS boost for weak PCs with an integrated GPU: Vanilla style with impact marks, player shadows, weather, Force Speed afterimages, footprints and saber steam in rain off too (`graphicsquality fpsboost`) _(JoFSlash)_
 ## 2026.1017.2 (Alpha) | 17/10/2026
 
 > Force: JoF's 22 community presets in the Force menu.

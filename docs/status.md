@@ -1,3 +1,15 @@
+## FPS boost graphics preset
+
+17/10/2026, `claude/inspiring-davinci-s81e0l`: a fourth graphics preset, FPS boost,
+first in the list, for weak PCs with an integrated GPU: Vanilla style with impact
+marks, player shadows, weather, Force Speed afterimages, footprints and dust, and
+saber steam in rain off too ([client.md](client.md#graphics-quality)). The other
+presets leave those small effects as the player set them; leaving FPS boost turns them
+back on. It counts as the Vanilla renderer, so the low-FPS help does not offer Vanilla
+on it. Checked by unit tests. JoFSlash's Ryzen 7 PRO 4750U (Radeon Vega 7) laptop:
+about 100 FPS on FPS boost against about 50 before (one report, settings and map not
+recorded; EJK 1.6.2 gave 100-120 there).
+
 ## NPC sabers and voices
 
 17/10/2026, `personal/npc-sabers-sounds`, based on `Sol-Vulpes/SJK` `cb03b251`

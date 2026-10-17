@@ -1580,9 +1580,17 @@ See [catalog.rs](../crates/sjk-viewer/src/settings/catalog.rs).
 The first row of VIDEO, of [First setup](#first-setup) (under Graphics), of the SJK
 UI's Graphics (Advanced, under Quality) and of Simple's Graphics (under Preset) is
 the graphics preset ([graphics_quality.rs](../crates/sjk-viewer/src/graphics_quality.rs)),
-a dropdown of three presets (Sol's request, 16/10/2026; until then a Renderer row,
-Vanilla or SJK (alpha), and an SJK quality row of four levels, from 12/10/2026):
+a dropdown of four presets (Sol's request, 16/10/2026, FPS boost added 17/10/2026;
+until then a Renderer row, Vanilla or SJK (alpha), and an SJK quality row of four
+levels, from 12/10/2026):
 
+- **FPS boost**: the most frames per second, for weak PCs with an integrated GPU:
+  Vanilla style with the small effects it keeps also off (impact marks, player
+  shadows, weather, Force Speed afterimages, footprints and dust, saber steam in
+  rain). The other presets leave those as the player set them and do not count
+  them; leaving FPS boost (for a preset, or `renderer sjk`) turns them back on.
+  It counts as the Vanilla renderer (`renderer`, the low-FPS help). Resolution,
+  supersampling and the FPS cap stay the player's.
 - **Vanilla style**: the original game's look at the most frames per second, every
   SJK extra off (the level called EJK from 10/10/2026, Ultra low before, then
   Vanilla).
@@ -1609,31 +1617,34 @@ at either end. A renderer setting's row reads its value in the preset in use (or
 for Custom, the nearest) as its default (`graphics_quality::row_default`), so a
 preset's rows do not carry the changed dot, a row changed on its own does, and its
 Backspace leads back to the preset. The `graphicsquality` command names the preset,
-or sets it with `graphicsquality vanilla|sjk|experimental` (a preset's name works
+or sets it with `graphicsquality fpsboost|vanilla|sjk|experimental` (a preset's name works
 too; `ejk` and `ultralow` still name Vanilla style). Profiles on one of the former
 levels read Experimental (High) or Custom (Performance, Balanced, Ultra).
 
-| Setting | Vanilla style | SJK (recommended) | Experimental |
-| --- | --- | --- | --- |
-| HDR scene, bloom, FXAA, per-pixel model lighting | off | on | on |
-| Soft particles | off | off | on |
-| Ambient occlusion (`r_ssao`) | off | on | on |
-| Dynamic glow (`r_DynamicGlow`) | off | on | on |
-| Sunbeam dust (`r_dustMotes`) | 0 | 0 | 1 |
-| Reflection probes, floor mirrors | off | off | on |
-| Normal, specular and parallax maps | off | off | on |
-| Emission maps and their halo | off | on | on |
-| Sun and sky (`r_dayNight`) | off | off | on |
-| Emission-map lights (`r_emissiveLights`) | 0 | 0 | 1 |
-| Light shafts (`r_volumetrics`) | 0 | 0 | 3 |
-| World and character sun shadows | off | off | on |
-| Shadow resolution | 1024 | 1024 | 2048 |
-| Shadow filter taps | 8 | 8 | 16 |
-| Weather density | 1 | 1 | 2 |
-| Weather quality | 0 | 0 | 2 |
-| Volumetric clouds | off | off | on |
+| Setting | FPS boost | Vanilla style | SJK (recommended) | Experimental |
+| --- | --- | --- | --- | --- |
+| HDR scene, bloom, FXAA, per-pixel model lighting | off | off | on | on |
+| Soft particles | off | off | off | on |
+| Ambient occlusion (`r_ssao`) | off | off | on | on |
+| Dynamic glow (`r_DynamicGlow`) | off | off | on | on |
+| Sunbeam dust (`r_dustMotes`) | 0 | 0 | 0 | 1 |
+| Reflection probes, floor mirrors | off | off | off | on |
+| Normal, specular and parallax maps | off | off | off | on |
+| Emission maps and their halo | off | off | on | on |
+| Sun and sky (`r_dayNight`) | off | off | off | on |
+| Emission-map lights (`r_emissiveLights`) | 0 | 0 | 0 | 1 |
+| Light shafts (`r_volumetrics`) | 0 | 0 | 0 | 3 |
+| World and character sun shadows | off | off | off | on |
+| Shadow resolution | 1024 | 1024 | 1024 | 2048 |
+| Shadow filter taps | 8 | 8 | 8 | 16 |
+| Weather density | 1 | 1 | 1 | 2 |
+| Weather quality | 0 | 0 | 0 | 2 |
+| Volumetric clouds | off | off | off | on |
+| Impact marks, player shadows (`cg_marks`, `cg_shadows`) | off | player's | player's | player's |
+| Weather (`r_weather`) | off | player's | player's | player's |
+| Force Speed afterimages, footprints, saber steam in rain | off | player's | player's | player's |
 
-Under Vanilla style and SJK (recommended), with no sun, light shafts or sun shadows,
+Under FPS boost, Vanilla style and SJK (recommended), with no sun, light shafts or sun shadows,
 a map loads without building its lamps (see [rendering](rendering.md#default-visual-profile)), which no pass reads there.
 
 The `renderer` command keeps the former Renderer row's switch: `renderer vanilla`

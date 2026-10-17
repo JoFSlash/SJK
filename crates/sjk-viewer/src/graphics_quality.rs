@@ -1,7 +1,12 @@
-//! Graphics presets: Vanilla style, SJK (recommended) and Experimental, each one
-//! choice that sets the renderer's costly settings together (Sol's three,
-//! 16/10/2026, in place of the Renderer row and the SJK renderer's four levels).
+//! Graphics presets: FPS boost, Vanilla style, SJK (recommended) and
+//! Experimental, each one choice that sets the renderer's costly settings
+//! together (Sol's three, 16/10/2026, in place of the Renderer row and the SJK
+//! renderer's four levels; FPS boost added 17/10/2026 for integrated GPUs).
 //!
+//! FPS boost is Vanilla style with the remaining extras a weak, integrated GPU
+//! pays for also off: impact marks, player shadows, weather, Force Speed
+//! afterimages, footprints and dust, and saber steam in rain
+//! ([`FPS_BOOST_OFF`]). The other presets leave those to the player.
 //! Vanilla style is the original game's look at the least cost, every SJK extra
 //! off (the EJK level until 12/10/2026, then Vanilla). SJK (recommended) is
 //! Sol's own setup: SJK's image (HDR, bloom, glow, FXAA, ambient occlusion, lit
@@ -23,7 +28,7 @@ use crate::console::ViewerConsole;
 pub(crate) const COMMAND: &str = "graphicsquality";
 /// Help text for completion and `cmdlist`.
 pub(crate) const HELP: &str =
-    "Show or set the graphics preset: vanilla, sjk (recommended) or experimental";
+    "Show or set the graphics preset: fpsboost, vanilla, sjk (recommended) or experimental";
 /// The Graphics preset row's stand-in for a cvar name: the command that sets it.
 pub(crate) const ROW_NAME: &str = COMMAND;
 /// Console command that names the renderer or switches Vanilla style on and
@@ -43,6 +48,9 @@ pub(crate) const SJK: &str = "sjk";
 /// A graphics preset, cheapest first.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum Level {
+    /// The most FPS, for integrated GPUs: Vanilla style with impact marks,
+    /// player shadows, weather and the small cosmetic effects off too.
+    FpsBoost,
     /// The original game's look at the least cost (EJK, Ultra low and Vanilla,
     /// before): every SJK extra off, maps show their baked lightmaps.
     Vanilla,
@@ -53,50 +61,65 @@ pub(crate) enum Level {
     Experimental,
 }
 
-/// Each setting a preset sets, with its value at Vanilla style, SJK
+/// Each setting a preset sets, with its value at FPS boost, Vanilla style, SJK
 /// (recommended) and Experimental. Experimental is each setting's default
 /// (pinned by a test); SJK (recommended) is Sol's config of 16/10/2026.
-const VALUES: &[(&str, [&str; 3])] = &[
+const VALUES: &[(&str, [&str; 4])] = &[
     // Image.
-    ("r_sceneHdr", ["0", "1", "1"]),
-    ("r_sceneBloom", ["0", "1", "1"]),
-    ("r_DynamicGlow", ["0", "1", "1"]),
-    ("r_fxaa", ["0", "1", "1"]),
-    ("r_softParticles", ["0", "0", "1"]),
-    ("r_ssao", ["0", "1", "1"]),
+    ("r_sceneHdr", ["0", "0", "1", "1"]),
+    ("r_sceneBloom", ["0", "0", "1", "1"]),
+    ("r_DynamicGlow", ["0", "0", "1", "1"]),
+    ("r_fxaa", ["0", "0", "1", "1"]),
+    ("r_softParticles", ["0", "0", "0", "1"]),
+    ("r_ssao", ["0", "0", "1", "1"]),
     // Dust shows only in light shafts.
-    (crate::dust_motes::CVAR, ["0", "0", "1"]),
-    ("r_modelPixelLight", ["0", "1", "1"]),
-    ("r_cubeMapping", ["0", "0", "1"]),
-    ("r_floorReflections", ["0", "0", "1"]),
-    ("r_normalMapping", ["0", "0", "1"]),
-    ("r_specularMapping", ["0", "0", "1"]),
-    ("r_parallaxMapping", ["0", "0", "1"]),
-    ("r_emissiveMaps", ["0", "1", "1"]),
-    ("r_emissiveGlow", ["0", "1", "1"]),
+    (crate::dust_motes::CVAR, ["0", "0", "0", "1"]),
+    ("r_modelPixelLight", ["0", "0", "1", "1"]),
+    ("r_cubeMapping", ["0", "0", "0", "1"]),
+    ("r_floorReflections", ["0", "0", "0", "1"]),
+    ("r_normalMapping", ["0", "0", "0", "1"]),
+    ("r_specularMapping", ["0", "0", "0", "1"]),
+    ("r_parallaxMapping", ["0", "0", "0", "1"]),
+    ("r_emissiveMaps", ["0", "0", "1", "1"]),
+    ("r_emissiveGlow", ["0", "0", "1", "1"]),
     // Lighting.
-    ("r_dayNight", ["0", "0", "1"]),
-    ("r_emissiveLights", ["0", "0", "1"]),
-    ("r_volumetrics", ["0", "0", "3"]),
+    ("r_dayNight", ["0", "0", "0", "1"]),
+    ("r_emissiveLights", ["0", "0", "0", "1"]),
+    ("r_volumetrics", ["0", "0", "0", "3"]),
     // Shadows.
-    ("r_worldSunShadows", ["0", "0", "1"]),
-    ("r_actorSunShadows", ["0", "0", "1"]),
-    ("r_sunShadowResolution", ["1024", "1024", "2048"]),
-    ("r_sunShadowTaps", ["8", "8", "16"]),
+    ("r_worldSunShadows", ["0", "0", "0", "1"]),
+    ("r_actorSunShadows", ["0", "0", "0", "1"]),
+    ("r_sunShadowResolution", ["1024", "1024", "1024", "2048"]),
+    ("r_sunShadowTaps", ["8", "8", "8", "16"]),
     // Weather.
-    (crate::weather::DENSITY_CVAR, ["1", "1", "2"]),
-    (crate::weather::QUALITY_CVAR, ["0", "0", "2"]),
-    (crate::weather::CLOUDS_CVAR, ["0", "0", "1"]),
+    (crate::weather::DENSITY_CVAR, ["1", "1", "1", "2"]),
+    (crate::weather::QUALITY_CVAR, ["0", "0", "0", "2"]),
+    (crate::weather::CLOUDS_CVAR, ["0", "0", "0", "1"]),
+];
+
+/// The small effects FPS boost turns off (to 0) besides its [`VALUES`]. The other
+/// presets leave them as the player set them, so a player's own choice (no impact
+/// marks under SJK (recommended), say) still matches its preset; leaving FPS boost
+/// for another preset turns them back on (their defaults).
+const FPS_BOOST_OFF: &[&str] = &[
+    "cg_marks",
+    "cg_shadows",
+    "cg_speedTrail",
+    crate::footprints::PRINTS_CVAR,
+    crate::effect_aux::saber_rain_steam::CVAR,
+    crate::weather::CVAR,
 ];
 
 impl Level {
-    pub(crate) const ALL: [Self; 3] = [Self::Vanilla, Self::Sjk, Self::Experimental];
+    pub(crate) const ALL: [Self; 4] =
+        [Self::FpsBoost, Self::Vanilla, Self::Sjk, Self::Experimental];
     /// A new profile's preset, which the row's Backspace returns to.
     pub(crate) const DEFAULT: Self = Self::Sjk;
 
     /// The preset's name in Settings.
     pub(crate) fn label(self) -> &'static str {
         match self {
+            Self::FpsBoost => "FPS boost",
             Self::Vanilla => "Vanilla style",
             Self::Sjk => "SJK (recommended)",
             Self::Experimental => "Experimental",
@@ -110,6 +133,7 @@ impl Level {
     /// The preset's name in the command.
     fn command_name(self) -> &'static str {
         match self {
+            Self::FpsBoost => "fpsboost",
             Self::Vanilla => VANILLA,
             Self::Sjk => SJK,
             Self::Experimental => "experimental",
@@ -143,11 +167,22 @@ impl Level {
     pub(crate) fn current(console: &ViewerConsole) -> Option<Self> {
         Self::ALL
             .into_iter()
-            .find(|level| level.matches(console) == VALUES.len())
+            .find(|level| level.matches(console) == level.settings())
+    }
+
+    /// How many settings the preset sets.
+    fn settings(self) -> usize {
+        VALUES.len()
+            + if self == Self::FpsBoost {
+                FPS_BOOST_OFF.len()
+            } else {
+                0
+            }
     }
 
     /// The current preset, or for custom settings the preset they are nearest,
-    /// sharing the most values (the higher on a tie). Steps and lists start here.
+    /// sharing the most values (the higher on a tie: Vanilla style with its small
+    /// effects on is Vanilla style, not FPS boost). Steps and lists start here.
     pub(crate) fn nearest(console: &ViewerConsole) -> Self {
         Self::ALL
             .into_iter()
@@ -157,25 +192,56 @@ impl Level {
 
     /// How many of the preset's values `console` holds.
     fn matches(self, console: &ViewerConsole) -> usize {
+        let small_effects = if self == Self::FpsBoost {
+            FPS_BOOST_OFF
+                .iter()
+                .filter(|cvar| holds(console, cvar, "0"))
+                .count()
+        } else {
+            0
+        };
         VALUES
             .iter()
             .filter(|(cvar, values)| holds(console, cvar, values[self.index()]))
             .count()
+            + small_effects
     }
 
-    /// Set the preset's values, saving the profile once.
+    /// Set the preset's values, saving the profile once. Leaving FPS boost turns
+    /// its small effects back on.
     pub(crate) fn apply(self, console: &mut ViewerConsole) {
+        if self != Self::FpsBoost && Self::current(console) == Some(Self::FpsBoost) {
+            small_effects_on(console);
+        }
+        let small_effects_off = FPS_BOOST_OFF
+            .iter()
+            .filter(|_| self == Self::FpsBoost)
+            .map(|cvar| (*cvar, "0"));
         console.set_cvars(
             VALUES
                 .iter()
-                .map(|(cvar, values)| (*cvar, values[self.index()])),
+                .map(|(cvar, values)| (*cvar, values[self.index()]))
+                .chain(small_effects_off),
         );
     }
 }
 
-/// Whether the renderer is Vanilla: the settings are Vanilla style's.
+/// Put FPS boost's small effects back to their defaults.
+fn small_effects_on(console: &mut ViewerConsole) {
+    let defaults: Vec<(&str, String)> = FPS_BOOST_OFF
+        .iter()
+        .filter_map(|cvar| Some((*cvar, console.cvar_default(cvar)?.as_text())))
+        .collect();
+    console.set_cvars(defaults.iter().map(|(cvar, value)| (*cvar, value.as_str())));
+}
+
+/// Whether the renderer is Vanilla: the settings are Vanilla style's or FPS
+/// boost's, which has every SJK extra off too.
 pub(crate) fn vanilla(console: &ViewerConsole) -> bool {
-    Level::current(console) == Some(Level::Vanilla)
+    matches!(
+        Level::current(console),
+        Some(Level::FpsBoost | Level::Vanilla)
+    )
 }
 
 /// Set the renderer to `value` ([`VANILLA`] or [`SJK`], any case), as the
@@ -194,6 +260,9 @@ pub(crate) fn set_renderer(console: &mut ViewerConsole, value: &str) {
 /// as when Vanilla style was picked as a preset).
 pub(crate) fn toggle_vanilla(console: &mut ViewerConsole) {
     if vanilla(console) {
+        if Level::current(console) == Some(Level::FpsBoost) {
+            small_effects_on(console);
+        }
         let kept = console
             .cvar(RESTORE_CVAR)
             .map(sjk_shell::CvarValue::as_text)
@@ -234,6 +303,12 @@ pub(crate) fn shown(console: &ViewerConsole) -> &'static str {
 /// preset's rows do not read as changed and Backspace leads back to it; `None`
 /// for a setting no preset sets, whose default is its cvar's.
 pub(crate) fn row_default(console: &ViewerConsole, cvar: &str) -> Option<&'static str> {
+    if FPS_BOOST_OFF
+        .iter()
+        .any(|name| name.eq_ignore_ascii_case(cvar))
+    {
+        return (Level::nearest(console) == Level::FpsBoost).then_some("0");
+    }
     let (_, values) = VALUES
         .iter()
         .find(|(name, _)| name.eq_ignore_ascii_case(cvar))?;
@@ -352,7 +427,7 @@ mod tests {
         // The profile was saved: a new start reads the last preset.
         drop(console);
         let console = ViewerConsole::new(directory.path().join("config.cfg")).unwrap();
-        assert_eq!(Level::current(&console), Some(Level::Vanilla));
+        assert_eq!(Level::current(&console), Some(Level::FpsBoost));
     }
 
     #[test]
@@ -364,7 +439,7 @@ mod tests {
                 "{cvar}: {values:?}"
             );
             assert!(
-                numbers[0] < numbers[2],
+                numbers[0] < numbers[numbers.len() - 1],
                 "{cvar} is the same in every preset"
             );
         }
@@ -406,7 +481,9 @@ mod tests {
 
     #[test]
     fn steps_stop_at_the_ends() {
-        assert_eq!(Level::Vanilla.step(-1), Level::Vanilla);
+        assert_eq!(Level::FpsBoost.step(-1), Level::FpsBoost);
+        assert_eq!(Level::FpsBoost.step(1), Level::Vanilla);
+        assert_eq!(Level::Vanilla.step(-1), Level::FpsBoost);
         assert_eq!(Level::Vanilla.step(1), Level::Sjk);
         assert_eq!(Level::Sjk.step(-1), Level::Vanilla);
         assert_eq!(Level::Sjk.step(1), Level::Experimental);
@@ -456,6 +533,57 @@ mod tests {
         ] {
             assert!(holds(&console, cvar, "0"), "{cvar}");
         }
+    }
+
+    #[test]
+    fn fps_boost_is_vanilla_with_the_small_effects_off_too() {
+        let (_directory, mut console) = console();
+        command(&mut console, &["FPS boost".to_owned()]).unwrap();
+        assert_eq!(Level::current(&console), Some(Level::FpsBoost));
+        assert_eq!(shown(&console), "FPS boost");
+        assert!(vanilla(&console));
+        for (cvar, values) in VALUES {
+            assert_eq!(
+                values[Level::FpsBoost.index()],
+                values[Level::Vanilla.index()],
+                "{cvar}: FPS boost is Vanilla style's renderer"
+            );
+        }
+        for cvar in FPS_BOOST_OFF {
+            assert!(holds(&console, cvar, "0"), "{cvar}");
+            assert!(crate::settings::row_takes(cvar, "0"), "{cvar}");
+            assert_eq!(row_default(&console, cvar), Some("0"));
+            // Its default is on, which leaving FPS boost puts back.
+            let default = console.cvar_default(cvar).unwrap().as_text();
+            assert_eq!(default.parse::<f64>().ok(), Some(1.0), "{cvar}");
+        }
+        // Another preset puts the small effects back.
+        command(&mut console, &["vanilla".to_owned()]).unwrap();
+        assert_eq!(Level::current(&console), Some(Level::Vanilla));
+        assert!(holds(&console, "cg_marks", "1"));
+        assert_eq!(row_default(&console, "cg_marks"), None);
+        command(&mut console, &["fpsboost".to_owned()]).unwrap();
+        command(&mut console, &["sjk".to_owned()]).unwrap();
+        assert!(!vanilla(&console));
+        assert!(holds(&console, crate::weather::CVAR, "1"));
+        // So does the renderer switch back to SJK.
+        command(&mut console, &["fpsboost".to_owned()]).unwrap();
+        set_renderer(&mut console, SJK);
+        assert!(!vanilla(&console));
+        assert!(holds(&console, "cg_shadows", "1"));
+    }
+
+    #[test]
+    fn the_other_presets_keep_the_players_small_effects() {
+        let (_directory, mut console) = console();
+        Level::Sjk.apply(&mut console);
+        console.set_cvar("cg_marks", "0");
+        assert_eq!(Level::current(&console), Some(Level::Sjk));
+        Level::Experimental.apply(&mut console);
+        assert!(holds(&console, "cg_marks", "0"));
+        Level::Vanilla.apply(&mut console);
+        assert_eq!(Level::current(&console), Some(Level::Vanilla));
+        assert!(holds(&console, "cg_marks", "0"));
     }
 
     #[test]

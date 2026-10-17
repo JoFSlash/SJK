@@ -218,7 +218,7 @@ const HELP: &[(&str, &str)] = &[
     // VIDEO
     (
         crate::graphics_quality::ROW_NAME,
-        "Vanilla style: the original look, the most FPS. SJK (recommended): SJK's image on the maps' lighting. Experimental: everything on.",
+        "FPS boost: the most FPS, for weak GPUs. Vanilla style: the original look. SJK (recommended): SJK's image. Experimental: everything on.",
     ),
     (
         "r_resolution",
