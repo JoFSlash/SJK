@@ -1587,8 +1587,10 @@ levels, from 12/10/2026):
 - **FPS boost**: the most frames per second, for weak PCs with an integrated GPU:
   Vanilla style with the small effects it keeps also off (impact marks, player
   shadows, weather, Force Speed afterimages, footprints and dust, saber steam in
-  rain). Every other preset turns them back on. Resolution, supersampling and the
-  FPS cap stay the player's.
+  rain). The other presets leave those as the player set them and do not count
+  them; leaving FPS boost (for a preset, or `renderer sjk`) turns them back on.
+  It counts as the Vanilla renderer (`renderer`, the low-FPS help). Resolution,
+  supersampling and the FPS cap stay the player's.
 - **Vanilla style**: the original game's look at the most frames per second, every
   SJK extra off (the level called EJK from 10/10/2026, Ultra low before, then
   Vanilla).
@@ -1638,9 +1640,9 @@ levels read Experimental (High) or Custom (Performance, Balanced, Ultra).
 | Weather density | 1 | 1 | 1 | 2 |
 | Weather quality | 0 | 0 | 0 | 2 |
 | Volumetric clouds | off | off | off | on |
-| Impact marks, player shadows (`cg_marks`, `cg_shadows`) | off | on | on | on |
-| Weather (`r_weather`) | off | on | on | on |
-| Force Speed afterimages, footprints, saber steam in rain | off | on | on | on |
+| Impact marks, player shadows (`cg_marks`, `cg_shadows`) | off | player's | player's | player's |
+| Weather (`r_weather`) | off | player's | player's | player's |
+| Force Speed afterimages, footprints, saber steam in rain | off | player's | player's | player's |
 
 Under FPS boost, Vanilla style and SJK (recommended), with no sun, light shafts or sun shadows,
 a map loads without building its lamps (see [rendering](rendering.md#default-visual-profile)), which no pass reads there.

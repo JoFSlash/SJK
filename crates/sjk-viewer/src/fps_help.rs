@@ -92,9 +92,9 @@ impl crate::GpuState {
         let wanted = console
             .and_then(|console| console.bool_cvar(CVAR))
             .unwrap_or(true);
-        let lean = console.is_some_and(crate::graphics_quality::lean);
+        let vanilla = console.is_some_and(crate::graphics_quality::vanilla);
         let card_open = self.fps_card.wants();
-        let checking = on_map && wanted && !lean && !self.fps_help.checked;
+        let checking = on_map && wanted && !vanilla && !self.fps_help.checked;
         phases.watch(checking || card_open);
         if card_open {
             if let Some(sample) = phases.take_sample() {

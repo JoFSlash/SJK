@@ -5,7 +5,8 @@
 //!
 //! FPS boost is Vanilla style with the remaining extras a weak, integrated GPU
 //! pays for also off: impact marks, player shadows, weather, Force Speed
-//! afterimages, footprints and dust, and saber steam in rain.
+//! afterimages, footprints and dust, and saber steam in rain
+//! ([`FPS_BOOST_OFF`]). The other presets leave those to the player.
 //! Vanilla style is the original game's look at the least cost, every SJK extra
 //! off (the EJK level until 12/10/2026, then Vanilla). SJK (recommended) is
 //! Sol's own setup: SJK's image (HDR, bloom, glow, FXAA, ambient occlusion, lit
@@ -94,16 +95,19 @@ const VALUES: &[(&str, [&str; 4])] = &[
     (crate::weather::DENSITY_CVAR, ["1", "1", "1", "2"]),
     (crate::weather::QUALITY_CVAR, ["0", "0", "0", "2"]),
     (crate::weather::CLOUDS_CVAR, ["0", "0", "0", "1"]),
-    // Small effects: on in every preset but FPS boost.
-    ("cg_marks", ["0", "1", "1", "1"]),
-    ("cg_shadows", ["0", "1", "1", "1"]),
-    ("cg_speedTrail", ["0", "1", "1", "1"]),
-    (crate::footprints::PRINTS_CVAR, ["0", "1", "1", "1"]),
-    (
-        crate::effect_aux::saber_rain_steam::CVAR,
-        ["0", "1", "1", "1"],
-    ),
-    (crate::weather::CVAR, ["0", "1", "1", "1"]),
+];
+
+/// The small effects FPS boost turns off (to 0) besides its [`VALUES`]. The other
+/// presets leave them as the player set them, so a player's own choice (no impact
+/// marks under SJK (recommended), say) still matches its preset; leaving FPS boost
+/// for another preset turns them back on (their defaults).
+const FPS_BOOST_OFF: &[&str] = &[
+    "cg_marks",
+    "cg_shadows",
+    "cg_speedTrail",
+    crate::footprints::PRINTS_CVAR,
+    crate::effect_aux::saber_rain_steam::CVAR,
+    crate::weather::CVAR,
 ];
 
 impl Level {
@@ -163,11 +167,22 @@ impl Level {
     pub(crate) fn current(console: &ViewerConsole) -> Option<Self> {
         Self::ALL
             .into_iter()
-            .find(|level| level.matches(console) == VALUES.len())
+            .find(|level| level.matches(console) == level.settings())
+    }
+
+    /// How many settings the preset sets.
+    fn settings(self) -> usize {
+        VALUES.len()
+            + if self == Self::FpsBoost {
+                FPS_BOOST_OFF.len()
+            } else {
+                0
+            }
     }
 
     /// The current preset, or for custom settings the preset they are nearest,
-    /// sharing the most values (the higher on a tie). Steps and lists start here.
+    /// sharing the most values (the higher on a tie: Vanilla style with its small
+    /// effects on is Vanilla style, not FPS boost). Steps and lists start here.
     pub(crate) fn nearest(console: &ViewerConsole) -> Self {
         Self::ALL
             .into_iter()
@@ -177,29 +192,52 @@ impl Level {
 
     /// How many of the preset's values `console` holds.
     fn matches(self, console: &ViewerConsole) -> usize {
+        let small_effects = if self == Self::FpsBoost {
+            FPS_BOOST_OFF
+                .iter()
+                .filter(|cvar| holds(console, cvar, "0"))
+                .count()
+        } else {
+            0
+        };
         VALUES
             .iter()
             .filter(|(cvar, values)| holds(console, cvar, values[self.index()]))
             .count()
+            + small_effects
     }
 
-    /// Set the preset's values, saving the profile once.
+    /// Set the preset's values, saving the profile once. Leaving FPS boost turns
+    /// its small effects back on.
     pub(crate) fn apply(self, console: &mut ViewerConsole) {
+        if self != Self::FpsBoost && Self::current(console) == Some(Self::FpsBoost) {
+            small_effects_on(console);
+        }
+        let small_effects_off = FPS_BOOST_OFF
+            .iter()
+            .filter(|_| self == Self::FpsBoost)
+            .map(|cvar| (*cvar, "0"));
         console.set_cvars(
             VALUES
                 .iter()
-                .map(|(cvar, values)| (*cvar, values[self.index()])),
+                .map(|(cvar, values)| (*cvar, values[self.index()]))
+                .chain(small_effects_off),
         );
     }
 }
 
-/// Whether the renderer is Vanilla: the settings are Vanilla style's.
-pub(crate) fn vanilla(console: &ViewerConsole) -> bool {
-    Level::current(console) == Some(Level::Vanilla)
+/// Put FPS boost's small effects back to their defaults.
+fn small_effects_on(console: &mut ViewerConsole) {
+    let defaults: Vec<(&str, String)> = FPS_BOOST_OFF
+        .iter()
+        .filter_map(|cvar| Some((*cvar, console.cvar_default(cvar)?.as_text())))
+        .collect();
+    console.set_cvars(defaults.iter().map(|(cvar, value)| (*cvar, value.as_str())));
 }
 
-/// Whether SJK's lighting and image are all off: Vanilla style or FPS boost.
-pub(crate) fn lean(console: &ViewerConsole) -> bool {
+/// Whether the renderer is Vanilla: the settings are Vanilla style's or FPS
+/// boost's, which has every SJK extra off too.
+pub(crate) fn vanilla(console: &ViewerConsole) -> bool {
     matches!(
         Level::current(console),
         Some(Level::FpsBoost | Level::Vanilla)
@@ -222,6 +260,9 @@ pub(crate) fn set_renderer(console: &mut ViewerConsole, value: &str) {
 /// as when Vanilla style was picked as a preset).
 pub(crate) fn toggle_vanilla(console: &mut ViewerConsole) {
     if vanilla(console) {
+        if Level::current(console) == Some(Level::FpsBoost) {
+            small_effects_on(console);
+        }
         let kept = console
             .cvar(RESTORE_CVAR)
             .map(sjk_shell::CvarValue::as_text)
@@ -262,6 +303,12 @@ pub(crate) fn shown(console: &ViewerConsole) -> &'static str {
 /// preset's rows do not read as changed and Backspace leads back to it; `None`
 /// for a setting no preset sets, whose default is its cvar's.
 pub(crate) fn row_default(console: &ViewerConsole, cvar: &str) -> Option<&'static str> {
+    if FPS_BOOST_OFF
+        .iter()
+        .any(|name| name.eq_ignore_ascii_case(cvar))
+    {
+        return (Level::nearest(console) == Level::FpsBoost).then_some("0");
+    }
     let (_, values) = VALUES
         .iter()
         .find(|(name, _)| name.eq_ignore_ascii_case(cvar))?;
@@ -494,28 +541,49 @@ mod tests {
         command(&mut console, &["FPS boost".to_owned()]).unwrap();
         assert_eq!(Level::current(&console), Some(Level::FpsBoost));
         assert_eq!(shown(&console), "FPS boost");
-        assert!(lean(&console));
-        assert!(!vanilla(&console));
+        assert!(vanilla(&console));
         for (cvar, values) in VALUES {
-            let vanilla_value = values[Level::Vanilla.index()];
-            let boost_value = values[Level::FpsBoost.index()];
-            assert!(
-                boost_value.parse::<f64>().unwrap() <= vanilla_value.parse::<f64>().unwrap(),
-                "{cvar}: FPS boost costs more than Vanilla style"
+            assert_eq!(
+                values[Level::FpsBoost.index()],
+                values[Level::Vanilla.index()],
+                "{cvar}: FPS boost is Vanilla style's renderer"
             );
         }
-        for cvar in ["cg_marks", "cg_shadows", crate::weather::CVAR, "r_sceneHdr"] {
+        for cvar in FPS_BOOST_OFF {
             assert!(holds(&console, cvar, "0"), "{cvar}");
+            assert!(crate::settings::row_takes(cvar, "0"), "{cvar}");
+            assert_eq!(row_default(&console, cvar), Some("0"));
+            // Its default is on, which leaving FPS boost puts back.
+            let default = console.cvar_default(cvar).unwrap().as_text();
+            assert_eq!(default.parse::<f64>().ok(), Some(1.0), "{cvar}");
         }
-        // Vanilla style and the presets above it put the small effects back.
+        // Another preset puts the small effects back.
         command(&mut console, &["vanilla".to_owned()]).unwrap();
-        assert!(vanilla(&console));
-        assert!(lean(&console));
+        assert_eq!(Level::current(&console), Some(Level::Vanilla));
         assert!(holds(&console, "cg_marks", "1"));
+        assert_eq!(row_default(&console, "cg_marks"), None);
         command(&mut console, &["fpsboost".to_owned()]).unwrap();
         command(&mut console, &["sjk".to_owned()]).unwrap();
-        assert!(!lean(&console));
+        assert!(!vanilla(&console));
         assert!(holds(&console, crate::weather::CVAR, "1"));
+        // So does the renderer switch back to SJK.
+        command(&mut console, &["fpsboost".to_owned()]).unwrap();
+        set_renderer(&mut console, SJK);
+        assert!(!vanilla(&console));
+        assert!(holds(&console, "cg_shadows", "1"));
+    }
+
+    #[test]
+    fn the_other_presets_keep_the_players_small_effects() {
+        let (_directory, mut console) = console();
+        Level::Sjk.apply(&mut console);
+        console.set_cvar("cg_marks", "0");
+        assert_eq!(Level::current(&console), Some(Level::Sjk));
+        Level::Experimental.apply(&mut console);
+        assert!(holds(&console, "cg_marks", "0"));
+        Level::Vanilla.apply(&mut console);
+        assert_eq!(Level::current(&console), Some(Level::Vanilla));
+        assert!(holds(&console, "cg_marks", "0"));
     }
 
     #[test]
