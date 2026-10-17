@@ -380,7 +380,7 @@ mod tests {
         // The profile was saved: a new start reads the last preset.
         drop(console);
         let console = ViewerConsole::new(directory.path().join("config.cfg")).unwrap();
-        assert_eq!(Level::current(&console), Some(Level::Vanilla));
+        assert_eq!(Level::current(&console), Some(Level::FpsBoost));
     }
 
     #[test]
@@ -392,7 +392,7 @@ mod tests {
                 "{cvar}: {values:?}"
             );
             assert!(
-                numbers[0] < numbers[2],
+                numbers[0] < numbers[numbers.len() - 1],
                 "{cvar} is the same in every preset"
             );
         }
