@@ -1,7 +1,11 @@
-//! Graphics presets: Vanilla style, SJK (recommended) and Experimental, each one
-//! choice that sets the renderer's costly settings together (Sol's three,
-//! 16/10/2026, in place of the Renderer row and the SJK renderer's four levels).
+//! Graphics presets: FPS boost, Vanilla style, SJK (recommended) and
+//! Experimental, each one choice that sets the renderer's costly settings
+//! together (Sol's three, 16/10/2026, in place of the Renderer row and the SJK
+//! renderer's four levels; FPS boost added 17/10/2026 for integrated GPUs).
 //!
+//! FPS boost is Vanilla style with the remaining extras a weak, integrated GPU
+//! pays for also off: impact marks, player shadows, weather, Force Speed
+//! afterimages, footprints and dust, and saber steam in rain.
 //! Vanilla style is the original game's look at the least cost, every SJK extra
 //! off (the EJK level until 12/10/2026, then Vanilla). SJK (recommended) is
 //! Sol's own setup: SJK's image (HDR, bloom, glow, FXAA, ambient occlusion, lit
@@ -23,7 +27,7 @@ use crate::console::ViewerConsole;
 pub(crate) const COMMAND: &str = "graphicsquality";
 /// Help text for completion and `cmdlist`.
 pub(crate) const HELP: &str =
-    "Show or set the graphics preset: vanilla, sjk (recommended) or experimental";
+    "Show or set the graphics preset: fpsboost, vanilla, sjk (recommended) or experimental";
 /// The Graphics preset row's stand-in for a cvar name: the command that sets it.
 pub(crate) const ROW_NAME: &str = COMMAND;
 /// Console command that names the renderer or switches Vanilla style on and
@@ -43,6 +47,9 @@ pub(crate) const SJK: &str = "sjk";
 /// A graphics preset, cheapest first.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum Level {
+    /// The most FPS, for integrated GPUs: Vanilla style with impact marks,
+    /// player shadows, weather and the small cosmetic effects off too.
+    FpsBoost,
     /// The original game's look at the least cost (EJK, Ultra low and Vanilla,
     /// before): every SJK extra off, maps show their baked lightmaps.
     Vanilla,
@@ -53,50 +60,62 @@ pub(crate) enum Level {
     Experimental,
 }
 
-/// Each setting a preset sets, with its value at Vanilla style, SJK
+/// Each setting a preset sets, with its value at FPS boost, Vanilla style, SJK
 /// (recommended) and Experimental. Experimental is each setting's default
 /// (pinned by a test); SJK (recommended) is Sol's config of 16/10/2026.
-const VALUES: &[(&str, [&str; 3])] = &[
+const VALUES: &[(&str, [&str; 4])] = &[
     // Image.
-    ("r_sceneHdr", ["0", "1", "1"]),
-    ("r_sceneBloom", ["0", "1", "1"]),
-    ("r_DynamicGlow", ["0", "1", "1"]),
-    ("r_fxaa", ["0", "1", "1"]),
-    ("r_softParticles", ["0", "0", "1"]),
-    ("r_ssao", ["0", "1", "1"]),
+    ("r_sceneHdr", ["0", "0", "1", "1"]),
+    ("r_sceneBloom", ["0", "0", "1", "1"]),
+    ("r_DynamicGlow", ["0", "0", "1", "1"]),
+    ("r_fxaa", ["0", "0", "1", "1"]),
+    ("r_softParticles", ["0", "0", "0", "1"]),
+    ("r_ssao", ["0", "0", "1", "1"]),
     // Dust shows only in light shafts.
-    (crate::dust_motes::CVAR, ["0", "0", "1"]),
-    ("r_modelPixelLight", ["0", "1", "1"]),
-    ("r_cubeMapping", ["0", "0", "1"]),
-    ("r_floorReflections", ["0", "0", "1"]),
-    ("r_normalMapping", ["0", "0", "1"]),
-    ("r_specularMapping", ["0", "0", "1"]),
-    ("r_parallaxMapping", ["0", "0", "1"]),
-    ("r_emissiveMaps", ["0", "1", "1"]),
-    ("r_emissiveGlow", ["0", "1", "1"]),
+    (crate::dust_motes::CVAR, ["0", "0", "0", "1"]),
+    ("r_modelPixelLight", ["0", "0", "1", "1"]),
+    ("r_cubeMapping", ["0", "0", "0", "1"]),
+    ("r_floorReflections", ["0", "0", "0", "1"]),
+    ("r_normalMapping", ["0", "0", "0", "1"]),
+    ("r_specularMapping", ["0", "0", "0", "1"]),
+    ("r_parallaxMapping", ["0", "0", "0", "1"]),
+    ("r_emissiveMaps", ["0", "0", "1", "1"]),
+    ("r_emissiveGlow", ["0", "0", "1", "1"]),
     // Lighting.
-    ("r_dayNight", ["0", "0", "1"]),
-    ("r_emissiveLights", ["0", "0", "1"]),
-    ("r_volumetrics", ["0", "0", "3"]),
+    ("r_dayNight", ["0", "0", "0", "1"]),
+    ("r_emissiveLights", ["0", "0", "0", "1"]),
+    ("r_volumetrics", ["0", "0", "0", "3"]),
     // Shadows.
-    ("r_worldSunShadows", ["0", "0", "1"]),
-    ("r_actorSunShadows", ["0", "0", "1"]),
-    ("r_sunShadowResolution", ["1024", "1024", "2048"]),
-    ("r_sunShadowTaps", ["8", "8", "16"]),
+    ("r_worldSunShadows", ["0", "0", "0", "1"]),
+    ("r_actorSunShadows", ["0", "0", "0", "1"]),
+    ("r_sunShadowResolution", ["1024", "1024", "1024", "2048"]),
+    ("r_sunShadowTaps", ["8", "8", "8", "16"]),
     // Weather.
-    (crate::weather::DENSITY_CVAR, ["1", "1", "2"]),
-    (crate::weather::QUALITY_CVAR, ["0", "0", "2"]),
-    (crate::weather::CLOUDS_CVAR, ["0", "0", "1"]),
+    (crate::weather::DENSITY_CVAR, ["1", "1", "1", "2"]),
+    (crate::weather::QUALITY_CVAR, ["0", "0", "0", "2"]),
+    (crate::weather::CLOUDS_CVAR, ["0", "0", "0", "1"]),
+    // Small effects: on in every preset but FPS boost.
+    ("cg_marks", ["0", "1", "1", "1"]),
+    ("cg_shadows", ["0", "1", "1", "1"]),
+    ("cg_speedTrail", ["0", "1", "1", "1"]),
+    (crate::footprints::PRINTS_CVAR, ["0", "1", "1", "1"]),
+    (
+        crate::effect_aux::saber_rain_steam::CVAR,
+        ["0", "1", "1", "1"],
+    ),
+    (crate::weather::CVAR, ["0", "1", "1", "1"]),
 ];
 
 impl Level {
-    pub(crate) const ALL: [Self; 3] = [Self::Vanilla, Self::Sjk, Self::Experimental];
+    pub(crate) const ALL: [Self; 4] =
+        [Self::FpsBoost, Self::Vanilla, Self::Sjk, Self::Experimental];
     /// A new profile's preset, which the row's Backspace returns to.
     pub(crate) const DEFAULT: Self = Self::Sjk;
 
     /// The preset's name in Settings.
     pub(crate) fn label(self) -> &'static str {
         match self {
+            Self::FpsBoost => "FPS boost",
             Self::Vanilla => "Vanilla style",
             Self::Sjk => "SJK (recommended)",
             Self::Experimental => "Experimental",
@@ -110,6 +129,7 @@ impl Level {
     /// The preset's name in the command.
     fn command_name(self) -> &'static str {
         match self {
+            Self::FpsBoost => "fpsboost",
             Self::Vanilla => VANILLA,
             Self::Sjk => SJK,
             Self::Experimental => "experimental",
@@ -176,6 +196,14 @@ impl Level {
 /// Whether the renderer is Vanilla: the settings are Vanilla style's.
 pub(crate) fn vanilla(console: &ViewerConsole) -> bool {
     Level::current(console) == Some(Level::Vanilla)
+}
+
+/// Whether SJK's lighting and image are all off: Vanilla style or FPS boost.
+pub(crate) fn lean(console: &ViewerConsole) -> bool {
+    matches!(
+        Level::current(console),
+        Some(Level::FpsBoost | Level::Vanilla)
+    )
 }
 
 /// Set the renderer to `value` ([`VANILLA`] or [`SJK`], any case), as the
@@ -406,7 +434,9 @@ mod tests {
 
     #[test]
     fn steps_stop_at_the_ends() {
-        assert_eq!(Level::Vanilla.step(-1), Level::Vanilla);
+        assert_eq!(Level::FpsBoost.step(-1), Level::FpsBoost);
+        assert_eq!(Level::FpsBoost.step(1), Level::Vanilla);
+        assert_eq!(Level::Vanilla.step(-1), Level::FpsBoost);
         assert_eq!(Level::Vanilla.step(1), Level::Sjk);
         assert_eq!(Level::Sjk.step(-1), Level::Vanilla);
         assert_eq!(Level::Sjk.step(1), Level::Experimental);
@@ -456,6 +486,36 @@ mod tests {
         ] {
             assert!(holds(&console, cvar, "0"), "{cvar}");
         }
+    }
+
+    #[test]
+    fn fps_boost_is_vanilla_with_the_small_effects_off_too() {
+        let (_directory, mut console) = console();
+        command(&mut console, &["FPS boost".to_owned()]).unwrap();
+        assert_eq!(Level::current(&console), Some(Level::FpsBoost));
+        assert_eq!(shown(&console), "FPS boost");
+        assert!(lean(&console));
+        assert!(!vanilla(&console));
+        for (cvar, values) in VALUES {
+            let vanilla_value = values[Level::Vanilla.index()];
+            let boost_value = values[Level::FpsBoost.index()];
+            assert!(
+                boost_value.parse::<f64>().unwrap() <= vanilla_value.parse::<f64>().unwrap(),
+                "{cvar}: FPS boost costs more than Vanilla style"
+            );
+        }
+        for cvar in ["cg_marks", "cg_shadows", crate::weather::CVAR, "r_sceneHdr"] {
+            assert!(holds(&console, cvar, "0"), "{cvar}");
+        }
+        // Vanilla style and the presets above it put the small effects back.
+        command(&mut console, &["vanilla".to_owned()]).unwrap();
+        assert!(vanilla(&console));
+        assert!(lean(&console));
+        assert!(holds(&console, "cg_marks", "1"));
+        command(&mut console, &["fpsboost".to_owned()]).unwrap();
+        command(&mut console, &["sjk".to_owned()]).unwrap();
+        assert!(!lean(&console));
+        assert!(holds(&console, crate::weather::CVAR, "1"));
     }
 
     #[test]

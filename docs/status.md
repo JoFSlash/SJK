@@ -1,3 +1,11 @@
+## FPS boost graphics preset
+
+17/10/2026, `claude/inspiring-davinci-s81e0l`: a fourth graphics preset, FPS boost,
+first in the list, for weak PCs with an integrated GPU: Vanilla style with impact
+marks, player shadows, weather, Force Speed afterimages, footprints and dust, and
+saber steam in rain off too ([client.md](client.md#graphics-quality)); the low-FPS help
+does not offer Vanilla on it. Checked by unit tests; not measured in the game.
+
 ## NPC sabers and voices
 
 17/10/2026, `personal/npc-sabers-sounds`, based on `Sol-Vulpes/SJK` `cb03b251`

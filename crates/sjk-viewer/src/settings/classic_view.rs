@@ -1223,13 +1223,13 @@ mod tests {
                 changed: false
             }
         );
-        // The list holds the three presets and opens on the one in use;
+        // The list holds the four presets and opens on the one in use;
         // picking one sets it.
         assert!(menu.open_dropdown(&console, row));
         let open = menu.dropdown.as_ref().unwrap();
         assert_eq!(open.picks, Level::ALL.map(Pick::Quality));
-        assert_eq!(open.current, 1);
-        menu.apply_pick(&mut console, 2);
+        assert_eq!(open.current, 2);
+        menu.apply_pick(&mut console, 3);
         assert_eq!(Level::current(&console), Some(Level::Experimental));
         assert_eq!(menu.values[row], "Experimental");
         assert!(menu.defaults[row].changed);
@@ -1256,7 +1256,9 @@ mod tests {
         assert!(!row_default(&console, shadows).changed);
 
         menu.adjust(&mut console, -1);
-        assert_eq!(menu.values[row], "Vanilla style");
+        assert_eq!(menu.values[row], "FPS boost");
+        menu.adjust(&mut console, -1);
+        assert_eq!(menu.values[row], "FPS boost");
         // Backspace's default is SJK (recommended).
         menu.reset_to_default(&mut console, row);
         assert_eq!(Level::current(&console), Some(Level::Sjk));
