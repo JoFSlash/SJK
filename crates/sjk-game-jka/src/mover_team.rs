@@ -113,6 +113,8 @@ fn unlock(doors: &mut [impl DoorSlot], leader: usize) {
             door.targetname.clear();
         }
         door.spawnflags &= !MOVER_LOCKED;
+        // `s.frame = 1`: the second stage of its shader.
+        door.frame = 1;
         at += 1;
     }
 }
@@ -287,20 +289,37 @@ pub fn run(doors: &mut [impl DoorSlot], index: usize, level_time: i32) -> Ran {
 }
 
 /// `Touch_DoorTrigger` (`:1112-1190`) for a living player in the trigger of the team
-/// `master` leads: a locked door does not even try, and one already opening is left
-/// alone; anything else is used (which holds an open door open, and turns a closing
-/// one back).
+/// `master` leads, `team` its `sess.sessionTeam` (`None` for what is not a client): a
+/// locked door does not even try — unless the toucher is on its `teamallow` team, for
+/// whom it is unlocked just while it is used and locked again after, so that it keeps
+/// its name and stays shut to everybody else — and one already opening is left alone;
+/// anything else is used (which holds an open door open, and turns a closing one back).
 pub fn touch_trigger(
     doors: &mut [impl DoorSlot],
     master: usize,
     level_time: i32,
     toucher: Option<usize>,
+    team: Option<i32>,
 ) -> Option<String> {
     let door = doors[master].door();
-    if door.spawnflags & MOVER_LOCKED != 0 || door.state == MoverState::OneToTwo {
-        return None;
+    let mut relock = false;
+    if door.spawnflags & MOVER_LOCKED != 0 {
+        if door.allied_team == 0 || team != Some(door.allied_team) {
+            return None;
+        }
+        // Only the master's flag: `Use_BinaryMover` reads no other.
+        doors[master].door_mut().spawnflags &= !MOVER_LOCKED;
+        relock = true;
     }
-    use_mover(doors, master, level_time, toucher)
+    let fired = if doors[master].door().state != MoverState::OneToTwo {
+        use_mover(doors, master, level_time, toucher)
+    } else {
+        None
+    };
+    if relock {
+        doors[master].door_mut().spawnflags |= MOVER_LOCKED;
+    }
+    fired
 }
 
 /// `Think_SpawnNewDoorTrigger` (`:1202-1245`): the box around every part of the team as
@@ -383,9 +402,84 @@ pub fn blocked(
     if relock {
         let mut at = 0;
         while let Some(index) = part(doors, master, at) {
-            doors[index].door_mut().spawnflags |= MOVER_LOCKED;
+            let door = doors[index].door_mut();
+            door.spawnflags |= MOVER_LOCKED;
+            door.frame = 0;
             at += 1;
         }
     }
     damage
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::movers::{MoverKind, spawn_door, usable_by};
+    use sjk_entity::Entity;
+
+    /// A `func_door` with `keys` over the defaults, eight units thick and opening sideways.
+    fn door(keys: &[(&str, &str)]) -> Door {
+        let mut fields = vec![
+            ("classname".to_owned(), "func_door".to_owned()),
+            ("model".to_owned(), "*1".to_owned()),
+        ];
+        fields.extend(keys.iter().map(|(k, v)| ((*k).to_owned(), (*v).to_owned())));
+        let door = spawn_door(
+            &Entity::from_fields(fields),
+            ([-64.0, -4.0, 0.0], [64.0, 4.0, 128.0]),
+        )
+        .expect("a func_door");
+        assert_eq!(door.kind, MoverKind::Door);
+        door
+    }
+
+    #[test]
+    fn locked_teamallow_door_opens_for_its_team_alone_and_stays_locked() {
+        let mut doors = [door(&[("spawnflags", "16"), ("teamallow", "2")])];
+        assert_eq!(doors[0].allied_team, 2);
+        assert!(doors[0].shader_anim && doors[0].frame == 0);
+        // The other team, and what is not a client, find it shut.
+        assert_eq!(touch_trigger(&mut doors, 0, 1_000, Some(0), Some(1)), None);
+        assert_eq!(touch_trigger(&mut doors, 0, 1_000, None, None), None);
+        assert_eq!(doors[0].state, MoverState::Pos1);
+        // Its own team walks through, and it is locked again afterwards.
+        let _ = touch_trigger(&mut doors, 0, 1_000, Some(1), Some(2));
+        assert_eq!(doors[0].state, MoverState::OneToTwo);
+        assert_ne!(doors[0].spawnflags & MOVER_LOCKED, 0);
+        assert_eq!(doors[0].frame, 0);
+    }
+
+    #[test]
+    fn locked_door_without_teamallow_stays_shut_until_used() {
+        let mut doors = [door(&[("spawnflags", "16")])];
+        assert_eq!(touch_trigger(&mut doors, 0, 1_000, Some(0), Some(2)), None);
+        assert_eq!(doors[0].state, MoverState::Pos1);
+        // `Use_BinaryMover` unlocks it, and the shader shows it.
+        let _ = use_mover(&mut doors, 0, 1_000, None);
+        assert_eq!(doors[0].spawnflags & MOVER_LOCKED, 0);
+        assert_eq!(doors[0].frame, 1);
+        let _ = touch_trigger(&mut doors, 0, 1_100, Some(0), Some(1));
+        assert_eq!(doors[0].state, MoverState::OneToTwo);
+    }
+
+    #[test]
+    fn unlocked_teamallow_door_opens_for_everyone() {
+        let mut doors = [door(&[("teamallow", "1")])];
+        let _ = touch_trigger(&mut doors, 0, 1_000, Some(0), Some(2));
+        assert_eq!(doors[0].state, MoverState::OneToTwo);
+    }
+
+    #[test]
+    fn player_use_door_answers_the_use_key_but_not_its_siege_team() {
+        let plain = door(&[]);
+        assert!(!usable_by(&plain, false, 1, false));
+        let usable = door(&[("spawnflags", "64"), ("teamallow", "2"), ("vehopen", "1")]);
+        assert!(usable.vehicle_opens);
+        assert!(usable_by(&usable, false, 2, false));
+        assert!(usable_by(&usable, true, 1, false));
+        assert!(!usable_by(&usable, true, 2, false));
+        assert!(usable_by(&usable, true, 2, true));
+        let inactive = door(&[("spawnflags", "192")]);
+        assert!(!usable_by(&inactive, false, 1, false));
+    }
 }

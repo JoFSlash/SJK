@@ -152,3 +152,18 @@ bait, victim attachment/swallowing, and single-player camera effects are not
 implemented. Pursuit uses local steering and ordinary NPC movement; complex
 obstacles still need broader map playtesting. No new protocol fields or SP entity
 flags are sent, and no new assets are required for the retail sand creature.
+
+## Siege doors
+
+A `func_door` reads `teamallow` (`alliedTeam`) and `vehopen` as `SP_func_door` does
+(`g_mover.c:1414-1505`). `Touch_DoorTrigger` lets a client of the `teamallow` team through a
+locked door: only the master is unlocked while it is used, then locked again, so the door
+keeps its name and stays shut to the other side. Without `teamallow`, a locked door still
+waits to be used. Players on vehicles, and vehicle NPCs, open a door only when it has
+`vehopen`. The use key reaches a `PLAYER_USE` door (`ValidUseTarget`, `GlobalUse`). In
+siege, `TryUse`'s `alliedTeam` rule means the `teamallow` team cannot use it unless
+`g_ff_objectives` is set. Before the round begins, the use key does nothing. A door that
+spawns locked carries `EF_SHADER_ANIM`. Its `s.frame` is 0 while locked and 1 once
+unlocked (`LockDoors`, `UnLockDoors`), so the client draws the lock lights by state.
+`trigger_multiple` and `trigger_once` take their team from `team`, or else from the generic
+`teamuser`/`alliedteam` spawn fields.

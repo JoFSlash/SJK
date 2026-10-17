@@ -1,3 +1,29 @@
+## Siege doors (Hoth)
+
+17/10/2026, `claude/epic-feynman-xbfipm`, based on `bb83eb2` (report: `mp/siege_hoth`
+unplayable, some doors would not open). Implemented, after OpenJK `codemp`
+`g_mover.c`/`g_utils.c`/`g_trigger.c`:
+
+- `teamallow` on `func_door`: a locked door opens for its team while staying locked to the
+  other team.
+- `vehopen` for riders and vehicle NPCs.
+- The use key on `PLAYER_USE` doors, which only reached `func_button`/`func_usable`
+  before. The siege `alliedTeam` rule applies with `g_ff_objectives`.
+- No use key before the siege round begins.
+- `EF_SHADER_ANIM` and `s.frame` lock lights on doors that spawn locked.
+- `teamuser`/`alliedteam` on `trigger_multiple`.
+
+See [server](server.md#siege-doors).
+
+Four unit tests pin the locked/teamallow and use-key rules. The `sjk-game-jka` and
+`sjk-dedicated` tests, fmt and clippy passed on Linux. The full workspace build was not
+run: `alsa-sys` needs the ALSA development package, which this container lacks.
+Not exercised on `mp/siege_hoth` or in a live match, because this container has no game
+assets. The report of being stuck at the start of a 1v1 siege against an NPC is not
+reproduced. Round start (`SiegeCheckTimers`), which counts clients by `siegeDesiredTeam`
+(bots count, `npc spawn` NPCs do not, as in the reference), and the class speed match the
+reference by inspection.
+
 ## NPC sabers and voices
 
 17/10/2026, `personal/npc-sabers-sounds`, based on `Sol-Vulpes/SJK` `cb03b251`

@@ -187,6 +187,17 @@ pub struct Door {
     /// The `EV_PLAYDOORSOUND`s raised on it (`BMS_START`, `BMS_END`) and not yet sent:
     /// the server takes them as it publishes the mover.
     pub sounds: Vec<u32>,
+    /// `teamallow` (`alliedTeam`, `G_SpawnInt( "teamallow", "0", ... )`): the team (1 red,
+    /// 2 blue) that opens the door just by walking up to it even while it is locked; zero
+    /// for none. A siege map's base doors let their defenders through this way.
+    pub allied_team: i32,
+    /// `vehopen` (`genericValue14`): vehicles, and players riding them, open it too.
+    pub vehicle_opens: bool,
+    /// `EF_SHADER_ANIM`: spawned locked, it draws its lock by its shader's frame.
+    pub shader_anim: bool,
+    /// `s.frame`: the shader frame, 0 while locked (`LockDoors`) and 1 once unlocked
+    /// (`UnLockDoors`).
+    pub frame: u32,
 }
 
 /// `BMS_START`, `BMS_END` (`g_mover.c:55-57`): a mover's start and stop sounds.
@@ -324,6 +335,11 @@ pub fn spawn_door(entity: &Entity, bounds: ([f32; 3], [f32; 3])) -> Option<Door>
         sound_set: entity.get("soundSet").unwrap_or_default().to_owned(),
         looping: false,
         sounds: Vec::new(),
+        allied_team: crate::userinfo::atoi(entity.get("teamallow").unwrap_or_default().as_bytes()),
+        vehicle_opens: crate::userinfo::atoi(entity.get("vehopen").unwrap_or_default().as_bytes())
+            != 0,
+        shader_anim: spawnflags & MOVER_LOCKED != 0,
+        frame: 0,
     })
 }
 
@@ -414,6 +430,10 @@ pub fn spawn_plat(entity: &Entity, bounds: ([f32; 3], [f32; 3])) -> Option<Door>
         sound_set: entity.get("soundSet").unwrap_or_default().to_owned(),
         looping: false,
         sounds: Vec::new(),
+        allied_team: 0,
+        vehicle_opens: false,
+        shader_anim: false,
+        frame: 0,
     })
 }
 
@@ -504,6 +524,10 @@ pub fn spawn_button(entity: &Entity, bounds: ([f32; 3], [f32; 3])) -> Option<Doo
         sound_set: entity.get("soundSet").unwrap_or_default().to_owned(),
         looping: false,
         sounds: Vec::new(),
+        allied_team: 0,
+        vehicle_opens: false,
+        shader_anim: false,
+        frame: 0,
     })
 }
 
@@ -664,10 +688,22 @@ pub fn touch_plat(plat: &mut Door, health: i32, level_time: i32) {
     }
 }
 
+/// Whether the use key reaching `door` uses it (`TryUse`, `g_utils.c:1777-1806`): it is
+/// `PLAYER_USE` (`ValidUseTarget`'s `SVF_PLAYER_USABLE`) and active, and in siege
+/// (`siege`) a player of its `teamallow` `team` may not, unless friendly fire on
+/// objectives (`objectives`, `g_ff_objectives`) is on.
+pub fn usable_by(door: &Door, siege: bool, team: i32, objectives: bool) -> bool {
+    door.svflags & SVF_PLAYER_USABLE != 0
+        && !door.inactive
+        && !door.spent
+        && (!siege || door.allied_team == 0 || door.allied_team != team || objectives)
+}
+
 /// `Touch_DoorTrigger` (`:1112-1190`) for a living player at a door with no team: see
-/// [`touch_trigger`](crate::mover_team::touch_trigger).
+/// [`touch_trigger`](crate::mover_team::touch_trigger). Nobody in particular touches it,
+/// so a locked door stays shut whatever its `teamallow`.
 pub fn touch_door_trigger(door: &mut Door, level_time: i32) -> Option<String> {
-    crate::mover_team::touch_trigger(std::slice::from_mut(door), 0, level_time, None)
+    crate::mover_team::touch_trigger(std::slice::from_mut(door), 0, level_time, None, None)
 }
 
 /// `Reached_BinaryMover` (`:664-730`) for one part: opening, it waits its `wait` and

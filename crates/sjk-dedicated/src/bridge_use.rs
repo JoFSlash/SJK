@@ -64,8 +64,14 @@ impl NativeGame {
         }
     }
 
-    /// `TryUse` (`g_utils.c:1594-1760`).
+    /// `TryUse` (`g_utils.c:1594-1760`): in siege nothing is used before the round
+    /// begins.
     fn use_now(&mut self, client: usize, level_time: i32) {
+        if self.gametype == GAMETYPE_SIEGE
+            && !self.siege.as_ref().is_some_and(|siege| siege.round.begun)
+        {
+            return;
+        }
         let Some(peer) = self.peer(client) else {
             return;
         };
@@ -100,9 +106,21 @@ impl NativeGame {
         if self.use_vehicle(client, found, level_time) || self.use_gun(client, found, level_time) {
             return;
         }
-        // A button the use key reached is pressed (`Use_BinaryMover`).
+        // A button the use key reached is pressed, and a `PLAYER_USE` door used
+        // (`ValidUseTarget`, `GlobalUse` to `Use_BinaryMover`) — in siege not by the team
+        // it lets through (`TryUse`'s `alliedTeam` rule, unless `g_ff_objectives`).
+        let team = self.peer(client).map_or(0, |peer| peer.session.team);
+        let objectives = self.integer_cvar(b"g_ff_objectives", 0) != 0;
+        let siege = self.gametype == GAMETYPE_SIEGE;
         if let Some(index) = self.doors.iter().position(|(number, door)| {
-            number.legacy_number() == found && door.kind == sjk_game_jka::movers::MoverKind::Button
+            number.legacy_number() == found
+                && match door.kind {
+                    sjk_game_jka::movers::MoverKind::Button => true,
+                    sjk_game_jka::movers::MoverKind::Door => {
+                        sjk_game_jka::movers::usable_by(door, siege, team, objectives)
+                    }
+                    sjk_game_jka::movers::MoverKind::Plat => false,
+                }
         }) {
             let fired = sjk_game_jka::mover_team::use_mover(
                 &mut self.doors,

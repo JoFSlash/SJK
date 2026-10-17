@@ -711,7 +711,7 @@ pub struct Multiple {
     pub inactive: bool,
     /// Whether a delayed firing is pending (`think == multi_trigger_run`).
     pub pending: bool,
-    /// `alliedTeam` (the `team` key, `atoi`'d): only a player of that team sets it off
+    /// `alliedTeam` (the `team` key, `atoi`'d, else `teamuser`/`alliedteam`): only a player of that team sets it off
     /// (`Touch_Multi`, `g_trigger.c:383-389`); 0 for everyone.
     pub allied_team: i32,
     /// `target2`, fired once the trigger is left ("cleared") `speed` milliseconds after
@@ -784,9 +784,22 @@ pub fn spawn_multiple(
         last_frame: 0,
         inactive: spawnflags & INACTIVE != 0,
         pending: false,
+        // `team` overrides what the spawn's `teamuser`/`alliedteam` fields (the last of
+        // them the lump gives) wrote into `alliedTeam`.
         allied_team: entity
             .get("team")
             .filter(|team| !team.is_empty())
+            .or_else(|| {
+                entity
+                    .fields()
+                    .iter()
+                    .rev()
+                    .find(|(key, _)| {
+                        key.eq_ignore_ascii_case("teamuser")
+                            || key.eq_ignore_ascii_case("alliedteam")
+                    })
+                    .map(|(_, value)| value.as_str())
+            })
             .map_or(0, |team| crate::userinfo::atoi(team.as_bytes())),
         target2,
         speed,
