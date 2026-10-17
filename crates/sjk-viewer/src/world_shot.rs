@@ -2282,7 +2282,7 @@ like this one.",
                             0,
                             Card::for_siege_shot(),
                             siege,
-                            Focus::Card(Control::SiegeClass),
+                            Focus::Card(Control::SiegeSide(sjk_client::LegacyTeamChoice::Red)),
                         ),
                         (
                             "duel6-ingame-team",

@@ -103,8 +103,8 @@ pub(crate) enum Control {
     VoteNo,
     /// Join a side, or spectate.
     Team(LegacyTeamChoice),
-    /// Siege: its page of classes and sides.
-    SiegeClass,
+    /// Siege: a side's page of classes (red or blue), which joins that side.
+    SiegeSide(LegacyTeamChoice),
     /// No vote on: the call-vote page.
     CallVote,
 }
@@ -119,7 +119,8 @@ impl Control {
             Self::Team(LegacyTeamChoice::Red) => "Join red",
             Self::Team(LegacyTeamChoice::Blue) => "Join blue",
             Self::Team(LegacyTeamChoice::Spectator) => "Spectate",
-            Self::SiegeClass => "Class and side",
+            Self::SiegeSide(LegacyTeamChoice::Blue) => "Join blue",
+            Self::SiegeSide(_) => "Join red",
             Self::CallVote => "Call a vote",
         }
     }
@@ -131,7 +132,7 @@ impl Control {
             Self::VoteYes => Some(b"vote yes"),
             Self::VoteNo => Some(b"vote no"),
             Self::Team(choice) => Some(sjk_client::legacy_team_command(choice)),
-            Self::SiegeClass | Self::CallVote => None,
+            Self::SiegeSide(_) | Self::CallVote => None,
         }
     }
 }
@@ -191,8 +192,9 @@ impl Controls {
 
     /// The card's controls for `game`: Yes and No while a vote is on; the side's
     /// buttons (Join red, Join blue and Spectate in a team game, Join and Spectate
-    /// otherwise, Class and side and Spectate in Siege), the side the player is on
-    /// passed over; Call a vote at the foot while no vote is on.
+    /// otherwise, Join red, Join blue and Spectate in Siege, each side opening its
+    /// classes), the side the player is on passed over; Call a vote at the foot while
+    /// no vote is on.
     pub(crate) fn for_match(game: Match) -> Self {
         let mut controls = Self::none();
         if !game.known {
@@ -204,7 +206,10 @@ impl Controls {
             controls.push(Control::VoteNo, VOTE_LINE, true);
         }
         if game.siege {
-            controls.push(Control::SiegeClass, SIDE_LINE, true);
+            // A side is joined through its classes, so its own side stays open
+            // for a change of class.
+            controls.push(Control::SiegeSide(LegacyTeamChoice::Red), SIDE_LINE, true);
+            controls.push(Control::SiegeSide(LegacyTeamChoice::Blue), SIDE_LINE, true);
         } else if game.team_game {
             controls.push(
                 Control::Team(LegacyTeamChoice::Red),
@@ -493,15 +498,17 @@ mod tests {
             labels(&Controls::for_match(game(false, 3, false)))[..2],
             [("Join", SIDE_LINE, true), ("Spectate", SIDE_LINE, false)]
         );
-        // Siege: its class and side page, and Spectate.
+        // Siege: both sides, each opening its classes (the own one too, for a change
+        // of class), and Spectate.
         let siege = Controls::for_match(Match {
             siege: true,
             ..game(true, 1, false)
         });
         assert_eq!(
-            labels(&siege)[..2],
+            labels(&siege)[..3],
             [
-                ("Class and side", SIDE_LINE, true),
+                ("Join red", SIDE_LINE, true),
+                ("Join blue", SIDE_LINE, true),
                 ("Spectate", SIDE_LINE, true)
             ]
         );
@@ -537,7 +544,7 @@ mod tests {
         );
         // These open pages instead.
         assert_eq!(sent(Control::CallVote), None);
-        assert_eq!(sent(Control::SiegeClass), None);
+        assert_eq!(sent(Control::SiegeSide(LegacyTeamChoice::Red)), None);
     }
 
     #[test]

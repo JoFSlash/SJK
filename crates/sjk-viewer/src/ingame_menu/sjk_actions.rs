@@ -127,8 +127,8 @@ impl GpuState {
                 self.close_game_menu();
             }
             Control::Team(team) => self.select_team(team),
-            Control::SiegeClass => {
-                self.open_siege_classes();
+            Control::SiegeSide(team) => {
+                self.open_siege_side(team == sjk_client::LegacyTeamChoice::Blue);
             }
             Control::CallVote => self.open_call_vote(),
         }

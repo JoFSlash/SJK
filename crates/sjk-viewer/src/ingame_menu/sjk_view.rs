@@ -154,7 +154,7 @@ pub(crate) fn parent(page: Page) -> Option<(Page, usize)> {
 pub(crate) fn return_focus(page: Page) -> Focus {
     match page {
         Page::Team => Focus::Card(Control::Team(sjk_client::LegacyTeamChoice::Spectator)),
-        Page::Siege => Focus::Card(Control::SiegeClass),
+        Page::Siege => Focus::Card(Control::SiegeSide(sjk_client::LegacyTeamChoice::Red)),
         page if page.is_vote_page() => Focus::Card(Control::CallVote),
         _ => Focus::List,
     }
@@ -928,7 +928,8 @@ fn keys(canvas: &mut MenuCanvas, frame: &Frame, page: Page, focus: Focus, chat: 
                     Control::VoteYes | Control::VoteNo => "vote",
                     Control::Team(sjk_client::LegacyTeamChoice::Spectator) => "spectate",
                     Control::Team(_) => "join",
-                    Control::SiegeClass | Control::CallVote => "open",
+                    Control::SiegeSide(_) => "classes",
+                    Control::CallVote => "open",
                 },
             ),
             (&["Esc"], "list"),
@@ -2500,7 +2501,10 @@ mod tests {
                 Page::Team,
                 Focus::Card(Control::Team(sjk_client::LegacyTeamChoice::Spectator)),
             ),
-            (Page::Siege, Focus::Card(Control::SiegeClass)),
+            (
+                Page::Siege,
+                Focus::Card(Control::SiegeSide(sjk_client::LegacyTeamChoice::Red)),
+            ),
             (Page::CallVote, Focus::Card(Control::CallVote)),
             (Page::VoteMap, Focus::Card(Control::CallVote)),
         ] {

@@ -1277,8 +1277,8 @@ entry of its own under Profile, making seven.
   - Team (the J key's, `teammenu`): Join the game and Spectate, or in a team game
     Auto-join, Red team, Blue team (each with its colour and players) and Spectate;
     the side the player is on is quiet ("Your team", "You are watching") and passed
-    over by the keys. In Siege the card's Class and side opens the class list (the
-    shared rows, a row's detail after its label).
+    over by the keys. In Siege the card's Join red and Join blue open that side's class
+    list (the shared rows, a row's detail after its label); choosing a class joins it.
   - Call a vote (the card's link): its lists (map, game type, kick, warmup, limits)
     are the shared call-vote lists. Calling a vote returns to the match, as
     retail's pop-ups do.
@@ -1330,9 +1330,10 @@ entry of its own under Profile, making seven.
   - **Your side**, from y 600 under the numbers: "Your side" and the side (Red team
     or Blue team in its colour, Playing, or Watching), then the kit's buttons, three
     to the card's width: Join red and Join blue (a mark of the side's colour on each)
-    and Spectate in a team game, Join and Spectate otherwise, Class and side (200
-    wide, Siege's class list) and Spectate in Siege. The side the player is on is
-    dimmed and passed over. A side sends `team red`, `team blue`, `team free` or
+    and Spectate in a team game, Join and Spectate otherwise, and in Siege Join red and
+    Join blue (marked the same, each opening that side's class list, the own side
+    too, for a change of class) and Spectate. Outside Siege the side the player is on
+    is dimmed and passed over. A side sends `team red`, `team blue`, `team free` or
     `team s` and returns to the match, as the Team page does.
   - **Call a vote**, quiet at the card's foot while no vote is on (muted Rajdhani 21,
     gold and underlined when hovered or focused, with "Map, mode, kick, limits"

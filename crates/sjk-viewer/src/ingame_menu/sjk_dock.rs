@@ -243,10 +243,7 @@ pub(super) fn card_controls(
         .iter()
         .filter(|each| each.line == super::super::sjk_focus::SIDE_LINE)
     {
-        let width = match each.control {
-            Control::SiegeClass => 200.0,
-            _ => (CARD_WIDTH - BUTTON_GAP * 2.0) / 3.0,
-        };
+        let width = (CARD_WIDTH - BUTTON_GAP * 2.0) / 3.0;
         kit::button(
             canvas,
             frame,
@@ -257,7 +254,9 @@ pub(super) fn card_controls(
             focused(each.control),
             token(each.control),
         );
-        if let Control::Team(team @ (LegacyTeamChoice::Red | LegacyTeamChoice::Blue)) = each.control
+        if let Control::Team(team @ (LegacyTeamChoice::Red | LegacyTeamChoice::Blue))
+        | Control::SiegeSide(team @ (LegacyTeamChoice::Red | LegacyTeamChoice::Blue)) =
+            each.control
         {
             // The side's colour as a mark at the button's left, over its pill.
             let _ = canvas.draw_list_mut().push(DrawCommand::RoundedRect {

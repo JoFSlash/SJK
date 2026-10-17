@@ -226,8 +226,19 @@ impl GpuState {
         self.game_menu_row = 0;
     }
 
-    /// Open the map's selector only in Siege; absent data is reported, never fabricated.
+    /// Open the map's selector only in Siege, on the player's own side; absent data is
+    /// reported, never fabricated.
     pub(crate) fn open_siege_classes(&mut self) -> bool {
+        self.open_siege_page(None)
+    }
+
+    /// Open the map's selector on the blue side's classes (`blue`) or the red side's,
+    /// as the card's Join red and Join blue do.
+    pub(crate) fn open_siege_side(&mut self, blue: bool) -> bool {
+        self.open_siege_page(Some(if blue { 2 } else { 1 }))
+    }
+
+    fn open_siege_page(&mut self, side: Option<u8>) -> bool {
         let game = self.live_session.as_ref().map(ClientSession::game_state);
         if !ingame_menu::siege_data::is_siege(game) {
             return false;
@@ -236,7 +247,7 @@ impl GpuState {
             (Some(game), Some(vfs)) => self.in_game_menu.refresh_siege(
                 game,
                 vfs,
-                ingame_menu::siege_data::local_team(game),
+                side.unwrap_or_else(|| ingame_menu::siege_data::local_team(game)),
             ),
             _ => Err("Siege assets are not available yet".into()),
         };
