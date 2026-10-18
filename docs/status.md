@@ -1,3 +1,11 @@
+## Line breaks in the string tables
+
+18/10/2026, `fix/string-table-newlines`, based on `Sol-Vulpes/SJK` `3483b1b`: on
+siege_hoth a centre print (the AT-ST through the wall door) showed a literal `\n`. The
+retail `.str` tables write a line break as `\n`, which the string package turns into
+one when it loads them (`ConvertCRLiterals_Read`); `string_table::parse_into` kept the
+two characters. It now converts them, for every table. `cargo check` passes; the
+added unit test and Clippy were not run.
 ## Vehicle HUD of a vehicle that hides its rider
 
 18/10/2026, `fix/vehicle-hud-hide-rider`, based on `Sol-Vulpes/SJK` `3483b1b`: on

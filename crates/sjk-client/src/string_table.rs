@@ -19,7 +19,8 @@ pub fn parse_into(target: &mut HashMap<String, String>, text: &str) {
             };
             let value = value.trim();
             if let Some(value) = value.strip_prefix('"').and_then(|v| v.strip_suffix('"')) {
-                target.insert(key, value.to_owned());
+                // `ConvertCRLiterals_Read`: a written `\n` is a line break.
+                target.insert(key, value.replace("\\n", "\n"));
             }
         }
     }
@@ -59,4 +60,19 @@ pub fn resolve<'a>(strings: &'a HashMap<String, String>, text: &'a str) -> &'a s
     text.strip_prefix('@')
         .and_then(|key| strings.get(key))
         .map_or(text, String::as_str)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_written_line_break_is_one() {
+        let mut strings = HashMap::new();
+        parse_into(
+            &mut strings,
+            "REFERENCE GATE\nLANG_ENGLISH \"The gate is open!\\nPush on!\"\n",
+        );
+        assert_eq!(strings["GATE"], "The gate is open!\nPush on!");
+    }
 }
