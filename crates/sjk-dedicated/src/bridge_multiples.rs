@@ -105,6 +105,28 @@ impl NativeGame {
             } else {
                 touched
             };
+            // DEBUG (testing only, not for a pull request): a hack's touch, once a second.
+            if trigger.siege.usetime > 0
+                && who.buttons & 32 != 0
+                && level_time / 1_000 != (level_time - 50) / 1_000
+            {
+                eprintln!(
+                    "DEBUG hack: client {client} at trigger {index} ({:?}): class {:?} \
+                     (needs {:?}), team {} (needs {}), spawnflags {}, weapon_time {}, \
+                     hand_extend {}, torso {}, in box {}, hack {:?}, result {touched:?}",
+                    trigger.target,
+                    hooks.class_name(),
+                    trigger.siege.idealclass,
+                    who.team,
+                    trigger.allied_team,
+                    trigger.spawnflags,
+                    who.weapon_time,
+                    who.hand_extend,
+                    who.torso_anim,
+                    hooks.origin_in_box(),
+                    hooks.hack_state(),
+                );
+            }
             self.siege_touch_done(client, hooks, level_time);
             if touched == sjk_game_jka::triggers::Touched2::Fires {
                 self.fire_trigger(index, client, level_time);

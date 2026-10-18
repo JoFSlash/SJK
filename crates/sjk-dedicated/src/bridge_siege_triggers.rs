@@ -86,6 +86,21 @@ impl TouchHooks for SiegeTouchHooks {
     }
 }
 
+// DEBUG (testing only, not for a pull request): what the hack log reads.
+impl SiegeTouchHooks {
+    pub(super) fn class_name(&self) -> Option<&str> {
+        self.class.as_deref()
+    }
+    pub(super) fn origin_in_box(&self) -> bool {
+        (0..3).all(|axis| {
+            self.origin[axis] >= self.absmin[axis] && self.origin[axis] <= self.absmax[axis]
+        })
+    }
+    pub(super) fn hack_state(&self) -> (u16, i32, i32) {
+        (self.hack.trigger, self.hack.time, self.level_time)
+    }
+}
+
 impl NativeGame {
     /// The trigger at `index`'s linked box (its model's box a unit bigger each way).
     fn trigger_abs_box(&self, index: usize) -> ([f32; 3], [f32; 3]) {
