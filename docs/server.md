@@ -187,3 +187,7 @@ On a siege level, the server log also records the chain that opens a map:
 - each spawn point set toggled, with how many points each side now has enabled,
 - each respawn that found no free enabled point and fell back to the map's first point
   (as `SelectRandomTeamSpawnPoint` does).
+
+At level start, a siege map's wiring is also logged: every siege objective, spawn point, door,
+breakable, turret, `trigger_multiple`/`trigger_once`, `func_usable` and named `target_*`,
+with the keys that connect them. Each siege objective used is logged too.

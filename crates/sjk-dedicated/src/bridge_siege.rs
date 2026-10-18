@@ -164,6 +164,64 @@ impl NativeGame {
             fired_logged: Vec::new(),
         }));
         self.spawn_siege_entities();
+        self.log_siege_map();
+    }
+
+    /// The server log's account of what a siege map wires together, so a chain that does
+    /// not complete (an objective, the doors it opens, the spawn points it moves) can be
+    /// followed: every entity that names, fires or is fired by something, or that is a
+    /// siege objective, spawn point, door, breakable or turret, with the keys that wire it.
+    fn log_siege_map(&self) {
+        const CLASSES: [&str; 12] = [
+            "info_siege_objective",
+            "info_siege_decomplete",
+            "target_siege_end",
+            "info_player_siegeteam1",
+            "info_player_siegeteam2",
+            "func_door",
+            "func_breakable",
+            "misc_turret",
+            "misc_turretG2",
+            "trigger_multiple",
+            "trigger_once",
+            "func_usable",
+        ];
+        const KEYS: [&str; 16] = [
+            "targetname",
+            "target",
+            "target2",
+            "target3",
+            "target4",
+            "opentarget",
+            "goaltarget",
+            "objective",
+            "side",
+            "spawnflags",
+            "teamallow",
+            "teamuser",
+            "teamnodmg",
+            "startoff",
+            "siegetrig",
+            "usetime",
+        ];
+        let Some(map) = self.map.as_ref() else {
+            return;
+        };
+        eprintln!("siege map wiring:");
+        for (index, entity) in map.entities.iter().enumerate() {
+            let class = entity.classname().unwrap_or_default();
+            let wired = entity.get("target").is_some() || entity.get("targetname").is_some();
+            if !(CLASSES.contains(&class) || class.starts_with("target_") && wired) {
+                continue;
+            }
+            let mut line = format!("  #{index} {class}");
+            for key in KEYS {
+                if let Some(value) = entity.get(key).filter(|value| !value.is_empty()) {
+                    line.push_str(&format!(" {key}={value}"));
+                }
+            }
+            eprintln!("{line}");
+        }
     }
 
     /// The map's siege entities in its order (`SP_info_siege_objective`,
@@ -387,6 +445,9 @@ impl NativeGame {
                         .state(entity.number)
                         .and_then(|state| state.raw_field(ES_EFLAGS))
                         .unwrap_or(0);
+                    eprintln!(
+                        "siege: objective {objective} of team {side} used by entity {activator}"
+                    );
                     let user = SiegeUser {
                         other: activator as i32,
                         activator: Some(activator as i32),
