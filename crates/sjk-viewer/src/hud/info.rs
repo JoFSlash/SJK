@@ -53,16 +53,10 @@ impl HudOverlay {
             // for its respawn wave sees the whole seconds left until it comes
             // (`timeRemaining /= 1000`, as the reference truncates).
             WarmupText::Hidden => {
+                // A hack's progress is the caption under its bar ([`hack_bar`]).
                 let left = obituaries.siege_respawn_at() - server_time;
-                let (hack_done, hack_length) = obituaries.hack();
                 if left > 0 {
                     let _ = write!(self.warmup_text, "RESPAWN IN: {}", left / 1_000);
-                } else if hack_done != 0 && hack_length > 0 {
-                    // `CG_DrawHaqrBar` (`cg_draw.c:4766-4803`): the hack's progress while
-                    // the use key is held on a `usetime` trigger, shown as a share done.
-                    let remaining = (hack_done - server_time).clamp(0, hack_length);
-                    let done = 100 - remaining * 100 / hack_length;
-                    let _ = write!(self.warmup_text, "HACKING: {done}%");
                 }
             }
             WarmupText::WaitingForPlayers => {
@@ -74,6 +68,7 @@ impl HudOverlay {
         }
         let (hack_done, hack_length) = obituaries.hack();
         self.hack_left = hack_bar::left(hack_done, hack_length, server_time);
+        hack_bar::caption(&mut self.hack_text, self.hack_left);
         self.interrupted = interrupted;
         self.lagometer.clone_from(lagometer);
     }

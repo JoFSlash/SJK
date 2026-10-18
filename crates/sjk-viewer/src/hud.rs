@@ -230,6 +230,8 @@ pub(crate) struct HudOverlay {
     /// The share of the player's hack still to go (`hack_bar`), `None` while it hacks
     /// nothing.
     hack_left: Option<f32>,
+    /// The caption under the hack bar ([`hack_bar::caption`]), empty while nothing is hacked.
+    hack_text: String,
     lagometer: sjk_client::LagometerSamples,
     default_document: HudLayoutDocument,
     classic_document: HudLayoutDocument,
@@ -354,6 +356,7 @@ impl HudOverlay {
             followed_name: String::with_capacity(64),
             interrupted: false,
             hack_left: None,
+            hack_text: String::with_capacity(24),
             lagometer: sjk_client::LagometerSamples::new(),
             default_document: HudLayoutDocument::from_json(DEFAULT_LAYOUT)
                 .expect("bundled default HUD document is valid"),

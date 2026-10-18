@@ -32,6 +32,7 @@ impl HudOverlay {
             318 => &self.enemy_info.name,
             319 => &self.enemy_info.detail,
             324 => &self.followed_name,
+            325 => &self.hack_text,
             value @ vehicle::TEXT_FIRST..=vehicle::TEXT_LAST => self.vehicle.text(value),
             value @ crate::scope::binoculars::TEXT_FIRST..=crate::scope::binoculars::TEXT_LAST => {
                 crate::scope::binoculars::DIGIT_TEXT

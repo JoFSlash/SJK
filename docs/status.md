@@ -1,3 +1,11 @@
+## Siege hack caption
+
+18/10/2026, `feat/siege-override-label`, on `feat/siege-hack-bar`: the top-of-screen
+`HACKING: n%` warmup line is gone. The share done is now a small caption under the
+hack bar, "Overriding... n%", in a soft warm white (an SJK addition; stock's bar has
+no text). Unit tests pin the caption text and that the bar draws it; untested in a
+game.
+
 ## Siege hack bar
 
 18/10/2026, `feat/siege-hack-bar`, based on `Sol-Vulpes/SJK` `f19a8a67`: the HUD showed a
