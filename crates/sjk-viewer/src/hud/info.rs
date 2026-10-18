@@ -49,7 +49,14 @@ impl HudOverlay {
             sjk_client::legacy_warmup_text(game, server_time)
         };
         match warmup {
-            WarmupText::Hidden => {}
+            // `CG_DrawSiegeDeathTimer` (`cg_draw.c:8319-8335`): a siege player waiting
+            // for its respawn wave sees the whole seconds left until it comes.
+            WarmupText::Hidden => {
+                let left = obituaries.siege_respawn_at() - server_time;
+                if left > 0 {
+                    let _ = write!(self.warmup_text, "RESPAWN IN: {}", left / 1_000);
+                }
+            }
             WarmupText::WaitingForPlayers => {
                 self.warmup_text.push_str("WAITING FOR PLAYERS");
             }

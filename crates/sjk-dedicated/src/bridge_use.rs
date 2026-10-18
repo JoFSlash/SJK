@@ -155,8 +155,10 @@ impl NativeGame {
     /// spent. Whether `found` is a vehicle.
     fn use_vehicle(&mut self, client: usize, found: u16, level_time: i32) -> bool {
         let gametype = self.gametype;
+        // `ent->client->sess.sessionTeam`, which a vehicle with an allied team checks.
+        let team = self.peer(client).map_or(0, |peer| peer.session.team);
         let result = self.with_rider(client, |roster, rider, host| {
-            let (zoomed, team) = (rider.player.zoom_mode() != 0, 0);
+            let zoomed = rider.player.zoom_mode() != 0;
             let wanted = roster.vehicle_use(found, rider, zoomed, gametype, team);
             match wanted {
                 VehicleUse::NotOne => return false,

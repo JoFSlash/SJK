@@ -10,6 +10,9 @@ const CS_PLAYERS: usize = 1_131;
 
 /// `EV_OBITUARY` in `codemp/game/bg_public.h:927`.
 pub const EV_OBITUARY: u16 = 93;
+/// `EV_SIEGESPEC`: a siege player now waits for its respawn wave, which comes at the
+/// event's `time` (`g_siegeRespawnCheck`).
+const EV_SIEGESPEC: u16 = 191;
 
 /// Gender used by the gendered self-kill strings in `CG_Obituary`.
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
@@ -100,6 +103,7 @@ pub struct ObituaryTracker {
     present: [bool; MAX_ENTITIES],
     feed: KillFeed,
     decoded: u64,
+    siege_respawn_at: i32,
 }
 
 impl ObituaryTracker {
@@ -110,6 +114,7 @@ impl ObituaryTracker {
             present: [false; MAX_ENTITIES],
             feed: KillFeed::new(),
             decoded: 0,
+            siege_respawn_at: 0,
         }
     }
 
@@ -127,7 +132,13 @@ impl ObituaryTracker {
                 continue;
             }
             self.signatures[index] = signature;
-            if event_number(entity, signature) != EV_OBITUARY {
+            let number = event_number(entity, signature);
+            // `CG_EntityEvent`'s `EV_SIEGESPEC`: only the viewed player's own wait is kept
+            // (`cg_siegeDeathTime`).
+            if number == EV_SIEGESPEC && entity.owner() == snapshot.player.client_num() {
+                self.siege_respawn_at = entity.time();
+            }
+            if number != EV_OBITUARY {
                 continue;
             }
             let gender = client_gender(game, entity.other_entity_num());
@@ -151,6 +162,12 @@ impl ObituaryTracker {
     /// Access the retained feed without copying it.
     pub const fn feed(&self) -> &KillFeed {
         &self.feed
+    }
+
+    /// When the viewed player's siege respawn wave comes (`cg_siegeDeathTime`), or 0
+    /// before any `EV_SIEGESPEC` named it.
+    pub const fn siege_respawn_at(&self) -> i32 {
+        self.siege_respawn_at
     }
 
     /// Total obituary events decoded by this tracker.
@@ -336,6 +353,43 @@ mod tests {
         entity.set_raw_field(39, u32::from(client));
         entity.set_raw_field(42, u32::from(means));
         entity
+    }
+
+    /// `EV_SIEGESPEC` for `owner`, its wave at `time`.
+    fn siege_spec(number: u16, owner: u16, time: i32) -> EntityState {
+        let mut entity = EntityState::zero(number, &LEGACY_ENTITY_FIELDS);
+        entity.set_raw_field(8, u32::from(ET_EVENTS) + u32::from(EV_SIEGESPEC));
+        entity.set_raw_field(40, u32::from(owner));
+        entity.set_raw_field(65, time as u32);
+        entity
+    }
+
+    fn snapshot(entities: Vec<EntityState>) -> Snapshot {
+        Snapshot {
+            message_sequence: 0,
+            reliable_acknowledge: 0,
+            server_commands: Vec::new(),
+            server_time: 1_000,
+            delta_from: None,
+            flags: 0,
+            area_mask: Vec::new(),
+            player: sjk_protocol::PlayerState::zero(),
+            vehicle_player: None,
+            entities,
+            consumed_bits: 0,
+        }
+    }
+
+    #[test]
+    fn the_viewed_players_siege_wave_is_kept() {
+        let game = GameState::empty_local(0);
+        let mut tracker = ObituaryTracker::new();
+        // Another player's wait is not the viewed player's (client 0).
+        tracker.observe(&snapshot(vec![siege_spec(300, 5, 20_000)]), &game);
+        assert_eq!(tracker.siege_respawn_at(), 0);
+        tracker.observe(&snapshot(vec![siege_spec(301, 0, 40_000)]), &game);
+        assert_eq!(tracker.siege_respawn_at(), 40_000);
+        assert_eq!(tracker.decoded(), 0);
     }
 
     #[test]

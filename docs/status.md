@@ -23,6 +23,18 @@ use key does nothing. The counts now follow `TeamCount`. The client also shows t
 `CS_SIEGE_STATE` ("WAITING FOR PLAYERS", "STARTS IN: n") in the warmup line, which it
 never drew before. A unit test pins that line. The side-count fix has no automated test.
 
+Also from that test session:
+- The client never drew `CG_DrawSiegeDeathTimer`. A dead siege player waiting for the
+  respawn wave (`g_siegeRespawn`, 20 s by default) saw nothing and thought it could not
+  respawn. The obituary tracker now keeps the viewed player's `EV_SIEGESPEC` time, and the
+  warmup line shows "RESPAWN IN: n".
+- The use key's vehicle boarding passed team 0 instead of `sess.sessionTeam`. In team
+  games, every vehicle with an allied team refused every player, so red could not board
+  the AT-ST on Hoth.
+
+The full workspace fmt, build, test and clippy passed on Linux. The ALSA packages were
+installed in the container to build the client.
+
 Four unit tests pin the locked/teamallow and use-key rules. The `sjk-game-jka` and
 `sjk-dedicated` tests, fmt and clippy passed on Linux. The full workspace build was not
 run: `alsa-sys` needs the ALSA development package, which this container lacks.

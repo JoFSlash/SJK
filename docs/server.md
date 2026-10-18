@@ -176,3 +176,7 @@ The server log (`last-server.log` for a game the client starts) records a siege 
 start: a map without a `.siege` file, or a `.siege` file that cannot be read, the classes
 and teams read and each side's classes, then, once per change, how many clients want each
 side until the round begins, and when it begins.
+
+A dead siege player waits for the next respawn wave (`g_siegeRespawn`). The client shows
+the seconds left from `EV_SIEGESPEC` ("RESPAWN IN: n"). Boarding a vehicle with the use key
+checks the vehicle's allied team against the player's own team.
