@@ -26,6 +26,9 @@ pub(crate) mod gpu_skinning;
 #[path = "server_bone_angles.rs"]
 mod server_bone_angles;
 
+#[path = "emplaced_aim.rs"]
+mod emplaced_aim;
+
 #[path = "actor_pose_steps.rs"]
 mod steps;
 

@@ -1,5 +1,5 @@
 //! Per-actor preparation and upload. Failures return to the caller's actor loop.
-use super::{ActorMesh, gpu_skinning, server_bone_angles};
+use super::{ActorMesh, emplaced_aim, gpu_skinning, server_bone_angles};
 use crate::{GpuVertex, preview_gpu_vertex};
 use sjk_client::pmove::MovementState;
 use sjk_protocol::{GameState, Snapshot};
@@ -103,6 +103,12 @@ pub(super) fn prepare(mesh: &mut ActorMesh, frame: &Frame<'_>) -> Result<(), Box
                 .find(|state| u64::from(state.number()) + 1 == id.get())
         {
             server_bone_angles::apply(mesh, state, game_state);
+            emplaced_aim::apply(
+                mesh,
+                state,
+                snapshot,
+                predicted.map(|state| state.view_angles),
+            );
         }
     } else if let Some(pose) = pose {
         let origin = mesh

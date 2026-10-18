@@ -1,3 +1,13 @@
+## Emplaced guns turn with their gunner
+
+18/10/2026, `fix/emplaced-gun-aim`, based on `Sol-Vulpes/SJK` `6469816` (tester on
+`mp/siege_hoth`: the gun fired wherever the player aimed but its model never turned). The
+client did not turn the barrel as `CG_General` does (`cg_ents.c:1314-1338`). While a player
+works a gun (`s.activeForcePass` is `NUM_FORCE_POWERS + 1`), its `Bone02` now takes the
+gunner's view, the local player's own or another gunner's entity angles, with the pitch held
+to 40 and the yaw relative to the gun's. Two unit tests pin the angles. The workspace built
+on Linux; the tests and Clippy were not run.
+
 ## Away players on the scoreboard
 
 18/10/2026, `personal/afk-detect`, based on `Sol-Vulpes/SJK` `fd744924` (Sol: "detect
