@@ -1,3 +1,19 @@
+## Emplaced gun barrel follows its gunner
+
+18/10/2026, `fix/emplaced-gun-barrel`, based on `Sol-Vulpes/SJK` `3483b1b`: on
+siege_hoth the emplaced guns fired where their gunner aimed while the barrel stayed
+still. Stock turns the gun's `Bone02` to the gunner's view (`CG_General`,
+`cg_ents.c:1314-1338`), but the viewer draws `turret_chair.glm` as a rigid model with no
+skeleton. `emplaced_barrel` now reads the model's skeleton, splits the triangles that
+`Bone02` and the bones under it carry into a model of their own
+(`turret_chair.glm#Bone02`, loaded with the gun at map load or on demand), and draws
+it turned round the bone: the gunner's pitch held to 40 degrees down and its yaw
+relative to the gun's, the local gunner's predicted view, another gunner's entity
+angles. An unworked gun keeps the model's own pose. A gun whose skeleton has no
+`Bone02` is drawn whole, as before. `cargo check` of `sjk-viewer` passes; tests and
+Clippy were not run, and the turning, its axes and the split are untested against the
+retail model in a game.
+
 ## Jetpack effect layers and tail lengths
 
 18/10/2026, `fix/jetpack-tail-rendering`, based on `sol/main` `64698160`.

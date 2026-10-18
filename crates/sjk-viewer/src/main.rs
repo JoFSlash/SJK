@@ -186,6 +186,7 @@ mod achievements_frame;
 mod blade_skin_file;
 mod bug_report;
 mod electrify;
+mod emplaced_barrel;
 mod emote_icons;
 mod emotes;
 mod emotes_frame;
@@ -323,7 +324,7 @@ use sjk_vfs::VirtualFileSystem;
 
 use scene_flatten::{
     ActorDraw, DrawBatch, FlattenedScene, ViewerMaterial, append_actor_mesh, append_md3_mesh,
-    append_static_glm_mesh, preview_gpu_vertex,
+    append_static_glm_mesh, append_static_glm_part, preview_gpu_vertex,
 };
 use shared_geometry::SharedGeometry;
 use std::collections::{BTreeMap, BTreeSet, HashMap};

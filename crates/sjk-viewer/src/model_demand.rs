@@ -68,6 +68,23 @@ impl GpuState {
             })
             .cloned()
             .or_else(|| {
+                // An emplaced gun's barrel is drawn apart from it (`emplaced_barrel`).
+                let barrel = Appearance {
+                    model: emplaced_barrel::BARREL.to_owned(),
+                    variant: String::new(),
+                };
+                (self
+                    .object_meshes
+                    .iter()
+                    .any(|mesh| mesh.appearance.model == emplaced_barrel::MODEL)
+                    && !self
+                        .config_string_refresh
+                        .models
+                        .attempted
+                        .contains(&barrel))
+                .then_some(barrel)
+            })
+            .or_else(|| {
                 // A mover's second model (`mover_models`) is not a world appearance.
                 let (game, snapshot) = match (&self.live_session, &self.demo_session) {
                     (Some(live), _) => (live.game_state(), live.latest_snapshot()),

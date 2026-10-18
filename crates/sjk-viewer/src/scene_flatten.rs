@@ -286,9 +286,19 @@ pub(super) fn append_static_glm_mesh(
     scene: &mut FlattenedScene,
     model: &Glm,
 ) -> Result<Vec<ActorDraw>, Box<dyn Error>> {
+    append_static_glm_part(scene, model, |_, _| true)
+}
+
+/// [`append_static_glm_mesh`] of the LOD-0 triangles `keep` takes, by surface index and
+/// triangle: one rigid part of a model drawn apart from the rest.
+pub(super) fn append_static_glm_part(
+    scene: &mut FlattenedScene,
+    model: &Glm,
+    keep: impl Fn(usize, &[u32; 3]) -> bool,
+) -> Result<Vec<ActorDraw>, Box<dyn Error>> {
     let lod = model.lods.first().ok_or("static GLM has no LOD")?;
     let mut draws = Vec::new();
-    for (surface, hierarchy) in lod.surfaces.iter().zip(&model.hierarchy) {
+    for (index, (surface, hierarchy)) in lod.surfaces.iter().zip(&model.hierarchy).enumerate() {
         if hierarchy.name.starts_with('*') || hierarchy.flags & 0x2 != 0 {
             continue;
         }
@@ -303,14 +313,21 @@ pub(super) fn append_static_glm_mesh(
                 texture_coordinates: vertex.texture_coordinates,
                 lightmap_coordinates: [0.0; 2],
             }));
-        for triangle in &surface.triangles {
-            for index in triangle {
+        for triangle in surface
+            .triangles
+            .iter()
+            .filter(|triangle| keep(index, triangle))
+        {
+            for corner in triangle {
                 scene.indices.push(
                     vertex_base
-                        .checked_add(*index)
+                        .checked_add(*corner)
                         .ok_or("static GLM index overflow")?,
                 );
             }
+        }
+        if scene.indices.len() == index_start as usize {
+            continue;
         }
         let material = scene.materials.len();
         scene.materials.push(ViewerMaterial {
