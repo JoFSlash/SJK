@@ -562,37 +562,10 @@ impl HudOverlay {
                 &mut output,
             );
         }
-        // DEBUG (test build only): whether the vehicle strip is asked for and drawn.
-        if self.vehicle.debug_shown() {
-            thread_local! {
-                static LAST: std::cell::Cell<Option<(bool, bool, bool, usize)>> = const { std::cell::Cell::new(None) };
-            }
-            let before = self.draw_list.commands().len();
-            let now = (visibility.hud, visibility.vehicle, visibility.status, before);
-            if LAST.with(|last| last.replace(Some(now))).map(|last| (last.0, last.1, last.2)) != Some((now.0, now.1, now.2)) {
-                crate::log::progress(format_args!(
-                    "DEBUG vehicle strip: hud={} vehicle={} status={} hides_player={} commands_before={before} viewport={viewport:?} scale={user_scale}",
-                    visibility.hud, visibility.vehicle, visibility.status, self.vehicle.hides_player(),
-                ));
-            }
-        }
         if visibility.hud {
             if visibility.vehicle {
-                let before = self.draw_list.commands().len();
                 self.vehicle
                     .emit(&mut self.draw_list, self.theme, viewport, user_scale);
-                if self.vehicle.debug_shown() {
-                    thread_local! {
-                        static DRAWN: std::cell::Cell<Option<usize>> = const { std::cell::Cell::new(None) };
-                    }
-                    let drawn = self.draw_list.commands().len() - before;
-                    if DRAWN.with(|last| last.replace(Some(drawn))) != Some(drawn) {
-                        crate::log::progress(format_args!(
-                            "DEBUG vehicle strip drawn: {drawn} commands, list {} of capacity",
-                            self.draw_list.commands().len()
-                        ));
-                    }
-                }
             }
             self.speed.emit(&mut self.draw_list, self.theme, viewport);
             follow::emit(

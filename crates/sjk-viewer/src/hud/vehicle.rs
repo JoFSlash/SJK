@@ -349,11 +349,6 @@ impl State {
 
     /// The vehicle HUD is up and the vehicle hides its rider, so stock draws no player
     /// status HUD (`CG_DrawVehicleHud` returns false).
-    /// DEBUG (test build only).
-    pub(crate) fn debug_shown(&self) -> bool {
-        self.shown
-    }
-
     pub(crate) fn hides_player(&self) -> bool {
         self.hides_player
     }
