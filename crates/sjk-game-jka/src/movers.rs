@@ -60,7 +60,7 @@ const MOVER_START_OPEN: u32 = 1;
 const MOVER_PLAYER_USE: u32 = 64;
 /// `MOVER_FORCE_ACTIVATE` and `MOVER_LOCKED`: pushed or pulled open, and locked until used.
 const MOVER_FORCE_ACTIVATE: u32 = 2;
-pub(crate) const MOVER_LOCKED: u32 = 16;
+pub const MOVER_LOCKED: u32 = 16;
 const MOVER_INACTIVE: u32 = 128;
 
 /// What a mover is waiting to do (`ent->think`).

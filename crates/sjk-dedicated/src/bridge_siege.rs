@@ -87,6 +87,9 @@ pub(super) struct SiegeState {
     /// What the server log last said of the round's start (begun, and the clients
     /// wanting each side), so it is told once per change.
     pub(super) logged: Option<(bool, [usize; 2])>,
+    /// The names the server log last told as fired, with when, so a trigger firing
+    /// every frame is told once every few seconds.
+    pub(super) fired_logged: Vec<(String, i32)>,
 }
 
 /// What outlives a level: the engine's memory of the first round (`SiegePersSet`), and
@@ -158,6 +161,7 @@ impl NativeGame {
             points: Vec::new(),
             items: Vec::new(),
             logged: None,
+            fired_logged: Vec::new(),
         }));
         self.spawn_siege_entities();
     }
@@ -305,6 +309,25 @@ impl NativeGame {
         index
     }
 
+    /// The server log's line for `name` fired on a siege level, told at most once every
+    /// two seconds per name.
+    pub(super) fn log_siege_fired(&mut self, name: &str, activator: usize, level_time: i32) {
+        let Some(siege) = self.siege.as_mut() else {
+            return;
+        };
+        match siege.fired_logged.iter_mut().find(|(told, _)| told == name) {
+            Some((_, at)) if level_time - *at < 2_000 => return,
+            Some((_, at)) => *at = level_time,
+            None => siege.fired_logged.push((name.to_owned(), level_time)),
+        }
+        let by = if activator == usize::MAX {
+            "the world".to_owned()
+        } else {
+            format!("entity {activator}")
+        };
+        eprintln!("siege: '{name}' fired by {by}");
+    }
+
     /// `G_UseTargets2` reaching the siege entities called `name`, used by entity
     /// `activator` (a client's number, or another entity's).
     pub(super) fn use_siege_entities(&mut self, name: &str, activator: usize, level_time: i32) {
@@ -313,12 +336,28 @@ impl NativeGame {
             return;
         };
         // `SiegePointUse`: a siege spawn point toggled on or off.
+        let mut toggled = false;
         for point in siege
             .points
             .iter_mut()
             .filter(|point| point.targetname == name)
         {
             point.enabled = !point.enabled;
+            toggled = true;
+        }
+        if toggled {
+            let enabled = |team| {
+                siege
+                    .points
+                    .iter()
+                    .filter(|point| point.team == team && point.enabled)
+                    .count()
+            };
+            eprintln!(
+                "siege: spawn points '{name}' toggled; enabled now: team 1 {}, team 2 {}",
+                enabled(1),
+                enabled(2)
+            );
         }
         let matching: Vec<usize> = siege
             .entities
@@ -439,6 +478,9 @@ impl NativeGame {
             .take(32)
             .collect();
         let chosen = if free.is_empty() {
+            eprintln!(
+                "siege: no free enabled spawn point for team {team}; the map's first one is used"
+            );
             first
         } else {
             let ideal: Vec<&SiegePoint> = free

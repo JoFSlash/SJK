@@ -180,3 +180,10 @@ side until the round begins, and when it begins.
 A dead siege player waits for the next respawn wave (`g_siegeRespawn`). The client shows
 the seconds left from `EV_SIEGESPEC` ("RESPAWN IN: n"). Boarding a vehicle with the use key
 checks the vehicle's allied team against the player's own team.
+
+On a siege level, the server log also records the chain that opens a map:
+- each name fired (at most once every two seconds per name), with what fired it,
+- each door used by name, and whether it was unlocked,
+- each spawn point set toggled, with how many points each side now has enabled,
+- each respawn that found no free enabled point and fell back to the map's first point
+  (as `SelectRandomTeamSpawnPoint` does).

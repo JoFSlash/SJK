@@ -205,7 +205,21 @@ impl NativeGame {
                 continue;
             }
             let activator = (client != usize::MAX).then_some(client);
+            let before = self.doors[index].1.clone();
             let fired = mover_team::use_mover(&mut self.doors, index, level_time, activator);
+            if self.siege.is_some() {
+                let after = &self.doors[index].1;
+                let what = if before.spawnflags & movers::MOVER_LOCKED != 0
+                    && after.spawnflags & movers::MOVER_LOCKED == 0
+                {
+                    "unlocked"
+                } else if before.state != after.state || before.waiting != after.waiting {
+                    "used"
+                } else {
+                    "used, nothing changed"
+                };
+                eprintln!("siege: door '{name}' (mover {index}) {what}");
+            }
             self.publish_team(index);
             if let Some(target) = fired {
                 self.fire_targets(&target, client, level_time);

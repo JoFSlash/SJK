@@ -160,6 +160,7 @@ impl NativeGame {
         if name.is_empty() {
             return;
         }
+        self.log_siege_fired(name, client, level_time);
         let matching: Vec<usize> = self
             .targets
             .iter()
