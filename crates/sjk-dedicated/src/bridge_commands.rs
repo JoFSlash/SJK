@@ -194,6 +194,15 @@ impl NativeGame {
             self.intermission_think(client, &command, server_time);
             return;
         }
+        // A siege wait whose time has passed is over (`tempSpectate >= level.time` is
+        // what the reference reads; only the respawn wave sets it back to 0 here).
+        let level_time = self.last_frame_time;
+        if let Some(peer) = self.peer_mut(client)
+            && peer.temp_spectate != 0
+            && peer.temp_spectate < level_time
+        {
+            peer.temp_spectate = 0;
+        }
         // `SpectatorThink` (`g_active.c:697-760`): a follower does not move itself; the
         // buttons pick whom to follow.
         if let Some(following) = self

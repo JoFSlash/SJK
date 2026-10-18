@@ -13,6 +13,8 @@ pub const EV_OBITUARY: u16 = 93;
 /// `EV_SIEGESPEC`: a siege player now waits for its respawn wave, which comes at the
 /// event's `time` (`g_siegeRespawnCheck`).
 const EV_SIEGESPEC: u16 = 191;
+/// `PM_SPECTATOR`: how a siege player waiting for its wave moves.
+const PM_SPECTATOR: u8 = 4;
 
 /// Gender used by the gendered self-kill strings in `CG_Obituary`.
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
@@ -121,6 +123,11 @@ impl ObituaryTracker {
     /// Observe every entity event in one accepted snapshot exactly once.
     pub fn observe(&mut self, snapshot: &Snapshot, game: &GameState) {
         self.present.fill(false);
+        // A wave the viewed player no longer waits for — it is back in play, or the level,
+        // round or server changed under it — is forgotten.
+        if snapshot.player.movement_type() != PM_SPECTATOR {
+            self.siege_respawn_at = 0;
+        }
         for entity in &snapshot.entities {
             let index = usize::from(entity.number());
             if index >= MAX_ENTITIES {
@@ -387,8 +394,16 @@ mod tests {
         // Another player's wait is not the viewed player's (client 0).
         tracker.observe(&snapshot(vec![siege_spec(300, 5, 20_000)]), &game);
         assert_eq!(tracker.siege_respawn_at(), 0);
-        tracker.observe(&snapshot(vec![siege_spec(301, 0, 40_000)]), &game);
+        let mut waiting = snapshot(vec![siege_spec(301, 0, 40_000)]);
+        waiting.player.set_raw_field(63, u32::from(PM_SPECTATOR));
+        tracker.observe(&waiting, &game);
         assert_eq!(tracker.siege_respawn_at(), 40_000);
+        waiting.entities.clear();
+        tracker.observe(&waiting, &game);
+        assert_eq!(tracker.siege_respawn_at(), 40_000);
+        // Back in play: the wave is forgotten.
+        tracker.observe(&snapshot(Vec::new()), &game);
+        assert_eq!(tracker.siege_respawn_at(), 0);
         assert_eq!(tracker.decoded(), 0);
     }
 

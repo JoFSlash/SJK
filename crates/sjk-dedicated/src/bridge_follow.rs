@@ -168,10 +168,17 @@ impl NativeGame {
         command: &UserCommand,
         server_time: i32,
     ) {
+        let level_time = self.last_frame_time;
         let Some(peer) = self.peer_mut(client) else {
             return;
         };
         let old = std::mem::replace(&mut peer.spectator_buttons, command.buttons);
+        // A siege player waiting for its respawn wave neither follows anyone nor stops
+        // following (`if (client->tempSpectate < level.time)`, `g_active.c:747`): its
+        // buttons would otherwise send it to the spectators, whom the wave skips.
+        if peer.temp_spectate >= level_time {
+            return;
+        }
         let pressed = |button: u16| command.buttons & button != 0 && old & button == 0;
         let following = peer.session.spectator_state == SPECTATOR_FOLLOW;
         if pressed(BUTTON_ATTACK) {

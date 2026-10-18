@@ -86,18 +86,15 @@ impl NativeGame {
             let Some(peer) = self.peer_mut(other) else {
                 continue;
             };
-            // `TeamCount`: in siege a player waiting for the round counts on the side it
-            // wants (`siegeDesiredTeam`), or a bot added before the round begins would
-            // pick the side a waiting player already took and leave the other empty.
-            let team = match peer.session.team {
-                1 | 2 => peer.session.team,
-                _ if siege => peer.session.siege_desired_team,
-                _ => 0,
-            };
-            match team {
-                1 => sides.red_players += 1,
-                2 => sides.blue_players += 1,
-                _ => {}
+            // `TeamCount`: a player counts for the side it is on and, in siege, for the
+            // side it wants (`siegeDesiredTeam`) — a player waiting for the round is on
+            // neither yet, and one who asked to switch counts for both. Otherwise a bot
+            // added before the round picks the side a waiting player already took.
+            let (team, wanted) = (peer.session.team, peer.session.siege_desired_team);
+            for (side, players) in [(1, &mut sides.red_players), (2, &mut sides.blue_players)] {
+                if team == side || (siege && wanted == side) {
+                    *players += 1;
+                }
             }
         }
         sides

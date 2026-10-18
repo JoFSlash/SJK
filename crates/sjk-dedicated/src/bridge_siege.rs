@@ -554,9 +554,12 @@ impl NativeGame {
             return;
         }
         let mut wanted = [0; 2];
-        for player in SiegeWorld::players(self) {
-            if player.connected && (1..=2).contains(&player.desired_team) {
-                wanted[player.desired_team as usize - 1] += 1;
+        for client in 0..self.players.places() {
+            if let Some(peer) = self.peer(client)
+                && peer.begun
+                && (1..=2).contains(&peer.session.siege_desired_team)
+            {
+                wanted[peer.session.siege_desired_team as usize - 1] += 1;
             }
         }
         let Some(siege) = self.siege.as_mut() else {

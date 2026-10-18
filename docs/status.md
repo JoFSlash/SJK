@@ -32,6 +32,15 @@ Also from that test session:
   games, every vehicle with an allied team refused every player, so red could not board
   the AT-ST on Hoth.
 
+Review fixes (18/10/2026, tester: the respawn sometimes came late after the countdown):
+- A siege player waiting for its wave still had its spectator buttons read. Clicking
+  attack, as a dead player does to respawn, cycled it into following someone and onto
+  the spectators, and the wave skips spectators. The buttons now do nothing while it
+  waits (`g_active.c:747`).
+- A wait whose time has passed is cleared.
+- `TeamCount` counts a player for both the side it is on and the side it wants.
+- The HUD countdown rounds up, and it forgets the wave once the player is back in play.
+- The siege start log counts without allocating.
 The full workspace fmt, build, test and clippy passed on Linux. The ALSA packages were
 installed in the container to build the client.
 
