@@ -162,7 +162,9 @@ impl Shell {
             .map(|cvar| Candidate {
                 name: &cvar.name,
                 description: &cvar.description,
-                value: Some(listed_value(cvar.value.as_text())),
+                value: Some(listed_value(
+                    crate::secret::shown_value(&cvar.name, &cvar.value.as_text()).to_owned(),
+                )),
             })
             .collect::<Vec<_>>();
         cvars.sort_by_cached_key(|candidate| candidate.name.to_ascii_lowercase());

@@ -57,8 +57,8 @@ impl Shell {
                         format!(
                             "{} = {} (default {})",
                             v.name,
-                            v.value.as_text(),
-                            v.default.as_text()
+                            crate::secret::shown_value(&v.name, &v.value.as_text()),
+                            crate::secret::shown_value(&v.name, &v.default.as_text())
                         )
                     })
                     .collect());

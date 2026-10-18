@@ -4418,6 +4418,29 @@ included ([local_time.rs](../crates/sjk-shell/src/local_time.rs)); the scrollbac
 stamps and the log file's `[HH:MM:SS]` are local time too. Differences from EternalJK besides those above: the input never runs past
 the screen's right edge (EternalJK's can).
 
+## Passwords in the console
+
+The console never prints a password: what it prints is kept in the scrollback,
+`qconsole.log` and the crash trail that the session log, crash reports and log uploads
+are made from ([identity](identity.md#crash-reports)).
+[secret.rs](../crates/sjk-shell/src/secret.rs) in `sjk-shell` names what is secret in
+two tables: cvars whose name contains `password` (`rconPassword`, `password`,
+`g_password`, `sv_password`, `cl_consoleSocketPassword`), `loginpass`
+(`japlus.loginPass1-3`) or `giphykey` (`cl_giphyKey`), and the commands `amlogin`,
+`login` and `register`, whose arguments are a password. The echo of a typed line
+(`]rconpassword ********`, `]seta japlus.loginPass1 ********`, `]amlogin ********`,
+also inside `rcon` and a bound command), a cvar's description, `cvarlist`,
+`cvar_modified`, `bind`, `bindlist` and completion's listing show `********` for a set
+secret value. The value itself is unchanged: the cvar keeps it, the command and the
+server still get it, and `config.cfg` still saves the archived ones as plain text.
+There is no setting to show them again, as a log that might carry a password could not
+be shared. Lines printed before this change (an older session log or a crash report
+already waiting) are not rewritten.
+
+Covered by unit tests of the tables and the masking, and a shell test that types,
+queries, lists and binds a password and finds it in no printed line, the tap's
+included; not exercised in a live game.
+
 ## Console socket
 
 `cl_consoleSocket <port>` lets a program on the same computer read the console

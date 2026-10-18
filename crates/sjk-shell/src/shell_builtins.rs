@@ -37,8 +37,8 @@ impl Shell {
         Ok(vec![format!(
             "{} = \"{}\" (default \"{}\")",
             cvar.name,
-            cvar.value.as_text(),
-            cvar.default.as_text()
+            crate::secret::shown_value(&cvar.name, &cvar.value.as_text()),
+            crate::secret::shown_value(&cvar.name, &cvar.default.as_text())
         )])
     }
 
@@ -105,7 +105,13 @@ impl Shell {
         if arguments.len() == 1 {
             return Ok(vec![self.binds.get(&key).map_or_else(
                 || format!("{} is not bound", crate::key_names::display_key(&key)),
-                |command| format!("{} = \"{command}\"", crate::key_names::display_key(&key)),
+                |command| {
+                    format!(
+                        "{} = \"{}\"",
+                        crate::key_names::display_key(&key),
+                        crate::secret::input_line(command)
+                    )
+                },
             )]);
         }
         let command = arguments[1..].join(" ");
@@ -115,8 +121,9 @@ impl Shell {
         }
         self.binds.bind(&key, command.clone())?;
         Ok(vec![format!(
-            "{} = \"{command}\"",
-            crate::key_names::display_key(&key)
+            "{} = \"{}\"",
+            crate::key_names::display_key(&key),
+            crate::secret::input_line(&command)
         )])
     }
 

@@ -17,6 +17,7 @@ mod cvar;
 pub mod key_names;
 pub mod local_time;
 mod revision;
+pub mod secret;
 
 mod shell;
 mod shell_error;

@@ -1,3 +1,17 @@
+## Passwords in the console
+
+18/10/2026, `claude/nice-gates-marjpo`, based on `Sol-Vulpes/SJK` `bb83eb28`:
+implemented masking of passwords everywhere the console prints, so they no longer
+reach the scrollback, `qconsole.log`, the session log, crash reports or log uploads.
+`sjk-shell`'s `secret.rs` tables name the secret cvars (`*password*`, `*loginpass*`,
+`cl_giphyKey`) and password commands (`amlogin`, `login`, `register`); typed echoes,
+cvar descriptions and listings, binds and completion show `********`. See
+[client](client.md#passwords-in-the-console).
+
+Unit and shell tests pin the tables, the masking (several commands in a line, `rcon`,
+binds, open quotes) and that a typed, queried, listed and bound password appears in
+no printed line or tap line while the cvar keeps its value. Not exercised in a live
+game; reports and logs written before the change keep what they had.
 ## NPC sabers and voices
 
 17/10/2026, `personal/npc-sabers-sounds`, based on `Sol-Vulpes/SJK` `cb03b251`

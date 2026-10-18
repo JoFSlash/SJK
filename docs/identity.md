@@ -232,7 +232,10 @@ The trail is every console line as it is kept (through `Shell::set_line_tap`), c
 codes removed, except chat lines (`push_chat_line` keeps them out), and every
 `log::progress` diagnostic. Each report is also written as plain text to
 `crashes/last-crash.txt`, which a player can send by hand. Paths under the player's own
-folder become `%USERPROFILE%`.
+folder become `%USERPROFILE%`. Passwords never enter the trail: the console prints a
+password typed or listed as `********` before the tap sees the line
+([client](client.md#passwords-in-the-console)), so the trail, the session log, crash
+reports and log uploads carry the mask.
 
 With `cl_crashReports` on, the report waits in `crashes/pending/` (20 at most, the oldest
 make room). Once registered, the identity service sends what waits (`POST /v1/crash`,

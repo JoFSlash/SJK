@@ -328,7 +328,8 @@ impl Shell {
         if input.is_empty() {
             return Ok(());
         }
-        self.push_line(ConsoleLineKind::Input, format!("{PROMPT}{input}"));
+        let shown = crate::secret::input_line(input);
+        self.push_line(ConsoleLineKind::Input, format!("{PROMPT}{shown}"));
         self.command_buffer.append(input)?;
         Ok(())
     }
@@ -580,5 +581,62 @@ mod key_display_tests {
         assert!(list.iter().any(|line| line.starts_with("K+L ")), "{list:?}");
         assert_eq!(shell.execute_line("unbind L+K").unwrap(), ["K+L unbound"]);
         assert_eq!(shell.binds.get("K+L"), None);
+    }
+}
+
+#[cfg(test)]
+mod secret_tests {
+    use super::*;
+    use crate::{CvarDefinition, CvarFlags};
+    use std::sync::Mutex;
+
+    static TAPPED: Mutex<Vec<String>> = Mutex::new(Vec::new());
+
+    fn tap(line: &str) {
+        TAPPED.lock().unwrap().push(line.to_owned());
+    }
+
+    #[test]
+    fn a_typed_password_reaches_the_cvar_but_no_printed_line() {
+        let mut cvars = CvarRegistry::new();
+        cvars
+            .register(CvarDefinition::new(
+                "rconPassword",
+                "",
+                CvarFlags::NONE,
+                "Remote console password",
+            ))
+            .unwrap();
+        let mut shell = Shell::new(cvars, BindTable::new());
+        shell.set_line_tap(tap);
+        let mut printed = Vec::new();
+        for line in [
+            "rconpassword hunter2",
+            "seta rconPassword hunter2",
+            "rconPassword",
+            "print rconPassword",
+            "cvarlist rcon",
+            "cvar_modified",
+            "bind F5 \"amlogin hunter2\"",
+            "bind F5",
+            "bindlist",
+        ] {
+            printed.extend(shell.execute_line(line).unwrap());
+        }
+        assert_eq!(
+            shell.cvars.get("rconPassword").unwrap().value.as_text(),
+            "hunter2"
+        );
+        assert_eq!(shell.binds.get("f5"), Some("amlogin hunter2"));
+        printed.extend(shell.lines().map(|line| line.text.clone()));
+        printed.extend(TAPPED.lock().unwrap().iter().cloned());
+        assert!(
+            printed
+                .iter()
+                .any(|line| line.contains(crate::secret::MASK))
+        );
+        for line in &printed {
+            assert!(!line.contains("hunter2"), "{line}");
+        }
     }
 }
