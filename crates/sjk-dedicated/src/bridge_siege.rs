@@ -458,6 +458,16 @@ impl NativeGame {
                         "siege: objective {objective} of team {side} used by {}",
                         activator_name(activator)
                     );
+                    // DEBUG (testing only, not for a pull request): what the `.siege` file
+                    // gives this objective, which `siegeTriggerUse` fires.
+                    if let Some(siege) = self.siege.as_ref() {
+                        let read = siege.round.map.side(side).objective(objective);
+                        eprintln!(
+                            "DEBUG siege: objective {objective} of team {side}: on radar {}, \
+                             .siege entry {read:?}, own target {target:?}",
+                            flags & EF_RADAROBJECT != 0
+                        );
+                    }
                     let user = SiegeUser {
                         other: activator as i32,
                         activator: Some(activator as i32),
