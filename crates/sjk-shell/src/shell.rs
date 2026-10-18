@@ -328,7 +328,7 @@ impl Shell {
         if input.is_empty() {
             return Ok(());
         }
-        let shown = crate::secret::input_line(input);
+        let shown = crate::secret::input_line(input, &self.cvars);
         self.push_line(ConsoleLineKind::Input, format!("{PROMPT}{shown}"));
         self.command_buffer.append(input)?;
         Ok(())
@@ -394,6 +394,8 @@ impl Shell {
             match result {
                 Ok(lines) => {
                     for line in lines {
+                        // Returned as kept: scrubbed of secrets (`secret.rs`).
+                        let line = self.cvars.scrub(&line).into_owned();
                         self.push_line(ConsoleLineKind::Output, line.clone());
                         output.push(line);
                     }
@@ -439,6 +441,12 @@ impl Shell {
         if self.lines.len() == self.log_capacity {
             self.lines.pop_front();
         }
+        // The last of the secret layers (`secret.rs`): no kept line holds a
+        // secret cvar's value, whichever path printed it.
+        let text = match self.cvars.scrub(&text) {
+            std::borrow::Cow::Borrowed(_) => text,
+            std::borrow::Cow::Owned(scrubbed) => scrubbed,
+        };
         if let Some(tap) = self.line_tap {
             tap(&text);
         }
@@ -620,14 +628,28 @@ mod secret_tests {
             "bind F5 \"amlogin hunter2\"",
             "bind F5",
             "bindlist",
+            "bind P amlogin hunter2",
+            "seta autologin \"amlogin hunter2\"",
+            "autologin",
+            "cvarlist auto",
+            "strSub echo $rconPassword$",
+            "toggle rconPassword hunter2 other",
+            "toggle rconPassword hunter2 other",
         ] {
             printed.extend(shell.execute_line(line).unwrap());
         }
+        // What a mod or a frontend prints by itself is scrubbed too.
+        shell.push_log("userinfo: \\password\\hunter2");
+        assert_eq!(
+            shell.cvars.get("autologin").unwrap().value.as_text(),
+            "amlogin hunter2"
+        );
         assert_eq!(
             shell.cvars.get("rconPassword").unwrap().value.as_text(),
             "hunter2"
         );
         assert_eq!(shell.binds.get("f5"), Some("amlogin hunter2"));
+        assert_eq!(shell.binds.get("p"), Some("amlogin hunter2"));
         printed.extend(shell.lines().map(|line| line.text.clone()));
         printed.extend(TAPPED.lock().unwrap().iter().cloned());
         assert!(

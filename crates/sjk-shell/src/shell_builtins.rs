@@ -37,8 +37,8 @@ impl Shell {
         Ok(vec![format!(
             "{} = \"{}\" (default \"{}\")",
             cvar.name,
-            crate::secret::shown_value(&cvar.name, &cvar.value.as_text()),
-            crate::secret::shown_value(&cvar.name, &cvar.default.as_text())
+            cvar.shown_value(),
+            cvar.shown_default()
         )])
     }
 
@@ -109,7 +109,7 @@ impl Shell {
                     format!(
                         "{} = \"{}\"",
                         crate::key_names::display_key(&key),
-                        crate::secret::input_line(command)
+                        crate::secret::input_line(command, &self.cvars)
                     )
                 },
             )]);
@@ -123,7 +123,7 @@ impl Shell {
         Ok(vec![format!(
             "{} = \"{}\"",
             crate::key_names::display_key(&key),
-            crate::secret::input_line(&command)
+            crate::secret::input_line(&command, &self.cvars)
         )])
     }
 

@@ -702,9 +702,12 @@ impl ViewerConsole {
                 let result = self.apply_cvar(&name, &value);
                 self.browser.refresh(&self.shell);
                 match result {
-                    Ok(()) => self
-                        .browser
-                        .set_status(format!("{name} = \"{value}\""), false),
+                    Ok(()) => {
+                        let shown =
+                            sjk_shell::secret::shown(self.shell.cvars.is_secret(&name), &value);
+                        self.browser
+                            .set_status(format!("{name} = \"{shown}\""), false)
+                    }
                     Err(error) => self.browser.set_status(error.to_string(), true),
                 }
             }

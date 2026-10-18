@@ -26,6 +26,9 @@ impl CvarFlags {
     pub const USER_CREATED: Self = Self(1 << 4);
     /// Omit an archived value from generated configuration when it equals its default.
     pub const OMIT_DEFAULT: Self = Self(1 << 5);
+    /// A password or key: the console never prints the value ([`crate::secret`]).
+    /// Registration adds it to a cvar [`crate::secret::is_secret_name`] names.
+    pub const SECRET: Self = Self(1 << 6);
 
     /// Returns whether every bit in `other` is present.
     pub const fn contains(self, other: Self) -> bool {
@@ -193,6 +196,26 @@ pub struct Cvar {
     pub description: String,
 }
 
+impl Cvar {
+    /// The value as the console may print it ([`crate::secret::shown`]): masked
+    /// when the cvar is [`CvarFlags::SECRET`], a command line it holds with its
+    /// passwords masked otherwise.
+    pub fn shown_value(&self) -> String {
+        crate::secret::shown(
+            self.flags.contains(CvarFlags::SECRET),
+            &self.value.as_text(),
+        )
+    }
+
+    /// The default as [`Self::shown_value`] shows a value.
+    pub fn shown_default(&self) -> String {
+        crate::secret::shown(
+            self.flags.contains(CvarFlags::SECRET),
+            &self.default.as_text(),
+        )
+    }
+}
+
 /// Immutable change notification delivered after a successful mutation.
 #[derive(Clone, Debug, PartialEq)]
 pub struct CvarChange {
@@ -218,6 +241,9 @@ pub struct CvarRegistry {
     aliases: BTreeMap<String, String>,
     /// Stamp of the archived state ([`Self::archive_revision`]).
     revision: u64,
+    /// Keys of the [`CvarFlags::SECRET`] cvars, for [`Self::scrub`]; a key whose
+    /// cvar was unset is skipped there.
+    secrets: Vec<String>,
 }
 
 impl CvarRegistry {
@@ -298,6 +324,13 @@ impl CvarRegistry {
         if definition.flags.contains(CvarFlags::ARCHIVE) {
             self.archive_changed();
         }
+        let mut flags = definition.flags;
+        if crate::secret::is_secret_name(&definition.name) {
+            flags |= CvarFlags::SECRET;
+        }
+        if flags.contains(CvarFlags::SECRET) && !self.secrets.contains(&key) {
+            self.secrets.push(key.clone());
+        }
         self.entries.insert(
             key,
             CvarEntry {
@@ -305,7 +338,7 @@ impl CvarRegistry {
                     name: definition.name,
                     value: definition.default.clone(),
                     default: definition.default,
-                    flags: definition.flags,
+                    flags,
                     description: definition.description,
                 },
                 callbacks: Vec::new(),
@@ -328,6 +361,36 @@ impl CvarRegistry {
             .map(|entry| &entry.cvar)
     }
 
+    /// Whether `name` holds a secret: a [`CvarFlags::SECRET`] cvar, or a name
+    /// [`crate::secret::is_secret_name`] gives that flag once it is created.
+    pub fn is_secret(&self, name: &str) -> bool {
+        self.get(name).map_or_else(
+            || crate::secret::is_secret_name(name),
+            |cvar| cvar.flags.contains(CvarFlags::SECRET),
+        )
+    }
+
+    /// `text` with each current secret value of [`crate::secret::SCRUB_MIN_CHARS`]
+    /// characters or more replaced by [`crate::secret::MASK`]; borrowed when it holds
+    /// none, as for nearly every line.
+    pub fn scrub<'a>(&self, text: &'a str) -> std::borrow::Cow<'a, str> {
+        let mut scrubbed = std::borrow::Cow::Borrowed(text);
+        for key in &self.secrets {
+            let Some(entry) = self.entries.get(key) else {
+                continue;
+            };
+            let CvarValue::Text(value) = &entry.cvar.value else {
+                continue;
+            };
+            if value.chars().count() >= crate::secret::SCRUB_MIN_CHARS
+                && scrubbed.contains(value.as_str())
+            {
+                scrubbed = scrubbed.replace(value.as_str(), crate::secret::MASK).into();
+            }
+        }
+        scrubbed
+    }
+
     /// Iterate cvars in deterministic normalized-name order.
     pub fn iter(&self) -> impl Iterator<Item = &Cvar> {
         self.entries.values().map(|entry| &entry.cvar)
@@ -345,6 +408,12 @@ impl CvarRegistry {
 
     /// Add behavioral flags to an existing cvar.
     pub fn add_flags(&mut self, name: &str, flags: CvarFlags) -> Result<(), CvarError> {
+        if flags.contains(CvarFlags::SECRET) {
+            let key = self.canonical_key(&name.to_ascii_lowercase()).to_owned();
+            if !self.secrets.contains(&key) {
+                self.secrets.push(key);
+            }
+        }
         let cvar = &mut self.entry_mut(name)?.cvar;
         let before = cvar.flags;
         cvar.flags |= flags;
@@ -454,5 +523,15 @@ mod float_text_tests {
         // A value no f32 holds keeps its full form.
         assert_eq!(CvarValue::Float(0.1).as_text(), "0.1");
         assert_eq!(CvarValue::Float(1.0 / 3.0).as_text(), "0.3333333333333333");
+    }
+}
+
+impl crate::secret::Names for CvarRegistry {
+    fn is_secret(&self, name: &str) -> bool {
+        CvarRegistry::is_secret(self, name)
+    }
+
+    fn is_cvar(&self, name: &str) -> bool {
+        self.get(name).is_some()
     }
 }

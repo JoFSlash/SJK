@@ -4423,23 +4423,39 @@ the screen's right edge (EternalJK's can).
 The console never prints a password: what it prints is kept in the scrollback,
 `qconsole.log` and the crash trail that the session log, crash reports and log uploads
 are made from ([identity](identity.md#crash-reports)).
-[secret.rs](../crates/sjk-shell/src/secret.rs) in `sjk-shell` names what is secret in
-two tables: cvars whose name contains `password` (`rconPassword`, `password`,
-`g_password`, `sv_password`, `cl_consoleSocketPassword`), `loginpass`
-(`japlus.loginPass1-3`) or `giphykey` (`cl_giphyKey`), and the commands `amlogin`,
-`login` and `register`, whose arguments are a password. The echo of a typed line
-(`]rconpassword ********`, `]seta japlus.loginPass1 ********`, `]amlogin ********`,
-also inside `rcon` and a bound command), a cvar's description, `cvarlist`,
-`cvar_modified`, `bind`, `bindlist` and completion's listing show `********` for a set
-secret value. The value itself is unchanged: the cvar keeps it, the command and the
-server still get it, and `config.cfg` still saves the archived ones as plain text.
-There is no setting to show them again, as a log that might carry a password could not
-be shared. Lines printed before this change (an older session log or a crash report
-already waiting) are not rewritten.
+[secret.rs](../crates/sjk-shell/src/secret.rs) in `sjk-shell` names what is secret:
+cvars whose name contains `password` (`rconPassword`, `password`, `g_password`,
+`sv_password`, `cl_consoleSocketPassword`), `loginpass` (`japlus.loginPass1-3`) or
+`giphykey` (`cl_giphyKey`), which get the `SECRET` cvar flag when registered, and the
+commands `amlogin`, `login` and `register`, whose arguments are a password. Three
+layers keep them out:
 
-Covered by unit tests of the tables and the masking, and a shell test that types,
-queries, lists and binds a password and finds it in no printed line, the tap's
-included; not exercised in a live game.
+- every description and listing (a cvar's value, `print`, `cvarlist`, `cvar_modified`,
+  completion's listing, `userinfo`, the cvar browser) shows a set secret value as
+  `********` through `Cvar::shown_value`, and a command line a cvar or bind holds
+  with its password masked (`autologin = "amlogin ********"`);
+- the echo of a typed line masks a password command's arguments, a secret cvar's new
+  value (`]rconpassword ********`, also after `set`, `toggle`, `ifCvar` and the
+  arithmetic commands) and the password in a command line given to `set`/`seta`, a
+  cvar, `bind` (`]bind P "amlogin ********"`), `rcon` or `cmd`; a line with an open
+  quote is masked from its first password word on;
+- every kept line, and every command output a frontend gets back, is scrubbed of the
+  current values of the secret cvars of at least four characters, so a path the
+  first two miss (`strSub echo $rconPassword$`, a mod printing userinfo) prints
+  `********` too.
+
+The values themselves are unchanged: the cvar and the bind keep them, the command and
+the server still get them (`bind P amlogin <password>` logs in as before), and
+`config.cfg` still saves the archived ones and binds as plain text. The cvar browser
+edits a secret from an empty field and copies it by name, so the mask is never typed
+back as its value. There is no setting to show them again (`secret.rs` says why), and
+lines printed before this change (an older session log, a crash report already
+waiting) are not rewritten.
+
+Covered by unit tests of the tables and each layer, and a shell test that types,
+queries, lists, binds, holds in a cvar and `strSub`s a password and finds it in no
+printed line, returned output or tap line while the cvar and binds keep it; not
+exercised in a live game.
 
 ## Console socket
 

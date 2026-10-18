@@ -57,10 +57,14 @@ pub(crate) enum Look {
 enum Kind {
     Command(CommandSource),
     Cvar {
+        /// The value and default as the console shows them (`Cvar::shown_value`).
         value: String,
         default: String,
         read_only: bool,
         archived: bool,
+        /// A password or key (`CvarFlags::SECRET`): edited from empty and copied
+        /// by name only, so the mask is never typed back as its value.
+        secret: bool,
     },
 }
 
@@ -243,10 +247,11 @@ impl Browser {
             .dedup_by(|later, earlier| later.search_name == earlier.search_name);
         for cvar in shell.cvars.iter() {
             let kind = Kind::Cvar {
-                value: cvar.value.as_text(),
-                default: cvar.default.as_text(),
+                value: cvar.shown_value(),
+                default: cvar.shown_default(),
                 read_only: cvar.flags.contains(CvarFlags::READ_ONLY),
                 archived: cvar.flags.contains(CvarFlags::ARCHIVE),
+                secret: cvar.flags.contains(CvarFlags::SECRET),
             };
             self.entries
                 .push(entry(&cvar.name, &cvar.description, kind));
@@ -347,6 +352,10 @@ impl Browser {
             } => {
                 let text = format!("{} is read-only", entry.name);
                 self.set_status(text, true);
+                BrowserAction::None
+            }
+            Kind::Cvar { secret: true, .. } => {
+                self.editing = Some(String::new());
                 BrowserAction::None
             }
             Kind::Cvar { value, .. } => {
@@ -515,7 +524,7 @@ impl Browser {
 /// (quoted when it is empty or has spaces), ready to paste.
 fn entry_line(entry: &Entry) -> String {
     match &entry.kind {
-        Kind::Command(_) => entry.name.clone(),
+        Kind::Command(_) | Kind::Cvar { secret: true, .. } => entry.name.clone(),
         Kind::Cvar { value, .. } if value.is_empty() || value.contains(char::is_whitespace) => {
             format!("{} \"{value}\"", entry.name)
         }

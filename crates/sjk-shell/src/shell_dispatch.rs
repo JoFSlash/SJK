@@ -62,7 +62,7 @@ impl Shell {
                     format!(
                         "{:<16} {}",
                         crate::key_names::display_key(key),
-                        crate::secret::input_line(command)
+                        crate::secret::input_line(command, &self.cvars)
                     )
                 })
                 .collect()),
@@ -70,14 +70,7 @@ impl Shell {
                 .cvars
                 .iter()
                 .filter(|cvar| list_matches(&cvar.name, arguments))
-                .map(|cvar| {
-                    let value = cvar.value.as_text();
-                    format!(
-                        "{:<24} {}",
-                        cvar.name,
-                        crate::secret::shown_value(&cvar.name, &value)
-                    )
-                })
+                .map(|cvar| format!("{:<24} {}", cvar.name, cvar.shown_value()))
                 .collect()),
             "cmdlist" => {
                 let mut lines = builtin_commands()

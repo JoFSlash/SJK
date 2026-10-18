@@ -70,7 +70,7 @@ impl ViewerConsole {
                     info.push('\\');
                     info.push_str(&var.name);
                     info.push('\\');
-                    info.push_str(&var.value.as_text());
+                    info.push_str(&var.shown_value());
                 }
                 lines.push(info);
                 Ok(lines)
