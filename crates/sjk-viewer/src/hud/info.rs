@@ -72,6 +72,8 @@ impl HudOverlay {
                 let _ = write!(self.warmup_text, "STARTS IN: {seconds}");
             }
         }
+        let (hack_done, hack_length) = obituaries.hack();
+        self.hack_left = hack_bar::left(hack_done, hack_length, server_time);
         self.interrupted = interrupted;
         self.lagometer.clone_from(lagometer);
     }

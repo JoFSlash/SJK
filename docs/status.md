@@ -1,3 +1,12 @@
+## Siege hack bar
+
+18/10/2026, `feat/siege-hack-bar`, based on `Sol-Vulpes/SJK` `3483b1b`: the HUD showed a
+hack's progress only as the `HACKING: n%` line. As `CG_DrawHaqrBar`
+(`cg_draw.c:4766-4803`) does, a 50 by 5 unit bar now stands under the crosshair while
+the player hacks: a black frame, the part still to go in translucent yellow, the part
+done greyed out, nothing for less than a unit or more than the whole. The hacker icon
+stock draws above it is not drawn. `cargo check` passes; the added unit test and Clippy
+were not run, and the bar is untested in a game.
 ## Line breaks in the string tables
 
 18/10/2026, `fix/string-table-newlines`, based on `Sol-Vulpes/SJK` `3483b1b`: on
