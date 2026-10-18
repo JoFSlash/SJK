@@ -100,7 +100,22 @@ impl NativeGame {
             });
             return;
         }
-        let Some(found) = self.use_target(client) else {
+        let found = self.use_target(client);
+        // DEBUG (testing only, not for a pull request): a use near a gun that missed it.
+        if let Some(origin) = self.peer(client).map(|peer| peer.state.origin()) {
+            for (number, gun) in self.mounted.guns.iter() {
+                let to: [f32; 3] = std::array::from_fn(|axis| gun.origin[axis] - origin[axis]);
+                let near = (to[0] * to[0] + to[1] * to[1] + to[2] * to[2]).sqrt() < 128.0;
+                if near && found != Some(number.legacy_number()) {
+                    eprintln!(
+                        "DEBUG emplaced: client {client} pressed use near gun {} but the use \
+                         trace found {found:?}",
+                        number.legacy_number()
+                    );
+                }
+            }
+        }
+        let Some(found) = found else {
             return;
         };
         if self.use_vehicle(client, found, level_time) || self.use_gun(client, found, level_time) {

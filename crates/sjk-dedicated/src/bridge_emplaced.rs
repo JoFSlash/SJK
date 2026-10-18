@@ -332,7 +332,32 @@ impl NativeGame {
             entity_weapon,
             in_use: true,
         };
+        // DEBUG (testing only, not for a pull request): why a use of the gun took or not.
+        {
+            let gun = &mounted.guns[index].1;
+            let origin = gunner.state.origin();
+            let to: [f32; 3] = std::array::from_fn(|axis| gun.origin[axis] - origin[axis]);
+            let distance = (to[0] * to[0] + to[1] * to[1] + to[2] * to[2]).sqrt();
+            let yaw = |angles: [f32; 3]| {
+                let (s, c) = angles[1].to_radians().sin_cos();
+                [c, s]
+            };
+            let (view, facing) = (yaw(gunner.state.view_angles()), yaw(gun.base_angles));
+            let flat = (to[0] * to[0] + to[1] * to[1]).sqrt().max(1e-3);
+            eprintln!(
+                "DEBUG emplaced: client {client} uses gun {found}: distance {distance:.0} (max 64), \
+                 height {:.0} (max 42), view.facing {:.2} (min -0.2), toward.facing {:.2} \
+                 (min 0.6), health {}, taken by {:?}, emplaced_time {} vs {level_time}",
+                origin[2] - gun.origin[2],
+                view[0] * facing[0] + view[1] * facing[1],
+                (to[0] * facing[0] + to[1] * facing[1]) / flat,
+                gun.health,
+                gun.activator,
+                *gunner.emplaced_time,
+            );
+        }
         let used = emplaced::use_gun(&mut mounted.guns[index].1, gunner, level_time);
+        eprintln!("DEBUG emplaced: result {used:?}");
         if used == Used::TryHeal {
             self.heal_gun(client, index, level_time);
         }
