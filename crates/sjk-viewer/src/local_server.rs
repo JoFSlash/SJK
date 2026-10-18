@@ -250,10 +250,15 @@ pub(crate) enum ServerPoll {
     Failed(String),
 }
 
+/// The process handed back by the spawning thread, or why there is none.
+type Spawned = std::io::Result<(Child, Option<ChildStdin>)>;
+
 /// A running `sjk-server` child owned by the client.
 pub(crate) struct LocalServer {
     child: Option<Child>,
     stdin: Option<ChildStdin>,
+    /// The spawning thread's answer, until it is taken.
+    spawning: Option<Receiver<Spawned>>,
     events: Receiver<Event>,
     address: Option<SocketAddr>,
     ready: bool,
@@ -264,6 +269,11 @@ pub(crate) struct LocalServer {
 impl LocalServer {
     /// Start `program` with `arguments`; its output goes to `log_path`
     /// (rewritten), and `console` lines are typed once it answers.
+    ///
+    /// The process is created on its own thread: creating it can stall for
+    /// seconds (Windows scans a binary it has not seen run before, about 10 s
+    /// when it asks the cloud), and the menu must keep drawing meanwhile.
+    /// [`Self::poll`] takes the process over once it exists.
     pub(crate) fn start(
         program: &Path,
         arguments: &[OsString],
@@ -278,30 +288,50 @@ impl LocalServer {
             .write(true)
             .truncate(true)
             .open(log_path)?;
-        let mut child = Command::new(program)
+        let mut command = Command::new(program);
+        command
             .args(arguments)
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
-            .stderr(Stdio::from(log.try_clone()?))
-            .spawn()?;
-        let stdin = child.stdin.take();
-        let stdout = child
-            .stdout
-            .take()
-            .ok_or_else(|| std::io::Error::other("no server output"))?;
+            .stderr(Stdio::from(log.try_clone()?));
         let (sender, events) = mpsc::channel();
+        let (spawned, spawning) = mpsc::channel();
         std::thread::Builder::new()
             .name("local-server-log".into())
-            .spawn(move || copy_output(stdout, log, sender))?;
+            .spawn(move || spawn_and_copy(command, log, &spawned, sender))?;
         Ok(Self {
-            child: Some(child),
-            stdin,
+            child: None,
+            stdin: None,
+            spawning: Some(spawning),
             events,
             address: None,
             ready: false,
             console,
             log_path: log_path.to_owned(),
         })
+    }
+
+    /// Take the process over once the spawning thread has created it; the
+    /// error, if it could not be.
+    fn take_spawned(&mut self) -> Option<std::io::Error> {
+        let result = self.spawning.as_ref()?.try_recv();
+        match result {
+            Err(TryRecvError::Empty) => None,
+            Ok(Ok((child, stdin))) => {
+                self.spawning = None;
+                self.child = Some(child);
+                self.stdin = stdin;
+                None
+            }
+            Ok(Err(error)) => {
+                self.spawning = None;
+                Some(error)
+            }
+            Err(TryRecvError::Disconnected) => {
+                self.spawning = None;
+                Some(std::io::Error::other("the spawning thread ended"))
+            }
+        }
     }
 
     /// Where the server's output is written.
@@ -317,6 +347,12 @@ impl LocalServer {
     /// Advance the start-up without blocking: note what the watchers saw,
     /// and type the bot lines the moment the server answers.
     pub(crate) fn poll(&mut self) -> ServerPoll {
+        if let Some(error) = self.take_spawned() {
+            return ServerPoll::Failed(format!("could not start the server: {error}"));
+        }
+        if self.spawning.is_some() {
+            return ServerPoll::Starting;
+        }
         if let Some(status) = self
             .child
             .as_mut()
@@ -375,6 +411,7 @@ impl LocalServer {
     /// Stop the server without blocking the caller: it is asked to `quit`
     /// and, on a helper thread, killed if it has not within the grace time.
     pub(crate) fn stop(mut self) {
+        let _ = self.take_spawned();
         let (Some(child), stdin) = (self.child.take(), self.stdin.take()) else {
             return;
         };
@@ -390,6 +427,7 @@ impl LocalServer {
 impl Drop for LocalServer {
     /// The client is going: stop the server before returning.
     fn drop(&mut self) {
+        let _ = self.take_spawned();
         if let Some(child) = self.child.take() {
             shut_down(child, self.stdin.take());
         }
@@ -420,6 +458,37 @@ fn shut_down(mut child: Child, stdin: Option<ChildStdin>) {
         "local server killed after {} ms",
         QUIT_GRACE.as_millis()
     ));
+}
+
+/// Create the server process, hand it to its owner, then copy its output
+/// ([`copy_output`]). An owner gone before the process exists (the player
+/// left the screen) gets none: the process is stopped here instead. One that
+/// goes after the hand-over but before taking it drops the console pipe, and
+/// `--quit-on-eof` ends the server.
+fn spawn_and_copy(
+    mut command: Command,
+    log: File,
+    spawned: &Sender<Spawned>,
+    events: Sender<Event>,
+) {
+    let mut child = match command.spawn() {
+        Ok(child) => child,
+        Err(error) => {
+            let _ = spawned.send(Err(error));
+            return;
+        }
+    };
+    let stdin = child.stdin.take();
+    let Some(stdout) = child.stdout.take() else {
+        shut_down(child, stdin);
+        let _ = spawned.send(Err(std::io::Error::other("no server output")));
+        return;
+    };
+    if let Err(mpsc::SendError(Ok((child, stdin)))) = spawned.send(Ok((child, stdin))) {
+        shut_down(child, stdin);
+        return;
+    }
+    copy_output(stdout, log, events);
 }
 
 /// Copy the server's standard output into the log, reporting its

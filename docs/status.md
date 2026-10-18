@@ -1,3 +1,17 @@
+## Create game no longer freezes while the server process starts
+
+18/10/2026, `fix/local-server-spawn-off-ui`, based on `Sol-Vulpes/SJK` `135ee07f`.
+A tester's log showed 10.8 s between "local server: ..." and "local server starting"
+on the first Create game after unpacking a new build, with the window frozen: the
+`sjk-server` process was created on the render thread, and Windows holds the first
+run of an unseen binary while Defender scans it. On Windows 11 a fresh copy of the
+server took 1.85 s to start and 0.17 s on the next run; the tester's 10.8 s
+matches a cloud lookup. The process is now created on the output-copy thread and
+`LocalServer::poll` takes it over; a server dropped before it exists is shut down
+by that thread. The dedicated server itself starts in 1.4-1.6 s for
+`mp/siege_hoth`, `mp/ctf1` and `mp/ffa1` alike, so no game type is slower to host.
+Not yet re-tested through the menu on a fresh unpack.
+
 ## Menu pictures and readable world install failures
 
 18/10/2026, `personal/menu-pictures`, based on `main` `f19a8a67`: `ui_menuPictures`

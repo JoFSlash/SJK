@@ -110,7 +110,10 @@ Presence here describes implemented surfaces; validation limits are in
 Create game starts a child `sjk-server`, normally found beside the client.
 Set `JKA_DEDICATED` to its executable path if installed elsewhere. The child
 lifetime is managed by the client and defaults to local access; see
-[local_server.rs](../crates/sjk-viewer/src/local_server.rs).
+[local_server.rs](../crates/sjk-viewer/src/local_server.rs). The process is
+created on a helper thread: Windows can hold the first run of a binary it has
+not seen before for up to about ten seconds while it scans it, and the menu keeps
+drawing "Starting the server..." meanwhile instead of freezing.
 
 Map previews (`levelshots/<map>.jpg`, `.tga` or `.png`) keep the resolution they
 ship in, so an HD levelshot pack stays sharp in a large preview and on the
