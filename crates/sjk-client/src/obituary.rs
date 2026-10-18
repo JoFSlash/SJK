@@ -106,6 +106,7 @@ pub struct ObituaryTracker {
     feed: KillFeed,
     decoded: u64,
     siege_respawn_at: i32,
+    hack: (i32, i32),
 }
 
 impl ObituaryTracker {
@@ -117,6 +118,7 @@ impl ObituaryTracker {
             feed: KillFeed::new(),
             decoded: 0,
             siege_respawn_at: 0,
+            hack: (0, 0),
         }
     }
 
@@ -128,6 +130,11 @@ impl ObituaryTracker {
         if snapshot.player.movement_type() != PM_SPECTATOR {
             self.siege_respawn_at = 0;
         }
+        // `ps.hackingTime` and `ps.hackingBaseTime` (netfields 91 and 124).
+        self.hack = (
+            snapshot.player.raw_field(91).unwrap_or(0) as i32,
+            snapshot.player.raw_field(124).unwrap_or(0) as i32,
+        );
         for entity in &snapshot.entities {
             let index = usize::from(entity.number());
             if index >= MAX_ENTITIES {
@@ -175,6 +182,12 @@ impl ObituaryTracker {
     /// before any `EV_SIEGESPEC` named it.
     pub const fn siege_respawn_at(&self) -> i32 {
         self.siege_respawn_at
+    }
+
+    /// The viewed player's hack (`ps.hackingTime`, `ps.hackingBaseTime`): when it is done
+    /// and how long it takes, both 0 while it hacks nothing.
+    pub const fn hack(&self) -> (i32, i32) {
+        self.hack
     }
 
     /// Total obituary events decoded by this tracker.
@@ -404,6 +417,14 @@ mod tests {
         // Back in play: the wave is forgotten.
         tracker.observe(&snapshot(Vec::new()), &game);
         assert_eq!(tracker.siege_respawn_at(), 0);
+        // A hack in progress is read from the player state, and gone once it is.
+        let mut hacking = snapshot(Vec::new());
+        hacking.player.set_raw_field(91, 11_000);
+        hacking.player.set_raw_field(124, 10_000);
+        tracker.observe(&hacking, &game);
+        assert_eq!(tracker.hack(), (11_000, 10_000));
+        tracker.observe(&snapshot(Vec::new()), &game);
+        assert_eq!(tracker.hack(), (0, 0));
         assert_eq!(tracker.decoded(), 0);
     }
 

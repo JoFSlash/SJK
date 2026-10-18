@@ -42,6 +42,10 @@ Review fixes (18/10/2026, tester: the respawn sometimes came late after the coun
 - The HUD countdown forgets the wave once the player is back in play. It truncates whole
   seconds, as `CG_DrawSiegeDeathTimer` does.
 - The siege start log counts without allocating.
+- The HUD shows a siege hack's progress ("HACKING: n%", `CG_DrawHaqrBar`'s share) in the
+  warmup line. The client never drew it, so a player holding use at a panel could not see the
+  hack going (`usetime`, an `idealclass` such as Imperial Tech, kept in the trigger's box,
+  turned less than ten degrees).
 
 The full workspace fmt, build, test and clippy passed on Linux. The ALSA packages were
 installed in the container to build the client.
