@@ -32,6 +32,8 @@ const MAX_SOUNDS: usize = 256;
 const MAX_CLIENTS: usize = 32; // codemp/qcommon/q_shared.h:890
 const MAX_ENTITIES: usize = 1_024;
 const MAX_CG_LOOPSOUNDS: u8 = 8; // codemp/cgame/cg_local.h:319
+/// `playerState_t::loopSound` (protocol 26 netfield 75).
+const PS_LOOP_SOUND: usize = 75;
 const MAX_LOOP_SOUNDS: usize = 32; // codemp/client/snd_dma.cpp:213
 const ET_PLAYER: u8 = 1;
 const ET_MISSILE: u8 = 3;
@@ -343,6 +345,21 @@ impl LegacyLoopAdapter {
                 self.add_weapon_loop(state, origin);
                 self.add_entity_saber_loops(state, origin);
             }
+        }
+        // The viewed player's own loop (`ps.loopSound`, which `BG_PlayerStateToEntityState`
+        // gives `cg.predictedPlayerEntity`): a hacker's `hacking.wav` among others. Its
+        // entity is not among the snapshot's.
+        let own_loop = snapshot.player.raw_field(PS_LOOP_SOUND).unwrap_or(0) as usize;
+        if own_loop != 0 && own_loop < MAX_SOUNDS && !snapshot.player.is_spectator() {
+            let sound = self.cs_sounds[own_loop];
+            self.push(
+                LegacyLoopKind::Entity,
+                sound,
+                Some(own_loop as u8),
+                snapshot.player.client_num(),
+                listener_origin,
+                [0.0; 3],
+            );
         }
         let own = LegacyJetpack::from_flags(snapshot.player.entity_flags());
         if own.active && !snapshot.player.is_spectator() {

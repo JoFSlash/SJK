@@ -14,6 +14,8 @@ const BUTTON_USE: u16 = 32;
 /// `playerState_t`'s `hackingTime` and `hackingBaseTime` (protocol 26's player fields).
 const PS_HACKING_TIME: usize = 91;
 const PS_HACKING_BASE_TIME: usize = 124;
+/// `playerState_t::loopSound`.
+const PS_LOOP_SOUND: usize = 75;
 /// How long the kept console pose lasts each frame (`torsoTimer = 500`).
 const POSE_HOLD: i32 = 500;
 
@@ -188,6 +190,31 @@ impl NativeGame {
     /// `G_RunFrame`'s hacking checks for every hacker (`g_main.c:3206-3244`): the console
     /// pose kept, and the hack ended where the rules end it.
     pub(super) fn run_siege_hacks(&mut self) {
+        // `G_SetClientSound` (`g_active.c:456-460`): a hacker's own loop is
+        // `level.snd_hack`, which `G_InitGame` registered first thing.
+        let hacking_sound = {
+            let (sounds, told) = (&mut self.sounds, &mut self.told);
+            u32::from(
+                sounds.index(b"sound/player/hacking.wav", &mut |index, value| {
+                    told.push(Told::ConfigString {
+                        index,
+                        previous: Vec::new(),
+                        value: value.to_vec(),
+                    })
+                }),
+            )
+        };
+        for client in 0..self.players.places() {
+            if let Some(peer) = self.peer_mut(client) {
+                let hacking = peer.siege_hands.hack.trigger != 0;
+                let looping = peer.state.raw_field(PS_LOOP_SOUND).unwrap_or(0);
+                if hacking && looping != hacking_sound {
+                    peer.state.set_raw_field(PS_LOOP_SOUND, hacking_sound);
+                } else if !hacking && looping == hacking_sound {
+                    peer.state.set_raw_field(PS_LOOP_SOUND, 0);
+                }
+            }
+        }
         for client in 0..self.players.places() {
             let Some(hack) = self
                 .peer(client)

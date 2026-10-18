@@ -46,6 +46,10 @@ Review fixes (18/10/2026, tester: the respawn sometimes came late after the coun
   warmup line. The client never drew it, so a player holding use at a panel could not see the
   hack going (`usetime`, an `idealclass` such as Imperial Tech, kept in the trigger's box,
   turned less than ten degrees).
+- A hacker hears `sound/player/hacking.wav` loop, as `G_SetClientSound` sets
+  `ps.loopSound` while `isHacking`. The client now also plays the viewed player's own
+  `ps.loopSound`, which stock plays through `cg.predictedPlayerEntity`. Before, only the
+  snapshot's entities looped.
 
 The full workspace fmt, build, test and clippy passed on Linux. The ALSA packages were
 installed in the container to build the client.
