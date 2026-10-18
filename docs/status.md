@@ -46,6 +46,11 @@ Review fixes (18/10/2026, tester: the respawn sometimes came late after the coun
   warmup line. The client never drew it, so a player holding use at a panel could not see the
   hack going (`usetime`, an `idealclass` such as Imperial Tech, kept in the trigger's box,
   turned less than ten degrees).
+- A `trigger_once` that fired (a `wait` below zero) was still touched: `fire_multiple` only
+  cleared its `CONTENTS_TRIGGER`, and nothing read that. Pressing use at siege_hoth's bridge
+  panel completed objective 2 again every frame, and the score climbed. The touch now
+  ignores a trigger without `CONTENTS_TRIGGER`, as `G_TouchTriggers` does once
+  `multi_trigger_run` frees it. Two unit tests pin it.
 - A hacker hears `sound/player/hacking.wav` loop, as `G_SetClientSound` sets
   `ps.loopSound` while `isHacking`. The client now also plays the viewed player's own
   `ps.loopSound`, which stock plays through `cg.predictedPlayerEntity`. Before, only the

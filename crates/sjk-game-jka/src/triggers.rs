@@ -967,6 +967,12 @@ pub fn touch_multiple_as_with(
     level_time: i32,
     hooks: &mut dyn TouchHooks,
 ) -> Touched2 {
+    // A trigger that fired with a `wait` below zero (every `trigger_once`) is gone:
+    // `multi_trigger_run` takes its touch away and frees it, and `G_TouchTriggers` only
+    // finds `CONTENTS_TRIGGER` entities.
+    if trigger.contents & CONTENTS_TRIGGER == 0 {
+        return Touched2::Nothing;
+    }
     if trigger.inactive || who.spectating {
         return Touched2::Nothing;
     }
@@ -1205,4 +1211,62 @@ pub fn map_targets(
         targets.push((name, target));
     }
     targets
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn once(keys: &[(&str, &str)]) -> Multiple {
+        let mut fields = vec![
+            ("classname".to_owned(), "trigger_once".to_owned()),
+            ("model".to_owned(), "*1".to_owned()),
+            ("target".to_owned(), "objective".to_owned()),
+        ];
+        fields.extend(keys.iter().map(|(k, v)| ((*k).to_owned(), (*v).to_owned())));
+        spawn_multiple(&Entity::from_fields(fields), ([-8.0; 3], [8.0; 3]), 0)
+            .expect("a trigger_once")
+    }
+
+    fn player(buttons: u16) -> Toucher {
+        Toucher {
+            view_angles: [0.0; 3],
+            buttons,
+            health: 100,
+            spectating: false,
+            weapon_time: 0,
+            hand_extend: 0,
+            torso_anim: 0,
+            team: 1,
+        }
+    }
+
+    #[test]
+    fn a_trigger_once_that_fired_is_never_touched_again() {
+        let mut trigger = once(&[]);
+        let touch = |trigger: &mut Multiple, time| {
+            touch_multiple(trigger, &player(0), [1.0, 0.0, 0.0], time)
+        };
+        assert_eq!(touch(&mut trigger, 1_000), Touched2::Fires);
+        assert!(fire_multiple(&mut trigger, 1_000, 0.0, true).gone);
+        assert_eq!(touch(&mut trigger, 1_050), Touched2::Nothing);
+        assert_eq!(touch(&mut trigger, 60_000), Touched2::Nothing);
+    }
+
+    #[test]
+    fn a_spent_use_button_trigger_once_ignores_the_held_use_key() {
+        // siege_hoth's bridge panel: USE_BUTTON, held down after it fired.
+        let mut trigger = once(&[("spawnflags", "4"), ("team", "1")]);
+        let held = player(BUTTON_USE);
+        assert_eq!(
+            touch_multiple(&mut trigger, &held, [1.0, 0.0, 0.0], 1_000),
+            Touched2::Uses
+        );
+        assert_eq!(pressed(&mut trigger, 1_000), Touched2::Fires);
+        let _ = fire_multiple(&mut trigger, 1_000, 0.0, true);
+        assert_eq!(
+            touch_multiple(&mut trigger, &held, [1.0, 0.0, 0.0], 1_050),
+            Touched2::Nothing
+        );
+    }
 }
