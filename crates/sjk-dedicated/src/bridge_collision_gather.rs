@@ -124,7 +124,7 @@ impl NativeGame {
         self.obstacles.extend(items);
     }
 
-    /// The players and NPCs a blast may reach, with their linked boxes.
+    /// The players, NPCs and things a blast may reach, with their linked boxes.
     pub(super) fn gather_splash_targets(&mut self) {
         let Self {
             server,
@@ -165,5 +165,16 @@ impl NativeGame {
         map_turrets.add_splash_targets(splash_targets);
         splash_targets.extend(mounted.splash_targets());
         splash_targets.extend(self.stock.shields.splash_targets());
+        // The breakable brushes: a det pack or a grenade's blast is how a heavy-weapons
+        // objective comes down (`G_RadiusDamage` reaches every `takedamage` entity).
+        splash_targets.extend(self.breakables.iter().map(|(id, brush)| {
+            let bounds = sjk_game_jka::breakables::linked_box(brush);
+            SplashTarget {
+                number: id.legacy_number(),
+                bounds,
+                origin: std::array::from_fn(|axis| (bounds.0[axis] + bounds.1[axis]) * 0.5),
+                takes_damage: brush.takes_damage,
+            }
+        }));
     }
 }

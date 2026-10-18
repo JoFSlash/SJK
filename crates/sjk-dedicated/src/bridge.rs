@@ -157,6 +157,8 @@ pub struct NativeGame {
     door_portals: Vec<bool>,
     /// The breakable brushes the map placed, by the entity number each was given.
     breakables: Vec<(EntityId, sjk_game_jka::breakables::Breakable)>,
+    /// The blows a blast dealt them while the map was set aside: brush, request, owner.
+    brush_blows: Vec<(u16, DamageRequest, u16)>,
     /// Its targets: the name they are fired by, what they are, and what each is doing.
     targets: Vec<(String, sjk_game_jka::triggers::Target, MapTarget)>,
     /// `G_ModelIndex`'s table.
@@ -404,6 +406,7 @@ impl NativeGame {
             doors: Vec::new(),
             door_portals: Vec::new(),
             breakables: Vec::new(),
+            brush_blows: Vec::new(),
             models: ModelTable::default(),
             previous_frame_time: 0,
             deaths: Deaths {
@@ -713,6 +716,17 @@ impl NativeGame {
             .position(|(ours, _)| ours.legacy_number() == number)
         else {
             return self.shoot_mover(number, usize::from(owner), level_time);
+        };
+        let brush = &self.breakables[index].1;
+        let Some(damage) = self.brush_take(
+            number,
+            brush.takes_damage,
+            brush.team_no_damage,
+            damage,
+            means,
+            owner,
+        ) else {
+            return true;
         };
         let from = self
             .peer_mut(usize::from(owner))

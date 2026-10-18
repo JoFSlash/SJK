@@ -121,6 +121,29 @@ impl NativeGame {
         if self.npcs.roster.is_npc(target as u16) {
             return self.strike_npc(owner, target as u16, request, location, count);
         }
+        // A breakable brush a blast reached (`gather_splash_targets`).
+        if self
+            .breakables
+            .iter()
+            .any(|(id, _)| usize::from(id.legacy_number()) == target)
+        {
+            let attacker = request
+                .attacker
+                .map_or(owner as u16, |attacker| attacker.client);
+            // What breaking it fires may need the map, which a blast sets aside.
+            if self.map.is_none() {
+                self.brush_blows.push((target as u16, request, attacker));
+            } else {
+                let _ = self.hurt_brush(
+                    target as u16,
+                    request.damage,
+                    request.means,
+                    attacker,
+                    request.level_time,
+                );
+            }
+            return (Damaged::default(), false);
+        }
         if self.turret_spares(target, owner)
             || u16::try_from(target).is_ok_and(|target| {
                 self.strike_turret(target, request)
@@ -192,13 +215,23 @@ impl NativeGame {
         )
     }
 
-    /// The blows a blast dealt NPCs while the map was set aside, dealt now in their order.
+    /// The blows a blast dealt NPCs, turrets and breakable brushes while the map was set
+    /// aside, dealt now in their order.
     pub(crate) fn flush_npc_blows(&mut self) {
         let blows = std::mem::take(&mut self.npcs.deferred_blows);
         for (owner, target, request, counted) in blows {
             let _ = self.hurt_npc(owner, target, request, None, counted);
         }
         self.flush_turret_blows();
+        for (target, request, attacker) in std::mem::take(&mut self.brush_blows) {
+            let _ = self.hurt_brush(
+                target,
+                request.damage,
+                request.means,
+                attacker,
+                request.level_time,
+            );
+        }
     }
 
     /// `G_Damage` on NPC `target` through the roster, placed by the surface a blade struck

@@ -83,6 +83,8 @@ pub struct Breakable {
     pub spawnflags: u32,
     pub contents: u32,
     pub svflags: u32,
+    /// `teamnodmg`: the siege team whose blows it ignores (the spawn table's generic key).
+    pub team_no_damage: i32,
     /// `material`: what its debris is made of.
     pub material: u32,
     /// `radius` scales how many chunks it throws, `mass` how big they are.
@@ -172,6 +174,7 @@ pub fn spawn(entity: &Entity, bounds: ([f32; 3], [f32; 3])) -> Option<Breakable>
         spawnflags,
         contents: CONTENTS_SOLID,
         svflags,
+        team_no_damage: integer("teamnodmg").unwrap_or(0),
         material: integer("material").unwrap_or(0) as u32,
         // Both default to one, and a zero is read back as one by the tail of the spawn.
         radius: match float("radius").unwrap_or(1.0) {

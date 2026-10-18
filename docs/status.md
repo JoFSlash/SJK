@@ -1,3 +1,18 @@
+## Blasts on breakable brushes, their teamnodmg
+
+18/10/2026, `fix/siege-breakable-splash`, based on `Sol-Vulpes/SJK` `3483b1b`: on
+siege_hoth the Imperials could not bring down the shield generator, a `func_breakable`
+with 3000 health that only heavy weapons hurt (spawnflags 32), whose det packs,
+grenades and mines deal their damage as splash alone. A blast reached players, NPCs,
+turrets and shields but no breakable brush, so only a direct hit counted.
+`gather_splash_targets` now adds every breakable with its linked box, and `strike_at`
+deals a blast's blow on one through `hurt_brush` (kept until the map is back, as the
+turrets' are, since what breaking it fires may need it). `hurt_brush` also goes
+through `G_Damage`'s gates first (`object_take`): in siege nothing is hurt before the
+round begins, and a breakable's `teamnodmg` keeps that team off it unless
+`g_ff_objectives`. `cargo check` of `sjk-dedicated` passes; tests and Clippy were not
+run, and the hoth generator coming down is untested in a game.
+
 ## Jetpack effect layers and tail lengths
 
 18/10/2026, `fix/jetpack-tail-rendering`, based on `sol/main` `64698160`.

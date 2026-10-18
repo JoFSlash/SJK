@@ -121,6 +121,32 @@ impl NativeGame {
         })
     }
 
+    /// `G_Damage`'s gates ahead of a breakable brush's own (`g_combat.c:4425-4842`): in
+    /// siege nothing is hurt before the round begins and `teamnodmg` keeps a team off its
+    /// own objectives. What comes off the brush's health, or `None`.
+    pub(in crate::bridge) fn brush_take(
+        &self,
+        me: u16,
+        takes_damage: bool,
+        team_no_damage: i32,
+        damage: i32,
+        means: u32,
+        owner: u16,
+    ) -> Option<i32> {
+        let blow = ObjectBlow {
+            attacker: (owner != ENTITYNUM_WORLD)
+                .then(|| self.blow_attacker(owner))
+                .flatten(),
+            damage,
+            flags: 0,
+            means,
+            siege: self.gametype == GT_SIEGE,
+            siege_round_begun: self.siege.as_ref().is_some_and(|siege| siege.round.begun),
+            friendly_fire_objectives: self.integer_cvar(b"g_ff_objectives", 0) != 0,
+        };
+        sjk_game_jka::map_turret_world::object_take(me, takes_damage, team_no_damage, &blow)
+    }
+
     /// What `G_Damage` reads of the attacker numbered `number` when it strikes a turret.
     pub(in crate::bridge) fn blow_attacker(&self, number: u16) -> Option<BlowAttacker> {
         if let Some(peer) = self.peer(usize::from(number)) {
