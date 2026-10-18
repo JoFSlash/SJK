@@ -1,3 +1,16 @@
+## Vehicle HUD in the SJK HUD's style
+
+18/10/2026, `feat/vehicle-hud-sjk-style`, on `fix/vehicle-hud-hide-rider`: with the AT-ST's
+HUD showing, a tester asked for it in the style of the rest of the SJK HUD. The strip
+kept stock's `swoopvehiclehud` shape (a hull plate in brackets and three square groups);
+it is now one dark rounded panel at the bottom of the screen like the SJK HUD's own,
+holding the hull's twelve segments with its value above them and the speed, shield and
+ammunition meters (five segments, or two rows for two weapons) with their values under
+them. Segments are rounded on the SJK meters' white track, coloured as the SJK HUD's
+health, armour, Force and ammunition; the turbo's charge and the weapons-linked mark are
+thin pills in the panel's margins. What each meter measures is unchanged. `cargo check`
+passes; the unit tests and Clippy were not run.
+
 ## Vehicle HUD of a vehicle that hides its rider
 
 18/10/2026, `fix/vehicle-hud-hide-rider`, based on `Sol-Vulpes/SJK` `3483b1b`: on

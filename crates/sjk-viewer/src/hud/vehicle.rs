@@ -163,53 +163,63 @@ pub(super) fn crosshair_doubled(number: u16, dynamic_crosshair: i64) -> bool {
     number != 0 && dynamic_crosshair < 2
 }
 
-/// Strip-local rectangles (`x`, `y`, width, height) in the 640 by 80 units of the
-/// `swoopvehiclehud` menu, which stock draws over the bottom of the 640 by 480 screen.
+/// Panel-local rectangles (`x`, `y`, width, height) in units of the 640 by 480 screen:
+/// one dark pill at the bottom of the screen, as the SJK HUD's own panels, holding the
+/// hull's segmented bar with its value above it and a row of three segmented meters
+/// (speed, shield, ammunition) with their values under them.
 mod strip {
-    pub(super) const WIDTH: f32 = 640.0;
-    pub(super) const HEIGHT: f32 = 80.0;
-    /// Gap kept under the strip: stock's pictures end above the screen's edge.
-    pub(super) const MARGIN: f32 = 6.0;
-    pub(super) const HULL_PLATE: [f32; 4] = [190.0, 32.0, 256.0, 16.0];
-    pub(super) const HULL_FIRST: f32 = 203.0;
-    pub(super) const HULL_PITCH: f32 = 19.0;
-    pub(super) const HULL_TIC: f32 = 17.0;
-    pub(super) const SPEED_X: f32 = 215.0;
-    pub(super) const SHIELD_X: f32 = 286.0;
-    pub(super) const AMMO_X: f32 = 357.0;
-    pub(super) const GROUP_Y: f32 = 55.0;
-    pub(super) const GROUP_WIDTH: f32 = 61.0;
-    pub(super) const GROUP_HEIGHT: f32 = 16.0;
-    pub(super) const ROW_HEIGHT: f32 = 10.0;
-    pub(super) const LOWER_Y: f32 = 67.0;
-    pub(super) const TIC_PITCH: f32 = 12.0;
-    pub(super) const TIC_INSET: f32 = 1.0;
-    pub(super) const TIC: f32 = 11.0;
-    pub(super) const TURBO: [f32; 4] = [207.0, 56.0, 3.0, 14.0];
-    pub(super) const LINKED: [f32; 4] = [426.0, 56.0, 3.0, 14.0];
-    pub(super) const HULL_LABEL: [f32; 4] = [190.0, 19.0, 256.0, 11.0];
-    pub(super) const LABEL_Y: f32 = 71.0;
-    pub(super) const LABEL_HEIGHT: f32 = 9.0;
-    pub(super) const FRAME_TOP: f32 = 30.0;
-    pub(super) const FRAME_HEIGHT: f32 = 46.0;
-    pub(super) const FRAME_LEFT: f32 = 188.0;
-    pub(super) const FRAME_RIGHT: f32 = 446.0;
-    pub(super) const FRAME_STUB: f32 = 8.0;
-    pub(super) const FRAME_LINE: f32 = 2.0;
+    pub(super) const WIDTH: f32 = 300.0;
+    pub(super) const HEIGHT: f32 = 62.0;
+    /// Gap kept under the panel.
+    pub(super) const MARGIN: f32 = 8.0;
+    pub(super) const RADIUS: f32 = 14.0;
+    /// The inner margin of the panel's contents.
+    pub(super) const PAD: f32 = 14.0;
+    pub(super) const HULL_LABEL: [f32; 4] = [PAD, 6.0, 160.0, 11.0];
+    pub(super) const HULL_BAR: [f32; 4] = [PAD, 19.0, WIDTH - 2.0 * PAD, 9.0];
+    /// The three meters of the lower row, `GROUP_GAP` apart.
+    pub(super) const GROUP_Y: f32 = 35.0;
+    pub(super) const GROUP_WIDTH: f32 = (WIDTH - 2.0 * PAD - 2.0 * GROUP_GAP) / 3.0;
+    pub(super) const GROUP_GAP: f32 = 10.0;
+    pub(super) const GROUP_HEIGHT: f32 = 7.0;
+    /// Two weapons: two thinner rows in the ammunition meter's place.
+    pub(super) const ROW_HEIGHT: f32 = 3.0;
+    pub(super) const LOWER_Y: f32 = GROUP_Y + GROUP_HEIGHT - ROW_HEIGHT;
+    pub(super) const LABEL_Y: f32 = 45.0;
+    pub(super) const LABEL_HEIGHT: f32 = 10.0;
+    /// Gap between two segments of a meter.
+    pub(super) const SEGMENT_GAP: f32 = 2.0;
+    pub(super) const SEGMENT_RADIUS: f32 = 1.5;
+    /// The turbo's charge and the weapons-linked mark: thin upright pills either side of
+    /// the lower row, in the panel's margin.
+    pub(super) const TURBO: [f32; 4] = [6.0, GROUP_Y, 3.0, GROUP_HEIGHT];
+    pub(super) const LINKED: [f32; 4] = [WIDTH - 9.0, GROUP_Y, 3.0, GROUP_HEIGHT];
+
+    /// The left edge of lower-row meter `index` (speed, shield, ammunition).
+    pub(super) const fn group_x(index: usize) -> f32 {
+        PAD + index as f32 * (GROUP_WIDTH + GROUP_GAP)
+    }
 }
 
-/// Colours of the meters.
+/// Colours, from the SJK HUD's own: its panels, its meters' track, and the health,
+/// armour, Force and ammunition colours of its arcs and values.
 mod tint {
     use sjk_ui::Color;
-    pub(super) const HULL: Color = Color::new(0.30, 0.95, 0.45, 1.0);
-    pub(super) const SHIELD: Color = Color::new(0.35, 0.62, 1.0, 1.0);
-    pub(super) const SPEED: Color = Color::new(0.85, 0.93, 1.0, 1.0);
+    pub(super) const PANEL: Color = Color::new(0.0, 0.0, 0.0, 0.5);
+    pub(super) const TRACK: Color = Color::new(1.0, 1.0, 1.0, 0.14);
+    pub(super) const HULL: Color = Color::new(1.0, 0.3, 0.22, 1.0);
+    pub(super) const HULL_TEXT: Color = Color::new(1.0, 0.46, 0.4, 1.0);
+    pub(super) const SHIELD: Color = Color::new(0.32, 1.0, 0.4, 1.0);
+    pub(super) const SHIELD_TEXT: Color = Color::new(0.5, 1.0, 0.56, 1.0);
+    pub(super) const SPEED: Color = Color::new(0.34, 0.64, 1.0, 1.0);
+    pub(super) const SPEED_TEXT: Color = Color::new(0.52, 0.74, 1.0, 1.0);
     /// `colorTable[CT_LTRED1]`-like flash of the speed while the turbo burns.
     pub(super) const BOOST: Color = Color::new(1.0, 0.4, 0.38, 1.0);
-    pub(super) const AMMO: Color = Color::new(1.0, 0.76, 0.26, 1.0);
+    pub(super) const AMMO: Color = Color::new(1.0, 0.76, 0.16, 1.0);
+    pub(super) const AMMO_TEXT: Color = Color::new(1.0, 0.82, 0.36, 1.0);
     /// `CT_GREEN` ready, `CT_RED` charging.
-    pub(super) const READY: Color = Color::new(0.2, 1.0, 0.3, 1.0);
-    pub(super) const CHARGING: Color = Color::new(1.0, 0.25, 0.2, 1.0);
+    pub(super) const READY: Color = Color::new(0.32, 1.0, 0.4, 1.0);
+    pub(super) const CHARGING: Color = Color::new(1.0, 0.3, 0.22, 1.0);
     /// `CT_CYAN`.
     pub(super) const LINKED: Color = Color::new(0.3, 0.95, 1.0, 1.0);
 }
@@ -407,12 +417,12 @@ impl State {
         }
     }
 
-    /// Append this frame's commands. `user_scale` is `cg_hudScale`; the strip stays
+    /// Append this frame's commands. `user_scale` is `cg_hudScale`; the panel stays
     /// centred and grows from the bottom edge.
     pub(super) fn emit(
         &self,
         draw: &mut DrawList,
-        theme: Theme,
+        _theme: Theme,
         viewport: [f32; 2],
         user_scale: f32,
     ) {
@@ -421,165 +431,108 @@ impl State {
         }
         let unit = viewport[1] / 480.0 * user_scale.clamp(0.25, 2.0);
         let left = viewport[0] * 0.5 - strip::WIDTH * 0.5 * unit;
-        let bottom = viewport[1] - strip::MARGIN * unit;
-        let place = |[x, y, w, h]: [f32; 4]| {
-            Rect::new(
-                left + x * unit,
-                bottom - (strip::HEIGHT - y) * unit,
-                w * unit,
-                h * unit,
-            )
-        };
-        let plate = theme.surface;
-        let solid = |draw: &mut DrawList, rect: Rect, color: Color| {
-            let _ = draw.push(DrawCommand::SolidRect { rect, color });
+        let top = viewport[1] - (strip::MARGIN + strip::HEIGHT) * unit;
+        let place =
+            |[x, y, w, h]: [f32; 4]| Rect::new(left + x * unit, top + y * unit, w * unit, h * unit);
+        let rounded = |draw: &mut DrawList, rect: [f32; 4], radius: f32, color: Color| {
+            let _ = draw.push(DrawCommand::RoundedRect {
+                rect: place(rect),
+                radius: radius * unit,
+                color,
+            });
         };
         let faded =
             |color: Color, alpha: f32| Color::new(color.r, color.g, color.b, color.a * alpha);
-
-        // Hull, with the frame's brackets around it.
-        solid(draw, place(strip::HULL_PLATE), plate);
-        for (index, alpha) in self.hull.iter().enumerate() {
-            if *alpha > 0.0 {
-                let x = strip::HULL_FIRST + index as f32 * strip::HULL_PITCH;
-                let rect = place([
-                    x,
-                    strip::HULL_PLATE[1] + strip::TIC_INSET,
-                    strip::HULL_TIC,
-                    strip::HULL_PLATE[3] - 2.0 * strip::TIC_INSET,
-                ]);
-                solid(draw, rect, faded(tint::HULL, *alpha));
-            }
-        }
-        for (x, stub_x) in [
-            (strip::FRAME_LEFT, strip::FRAME_LEFT),
-            (
-                strip::FRAME_RIGHT,
-                strip::FRAME_RIGHT + strip::FRAME_LINE - strip::FRAME_STUB,
-            ),
-        ] {
-            let top = strip::FRAME_TOP;
-            let bottom_y = top + strip::FRAME_HEIGHT - strip::FRAME_LINE;
-            solid(
-                draw,
-                place([x, top, strip::FRAME_LINE, strip::FRAME_HEIGHT]),
-                theme.foreground,
-            );
-            for y in [top, bottom_y] {
-                solid(
-                    draw,
-                    place([stub_x, y, strip::FRAME_STUB, strip::FRAME_LINE]),
-                    theme.foreground,
-                );
-            }
-        }
-
-        // Speed, shield and ammunition groups.
-        let group = |draw: &mut DrawList, x: f32, y: f32, h: f32, alphas: &[f32], color: Color| {
-            solid(draw, place([x, y, strip::GROUP_WIDTH, h]), plate);
+        // A meter: its segments on the track, each lit as far as the value covers it.
+        let meter = |draw: &mut DrawList, [x, y, w, h]: [f32; 4], alphas: &[f32], color: Color| {
+            let count = alphas.len().max(1) as f32;
+            let each = (w - strip::SEGMENT_GAP * (count - 1.0)) / count;
             for (index, alpha) in alphas.iter().enumerate() {
+                let at = [x + index as f32 * (each + strip::SEGMENT_GAP), y, each, h];
+                rounded(draw, at, strip::SEGMENT_RADIUS, tint::TRACK);
                 if *alpha > 0.0 {
-                    let rect = place([
-                        x + strip::TIC_INSET + index as f32 * strip::TIC_PITCH,
-                        y,
-                        strip::TIC,
-                        h,
-                    ]);
-                    solid(draw, rect, faded(color, *alpha));
+                    rounded(draw, at, strip::SEGMENT_RADIUS, faded(color, *alpha));
                 }
             }
+        };
+
+        rounded(
+            draw,
+            [0.0, 0.0, strip::WIDTH, strip::HEIGHT],
+            strip::RADIUS,
+            tint::PANEL,
+        );
+        meter(draw, strip::HULL_BAR, &self.hull, tint::HULL);
+        let group = |index: usize| {
+            [
+                strip::group_x(index),
+                strip::GROUP_Y,
+                strip::GROUP_WIDTH,
+                strip::GROUP_HEIGHT,
+            ]
         };
         let speed_color = if self.boost_flash {
             tint::BOOST
         } else {
             tint::SPEED
         };
-        group(
-            draw,
-            strip::SPEED_X,
-            strip::GROUP_Y,
-            strip::GROUP_HEIGHT,
-            &self.speed,
-            speed_color,
-        );
-        group(
-            draw,
-            strip::SHIELD_X,
-            strip::GROUP_Y,
-            strip::GROUP_HEIGHT,
-            &self.shield,
-            tint::SHIELD,
-        );
+        meter(draw, group(0), &self.speed, speed_color);
+        if self.shield_present {
+            meter(draw, group(1), &self.shield, tint::SHIELD);
+        }
+        let ammo_x = strip::group_x(2);
         match self.weapons {
-            [true, false] => group(
-                draw,
-                strip::AMMO_X,
-                strip::GROUP_Y,
-                strip::GROUP_HEIGHT,
-                &self.ammo,
-                tint::AMMO,
-            ),
+            [true, false] => meter(draw, group(2), &self.ammo, tint::AMMO),
             [true, true] => {
-                group(
-                    draw,
-                    strip::AMMO_X,
-                    strip::GROUP_Y,
-                    strip::ROW_HEIGHT,
-                    &self.ammo_upper,
-                    tint::AMMO,
-                );
-                group(
-                    draw,
-                    strip::AMMO_X,
-                    strip::LOWER_Y,
-                    strip::ROW_HEIGHT,
-                    &self.ammo_lower,
-                    tint::AMMO,
-                );
+                let row = |y: f32| [ammo_x, y, strip::GROUP_WIDTH, strip::ROW_HEIGHT];
+                meter(draw, row(strip::GROUP_Y), &self.ammo_upper, tint::AMMO);
+                meter(draw, row(strip::LOWER_Y), &self.ammo_lower, tint::AMMO);
             }
             _ => {}
         }
 
-        // Turbo recharge fills from the bottom; the weapons-linked mark is a cyan bar.
+        // Turbo recharge fills from the bottom; the weapons-linked mark is a cyan pill.
         if let Some((fraction, ready)) = self.turbo {
             let [x, y, w, h] = strip::TURBO;
-            solid(draw, place(strip::TURBO), plate);
+            rounded(draw, strip::TURBO, w * 0.5, tint::TRACK);
             let filled = h * fraction;
-            let color = if ready { tint::READY } else { tint::CHARGING };
-            solid(draw, place([x, y + h - filled, w, filled]), color);
+            if filled > 0.0 {
+                let color = if ready { tint::READY } else { tint::CHARGING };
+                rounded(draw, [x, y + h - filled, w, filled], w * 0.5, color);
+            }
         }
         if self.linked {
-            solid(draw, place(strip::LINKED), tint::LINKED);
+            rounded(draw, strip::LINKED, strip::LINKED[2] * 0.5, tint::LINKED);
         }
 
-        // Numbers: the hull above its bar, the rest under their groups.
-        let label = |draw: &mut DrawList, id: u32, rect: [f32; 4], align: TextAlign| {
+        // Values: the hull's above its bar, the rest under their meters.
+        let label = |draw: &mut DrawList, id: u32, rect: [f32; 4], color: Color| {
             let _ = draw.push(DrawCommand::Text {
                 rect: place(rect),
                 text: TextId(id),
                 size: rect[3] * 0.9 * unit,
-                color: theme.foreground,
-                align,
+                color,
+                align: TextAlign::Start,
                 overflow: TextOverflow::Clip,
                 weight: FontWeight::Semibold,
                 letter_spacing: 0.0,
             });
         };
-        label(draw, HULL_TEXT, strip::HULL_LABEL, TextAlign::Start);
-        let under = |x: f32| {
+        label(draw, HULL_TEXT, strip::HULL_LABEL, tint::HULL_TEXT);
+        let under = |index: usize| {
             [
-                x,
+                strip::group_x(index),
                 strip::LABEL_Y,
-                strip::GROUP_WIDTH + 14.0,
+                strip::GROUP_WIDTH,
                 strip::LABEL_HEIGHT,
             ]
         };
-        label(draw, SPEED_TEXT, under(strip::SPEED_X), TextAlign::Start);
+        label(draw, SPEED_TEXT, under(0), tint::SPEED_TEXT);
         if self.shield_present {
-            label(draw, SHIELD_TEXT, under(strip::SHIELD_X), TextAlign::Start);
+            label(draw, SHIELD_TEXT, under(1), tint::SHIELD_TEXT);
         }
         if self.weapons[0] {
-            label(draw, AMMO_TEXT, under(strip::AMMO_X), TextAlign::Start);
+            label(draw, AMMO_TEXT, under(2), tint::AMMO_TEXT);
         }
     }
 }
@@ -786,59 +739,31 @@ mod tests {
     }
 
     #[test]
-    fn every_rectangle_stays_inside_the_strip() {
+    fn every_rectangle_stays_inside_the_panel() {
         let fits = |[x, y, w, h]: [f32; 4]| {
             x >= 0.0 && y >= 0.0 && x + w <= strip::WIDTH && y + h <= strip::HEIGHT
         };
         for rect in [
-            strip::HULL_PLATE,
+            strip::HULL_LABEL,
+            strip::HULL_BAR,
             strip::TURBO,
             strip::LINKED,
-            strip::HULL_LABEL,
-            [
-                strip::FRAME_LEFT,
-                strip::FRAME_TOP,
-                8.0,
-                strip::FRAME_HEIGHT,
-            ],
-            [
-                strip::FRAME_RIGHT + strip::FRAME_LINE - strip::FRAME_STUB,
-                strip::FRAME_TOP,
-                strip::FRAME_STUB,
-                strip::FRAME_HEIGHT,
-            ],
         ] {
             assert!(fits(rect), "{rect:?}");
         }
-        for x in [strip::SPEED_X, strip::SHIELD_X, strip::AMMO_X] {
-            assert!(fits([
-                x,
-                strip::GROUP_Y,
-                strip::GROUP_WIDTH,
-                strip::GROUP_HEIGHT
-            ]));
-            assert!(fits([
-                x,
-                strip::LOWER_Y,
-                strip::GROUP_WIDTH,
-                strip::ROW_HEIGHT
-            ]));
-            assert!(fits([
-                x,
-                strip::LABEL_Y,
-                strip::GROUP_WIDTH + 14.0,
-                strip::LABEL_HEIGHT
-            ]));
-            // Five tics end inside their plate.
-            let last = x + strip::TIC_INSET + 4.0 * strip::TIC_PITCH + strip::TIC;
-            assert!(last <= x + strip::GROUP_WIDTH);
+        for index in 0..3 {
+            let x = strip::group_x(index);
+            for rect in [
+                [x, strip::GROUP_Y, strip::GROUP_WIDTH, strip::GROUP_HEIGHT],
+                [x, strip::LOWER_Y, strip::GROUP_WIDTH, strip::ROW_HEIGHT],
+                [x, strip::LABEL_Y, strip::GROUP_WIDTH, strip::LABEL_HEIGHT],
+            ] {
+                assert!(fits(rect), "{rect:?}");
+            }
         }
-        // The hull's twelve tics end inside its plate and the groups do not overlap.
-        let last = strip::HULL_FIRST + 11.0 * strip::HULL_PITCH + strip::HULL_TIC;
-        assert!(last <= strip::HULL_PLATE[0] + strip::HULL_PLATE[2]);
-        assert!(strip::SPEED_X + strip::GROUP_WIDTH <= strip::SHIELD_X);
-        assert!(strip::SHIELD_X + strip::GROUP_WIDTH <= strip::AMMO_X);
-        assert!(strip::AMMO_X + strip::GROUP_WIDTH <= strip::LINKED[0]);
+        // The turbo and linked pills stay clear of the meters between them.
+        assert!(strip::TURBO[0] + strip::TURBO[2] <= strip::group_x(0));
+        assert!(strip::group_x(2) + strip::GROUP_WIDTH <= strip::LINKED[0]);
     }
 
     #[test]
@@ -861,7 +786,7 @@ mod tests {
             let (mut left, mut right) = (f32::MAX, f32::MIN);
             for command in draw.commands() {
                 let rect = match command {
-                    DrawCommand::SolidRect { rect, .. } | DrawCommand::Text { rect, .. } => rect,
+                    DrawCommand::RoundedRect { rect, .. } | DrawCommand::Text { rect, .. } => rect,
                     other => panic!("unexpected {other:?}"),
                 };
                 assert!(rect.y + rect.height <= viewport[1], "{viewport:?}");
@@ -869,7 +794,7 @@ mod tests {
                 left = left.min(rect.x);
                 right = right.max(rect.x + rect.width);
             }
-            // Stock's strip is symmetric to within the brackets' 2 units either side.
+            // The panel is centred.
             let middle = (left + right) * 0.5;
             let unit = viewport[1] / 480.0 * scale;
             assert!(
