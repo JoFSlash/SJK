@@ -39,7 +39,8 @@ Review fixes (18/10/2026, tester: the respawn sometimes came late after the coun
   waits (`g_active.c:747`).
 - A wait whose time has passed is cleared.
 - `TeamCount` counts a player for both the side it is on and the side it wants.
-- The HUD countdown rounds up, and it forgets the wave once the player is back in play.
+- The HUD countdown forgets the wave once the player is back in play. It truncates whole
+  seconds, as `CG_DrawSiegeDeathTimer` does.
 - The siege start log counts without allocating.
 
 The full workspace fmt, build, test and clippy passed on Linux. The ALSA packages were
