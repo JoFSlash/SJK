@@ -176,6 +176,7 @@ mod scene_views;
 mod scope;
 mod sender_card;
 mod server_caps;
+mod siege_objective_notice;
 mod siege_sabers;
 mod surface_tables;
 mod team_sabers;
@@ -655,6 +656,8 @@ struct GpuState {
     remap_blocked_maps: remap_blocked_maps::Cache,
     snapshot_observations: snapshot_presentation::Counters,
     obituaries: sjk_client::ObituaryTracker,
+    /// The siege objectives' notices, read from the map's `.siege` file.
+    siege_notices: siege_objective_notice::Notices,
     /// What the player does in matches, for the achievements (`achievements.rs`).
     achievement_tracker: achievements::tracker::Tracker,
     lagometer: sjk_client::LagometerSamples,
@@ -1532,6 +1535,7 @@ impl GpuState {
             remap_blocked_maps: Default::default(),
             snapshot_observations: snapshot_presentation::Counters::default(),
             obituaries: sjk_client::ObituaryTracker::new(),
+            siege_notices: siege_objective_notice::Notices::default(),
             achievement_tracker: achievements::tracker::Tracker::default(),
             lagometer: sjk_client::LagometerSamples::new(),
             auto_switch: auto_switch::Tracker::default(),

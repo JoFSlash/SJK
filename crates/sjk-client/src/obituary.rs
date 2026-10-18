@@ -22,6 +22,18 @@ pub struct SiegeRoundOver {
     /// The snapshot's server time.
     pub server_time: i32,
 }
+/// `EV_SIEGE_OBJECTIVECOMPLETE`: a siege objective done (`SiegeBroadcast_OBJECTIVECOMPLETE`,
+/// `g_saga.c`).
+const EV_SIEGE_OBJECTIVECOMPLETE: u16 = sjk_game_jka::siege::EV_SIEGE_OBJECTIVECOMPLETE as u16;
+
+/// A siege objective a snapshot said was completed.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct SiegeObjectiveComplete {
+    /// The team whose objective it is (`eventParm`): 1 or 2.
+    pub team: u8,
+    /// Its number in that team's `.siege` group (`trickedentindex`), from 1.
+    pub objective: u16,
+}
 /// `EV_SIEGESPEC`: a siege player now waits for its respawn wave, which comes at the
 /// event's `time` (`g_siegeRespawnCheck`).
 const EV_SIEGESPEC: u16 = 191;
@@ -119,6 +131,7 @@ pub struct ObituaryTracker {
     feed: KillFeed,
     decoded: u64,
     siege_round_over: Option<SiegeRoundOver>,
+    siege_objectives: Vec<SiegeObjectiveComplete>,
     siege_respawn_at: i32,
     hack: (i32, i32),
 }
@@ -132,6 +145,7 @@ impl ObituaryTracker {
             feed: KillFeed::new(),
             decoded: 0,
             siege_round_over: None,
+            siege_objectives: Vec::with_capacity(4),
             siege_respawn_at: 0,
             hack: (0, 0),
         }
@@ -140,6 +154,7 @@ impl ObituaryTracker {
     /// Observe every entity event in one accepted snapshot exactly once.
     pub fn observe(&mut self, snapshot: &Snapshot, game: &GameState) {
         self.present.fill(false);
+        self.siege_objectives.clear();
         // A wave the viewed player no longer waits for — it is back in play, or the level,
         // round or server changed under it — is forgotten.
         if snapshot.player.movement_type() != PM_SPECTATOR {
@@ -166,6 +181,13 @@ impl ObituaryTracker {
                 self.siege_round_over = Some(SiegeRoundOver {
                     winner: entity.event_parameter(),
                     server_time: snapshot.server_time,
+                });
+                continue;
+            }
+            if event == EV_SIEGE_OBJECTIVECOMPLETE {
+                self.siege_objectives.push(SiegeObjectiveComplete {
+                    team: entity.event_parameter(),
+                    objective: entity.tracked_entity_num(),
                 });
                 continue;
             }
@@ -215,6 +237,11 @@ impl ObituaryTracker {
     /// Total obituary events decoded by this tracker.
     pub const fn decoded(&self) -> u64 {
         self.decoded
+    }
+
+    /// The siege objectives the last snapshot observed said were completed.
+    pub fn siege_objectives(&self) -> &[SiegeObjectiveComplete] {
+        &self.siege_objectives
     }
 
     /// The last siege round won that this tracker saw (`EV_SIEGE_ROUNDOVER`), the same
