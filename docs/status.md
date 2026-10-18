@@ -1,3 +1,15 @@
+## Vehicle HUD of a vehicle that hides its rider
+
+18/10/2026, `fix/vehicle-hud-hide-rider`, based on `Sol-Vulpes/SJK` `3483b1b`: on
+siege_hoth the AT-ST's pilot saw no vehicle HUD at all. The vehicle HUD drew only with
+the status HUD, and a vehicle with `hideRider` (the AT-ST) switches the player's status
+HUD off (`CG_DrawVehicleHud` returning false), so its own HUD went with it. A tester's
+log showed every condition of the HUD met in the AT-ST (piloted, the `.veh` profile
+loaded, alive). `HudVisibility` now keeps the vehicle HUD apart (`vehicle`, governed by
+`cg_drawStatus` and the scoreboard like the status HUD), and only the player's status
+and weapon HUD give way to the vehicle. `cargo check` of `sjk-viewer` passes; tests and
+Clippy were not run, and the AT-ST HUD is untested in a game.
+
 ## Jetpack effect layers and tail lengths
 
 18/10/2026, `fix/jetpack-tail-rendering`, based on `sol/main` `64698160`.

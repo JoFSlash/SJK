@@ -353,7 +353,8 @@ impl State {
         self.hides_player
     }
 
-    /// Hide the player's own status and weapon HUD where stock does.
+    /// Hide the player's own status and weapon HUD where stock does; the vehicle's own
+    /// HUD (`visibility.vehicle`) stays.
     pub(crate) fn apply(&self, mut visibility: HudVisibility) -> HudVisibility {
         if self.hides_player {
             visibility.status = false;

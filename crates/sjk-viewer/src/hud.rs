@@ -79,6 +79,9 @@ const RADIAL_LAYOUT: &str = include_str!("../assets/hud/radial.json");
 pub(crate) struct HudVisibility {
     pub(crate) hud: bool,
     pub(crate) status: bool,
+    /// The vehicle HUD, which `cg_drawStatus` governs too, but which stays when the
+    /// vehicle takes the player's own status HUD (`hideRider`).
+    pub(crate) vehicle: bool,
     pub(crate) weapon: bool,
     /// Weapon, inventory and Force selection rows, independently of status cvars.
     pub(crate) selection: bool,
@@ -105,6 +108,7 @@ impl HudVisibility {
         Self {
             hud,
             status: hud && enabled("cg_drawStatus", true),
+            vehicle: hud && enabled("cg_drawStatus", true),
             weapon: hud && enabled("cg_drawWeapon", true),
             selection: hud,
             crosshair: hud
@@ -124,6 +128,7 @@ impl HudVisibility {
     pub(crate) const HIDDEN: Self = Self {
         hud: false,
         status: false,
+        vehicle: false,
         weapon: false,
         selection: false,
         crosshair: false,
@@ -550,7 +555,7 @@ impl HudOverlay {
             );
         }
         if visibility.hud {
-            if visibility.status {
+            if visibility.vehicle {
                 self.vehicle
                     .emit(&mut self.draw_list, self.theme, viewport, user_scale);
             }

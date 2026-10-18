@@ -63,6 +63,7 @@ fn apply(mask: Mask, visibility: &mut HudVisibility) {
     }
     if mask.status {
         visibility.status = false;
+        visibility.vehicle = false;
         visibility.weapon = false;
         visibility.selection = false;
     }
