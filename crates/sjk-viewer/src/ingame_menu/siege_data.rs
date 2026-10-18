@@ -129,7 +129,7 @@ fn safe_name(name: &str) -> bool {
             .any(|c| c.is_control() || matches!(c, '"' | ';' | '\\'))
 }
 
-fn read(vfs: &VirtualFileSystem, path: &str) -> Result<Vec<String>, String> {
+pub(crate) fn read(vfs: &VirtualFileSystem, path: &str) -> Result<Vec<String>, String> {
     let asset = vfs
         .read(path)
         .map_err(|e| e.to_string())?
@@ -223,7 +223,7 @@ fn tokenize(text: &str, class_only: bool) -> Result<Vec<String>, String> {
     Ok(result)
 }
 
-fn value<'a>(tokens: &'a [String], key: &str) -> Option<&'a str> {
+pub(crate) fn value<'a>(tokens: &'a [String], key: &str) -> Option<&'a str> {
     let mut depth = 0;
     for pair in tokens.windows(2) {
         match pair[0].as_str() {
@@ -238,7 +238,7 @@ fn value<'a>(tokens: &'a [String], key: &str) -> Option<&'a str> {
     None
 }
 
-fn group<'a>(tokens: &'a [String], key: &str) -> Option<&'a [String]> {
+pub(crate) fn group<'a>(tokens: &'a [String], key: &str) -> Option<&'a [String]> {
     let mut depth = 0;
     for (i, pair) in tokens.windows(2).enumerate() {
         if depth == 0 && pair[0].eq_ignore_ascii_case(key) && pair[1] == "{" {

@@ -33,6 +33,8 @@ pub(crate) struct Sinks<'a> {
     /// The nameplates' Force, health and shield estimates.
     pub(crate) nameplate: &'a mut hud::nameplate::State,
     pub(crate) obituaries: &'a mut sjk_client::ObituaryTracker,
+    pub(crate) siege_notices: &'a mut siege_objective_notice::Notices,
+    pub(crate) chat: &'a mut chat::ChatOverlay,
     pub(crate) lagometer: &'a mut sjk_client::LagometerSamples,
     pub(crate) console: &'a mut Option<console::ViewerConsole>,
     pub(crate) localization: &'a Localization,
@@ -109,6 +111,16 @@ pub(crate) fn observe(
             }
         }
     }
+    sinks.siege_notices.announce(
+        sinks.obituaries.siege_objectives(),
+        snapshot.player.client_num(),
+        snapshot.player.team(),
+        game_state,
+        sinks.vfs,
+        sinks.localization,
+        sinks.chat,
+        sinks.audio.as_mut(),
+    );
     let ping = snapshot
         .server_time
         .wrapping_sub(snapshot.player.command_time())
@@ -223,6 +235,8 @@ impl GpuState {
                     force_overlays: &mut self.force_overlays,
                     nameplate: &mut self.hud.nameplate,
                     obituaries: &mut self.obituaries,
+                    siege_notices: &mut self.siege_notices,
+                    chat: &mut self.chat,
                     lagometer: &mut self.lagometer,
                     console: &mut self.console,
                     localization: &self.localization,
@@ -320,6 +334,8 @@ impl GpuState {
                     force_overlays: &mut self.force_overlays,
                     nameplate: &mut self.hud.nameplate,
                     obituaries: &mut self.obituaries,
+                    siege_notices: &mut self.siege_notices,
+                    chat: &mut self.chat,
                     lagometer: &mut self.lagometer,
                     console: &mut self.console,
                     localization: &self.localization,

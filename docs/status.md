@@ -1,3 +1,17 @@
+## Siege objective notices
+
+18/10/2026, `feat/siege-objective-notice`, based on `Sol-Vulpes/SJK` `3483b1b`: on
+siege_hoth a completed objective (the shield generator, a hack) went by with nothing
+but the score. The client now reads `EV_SIEGE_OBJECTIVECOMPLETE` in the obituary
+tracker's event scan (`siege_objectives`) and, as `CG_SiegeObjectiveCompleted` does,
+looks the objective up in the map's `.siege` file (`siege_objective_notice`, read once
+per map with the team groups the selector already resolves): the viewer's own team's
+`message_teamN` is centre printed (an `@` reference through the string tables) and its
+`sound_teamN` played as the announcer. Spectators are told nothing. `cargo check` of
+`sjk-viewer` passes; tests and Clippy were not run, and the notice is untested in a
+game. The centre print uses the chat overlay's, not the reference's larger
+`BIGCHAR_WIDTH` text at 30% of the screen height.
+
 ## Jetpack effect layers and tail lengths
 
 18/10/2026, `fix/jetpack-tail-rendering`, based on `sol/main` `64698160`.
