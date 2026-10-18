@@ -1,4 +1,4 @@
-//! Session-local death counts for jaPRO scoreboard modes 2 and 3.
+//! Server-reported and session-local death counts for EJK's scoreboard modes.
 use super::*;
 
 /// Fixed counters, consuming the existing obituary feed exactly once.
@@ -79,10 +79,43 @@ impl Scoreboard {
 }
 
 impl Deaths {
-    /// Without a JA+ plugin handshake, mode 1 is deliberately hidden (stock rule).
-    pub(super) fn count(&self, client: u8) -> Option<i32> {
-        (matches!(self.mode, 2 | 3) && !matches!(self.gametype, 3 | 7))
-            .then(|| self.counts.get(usize::from(client)).copied())
-            .flatten()
+    /// Apply JoF EJK's `cg_scoreDeaths` policy: mode 1 uses plugin data, mode 2
+    /// falls back to the local counter, and mode 3 always uses the local counter.
+    pub(super) fn count(&self, client: u8, reported: Option<i32>) -> Option<i32> {
+        if self.mode == 0 || matches!(self.gametype, 3 | 7) {
+            return None;
+        }
+        match self.mode {
+            2 => reported.or_else(|| self.counts.get(usize::from(client)).copied()),
+            3 => self.counts.get(usize::from(client)).copied(),
+            _ => reported,
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Deaths;
+
+    #[test]
+    fn ejk_modes_choose_reported_or_local_deaths() {
+        let mut deaths = Deaths::default();
+        deaths.counts[4] = 6;
+
+        deaths.mode = 0;
+        assert_eq!(deaths.count(4, Some(9)), None);
+        deaths.mode = 1;
+        assert_eq!(deaths.count(4, Some(9)), Some(9));
+        assert_eq!(deaths.count(4, None), None);
+        deaths.mode = 2;
+        assert_eq!(deaths.count(4, Some(9)), Some(9));
+        assert_eq!(deaths.count(4, None), Some(6));
+        deaths.mode = 3;
+        assert_eq!(deaths.count(4, Some(9)), Some(6));
+        deaths.mode = 4;
+        assert_eq!(deaths.count(4, Some(9)), Some(9));
+
+        deaths.gametype = 7;
+        assert_eq!(deaths.count(4, Some(9)), None);
     }
 }

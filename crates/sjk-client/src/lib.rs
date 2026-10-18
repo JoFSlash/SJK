@@ -370,6 +370,8 @@ pub struct ScoreEntry {
     pub assists: i32,
     /// CTF flag captures (`captures`).
     pub captures: i32,
+    /// Deaths appended by JA+/jaPRO for clients using their plugin protocol.
+    pub deaths: Option<i32>,
 }
 
 mod local_session;
@@ -1408,6 +1410,7 @@ fn parse_scores(arguments: &[Vec<u8>]) -> Option<([i32; 2], Vec<ScoreEntry>)> {
             defends: integer(base + 10).unwrap_or(0),
             assists: integer(base + 11).unwrap_or(0),
             captures: integer(base + 13).unwrap_or(0),
+            deaths: (row_fields == WITH_DEATHS_FIELDS).then(|| integer(base + 14).unwrap_or(0)),
         });
     }
     Some((team_scores, scores))
@@ -1603,12 +1606,12 @@ pub use thrown_sabers::{LegacyThrownSaber, LegacyThrownSabers, legacy_thrown_sab
 mod score_tests {
     use super::{parse_scores, tokenize_command};
 
-    fn rows(command: &str) -> Vec<(u8, i32, i32)> {
+    fn rows(command: &str) -> Vec<(u8, i32, i32, Option<i32>)> {
         parse_scores(&tokenize_command(command.as_bytes()))
             .unwrap()
             .1
             .iter()
-            .map(|row| (row.client_num, row.score, row.ping))
+            .map(|row| (row.client_num, row.score, row.ping, row.deaths))
             .collect()
     }
 
@@ -1617,7 +1620,7 @@ mod score_tests {
         let command = "scores 2 0 0 \
             0 5 40 1 0 0 0 0 0 0 0 0 0 0 \
             1 3 60 2 0 0 0 0 0 0 0 0 0 0";
-        assert_eq!(rows(command), [(0, 5, 40), (1, 3, 60)]);
+        assert_eq!(rows(command), [(0, 5, 40, None), (1, 3, 60, None)]);
     }
 
     #[test]
@@ -1625,12 +1628,12 @@ mod score_tests {
         // As a JA+ 2.4B7 server sends them to a client-plugin user.
         assert_eq!(
             rows("scores 1 0 0 1 0 999 0 0 0 0 0 0 0 0 0 1 0 0"),
-            [(1, 0, 999)]
+            [(1, 0, 999, Some(0))]
         );
         let command = "scores 2 0 0 \
             0 5 40 1 0 0 0 0 0 0 0 0 0 0 7 \
-            1 3 60 2 0 0 0 0 0 0 0 0 0 0 9";
-        assert_eq!(rows(command), [(0, 5, 40), (1, 3, 60)]);
+            1 3 60 2 0 0 0 0 0 0 0 0 0 0 -2";
+        assert_eq!(rows(command), [(0, 5, 40, Some(7)), (1, 3, 60, Some(-2))]);
     }
 
     /// A full server: the count is every connected client, but only 20 rows follow.
@@ -1654,8 +1657,8 @@ mod score_tests {
     fn full_japro_server_rows_are_read_whole() {
         let read = rows(&full_server(15));
         assert_eq!(read.len(), 20);
-        assert_eq!(read[0], (27, 40, 50));
-        assert_eq!(read[19], (8, 21, 69));
+        assert_eq!(read[0], (27, 40, 50, Some(2)));
+        assert_eq!(read[19], (8, 21, 69, Some(2)));
         let mut clients = read.iter().map(|row| row.0).collect::<Vec<_>>();
         clients.dedup();
         assert_eq!(clients.len(), 20, "every row is a different player");
@@ -1665,8 +1668,8 @@ mod score_tests {
     fn full_stock_server_rows_are_read_whole() {
         let read = rows(&full_server(14));
         assert_eq!(read.len(), 20);
-        assert_eq!(read[0], (27, 40, 50));
-        assert_eq!(read[19], (8, 21, 69));
+        assert_eq!(read[0], (27, 40, 50, None));
+        assert_eq!(read[19], (8, 21, 69, None));
     }
 
     /// 210 values are 15 stock rows or 14 rows with deaths; only one reads as players.

@@ -46,7 +46,9 @@ serves custom RGB blades (`cp_sbRGB1`/`cp_sbRGB2`, sent whenever a blade selects
 RGB) and its flame, electric and black ones (`color1`/`color2` 7 to 11, which the
 userinfo carries as set, any number up to 255: none stops a connection any more,
 and SJK draws its own blade in the colour EternalJK's `ClampSaberColor` gives) and
-appends a deaths field to each `scores` row (15 fields instead of 14).
+appends a deaths field to each `scores` row (15 fields instead of 14). The signed
+field is retained on the parsed score entry and used by both scoreboard styles;
+it is not merely used to detect the wider row.
 The server sends at most 20 rows (`MAX_CLIENT_SCORE_SEND`) but announces every
 connected player, so the row width comes from the fields actually sent rather than
 the announced count: the width that divides them, and when both do, the one whose

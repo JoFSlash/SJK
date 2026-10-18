@@ -31,7 +31,7 @@
 
 [Sol]
 github: Sol-Vulpes
-role: Creator and developer of Sol JK: 124 contributor pull requests reviewed and merged
+role: Creator and developer of Sol JK
 did: Sol JK itself: its name, emblem, website, releases and self-updates
 did: The classic menus and classic+, the settings and search, the retail-look console
 did: The SJK UI, Sol JK's own menus over the live map
@@ -51,6 +51,7 @@ did: Every saber shader drops from holocrons, except the ones medals bring
 did: The Shaders tab: your saber on its own to turn, and a card for each shader
 did: Kyber shards and the shop: shatter duplicates, craft shaders, four offers a day
 did: The card pack: a holocron's card comes with its credits and a few kyber shards
+did: A card on the holocron strip shows as its credits, the card tucked in a corner
 did: The shop in kyber shards, and holocrons bought with credits
 did: The four holocrons: the Jedi cube, the Great Holocron, the Sith pyramid, the kyber prism
 did: Grand finds told in SJK chat: who opened a holocron and got a grand prize
@@ -167,7 +168,7 @@ link: Creyon's pull requests | https://github.com/Sol-Vulpes/SJK/pulls?q=is%3Apr
 
 [Lumaya]
 github: lumayaa
-role: Contributor: 49 merged pull requests
+role: Contributor: 50 merged pull requests
 medal: early_contributor
 did: #24 Saber blades stop at walls instead of shining through them
 did: #29 Free camera: /freecam flies the camera away from your body
@@ -218,6 +219,7 @@ did: #158 Jetpack exhaust: replacement shaders, tail lengths, hidden layers
 did: #147 JoF mod: Destruction on the Force wheel and keys
 did: #148 JoF mod: server dialogue with choices and voices
 did: #149 JoF mod: EJK opt-in and Stasis/Repulse confirmations
+did: #165 Trusted chat media sources: GIFs, WebP, opt-in video
 link: Lumaya's pull requests | https://github.com/Sol-Vulpes/SJK/pulls?q=is%3Apr+author%3Alumayaa
 
 [Lukas]

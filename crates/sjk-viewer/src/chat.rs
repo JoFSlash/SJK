@@ -143,6 +143,7 @@ pub(crate) struct ChatOverlay {
     /// Whether the lines with a GIF read "GIF" and show it (`cl_sjkChatGifs`), or keep
     /// their links as text (`chat/feed_gif.rs`).
     gifs_shown: bool,
+    gif_sources_revision: u64,
     /// Our own client slot, from the gamestate: our whispers echoed back are not
     /// whispers to reply to (`chat/reply.rs`).
     own_slot: Option<u16>,
@@ -201,6 +202,7 @@ impl ChatOverlay {
             sjk_mark: None,
             sjk_sound_at: None,
             gifs_shown: true,
+            gif_sources_revision: 0,
             own_slot: None,
             last_whisperer: None,
             last_channel: (Channel::Global, None),

@@ -36,6 +36,9 @@ pub(super) struct Card {
     pub(super) medals: Vec<(Medal, u32)>,
     /// Their work from the history, newest first; empty for a card without.
     pub(super) work: Vec<Work>,
+    /// The others' SJK pull requests this card's owner reviewed and merged: Sol's
+    /// card (the first) only, counted from the history; 0 on every other card.
+    pub(super) reviewed: usize,
 }
 
 /// A feature or pull request, as merged into main.
@@ -196,6 +199,7 @@ pub(super) fn parse(text: &str) -> Result<Vec<Section>, String> {
                 links: Vec::new(),
                 medals: Vec::new(),
                 work: Vec::new(),
+                reviewed: 0,
             });
             continue;
         }
@@ -338,6 +342,19 @@ pub(super) fn parse_all(credits: &str, history: &str) -> Result<Vec<Section>, St
         };
         card.work = work;
     }
+    let reviewed = sections
+        .iter()
+        .flat_map(|section| &section.cards)
+        .skip(1)
+        .flat_map(|card| &card.work)
+        .filter(|work| work.reference.starts_with("SJK #"))
+        .count();
+    if let Some(sol) = sections
+        .first_mut()
+        .and_then(|section| section.cards.first_mut())
+    {
+        sol.reviewed = reviewed;
+    }
     Ok(sections)
 }
 
@@ -431,6 +448,15 @@ mod tests {
         }
         assert!(card("Claude").work.is_empty());
         assert!(!card("Lumaya").work.is_empty());
+        // Sol's card counts every contributor's SJK pull request, no one else's does.
+        let others = cards[1..]
+            .iter()
+            .flat_map(|card| &card.work)
+            .filter(|work| work.reference.starts_with("SJK #"))
+            .count();
+        assert!(others >= card("Creyon").work.len());
+        assert_eq!(card("Sol").reviewed, others);
+        assert!(cards[1..].iter().all(|card| card.reviewed == 0));
     }
 
     #[test]

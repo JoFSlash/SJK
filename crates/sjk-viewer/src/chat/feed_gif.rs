@@ -21,6 +21,7 @@ pub(super) const LOOK: gif_draw::Look = gif_draw::FEED;
 pub(super) struct LineGif {
     pub(super) id: GifId,
     other: String,
+    labelled: bool,
     other_emojis: Vec<u16>,
 }
 
@@ -35,12 +36,15 @@ impl ChatOverlay {
                 (text, Vec::new())
             }
         };
-        let (labelled, id) = chat_gifs::link::with_label(&text);
-        let Some(id) = id else {
+        let found = chat_gifs::link::find(&text);
+        let Some((id, range)) = found else {
             let (body, emojis) = markup(text);
             return (body, emojis, None);
         };
-        let (shown, other) = if self.gifs_shown {
+        let mut labelled = text.clone();
+        labelled.replace_range(range, chat_gifs::link::LABEL);
+        let shows = self.gifs_shown && chat_gifs::sources::trusted(&id);
+        let (shown, other) = if shows {
             (labelled, text)
         } else {
             (text, labelled)
@@ -49,6 +53,7 @@ impl ChatOverlay {
         let (other, other_emojis) = markup(other);
         let gif = LineGif {
             id,
+            labelled: shows,
             other,
             other_emojis,
         };
@@ -58,12 +63,19 @@ impl ChatOverlay {
     /// Follow `cl_sjkChatGifs` ([`options::Options::gifs`]): the lines with a GIF take
     /// the text of the other way when it changed, and are wrapped again.
     pub(super) fn follow_gif_switch(&mut self) {
-        if self.gifs_shown == self.options.gifs {
+        let revision = chat_gifs::sources::revision();
+        if self.gifs_shown == self.options.gifs && self.gif_sources_revision == revision {
             return;
         }
         self.gifs_shown = self.options.gifs;
+        self.gif_sources_revision = revision;
         for line in &mut self.lines {
             if let Some(gif) = &mut line.gif {
+                let labelled = self.gifs_shown && chat_gifs::sources::trusted(&gif.id);
+                if labelled == gif.labelled {
+                    continue;
+                }
+                gif.labelled = labelled;
                 std::mem::swap(&mut line.body, &mut gif.other);
                 std::mem::swap(&mut line.emojis, &mut gif.other_emojis);
                 line.wrap = layout::Wrapped::default();
@@ -78,7 +90,7 @@ impl ChatOverlay {
         let gif = line
             .gif
             .as_ref()
-            .filter(|_| self.gifs_shown && !line.muted)?;
+            .filter(|gif| self.gifs_shown && !line.muted && chat_gifs::sources::trusted(&gif.id))?;
         Some(chat_gifs::show(&gif.id))
     }
 }

@@ -1,7 +1,7 @@
 //! `debug_open`: rehearse opening holocrons without the hub (`docs/cards.md`). It makes
 //! what an opening would bring, which the Holocrons tab plays in its ceremony as it would
-//! a real one, so the burst, the card turning in, its finish, the credits counting up and
-//! Next can all be tried offline.
+//! a real one, so the burst, the credits counting up, the card sliding out of them and
+//! flipping over, its finish and Next can all be tried offline.
 //!
 //! Nothing is sent: the command never reaches the identity service, and nothing is kept.
 //! The cards it makes go round the rarities and finishes so a few show them all; a finish

@@ -71,16 +71,18 @@ pub(super) enum Tab {
     Favourites,
     Search,
     Seen,
+    Sources,
 }
 
 impl Tab {
-    pub(super) const ALL: [Self; 3] = [Self::Favourites, Self::Search, Self::Seen];
+    pub(super) const ALL: [Self; 4] = [Self::Favourites, Self::Search, Self::Seen, Self::Sources];
 
     fn label(self) -> &'static str {
         match self {
             Self::Favourites => "Favourites",
             Self::Search => "Search",
             Self::Seen => "Seen in chat",
+            Self::Sources => "Sources",
         }
     }
 
@@ -112,6 +114,7 @@ pub(super) struct KeyCard {
 /// The picker's state, kept by the page.
 pub(super) struct Picker {
     pub(super) open: bool,
+    pub(super) sources: super::gif_sources::Editor,
     pub(super) tab: Tab,
     /// The search field's words, and when they last changed while not searched yet.
     pub(super) typed: String,
@@ -140,6 +143,7 @@ impl Picker {
     pub(super) fn new() -> Self {
         Self {
             open: false,
+            sources: super::gif_sources::Editor::default(),
             tab: Tab::Search,
             typed: String::new(),
             typed_at: None,
@@ -253,6 +257,7 @@ impl Picker {
     pub(super) fn first_control(&self) -> u16 {
         match self.tab {
             Tab::Search => SEARCH_TOKEN,
+            Tab::Sources => super::gif_sources::FIELD,
             _ if self.ids.is_empty() && self.made.is_some() => TAB_BASE + self.tab.index() as u16,
             _ => TILE_BASE,
         }
@@ -261,6 +266,9 @@ impl Picker {
     pub(super) fn choose_tab(&mut self, tab: Tab) {
         if self.tab != tab {
             self.tab = tab;
+            if tab == Tab::Sources {
+                self.ids.clear();
+            }
             self.row = 0;
             self.made = None;
         }
@@ -351,6 +359,7 @@ impl Picker {
                 self.ids.extend(self.results.ids.iter().cloned());
             }
             Tab::Seen => self.ids.extend(seen(inputs)),
+            Tab::Sources => {}
         }
         self.row = self.row.min(self.last_row());
     }
@@ -424,6 +433,7 @@ fn seen(inputs: &Inputs<'_>) -> Vec<GifId> {
             continue;
         }
         if let Some((id, _)) = link::find(&message.text)
+            && chat_gifs::sources::trusted(&id)
             && !ids.contains(&id)
         {
             ids.push(id);
@@ -437,7 +447,7 @@ fn seen(inputs: &Inputs<'_>) -> Vec<GifId> {
 pub(super) fn with_gif(draft: &str, id: &GifId) -> Option<String> {
     let mut words: Vec<&str> = draft
         .split(' ')
-        .filter(|word| !word.is_empty() && link::parse(word).is_none())
+        .filter(|word| !word.is_empty() && link::candidate(word).is_none())
         .collect();
     let url = link::page_url(id);
     words.push(&url);
@@ -451,7 +461,9 @@ impl Panel {
     pub(super) fn gif_picker(&mut self, frame: &Frame, inputs: &Inputs<'_>) {
         let s = frame.s;
         let key = search::key(inputs.giphy_key);
-        self.gifs.refresh(inputs, key);
+        if self.gifs.tab != Tab::Sources {
+            self.gifs.refresh(inputs, key);
+        }
         let tab = self.gifs.tab;
         let labels = Tab::ALL.map(Tab::label);
         let on_tabs = (TAB_BASE..TAB_BASE + Tab::ALL.len() as u16).contains(&self.focus);
@@ -466,6 +478,10 @@ impl Panel {
             TAB_BASE,
         );
         self.order.push(TAB_BASE + tab.index() as u16);
+        if tab == Tab::Sources {
+            self.gif_sources(frame);
+            return;
+        }
         if tab == Tab::Search {
             let searching = self.focus == SEARCH_TOKEN;
             let found = (!self.gifs.searched.is_empty())
@@ -647,6 +663,7 @@ impl Panel {
                 "No favourite GIFs yet: star one in Search or Seen in chat, or choose a message with a GIF and Add to favourites.".to_owned()
             }
             Tab::Seen => "No GIFs in SJK chat yet.".to_owned(),
+            Tab::Sources => String::new(),
             Tab::Search => match &picker.results.failure {
                 Some(failure) => failure.message(),
                 None if picker.results.loading => "Asking GIPHY...".to_owned(),

@@ -28,11 +28,19 @@ tests check this file):
 - ASCII only, as the menu font draws bytes.
 Add each release's notes here when it is tagged (docs/sjk.md "Releases").
 -->
-## Unreleased
+## 2026.1018.1 (Alpha) | 18/10/2026
+
+> Siege: Rounds start, doors, vehicles and objectives work, with a HUD for waves and hacking.
+> JoF servers: Destruction, server dialogue and ability sounds, in the JoF mod.
+> Nameplates: See & share nameplates shares your bars; duel bars stay hidden.
+> Scoreboard: Deaths on JA+ servers, away players set apart, Siege and team winners.
+> Chat: GIFs and WebP from sites you trust, and `block` hides a player entirely.
+> Sounds: NPCs speak with their own voices, taunts stop piling up, map music resumes.
 
 = cg_nameplate reset: See & share nameplates now also shares your health, shield and Force with the SJK players of your server. It is off until you turn it on.
 
 - Console completion: `amKnockMeDown`, `amDropSaber` and the emotes from `amAtEase` to `amWon` are completed as JA+ commands instead of JoF ones, and JoF tools complete JoF's own `amHelp`, `amTips`, `amEmotes`, `amShop` and `amCredits` _(Sol)_
+- On JA+, jaPRO and JoF servers the scoreboard shows each player's deaths as score/deaths, as EJK does; `cg_scoreDeaths` 0 hides them, 2 counts them locally where the server sends none, 3 always counts locally _(Lukas, after JoF EJK)_
 - JoF mod: on JoF servers that grant it, Destruction gets its place on the Force wheel, its key and its HUD icon; Settings > Mods > JoF Destruction support (`jof.destructionSupport`) _(Lumaya, after JoF EJK)_
 - JoF mod: JoF server dialogue shows with its choices and plays its voices; Settings > Mods > JoF dialogue (`jof.dialogue`) _(Lumaya, after JoF EJK)_
 - JoF mod: SJK tells JoF servers it supports EJK's extensions, as JoF EJK does, which turns on their server-side abilities, and Stasis and Repulse play their firing sounds (`jof.ejkOptIn`, `jof.abilitySounds`) _(Lumaya, after JoF EJK)_
@@ -43,6 +51,7 @@ Add each release's notes here when it is tagged (docs/sjk.md "Releases").
 - Siege on SJK servers: you can board your own team's vehicles again, siege_hoth's AT-ST included _(Slash, after JKA)_
 - Siege on SJK servers: bots added before the round take both sides, so the round can begin _(Slash, after JKA)_
 - No more 400 ms freezes when a map remaps a model to a skin you do not have, such as JoF's night ffa3 (stock Kyle to `kyle_new`): the missing shader is looked for once a map instead of at every skin change _(Milamber)_
+- SJK chat shows GIFs and animated WebP from the sites you trust, GIPHY by default; add others in GIF > Sources. Silent MP4 clips play on Windows only if you turn on Settings > Chat > Play chat video clips (`cl_sjkChatVideo`, off: Windows' decoder reads them, outside SJK's safe Rust) _(Lumaya, Sol)_
 - The scoreboard sets away players apart: anyone whose view has not moved for 3 minutes (or with [AFK] in their name) drops to the bottom of their list, faint, with "AFK" and how long; chat, a turn of the mouse or a kill brings them back. Settings > HUD > Scoreboard > Away players apart (`cg_scoreboardAfk`) _(Sol)_
 - Mute is now Block, and it blocks everything: a blocked player's game and SJK chat stay hidden, they are drawn as Kyle with the default saber, silent, and now their emotes, Order 66 orders, cardboard box events and player card are ignored too; `block <player>` and `unblock <player|all>` in the console, and the SJK chat page lists who you blocked with Unblock _(Sol)_
 - The Staff page is reworked into tabs for the chosen player (Overview, Medals and unlocks, Holocrons and credits, Achievements, Keys, Logs) plus Crashes and Chat bans for everyone, and it now gives and takes credits and kyber shards, blocks or allows a player's pictures, mutes them at the hub, lifts their chat bans and lists every chat ban in force _(Sol)_
@@ -57,6 +66,7 @@ Add each release's notes here when it is tagged (docs/sjk.md "Releases").
 - The Supporter medal is no longer oddly cut: its ribbon ends in a clean V on the star's bail (no dark block or broken stem under it), and its small medallion loses the stray line at its top _(Sol)_
 - The shop sells its four daily saber shaders for kyber shards (30 to 1 500, below what crafting costs), the Legendary offer turns Mythical one day in four, and credits now buy holocrons: an Uncommon for 150 or a Rare for 400 under the offers, asking twice, the holocron joining your list at once, once the SJK hub turns them on _(Sol)_
 - A card from a holocron now comes as a pack, once the SJK hub turns the shards on: beside the card its credits and a few kyber shards slide out in two tiles and count up, and Open all adds the pack's shards to its totals _(Sol)_
+- On a holocron's strip a card shows as its credits: a stack of coins and the amount, with the card tucked face down in a corner in the holocron's colour. Once the strip stops, the card slides out of its credits and flips over, a Holo, Solar or Legendary one in a flourish of light, then the kyber shards count up _(Sol)_
 - Following another player no longer replays the sounds they had just made: their last pending sounds are taken as already heard _(Lumaya, after JoF EJK)_
 - Cosmetic colour commands in a script, such as `color1 3newhat; color1 2`, act on the hat or cape worn at that command, so a later explicit choice wins _(Lumaya)_
 - The Not players shader remap mode also ignores the remaps a server sends as commands for player textures _(Lumaya, after JoF EJK)_

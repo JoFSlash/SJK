@@ -8,14 +8,18 @@
 //!   ([`super::unseal`]);
 //! - out of the flash a strip of what its tier can drop runs past a gold marker and slows
 //!   to a stop on the prize, as a loot crate does ([`super::strip`]): a tick a tile, a
-//!   colour band under each, the prize lit and the others dimmed once it rests;
+//!   colour band under each, the prize lit and the others dimmed once it rests; a card
+//!   shows there as its credits, a stack of coins and the amount, with the card tucked
+//!   face down in a corner in its rarity's colour (18/10/2026);
 //! - it bursts open in its tier's light: rings run out, rays turn, the gem flares and
 //!   goes;
-//! - the sealed card turns in to face the player (a shader instead of a card shows its
-//!   blade, framed in its tier's colour, and what it is; a pile of kyber shards its
-//!   crystals and how many), in its rarity's colour and its finish's
-//!   light ([`crate::cards::look`]);
-//! - the credits count up beside the credits' mark ([`crate::cards::mark`]);
+//! - a card comes as its pack: the credits' tile rises where the strip stopped, counting
+//!   up, then slides aside while the tucked card slides out to the middle, grows and
+//!   flips over to face the player in its rarity's colour and its finish's light
+//!   ([`crate::cards::look`]), a Holo, Solar or Legendary one in a flourish of its light;
+//!   then the kyber shards slide out on the other side and count up (a shader instead of
+//!   a card shows its blade, framed in its tier's colour, and what it is; a pile of kyber
+//!   shards its crystals and how many);
 //! - its words fade up: the card's rarity and finish, its edition, what the finish is,
 //!   that it stays sealed until the first set of cards is out, and "1 of 3".
 //!
@@ -51,18 +55,35 @@ const SPIN: f32 = 6.0;
 const SPIN_RUN: f32 = 0.88;
 /// The unseal and the spin: the entrance begins this far into a holocron's ceremony.
 const BEFORE: f32 = UNSEAL + SPIN;
-/// A card's entrance: the burst, the card turning in, the credits counting, the words.
+/// A shader's or a pile's entrance: the burst, the prize turning in, its count, the words.
 const ENTRANCE: f32 = 2.4;
 const BURST_END: f32 = 0.75;
 const TURN: [f32; 2] = [0.55, 1.25];
 const COUNT: [f32; 2] = [1.2, 1.9];
 const WORDS: f32 = 1.85;
-/// The card pack's two tiles sliding out from beside the card (seconds into the
-/// entrance), their size, their gap from the card and how far they slide (frame pixels).
-const PACK: [f32; 2] = [1.0, 1.45];
+/// A card's entrance, as its pack (18/10/2026; seconds into it): the credits' tile rising
+/// in where the strip stopped, its credits counting, the tile sliding aside while the
+/// tucked card slides out to the middle, the card flipping over, its flourish, the kyber
+/// shards' tile sliding out and counting, the words, and the whole entrance.
+const PACK_IN: [f32; 2] = [0.35, 0.8];
+const PACK_COUNT: [f32; 2] = [0.5, 1.05];
+const PACK_OUT: [f32; 2] = [1.05, 1.5];
+const FLIP: [f32; 2] = [1.5, 1.95];
+const FLOURISH: f32 = 0.8;
+const SHARDS_OUT: [f32; 2] = [1.95, 2.35];
+const SHARDS_COUNT: [f32; 2] = [2.05, 2.6];
+const CARD_WORDS: f32 = 2.55;
+const CARD_ENTRANCE: f32 = 3.1;
+/// The card pack's tiles: their size, their gap from the card and how far the shards'
+/// slides (frame pixels).
 const PACK_TILE: [f32; 2] = [230.0, 214.0];
 const PACK_GAP: f32 = 46.0;
 const PACK_SLIDE: f32 = 80.0;
+/// The card tucked in the credits' tile's corner: its middle from the tile's, its width
+/// (frame pixels) and its turn (radians, clockwise).
+const TUCKED_AT: [f32; 2] = [PACK_TILE[0] * 0.5 - 34.0, -PACK_TILE[1] * 0.5 + 36.0];
+const TUCKED_WIDTH: f32 = 78.0;
+const TUCKED_TURN: f32 = 0.24;
 /// More than this many opened at once run five strips at a time ([`super::batch`]).
 pub(super) const ONE_BY_ONE: usize = 3;
 /// The card on show: its middle and width (frame pixels); a revealed card's face is
@@ -74,7 +95,6 @@ const FACE_TOP: f32 = 62.0;
 const FACE_WIDTH: f32 = 400.0;
 /// The words' lines under the card.
 const CREDITS_Y: f32 = 636.0;
-const FACE_CREDITS_Y: f32 = 650.0;
 const TITLE_Y: f32 = 700.0;
 const EDITION_Y: f32 = 752.0;
 const ABOUT_Y: f32 = 790.0;
@@ -238,12 +258,23 @@ impl Prize {
         }
     }
 
+    /// How long its entrance takes, and when its words come up (seconds into it): a card's
+    /// pack takes longer than a shader or a pile.
+    pub(super) fn entrance(&self) -> [f32; 2] {
+        match self {
+            Self::Card(_) => [CARD_ENTRANCE, CARD_WORDS],
+            Self::Shader(_) | Self::Shards(_) => [ENTRANCE, WORDS],
+        }
+    }
+
     /// The tile the crate spin ends on.
     pub(super) fn item(&self) -> strip::Item {
         match self {
             Self::Card(shown) => strip::Item::Card {
                 rarity: shown.rarity.index,
                 finish: shown.finish.index,
+                tier: shown.tier,
+                credits: shown.credits,
             },
             Self::Shader(found) => found.skin.map_or(strip::Item::New, strip::Item::Shader),
             Self::Shards(pile) => strip::Item::Shards {
@@ -448,14 +479,15 @@ impl Panel {
                 since,
             }) => {
                 let elapsed = now.saturating_duration_since(*since).as_secs_f32();
+                let [entrance, _] = shown[*index].entrance();
                 if elapsed < BEFORE {
                     // The holocron opens and the crate stops where it was going: on to
                     // the burst.
                     back(since, BEFORE);
                     self.played.charged = true;
                     self.played.cracked = true;
-                } else if elapsed < BEFORE + ENTRANCE {
-                    back(since, BEFORE + ENTRANCE);
+                } else if elapsed < BEFORE + entrance {
+                    back(since, BEFORE + entrance);
                 } else if *index + 1 < shown.len() {
                     *index += 1;
                     *since = now;
@@ -554,7 +586,7 @@ impl Panel {
                     Prize::Shader(found) => self.entrance_shader(frame, found, entered, seconds),
                     Prize::Shards(pile) => self.entrance_shards(frame, pile, entered),
                 }
-                if entered >= WORDS {
+                if entered >= shown[*index].entrance()[1] {
                     match &shown[*index] {
                         Prize::Card(_) => self.words(frame, shown, *index, entered),
                         Prize::Shader(found) => {
@@ -687,29 +719,63 @@ impl Panel {
         }
     }
 
-    /// The burst, the card turning in and the credits counting up.
+    /// A card's entrance as its pack (18/10/2026): the burst; the credits' tile rising in
+    /// the middle, where the strip stopped, its card tucked face down in its corner, and
+    /// its credits counting up; the tile sliding aside to the left while the card slides
+    /// out of its corner to the middle, growing and straightening, and flips over to face
+    /// the player (a Holo, Solar or Legendary one in a flourish of its light); then the
+    /// kyber shards' tile sliding out on the right and counting up (none while the hub's
+    /// economy is off).
     fn entrance(&mut self, frame: &Frame, shown: &Shown, elapsed: f32, seconds: f32) {
         let tier = &holocrons::TIERS[shown.tier];
         let faces = cards::faces::current();
         let (top, card_width) = shown.place(&faces);
         let height = card_width * cards::look::ASPECT;
-        let middle = [CARD_X, top + height * 0.47];
-        self.burst(frame, middle, tier, elapsed);
-        // The card turns in.
-        let turn = ((elapsed - TURN[0]) / (TURN[1] - TURN[0])).clamp(0.0, 1.0);
-        if turn > 0.0 {
-            // Ease out: fast at first, settling.
-            let eased = 1.0 - (1.0 - turn).powi(3);
-            let grow = 0.85 + 0.15 * eased;
-            let width = card_width * grow;
+        let middle = top + height * 0.5;
+        self.burst(frame, [CARD_X, top + height * 0.47], tier, elapsed);
+        let span = |[from, to]: [f32; 2]| ((elapsed - from) / (to - from)).clamp(0.0, 1.0);
+        let ease = |t: f32| 1.0 - (1.0 - t).powi(3);
+        let rise = ease(span(PACK_IN));
+        let out = smooth(span(PACK_OUT));
+        let flip = span(FLIP);
+        if elapsed >= FLIP[1] {
+            flourish(
+                &mut self.ui,
+                frame,
+                [CARD_X, middle],
+                [card_width, height],
+                shown,
+                (elapsed - FLIP[1]) / FLOURISH,
+            );
+        }
+        let reach = card_width * 0.5 + PACK_GAP + PACK_TILE[0] * 0.5;
+        let tile = [CARD_X - reach * out, middle + 30.0 * (1.0 - rise)];
+        if rise > 0.0 {
+            let counted = (shown.credits as f32 * span(PACK_COUNT)).round() as u64;
+            pack_tile(&mut self.ui, frame, tile, Currency::Credits, counted, rise);
+            if flip < 0.5 {
+                // Face down, out of the tile's corner to the middle, then turning edge-on.
+                let from = [tile[0] + TUCKED_AT[0], tile[1] + TUCKED_AT[1]];
+                let lerp = |a: f32, b: f32| a + (b - a) * out;
+                tucked_card(
+                    &mut self.ui,
+                    frame,
+                    [lerp(from[0], CARD_X), lerp(from[1], middle)],
+                    lerp(TUCKED_WIDTH, card_width),
+                    lerp(TUCKED_TURN, 0.0),
+                    1.0 - smooth(flip * 2.0),
+                    [shown.tier, shown.finish.index],
+                    rise,
+                );
+            }
+        }
+        if flip >= 0.5 {
+            // Face up: from edge-on to facing the player.
+            let turn = smooth((flip - 0.5) * 2.0);
             cards::look::draw(
                 &mut self.ui,
                 frame,
-                [
-                    CARD_X - width * 0.5,
-                    top + (card_width - width) * cards::look::ASPECT * 0.5,
-                    width,
-                ],
+                [CARD_X - card_width * 0.5, top, card_width],
                 cards::look::Card {
                     rarity: shown.rarity,
                     finish: shown.finish,
@@ -718,57 +784,20 @@ impl Panel {
                     tilt: None,
                 },
                 seconds,
-                eased,
-                eased,
+                1.0,
+                turn,
             );
         }
-        // A pack: its credits and shards in tiles beside the card; else the credits alone
-        // count up under it.
-        if shown.shards > 0 {
-            self.pack(frame, shown, [top, card_width], elapsed);
-        } else if elapsed >= COUNT[0] {
-            let t = ((elapsed - COUNT[0]) / (COUNT[1] - COUNT[0])).clamp(0.0, 1.0);
-            let counted = (shown.credits as f32 * t).round() as u64;
-            credits_line(
-                &mut self.ui,
-                frame,
-                CARD_X,
-                if top == FACE_TOP {
-                    FACE_CREDITS_Y
-                } else {
-                    CREDITS_Y
-                },
-                &format!("+{}", cards::credits_text(counted)),
-                38.0,
-                (t * 3.0).min(1.0),
-            );
-        }
-    }
-
-    /// The card pack (17/10/2026): left of the card a tile of its credits, right of it one
-    /// of the kyber shards that came with it, sliding out from the card and counting up;
-    /// `[top, width]` is the card's place.
-    fn pack(&mut self, frame: &Frame, shown: &Shown, [top, width]: [f32; 2], elapsed: f32) {
-        let out = ((elapsed - PACK[0]) / (PACK[1] - PACK[0])).clamp(0.0, 1.0);
-        if out <= 0.0 {
-            return;
-        }
-        let eased = 1.0 - (1.0 - out).powi(3);
-        let counted = ((elapsed - COUNT[0]) / (COUNT[1] - COUNT[0])).clamp(0.0, 1.0);
-        let middle = top + width * cards::look::ASPECT * 0.5;
-        let reach = width * 0.5 + PACK_GAP + PACK_TILE[0] * 0.5 - PACK_SLIDE * (1.0 - eased);
-        for (side, currency) in [(-1.0, Currency::Credits), (1.0, Currency::Shards)] {
-            let amount = match currency {
-                Currency::Credits => shown.credits,
-                Currency::Shards => shown.shards,
-            };
+        let slide = ease(span(SHARDS_OUT));
+        if shown.shards > 0 && slide > 0.0 {
+            let counted = (shown.shards as f32 * span(SHARDS_COUNT)).round() as u64;
             pack_tile(
                 &mut self.ui,
                 frame,
-                [CARD_X + side * reach, middle],
-                currency,
-                (amount as f32 * counted).round() as u64,
-                eased,
+                [CARD_X + reach - PACK_SLIDE * (1.0 - slide), middle],
+                Currency::Shards,
+                counted,
+                slide,
             );
         }
     }
@@ -779,7 +808,7 @@ impl Panel {
         let Prize::Card(card) = &shown[index] else {
             return;
         };
-        let alpha = ((elapsed - WORDS) / 0.4).clamp(0.0, 1.0);
+        let alpha = ((elapsed - CARD_WORDS) / 0.4).clamp(0.0, 1.0);
         let fade = |colour: Color| Color::new(colour.r, colour.g, colour.b, colour.a * alpha);
         let faces = cards::faces::current();
         let face = cards::shown(&faces, card.card.as_deref());
@@ -956,7 +985,6 @@ impl Panel {
             STRIP_RIGHT - STRIP_LEFT,
             height + 60.0,
         )));
-        let faces = cards::faces::current();
         for (at, tile) in tiles.iter().enumerate() {
             let x = CARD_X - strip::TILE * 0.5 + at as f32 * pitch - distance;
             if x + strip::TILE + SMEAR_MAX < STRIP_LEFT || x > STRIP_RIGHT {
@@ -973,7 +1001,6 @@ impl Panel {
             let dim = if won { 1.0 } else { 1.0 - 0.65 * lit };
             self.strip_tile(
                 frame,
-                &faces,
                 *tile,
                 [x, STRIP_Y - lift, strip::TILE],
                 near,
@@ -1017,7 +1044,6 @@ impl Panel {
     pub(super) fn strip_tile(
         &mut self,
         frame: &Frame,
-        faces: &cards::faces::Faces,
         item: strip::Item,
         [x, y, width]: [f32; 3],
         near: f32,
@@ -1037,7 +1063,7 @@ impl Panel {
             radius: BAND * 0.5 * s,
             color: color::alpha(colour, 0.9),
         });
-        self.tile(frame, faces, item, [x, y, width], near, seconds);
+        self.tile(frame, item, [x, y, width], near, seconds);
         // At speed its colour streaks across it and trails it (the strip runs left),
         // longer and stronger the faster it runs.
         let trail = (speed * 0.03).min(SMEAR_MAX) * width / strip::TILE;
@@ -1072,13 +1098,13 @@ impl Panel {
         }
     }
 
-    /// One tile of the strip at `[x, y, width]` (frame pixels): a card in its rarity and
-    /// finish, or a shader's blade framed in its tier's colour with its name. `near` (0 to
+    /// One tile of the strip at `[x, y, width]` (frame pixels): a card's credits with the
+    /// card tucked face down in its corner in its rarity and finish, a shader's blade
+    /// framed in its tier's colour with its name, or a pile of kyber shards. `near` (0 to
     /// 1) is how close it is to the marker.
     pub(super) fn tile(
         &mut self,
         frame: &Frame,
-        faces: &cards::faces::Faces,
         item: strip::Item,
         [x, y, width]: [f32; 3],
         near: f32,
@@ -1094,21 +1120,73 @@ impl Panel {
         let height = width * cards::look::ASPECT;
         let rect = frame.rect(x, y, width, height);
         match item {
-            strip::Item::Card { rarity, finish } => {
-                cards::look::draw(
+            strip::Item::Card {
+                finish,
+                tier,
+                credits,
+                ..
+            } => {
+                // Its credits, a stack of coins and the amount, washed from above in the
+                // holocron's colour, the card tucked face down in the top right corner.
+                let colour = item.colour();
+                let wash = holocrons::TIERS[tier.min(holocrons::COUNT - 1)].colour;
+                let list = self.ui.draw_list_mut();
+                let _ = list.push(DrawCommand::RoundedRect {
+                    rect,
+                    radius: 14.0 * k * s,
+                    color: color::alpha(color::SPACE, 0.9),
+                });
+                let _ = list.push(DrawCommand::GradientRect {
+                    rect,
+                    radius: 14.0 * k * s,
+                    gradient: sjk_ui::Gradient {
+                        start: color::alpha(wash, 0.26 + 0.08 * near),
+                        end: color::alpha(wash, 0.03),
+                        vertical: true,
+                    },
+                });
+                credits_stack(
                     &mut self.ui,
                     frame,
-                    [x, y, width],
-                    cards::look::Card {
-                        rarity: &cards::RARITIES[rarity],
-                        finish: &cards::FINISHES[finish],
-                        edition: "",
-                        face: cards::shown(faces, None),
-                        tilt: None,
-                    },
-                    seconds,
-                    0.75 + 0.25 * near,
+                    [x + width * 0.44, y + height * 0.44],
+                    40.0 * k,
                     1.0,
+                );
+                tucked_card(
+                    &mut self.ui,
+                    frame,
+                    [x + width - 34.0 * k, y + 42.0 * k],
+                    58.0 * k,
+                    TUCKED_TURN,
+                    1.0,
+                    [tier, finish],
+                    1.0,
+                );
+                let _ = self.ui.draw_list_mut().push(DrawCommand::Border {
+                    rect,
+                    radius: 14.0 * k * s,
+                    width: (2.0 + near) * s,
+                    color: color::alpha(colour, 0.7 + 0.3 * near),
+                });
+                text(
+                    &mut self.ui,
+                    TextFamily::Display,
+                    format_args!("+{}", cards::credits_text(credits)),
+                    frame.rect(x, y + height - 78.0 * k, width, 38.0 * k),
+                    30.0 * k * s,
+                    color::GOLD_BRIGHT,
+                    FontWeight::Semibold,
+                    TextAlign::Center,
+                );
+                text(
+                    &mut self.ui,
+                    TextFamily::Body,
+                    format_args!("credits"),
+                    frame.rect(x, y + height - 38.0 * k, width, 22.0 * k),
+                    15.0 * k * s,
+                    color::MUTED,
+                    FontWeight::Regular,
+                    TextAlign::Center,
                 );
             }
             strip::Item::Shader(skin) => {
@@ -1533,13 +1611,15 @@ impl Panel {
         let action = match ceremony {
             Ceremony::Waiting { .. } => None,
             Ceremony::Failed { .. } => Some("close"),
-            Ceremony::Showing { shown, index, .. } => Some(if elapsed < BEFORE + ENTRANCE {
-                "skip"
-            } else if index + 1 < shown.len() {
-                "next"
-            } else {
-                "done"
-            }),
+            Ceremony::Showing { shown, index, .. } => {
+                Some(if elapsed < BEFORE + shown[*index].entrance()[0] {
+                    "skip"
+                } else if index + 1 < shown.len() {
+                    "next"
+                } else {
+                    "done"
+                })
+            }
             Ceremony::Batch { shown, .. } => {
                 Some(if super::batch::summing_up(elapsed, shown.len()) {
                     "done"
@@ -1579,9 +1659,9 @@ const MINI: f32 = 120.0;
 
 impl Panel {
     /// A light tile at `[x, y, width]` (frame pixels): a dark plate washed from below in
-    /// its colour, edged in it, with a card's rarity symbol (ringed in gold for Solar, a
-    /// rainbow under it for Holo) or a shader's blade, or "?" for a shader this client
-    /// does not know.
+    /// its colour, edged in it, with a card's credits (a stack of coins, the card tucked in
+    /// its corner and the amount) or a shader's blade, or "?" for a shader this client does
+    /// not know.
     fn mini_tile(&mut self, frame: &Frame, item: strip::Item, [x, y, width]: [f32; 3]) {
         let s = frame.s;
         let k = width / strip::STACKED.tile;
@@ -1603,43 +1683,43 @@ impl Panel {
                 vertical: true,
             },
         });
-        let [cx, cy] = frame.point(x + width * 0.5, y + height * 0.5);
         match item {
-            strip::Item::Card { rarity, finish } => {
-                if finish == 2 {
-                    let _ = list.push(DrawCommand::Arc {
-                        center: [cx, cy],
-                        radius: 26.0 * k * s,
-                        width: 3.0 * k * s,
-                        start: 0.0,
-                        sweep: std::f32::consts::TAU,
-                        color: color::alpha(color::GOLD_BRIGHT, 0.9),
-                        knockout: None,
-                    });
-                }
-                if finish == 1 {
-                    for (band, hue) in [0xFF_6B9D, 0x6B_D4FF, 0xB8_FF6B].into_iter().enumerate() {
-                        let left = x + width * (0.22 + 0.19 * band as f32);
-                        let _ = list.push(DrawCommand::RoundedRect {
-                            rect: frame.rect(left, y + height * 0.78, width * 0.18, 4.0 * k),
-                            radius: 2.0 * k * s,
-                            color: crate::holocrons::rgb(hue),
-                        });
-                    }
-                }
+            strip::Item::Card {
+                finish,
+                tier,
+                credits,
+                ..
+            } => {
                 let _ = list.push(DrawCommand::Border {
                     rect,
                     radius: 8.0 * k * s,
                     width: 2.0 * s,
                     color: color::alpha(colour, 0.8),
                 });
+                credits_stack(
+                    &mut self.ui,
+                    frame,
+                    [x + width * 0.42, y + height * 0.42],
+                    21.0 * k,
+                    1.0,
+                );
+                tucked_card(
+                    &mut self.ui,
+                    frame,
+                    [x + width - 17.0 * k, y + 22.0 * k],
+                    30.0 * k,
+                    TUCKED_TURN,
+                    1.0,
+                    [tier, finish],
+                    1.0,
+                );
                 text(
                     &mut self.ui,
-                    TextFamily::Body,
-                    format_args!("{}", crate::symbols::RARITY[rarity]),
-                    frame.rect(x, y + height * 0.5 - 20.0 * k, width, 40.0 * k),
-                    30.0 * k * s,
-                    colour,
+                    TextFamily::Display,
+                    format_args!("+{}", cards::credits_text(credits)),
+                    frame.rect(x, y + height - 32.0 * k, width, 24.0 * k),
+                    18.0 * k * s,
+                    color::GOLD_BRIGHT,
                     FontWeight::Semibold,
                     TextAlign::Center,
                 );
@@ -1918,16 +1998,16 @@ fn pack_tile(
         width: 1.5 * s,
         color: fade(accent, 0.6),
     });
-    let mark = 64.0;
-    let mark_width = match currency {
-        Currency::Credits => cards::mark::width(mark),
-        Currency::Shards => cards::shard::width(mark),
-    };
-    let at = frame.point(centre[0] - mark_width * 0.5, top + 30.0);
     match currency {
-        Currency::Credits => cards::mark::draw(list, at, mark * s, fade(accent, 1.0)),
-        Currency::Shards => cards::shard::draw(list, at, mark * s, fade(accent, 1.0)),
-    };
+        Currency::Credits => {
+            credits_stack(canvas, frame, [centre[0] - 6.0, top + 54.0], 36.0, alpha);
+        }
+        Currency::Shards => {
+            let mark = 64.0;
+            let at = frame.point(centre[0] - cards::shard::width(mark) * 0.5, top + 30.0);
+            let _ = cards::shard::draw(list, at, mark * s, fade(accent, 1.0));
+        }
+    }
     text(
         canvas,
         TextFamily::Display,
@@ -2032,4 +2112,308 @@ pub(super) fn credits_line(
         FontWeight::Semibold,
         TextAlign::Start,
     );
+}
+
+/// Coins smaller than this (their half across, frame pixels) and cards narrower than
+/// [`LIGHT_CARD`] are drawn light, in fewer shapes: the stacked strips' tiles are many.
+const LIGHT_COIN: f32 = 30.0;
+const LIGHT_CARD: f32 = 40.0;
+
+/// A coin of the credits centred on `centre` (frame pixels), `radius` its half across, at
+/// `alpha`: a deep gold disc and its gold rim, and on the one face up a fine ring inside
+/// it and the credits' mark ([`cards::mark`]).
+fn coin(
+    canvas: &mut crate::menu_widgets::MenuCanvas,
+    frame: &Frame,
+    [x, y]: [f32; 2],
+    radius: f32,
+    alpha: f32,
+    face_up: bool,
+) {
+    let s = frame.s;
+    let fade = |colour: Color, share: f32| {
+        Color::new(colour.r, colour.g, colour.b, colour.a * share * alpha)
+    };
+    let list = canvas.draw_list_mut();
+    let _ = list.push(DrawCommand::RoundedRect {
+        rect: frame.rect(x - radius, y - radius, radius * 2.0, radius * 2.0),
+        radius: radius * s,
+        color: fade(Color::new(0.30, 0.21, 0.06, 1.0), 1.0),
+    });
+    // Rings as borders, not arcs: a tile half out of a strip clips them.
+    let ring = |share: f32| {
+        frame.rect(
+            x - radius * share,
+            y - radius * share,
+            radius * share * 2.0,
+            radius * share * 2.0,
+        )
+    };
+    let _ = list.push(DrawCommand::Border {
+        rect: ring(1.0),
+        radius: radius * s,
+        width: (radius * 0.12 * s).max(1.0),
+        color: fade(color::GOLD, 1.0),
+    });
+    if !face_up {
+        return;
+    }
+    if radius >= LIGHT_COIN {
+        let _ = list.push(DrawCommand::Border {
+            rect: ring(0.72),
+            radius: radius * 0.72 * s,
+            width: (radius * 0.04 * s).max(1.0),
+            color: fade(color::GOLD_BRIGHT, 0.5),
+        });
+    }
+    let mark = radius;
+    let _ = cards::mark::draw(
+        list,
+        frame.point(x - cards::mark::width(mark) * 0.5, y - mark * 0.5),
+        mark * s,
+        fade(color::GOLD_BRIGHT, 1.0),
+    );
+}
+
+/// A stack of credits centred on `centre` (frame pixels), its coins `radius` their half
+/// across, at `alpha`: two coins showing behind and under the face up one in front (one
+/// behind it for a small stack, as the stacked strips' light tiles draw it, to keep their
+/// shapes few).
+pub(super) fn credits_stack(
+    canvas: &mut crate::menu_widgets::MenuCanvas,
+    frame: &Frame,
+    [x, y]: [f32; 2],
+    radius: f32,
+    alpha: f32,
+) {
+    let behind: &[(f32, f32)] = if radius < LIGHT_COIN {
+        &[(0.3, 0.26)]
+    } else {
+        &[(0.42, 0.34), (0.22, 0.17)]
+    };
+    for &(dx, dy) in behind {
+        coin(
+            canvas,
+            frame,
+            [x + dx * radius, y + dy * radius],
+            radius,
+            alpha * 0.85,
+            false,
+        );
+    }
+    coin(canvas, frame, [x, y], radius, alpha, true);
+}
+
+/// A card lying face down centred on `centre` (frame pixels), `width` wide, turned
+/// `angle` radians clockwise and `squeeze` (0 to 1) of its width across as it flips over,
+/// at `alpha`: its shadow and its back, a dark plate washed and edged in the colour of the
+/// holocron it came out of (gold edged for Solar, a rainbow across it for Holo) with that
+/// holocron's gem at its heart (a narrow one, [`LIGHT_CARD`], is its plate and edge
+/// alone). `[tier, finish]` are positions in [`holocrons::TIERS`] and
+/// [`cards::FINISHES`].
+#[allow(clippy::too_many_arguments)]
+pub(super) fn tucked_card(
+    canvas: &mut crate::menu_widgets::MenuCanvas,
+    frame: &Frame,
+    centre: [f32; 2],
+    width: f32,
+    angle: f32,
+    squeeze: f32,
+    [tier, finish]: [usize; 2],
+    alpha: f32,
+) {
+    if alpha <= 0.0 || squeeze <= 0.01 {
+        return;
+    }
+    let s = frame.s;
+    let tier = &holocrons::TIERS[tier.min(holocrons::COUNT - 1)];
+    let edge = if finish == 2 {
+        color::GOLD_BRIGHT
+    } else {
+        tier.colour
+    };
+    let height = width * cards::look::ASPECT;
+    let [cx, cy] = frame.point(centre[0], centre[1]);
+    let (sin, cos) = angle.sin_cos();
+    let light = width < LIGHT_CARD;
+    let faded = alpha < 1.0;
+    let list = canvas.draw_list_mut();
+    if faded {
+        let _ = list.push(DrawCommand::PushOpacity(alpha.clamp(0.0, 1.0)));
+    }
+    // Turned about its middle, after narrowing across it for the flip.
+    let _ = list.push(DrawCommand::PushTransform([
+        cos * squeeze,
+        -sin,
+        cx - cos * squeeze * cx + sin * cy,
+        sin * squeeze,
+        cos,
+        cy - sin * squeeze * cx - cos * cy,
+        0.0,
+        0.0,
+        1.0,
+    ]));
+    let [left, top] = [centre[0] - width * 0.5, centre[1] - height * 0.5];
+    let rect = frame.rect(left, top, width, height);
+    let radius = width * 0.07 * s;
+    let unit = width / 220.0;
+    if light {
+        // Its plate in the holocron's colour, deepened, and its edge.
+        let deep = |c: f32| 0.035 + (c - 0.035) * 0.42;
+        let colour = tier.colour;
+        let _ = list.push(DrawCommand::RoundedRect {
+            rect,
+            radius,
+            color: Color::new(deep(colour.r), deep(colour.g), deep(colour.b), 0.98),
+        });
+        if finish == 1 {
+            for (band, hue) in cards::look::HOLO_BANDS.iter().step_by(2).enumerate() {
+                let _ = list.push(DrawCommand::SolidRect {
+                    rect: frame.rect(
+                        left + width * 0.16,
+                        top + height * (0.66 + 0.08 * band as f32),
+                        width * 0.68,
+                        height * 0.05,
+                    ),
+                    color: Color::new(hue[0], hue[1], hue[2], 0.6),
+                });
+            }
+        }
+        let _ = list.push(DrawCommand::Border {
+            rect,
+            radius,
+            width: (1.5 * s).max(1.0),
+            color: edge,
+        });
+        let _ = list.push(DrawCommand::PopTransform);
+        if faded {
+            let _ = list.push(DrawCommand::PopOpacity);
+        }
+        return;
+    }
+    let _ = list.push(DrawCommand::RoundedRect {
+        rect: frame.rect(left + 4.0 * unit, top + 8.0 * unit, width, height),
+        radius,
+        color: Color::new(0.0, 0.0, 0.0, 0.45),
+    });
+    let _ = list.push(DrawCommand::RoundedRect {
+        rect,
+        radius,
+        color: Color::new(0.035, 0.05, 0.1, 0.98),
+    });
+    let _ = list.push(DrawCommand::GradientRect {
+        rect,
+        radius,
+        gradient: sjk_ui::Gradient {
+            start: tier.colour_alpha(0.5),
+            end: tier.colour_alpha(0.12),
+            vertical: true,
+        },
+    });
+    if finish == 1 {
+        for (band, hue) in cards::look::HOLO_BANDS.iter().enumerate() {
+            let _ = list.push(DrawCommand::SolidRect {
+                rect: frame.rect(
+                    left + width * 0.14,
+                    top + height * (0.76 + 0.02 * band as f32),
+                    width * 0.72,
+                    height * 0.014,
+                ),
+                color: Color::new(hue[0], hue[1], hue[2], 0.45),
+            });
+        }
+    }
+    let _ = list.push(DrawCommand::Border {
+        rect,
+        radius,
+        width: (5.0 * unit * s).max(1.2),
+        color: edge,
+    });
+    let _ = list.push(DrawCommand::Border {
+        rect: frame.rect(
+            left + 14.0 * unit,
+            top + 14.0 * unit,
+            width - 28.0 * unit,
+            height - 28.0 * unit,
+        ),
+        radius: (radius - 9.0 * unit * s).max(1.0),
+        width: (2.0 * unit * s).max(1.0),
+        color: Color::new(1.0, 1.0, 1.0, 0.16),
+    });
+    gem::draw(
+        list,
+        [cx, cy - height * 0.03 * s],
+        width * 0.24 * s,
+        tier.colour,
+        1.0,
+        if width >= 200.0 { gem::ROWS } else { 6 },
+    );
+    let _ = list.push(DrawCommand::PopTransform);
+    if faded {
+        let _ = list.push(DrawCommand::PopOpacity);
+    }
+}
+
+/// The light a card flips over into, `t` (0 to 1) of the way through: a glow of its
+/// colour, a ring running out from round the card at `middle` (`[width, height]` its
+/// size, frame pixels) and rays turning, gold for Solar and the rainbow for Holo; only for
+/// a Holo, Solar or Legendary card.
+fn flourish(
+    canvas: &mut crate::menu_widgets::MenuCanvas,
+    frame: &Frame,
+    middle: [f32; 2],
+    [width, height]: [f32; 2],
+    shown: &Shown,
+    t: f32,
+) {
+    let (finish, rarity) = (shown.finish.index, shown.rarity.index);
+    if (finish == 0 && rarity != 3) || !(0.0..1.0).contains(&t) {
+        return;
+    }
+    let s = frame.s;
+    let colour = if finish == 2 {
+        color::GOLD_BRIGHT
+    } else {
+        shown.rarity.colour
+    };
+    let fade = 1.0 - t;
+    glow(
+        canvas,
+        frame,
+        middle,
+        height * (0.6 + 0.3 * t),
+        colour,
+        0.5 * fade,
+    );
+    let [cx, cy] = frame.point(middle[0], middle[1]);
+    let list = canvas.draw_list_mut();
+    let _ = list.push(DrawCommand::Arc {
+        center: [cx, cy],
+        radius: (height * 0.5 + 260.0 * t) * s,
+        width: (6.0 * fade).max(1.0) * s,
+        start: 0.0,
+        sweep: std::f32::consts::TAU,
+        color: color::alpha(colour, 0.85 * fade),
+        knockout: None,
+    });
+    const FLOURISH_RAYS: usize = 18;
+    let bands = &cards::look::HOLO_BANDS;
+    for ray in 0..FLOURISH_RAYS {
+        let angle = ray as f32 / FLOURISH_RAYS as f32 * std::f32::consts::TAU + t * 0.9;
+        let (sin, cos) = angle.sin_cos();
+        let hue = if finish == 1 {
+            let [r, g, b] = bands[ray % bands.len()];
+            Color::new(r, g, b, 1.0)
+        } else {
+            colour
+        };
+        let inner = (width * 0.45 + 40.0 * t) * s;
+        let outer = (width * 0.62 + 240.0 * smooth(t * 1.6)) * s;
+        let _ = list.push(DrawCommand::Line {
+            from: [cx + cos * inner, cy + sin * inner],
+            to: [cx + cos * outer, cy + sin * outer],
+            width: 4.0 * s,
+            color: color::alpha(hue, 0.6 * fade),
+        });
+    }
 }

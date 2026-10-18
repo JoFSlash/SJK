@@ -324,7 +324,6 @@ fn watching(row: &ScoreRow) -> bool {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Stat {
     Score,
-    Deaths,
     /// Duel wins and losses.
     Record,
     Captures,
@@ -338,7 +337,6 @@ impl Stat {
     fn label(self, wide: bool) -> &'static str {
         match self {
             Self::Score => "Score",
-            Self::Deaths => "Deaths",
             Self::Record => "Won/lost",
             Self::Captures if wide => "Captures",
             Self::Captures => "Caps",
@@ -356,10 +354,9 @@ impl fmt::Display for StatText<'_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self(stat, row) = self;
         match stat {
-            Stat::Score => write!(formatter, "{}", row.score),
-            Stat::Deaths => match row.deaths {
-                Some(deaths) => write!(formatter, "{deaths}"),
-                None => formatter.write_str("–"),
+            Stat::Score => match row.deaths {
+                Some(deaths) => write!(formatter, "{}/{deaths}", row.score),
+                None => write!(formatter, "{}", row.score),
             },
             Stat::Record => match row.record {
                 Some((wins, losses)) => write!(formatter, "{wins}/{losses}"),
@@ -376,8 +373,8 @@ impl fmt::Display for StatText<'_> {
 /// What a list shows.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Kind {
-    /// Free-for-all players: score, deaths when counted, time.
-    Free { deaths: bool },
+    /// Free-for-all players: score (optionally score/deaths) and time.
+    Free,
     /// A team: score and time, or in capture modes score, captures, assists
     /// and defends (and a carried flag before the name).
     Team { capture: bool },
@@ -389,10 +386,7 @@ impl Kind {
     /// The list's number columns, left to right.
     fn stats(self) -> &'static [Stat] {
         match self {
-            Self::Free { deaths: true } => &[Stat::Score, Stat::Deaths, Stat::Time],
-            Self::Free { deaths: false } | Self::Team { capture: false } => {
-                &[Stat::Score, Stat::Time]
-            }
+            Self::Free | Self::Team { capture: false } => &[Stat::Score, Stat::Time],
             Self::Team { capture: true } => {
                 &[Stat::Score, Stat::Captures, Stat::Assists, Stat::Defends]
             }
@@ -852,7 +846,7 @@ impl Painter<'_> {
                 span: Some([x, x + whole]),
             };
         }
-        let list = List::players(rows.iter().any(|row| row.deaths.is_some()));
+        let list = List::players();
         let (x, width) = self.compact_list(rows, &list, |row| !watching(row), CENTRE);
         Board {
             x,
@@ -1201,8 +1195,7 @@ impl Painter<'_> {
     /// Everyone playing in one list, by place; two side by side once rows
     /// would be thinner than [`ROW_SPLIT`].
     fn free_for_all(&mut self, rows: &[ScoreRow], board: &Board) {
-        let deaths = rows.iter().any(|row| row.deaths.is_some());
-        let list = List::players(deaths).at(board.x, board.width);
+        let list = List::players().at(board.x, board.width);
         self.list(rows, &list, |row| !watching(row));
     }
 
@@ -1968,13 +1961,13 @@ struct List {
 
 impl List {
     /// Free-for-all: everyone playing, by place.
-    fn players(deaths: bool) -> Self {
+    fn players() -> Self {
         Self {
             x: BOARD_LEFT,
             width: BOARD_WIDTH,
             top: LIST_TOP,
             bottom: BOTTOM,
-            kind: Kind::Free { deaths },
+            kind: Kind::Free,
             numbered: true,
             split: true,
             title: "Player",
@@ -2078,6 +2071,7 @@ mod tests {
             name: format!("^{}Player{client}", client % 8),
             team,
             score,
+            reported_deaths: None,
             deaths: None,
             ping: 20 + i32::from(client) * 9,
             time: 3 + i32::from(client),
@@ -2096,6 +2090,17 @@ mod tests {
             tagged: false,
             away: None,
         }
+    }
+
+    #[test]
+    fn score_includes_deaths_in_the_same_column() {
+        let mut row = row(0, 0, 3);
+        assert_eq!(StatText(Stat::Score, &row).to_string(), "3");
+        row.deaths = Some(2);
+        assert_eq!(StatText(Stat::Score, &row).to_string(), "3/2");
+        row.score = -2;
+        assert_eq!(StatText(Stat::Score, &row).to_string(), "-2/2");
+        assert_eq!(Kind::Free.stats(), &[Stat::Score, Stat::Time]);
     }
 
     #[test]
@@ -2530,8 +2535,7 @@ mod tests {
     #[test]
     fn compact_columns_pack_the_numbers_after_the_names() {
         for kind in [
-            Kind::Free { deaths: true },
-            Kind::Free { deaths: false },
+            Kind::Free,
             Kind::Team { capture: true },
             Kind::Team { capture: false },
             Kind::Waiting,
@@ -2632,8 +2636,7 @@ mod tests {
     #[test]
     fn names_end_before_the_numbers_in_every_list() {
         for kind in [
-            Kind::Free { deaths: true },
-            Kind::Free { deaths: false },
+            Kind::Free,
             Kind::Team { capture: true },
             Kind::Team { capture: false },
             Kind::Waiting,

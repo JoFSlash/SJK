@@ -13,6 +13,7 @@ members = [
     "crates/sjk-mod-japlus",
     "crates/sjk-mod-jof",
     "crates/sjk-materialgen",
+    "crates/sjk-mediafoundation",
     "crates/sjk-effect",
     "crates/sjk-model",
     "crates/sjk-nav",
@@ -48,6 +49,7 @@ sjk-mod = { path = "crates/sjk-mod" }
 sjk-mod-japlus = { path = "crates/sjk-mod-japlus" }
 sjk-mod-jof = { path = "crates/sjk-mod-jof" }
 sjk-effect = { path = "crates/sjk-effect" }
+sjk-mediafoundation = { path = "crates/sjk-mediafoundation" }
 sjk-model = { path = "crates/sjk-model" }
 sjk-nav = { path = "crates/sjk-nav" }
 sjk-network = { path = "crates/sjk-network" }

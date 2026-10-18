@@ -2537,7 +2537,10 @@ the menus are the SJK UI. A look chosen after that stays. The classic board
 - Columns are Name, Score, Ping, Time and, with `cg_showClientIDs` (on by
   default), the client ID; CTF shows Score, C, A, D, Ping and Time, and duels with
   a frag limit show wins/losses. Score shows score/deaths when `cg_scoreDeaths`
-  provides deaths. Bots show `BOT` for their ping; clients still connecting show
+  provides deaths. With JoF EJK's `cg_scoreDeaths` modes, 0 hides them, the
+  default 1 uses a JA+/jaPRO server's appended value, 2 falls back to the
+  session-local counter when the server sends none, and 3 always uses the local
+  counter. Bots show `BOT` for their ping; clients still connecting show
   `-`, and connected clients the scores do not list yet show `N/A`.
 - Team games list the leading team first over a translucent team band, then the
   spectators; free-for-all lists the players, then the spectators. Your row is
@@ -3253,7 +3256,8 @@ the file (Sol JK, Contributors, Art, Made with, Footnote) is a heading with its 
 
 - Everyone with a history (Sol, Bishop, Creyon, Lumaya) has a panel across the
   column: the name large (the first section's larger still), the role, chips
-  counting their changes, pull requests and commits, their links, and two folds.
+  counting their changes, pull requests and commits (Sol's also the contributors'
+  pull requests reviewed and merged, REVIEWED & MERGED), their links, and two folds.
   HIGHLIGHTS holds the card's own lines; ALL WORK (ALL PULL REQUESTS when all of
   it is pull requests) lists every feature and pull request newest first under
   the day it was merged into main, each row with its pull request's number

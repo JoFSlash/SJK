@@ -8,6 +8,14 @@ open. The manifests declare Rust 1.88 or newer and edition 2024.
 
 Install Rust/Cargo, a C/C++ toolchain, CMake and pkg-config. Linux also needs
 ALSA, Wayland and XKB development libraries and a working graphics driver.
+SJK builds no video codec: chat MP4 clips use Windows Media Foundation at run time
+([sjk-mediafoundation](../crates/sjk-mediafoundation/src/lib.rs), the one crate
+allowed `unsafe`), and WebP is decoded in Rust. No FFmpeg installation or runtime
+codec download is required. Crates that omit license files receive their declared SPDX
+license text and original author/license manifest; canonical texts are kept under
+`scripts/licenses` (the MPL-2.0 wording comes from
+[SPDX license-list-data](https://github.com/spdx/license-list-data/tree/main/text)).
+Cargo metadata is read as UTF-8 on Windows as on Linux.
 See [workspace dependencies](../Cargo.toml) and the
 [viewer manifest](../crates/sjk-viewer/Cargo.toml) when diagnosing missing libraries.
 
@@ -99,6 +107,12 @@ Contributions reach `main` through pull requests, one topic per pull request.
   ([the rule](sjk-ui.md#sjk-ui)); a classic+ view alone is not enough.
 - The description states what changed and why, the exact checks and their
   results, the platform they ran on and what remains unverified, as in a handoff.
+- A change players can see (menus, HUD, effects, models, maps) comes with
+  screenshots in its pull request whenever you can take them (Sol's rule,
+  18/10/2026): the new look, and before/after when something changed. A shot from
+  the game or an off-screen world shot (`world_shot` tests) both do. Sol posts the
+  good ones to the Discord `#screenshots` channel, so pick clear, full-frame shots
+  with no personal details in them.
 - Assistants push only to the contributor's fork or a branch they were
   authorized to use, never to `main` of this repository. Once review has started,
   add commits rather than rewriting the branch unless a reviewer asks for a rebase.

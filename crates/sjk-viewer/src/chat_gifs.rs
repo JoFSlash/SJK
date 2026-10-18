@@ -1,7 +1,8 @@
 //! GIFs in SJK chat (`docs/hub-chat.md`, "GIFs from GIPHY"): a message linking to a
 //! GIPHY GIF shows the GIF, animated, under its line on the SJK chat page and the docks.
-//! Each reader's client fetches it from GIPHY's media host itself; the hub carries only
-//! the text.
+//! Trusted generic sites can also supply GIFs, WebP pictures (animated or still) or
+//! silent H.264 MP4 clips (Windows Media Foundation only). Each reader's client
+//! fetches directly from its approved sources; the hub carries only the text.
 //!
 //! [`for_message`] finds the first GIPHY link of a message ([`link`]) and words the
 //! line with "GIF" in its place, unless GIFs are off (`cl_sjkChatGifs 0`) or the sender
@@ -21,11 +22,14 @@
 //! [`search`] asks GIPHY's search for the picker.
 
 pub(crate) mod decode;
+mod discover;
 pub(crate) mod draw;
 pub(crate) mod favourites;
 pub(crate) mod fetch;
 pub(crate) mod link;
 pub(crate) mod search;
+pub(crate) mod sources;
+pub(crate) mod video;
 
 pub(crate) use link::GifId;
 
@@ -38,6 +42,9 @@ use std::time::{Duration, Instant};
 
 /// `cl_sjkChatGifs`: whether GIPHY links in SJK chat show their GIF.
 pub(crate) const CVAR: &str = "cl_sjkChatGifs";
+/// `cl_sjkChatVideo`: whether MP4 clips from trusted sources play (Windows Media
+/// Foundation), off by default ([`video`]).
+pub(crate) const VIDEO_CVAR: &str = "cl_sjkChatVideo";
 /// GIFs kept decoded at once, the picker's tiles included.
 pub(crate) const ENTRIES: usize = 48;
 /// Bytes of pixels kept for every decoded GIF together (four GIFs at the largest
@@ -58,6 +65,19 @@ static ENABLED: AtomicBool = AtomicBool::new(true);
 /// Follow `cl_sjkChatGifs` (once a frame).
 pub(crate) fn set_enabled(on: bool) {
     ENABLED.store(on, Ordering::Relaxed);
+}
+
+/// Follow `cl_sjkChatVideo` (twice a second). A change drops every decoded clip and
+/// queued job, as removing a source does, so new resolutions follow the switch.
+pub(crate) fn set_video(on: bool) {
+    switch_video(on, sources::invalidate);
+}
+
+/// [`set_video`], calling `invalidate` only when the switch changed.
+fn switch_video(on: bool, invalidate: impl FnOnce()) {
+    if video::set_allowed(on) {
+        invalidate();
+    }
 }
 
 /// Whether GIPHY links show their GIF.
@@ -86,6 +106,7 @@ fn for_message_with(text: &str, muted: bool, on: bool) -> (String, Option<GifId>
 struct Key {
     id: GifId,
     preview: bool,
+    revision: u64,
 }
 
 impl Key {
@@ -93,6 +114,7 @@ impl Key {
         Self {
             id: id.clone(),
             preview: false,
+            revision: sources::revision(),
         }
     }
 }
@@ -403,21 +425,31 @@ impl Gifs {
 /// What to draw for GIF `id` this frame ([`Shown`]). The first call for a GIF asks the
 /// worker for it.
 pub(crate) fn show(id: &GifId) -> Shown {
+    if !enabled() || !sources::trusted(id) {
+        return Shown::Unavailable;
+    }
     lock().show(&Key::chat(id))
 }
 
 /// What to draw for GIF `id` as a picker's tile this frame: its preview, the smaller
 /// file GIPHY makes ([`link::Rendition::Preview`]).
 pub(crate) fn show_preview(id: &GifId) -> Shown {
+    if !enabled() || !sources::trusted(id) {
+        return Shown::Unavailable;
+    }
     lock().show(&Key {
         id: id.clone(),
         preview: true,
+        revision: sources::revision(),
     })
 }
 
 /// Whether the cache still waits for `key`: a GIF dropped while it waited in the queue
 /// (the picker scrolled past it) is not fetched.
 fn wanted(key: &Key) -> bool {
+    if !enabled() || key.revision != sources::revision() || !sources::trusted(&key.id) {
+        return false;
+    }
     lock()
         .entries
         .iter()
@@ -459,22 +491,29 @@ fn work(inbox: &Mutex<Receiver<Key>>, outbox: &Sender<(Key, Option<Gif>)>) {
             continue;
         }
         let id = &key.id;
-        let gif = match fetch::fetch(&mut http, id, key.preview) {
+        let result = if id.is_url() {
+            discover::fetch(&mut http, id, key.revision)
+        } else if sources::trusted(id) {
+            fetch::fetch(&mut http, id, key.preview)
+        } else {
+            Err(fetch::Failure::Refused)
+        };
+        let gif = match result {
             Ok(bytes) => {
                 let gif = decode::decode(&bytes);
                 if gif.is_none() {
-                    crate::log::progress(format_args!(
-                        "GIF {}: not a GIF SJK can show",
-                        id.as_str()
-                    ));
+                    crate::log::progress(format_args!("GIF {}: not a GIF SJK can show", id.host()));
                 }
                 gif
             }
             Err(error) => {
-                crate::log::progress(format_args!("GIF {}: {error}", id.as_str()));
+                crate::log::progress(format_args!("GIF source {}: {error}", id.host()));
                 None
             }
         };
+        if !wanted(&key) {
+            continue;
+        }
         if outbox.send((key, gif)).is_err() {
             return;
         }
@@ -494,6 +533,7 @@ pub(crate) fn insert_preview_for_shot(id: &GifId, bytes: &[u8], held_ms: u64) {
     let key = Key {
         id: id.clone(),
         preview: true,
+        revision: sources::revision(),
     };
     insert_key_for_shot(key, bytes, held_ms);
 }
@@ -530,6 +570,13 @@ pub(crate) fn fail_for_shot(id: &GifId) {
         state: State::Failed(Instant::now()),
         used,
     });
+}
+
+/// Invalidate cached frames and queued work after a trust-list change.
+pub(crate) fn sources_changed() {
+    let mut gifs = lock();
+    gifs.entries.clear();
+    gifs.slots = [const { None }; GPU_SLOTS];
 }
 
 #[cfg(test)]
@@ -694,6 +741,7 @@ mod tests {
         let tile = Key {
             id: chat.id.clone(),
             preview: true,
+            revision: sources::revision(),
         };
         let _ = gifs.show(&chat);
         let _ = gifs.show(&tile);
@@ -712,6 +760,42 @@ mod tests {
         assert_eq!(gif, GifId::new("3o7TKSjRrfIPjeiVyM"));
         let (shown, gif) = for_message_with(text, false, false);
         assert_eq!((shown.as_str(), gif), (text, None), "off");
+    }
+
+    #[test]
+    fn revoked_jobs_cannot_replace_a_new_policy_loading_entry() {
+        let (mut gifs, _inbox, outbox) = cache();
+        let old = id(7);
+        let mut new = old.clone();
+        new.revision += 1;
+        let _ = gifs.show(&old);
+        gifs.entries.clear();
+        gifs.slots = [const { None }; GPU_SLOTS];
+        let _ = gifs.show(&new);
+        outbox.send((old, Some(small_gif()))).unwrap();
+        gifs.take_answers();
+        assert_eq!(gifs.show(&new), Shown::Loading);
+    }
+    #[test]
+    fn switching_clips_starts_a_new_policy_only_on_a_change() {
+        let _switch = video::SWITCH
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let mut invalidated = 0;
+        for (on, changed) in [(true, 1), (true, 1), (false, 2), (false, 2)] {
+            switch_video(on, || invalidated += 1);
+            assert_eq!(invalidated, changed, "{on}");
+        }
+        assert!(!video::available(), "left off, the default");
+    }
+    #[test]
+    fn untrusted_generic_links_remain_text_and_never_enter_the_cache() {
+        let text = "look https://media.example.org/clip.mp4";
+        assert_eq!(for_message_with(text, false, true), (text.to_owned(), None));
+        let id = GifId::from_url("https://media.example.org/clip.mp4").unwrap();
+        assert_eq!(show(&id), Shown::Unavailable);
+        assert_eq!(show_preview(&id), Shown::Unavailable);
+        assert!(!asked_for(&id));
     }
 
     #[test]

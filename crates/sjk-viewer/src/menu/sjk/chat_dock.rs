@@ -389,6 +389,7 @@ pub(crate) struct DockCache {
     mark: Option<Option<(u64, u64, u64)>>,
     /// Whether GIFs were on when the lines were read (`cl_sjkChatGifs`).
     gifs: bool,
+    sources: u64,
     /// The last messages, oldest first.
     lines: Vec<Line>,
     online: u32,
@@ -418,11 +419,13 @@ impl DockCache {
             )
         });
         let gifs = crate::chat_gifs::enabled();
-        if self.mark == Some(mark) && self.gifs == gifs {
+        let sources = crate::chat_gifs::sources::revision();
+        if self.mark == Some(mark) && self.gifs == gifs && self.sources == sources {
             return;
         }
         self.mark = Some(mark);
         self.gifs = gifs;
+        self.sources = sources;
         self.lines.clear();
         self.refused.clear();
         let muted = player_mutes::muted_keys();

@@ -301,10 +301,10 @@ change, so it is part of the release it ships in.
 page ([client.md](client.md#credits-page)); [CREDITS.md](../CREDITS.md) stays
 the full written record. Sol develops SJK alone since October 2026; Bishop is
 credited for JKR, SJK's starting point, in a footnote at the end of both (Sol's
-decision, 18/10/2026: most of JKR's code has since been replaced). Sol's card and
-CREDITS.md's Sol section count the contributors' pull requests Sol reviewed and
-merged; each merged contributor pull request raises that count with the
-contributor's own.
+decision, 18/10/2026: most of JKR's code has since been replaced). Sol's card shows
+the contributors' pull requests Sol reviewed and merged as a "REVIEWED & MERGED"
+chip beside the pull requests and commits: the client counts every "SJK #" piece
+of the other cards' history, so it needs no hand count.
 
 Credits are kept for everything (Sol's rule, 06/10/2026): every merge into
 `main` that brings someone's work updates credits.txt, CREDITS.md and the

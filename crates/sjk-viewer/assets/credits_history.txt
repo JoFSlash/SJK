@@ -9,6 +9,24 @@
 #                               made it when that is not the piece's owner.
 
 = Sol
++ 18/10/2026 | - | SJK pull request #165, trusted chat media sources; WebP, opt-in MP4 via Windows Media Foundation
+- f73cef4 |  | Chat clips: decode MP4 through Windows Media Foundation, not OpenH264
+- ac489b6 |  | Chat media: animated and still WebP from trusted sources
+- 1da3048 |  | Chat media: sources_changed before the test module (clippy items_after_test_module)
+- 543546d |  | Docs and notices for Media Foundation MP4 and WebP chat media
+- 1c62d14 |  | Chat video clips are a player opt-in, off by default (cl_sjkChatVideo)
+- 9e5cfb2 |  | Docs: chat video clips are opt-in, off by default, and why
+- f0c9fd6 |  | Credits for SJK pull request #165 (Lumaya)
++ 18/10/2026 | - | credits_data.rs formatted
+- b25e3d4 |  | Format credits_data.rs (cargo fmt --check failed on main)
++ 18/10/2026 | - | A card on the holocron strip shows as its credits, the card tucked in a corner
+- caa83be |  | Holocron strip: a card shows as its credits, the card tucked in a corner
++ 18/10/2026 | - | REVIEWED & MERGED chip on Sol's credits card
+- d9501d3 |  | Credits: Sol's reviewed and merged pull requests as a chip beside pull requests and commits
++ 18/10/2026 | - | SJK pull request #164, server-reported scoreboard deaths
+- f74163e |  | Credits for SJK pull request #164 (Lukas); its changelog line
++ 18/10/2026 | - | am* commands moved from JoF tools to JA+ tools
+- b1fa179 |  | Complete the am* player commands and emotes as JA+ ones, and JoF's own am* commands in JoF tools
 + 18/10/2026 | - | SJK pull requests #147 #148 #149: Destruction, server dialogue, EJK opt-in in the JoF client mod
 - a7f3151 |  | Build without mod-jof free of warnings again
 - a2f46ae |  | Forward force_destruction to the server where Destruction is not active
@@ -1763,6 +1781,8 @@
 - 0874042 |  | Decode print and cp text as legacy bytes
 
 = Lukas
++ 18/10/2026 | SJK #164 | Show server-reported scoreboard deaths
+- a29c616 |  | Show server-reported scoreboard deaths
 + 18/10/2026 | SJK #154 | Hide corpses and pickups during private duels
 - af1b6be |  | Hide duel corpses and pickups by preference
 + 18/10/2026 | SJK #133 | Show SJK chat in the console
@@ -1789,6 +1809,8 @@
 - ddfe116 |  | Fix Linux clipboard integration
 
 = Lumaya
++ 18/10/2026 | SJK #165 | Add trusted chat media sources and silent MP4 playback
+- 8094630 |  | Add player-approved chat media sources and silent video
 + 18/10/2026 | SJK #149 | Move firing confirmations and EJK opt-in into the JoF mod
 - aec5ec9 |  | Play server-confirmed Stasis and Repulse sounds
 - 6b25434 |  | Move firing confirmations and EJK opt-in into the JoF mod

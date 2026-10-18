@@ -834,6 +834,7 @@ mod tests {
             name: format!("P{client}"),
             team,
             score: 0,
+            reported_deaths: None,
             deaths: None,
             ping: 50,
             time: 1,

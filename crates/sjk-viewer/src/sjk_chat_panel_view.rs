@@ -1089,6 +1089,7 @@ impl Panel {
                 .and_then(|chat| chat.messages.iter().find(|message| message.id == id))
         });
         self.shown.chosen_gif = None;
+        self.shown.chosen_source = None;
         self.shown.blocked.clear();
         let Some(message) = message else {
             self.shown.chosen = None;
@@ -1248,6 +1249,23 @@ impl Panel {
             // Staff's part goes under the button, as far below it as under Mute's line.
             y = at - 30.0;
         }
+        if !muted && let Some((id, _)) = crate::chat_gifs::link::find(&message.text) {
+            let at = y + 104.0;
+            let token = super::gif_sources::OPEN;
+            kit::button(
+                &mut self.ui,
+                frame,
+                [SIDE_X, at, 300.0, 42.0],
+                "Manage GIF source...",
+                false,
+                true,
+                self.focus == token,
+                token,
+            );
+            self.order.push(token);
+            self.shown.chosen_source = Some(id);
+            y = at - 30.0;
+        }
         if !inputs.staff {
             return;
         }
@@ -1400,6 +1418,13 @@ impl Panel {
                 (&["Enter"], "save"),
                 (&["Tab"], "next"),
                 (&["Esc"], "not now"),
+            ]
+        } else if self.gifs.open && self.gifs.tab == super::gif_picker::Tab::Sources {
+            [
+                (&["Ctrl", "V"], "paste"),
+                (&["Enter"], "activate"),
+                (&["Tab"], "next"),
+                (&["Esc"], "close GIFs"),
             ]
         } else if self.gifs.open {
             [

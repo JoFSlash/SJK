@@ -778,6 +778,10 @@ const HELP: &[(&str, &str)] = &[
         "GIPHY links in SJK chat show their GIF. Your PC loads it from GIPHY, which sees your address. Off keeps links as text.",
     ),
     (
+        crate::chat_gifs::VIDEO_CVAR,
+        "Off by default. MP4 clips from the internet are read by Windows' decoder, outside SJK's safe Rust: a crafted clip could exploit it.",
+    ),
+    (
         crate::chat_gifs::search::KEY_CVAR,
         "Your own GIPHY key, which GIF search needs: free at developers.giphy.com. The GIF picker's Search shows how.",
     ),

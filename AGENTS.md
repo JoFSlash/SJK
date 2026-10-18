@@ -97,6 +97,9 @@ multiplayer. Read [docs/status.md](docs/status.md),
 - Follow the [branch, commit and pull request
   rules](docs/development.md#branches-commits-and-pull-requests): one topic per
   branch and pull request, never commit to `main`.
+- Attach screenshots to a pull request whose change players can see, whenever you
+  can take them ([the rule](docs/development.md#branches-commits-and-pull-requests)):
+  the project posts them in its Discord `#screenshots` channel.
 
 ## Documentation is part of the change
 

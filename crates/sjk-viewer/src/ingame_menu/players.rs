@@ -586,6 +586,7 @@ mod tests {
             defends: 0,
             assists: 0,
             captures: 0,
+            deaths: None,
         };
         let scores = [score(2, 30, 40), score(0, 12, 80), score(4, 3, 0)];
         let mut state = State::default();

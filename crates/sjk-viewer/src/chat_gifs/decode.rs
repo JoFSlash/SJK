@@ -4,8 +4,12 @@
 //! too much memory is refused or cut: a canvas over [`MAX_CANVAS`] pixels a side is
 //! refused; an animation over [`MAX_FRAMES`] frames or [`MAX_DECODED`] bytes of pixels
 //! keeps its first frame only, still.
+//!
+//! WebP files (animated or still, from trusted sources) go the same way, decoded by
+//! the pure Rust `image-webp`; MP4 clips go to [`super::video`].
 
 use image::{AnimationDecoder, ImageDecoder, RgbaImage};
+use std::io::Cursor;
 
 /// The largest side a decoded GIF keeps; a larger one is scaled down to it.
 pub(crate) const MAX_SIDE: u32 = 480;
@@ -83,27 +87,59 @@ pub(crate) fn fitted(size: [u32; 2]) -> [u32; 2] {
     [scale(width) as u32, scale(height) as u32]
 }
 
-/// `bytes` (a GIF file) decoded, or `None` when it is not a GIF, is broken, has no
-/// frame or a canvas over [`MAX_CANVAS`].
+/// Whether `bytes` start as a GIF file does.
+pub(crate) fn is_gif(bytes: &[u8]) -> bool {
+    bytes.starts_with(b"GIF87a") || bytes.starts_with(b"GIF89a")
+}
+
+/// Whether `bytes` start as a WebP file does: a RIFF container of form `WEBP`.
+pub(crate) fn is_webp(bytes: &[u8]) -> bool {
+    bytes.starts_with(b"RIFF") && bytes.get(8..12) == Some(b"WEBP")
+}
+
+/// `bytes` (a GIF, WebP or MP4 file) decoded, or `None` when it is none of them, is
+/// broken, has no frame or a canvas over [`MAX_CANVAS`].
 pub(crate) fn decode(bytes: &[u8]) -> Option<Gif> {
+    if super::video::is_mp4(bytes) {
+        return super::video::decode(bytes);
+    }
     decode_within(bytes, MAX_DECODED)
 }
 
-/// [`decode`] keeping at most `budget` bytes of pixels.
+/// [`decode`] of a GIF or WebP file, keeping at most `budget` bytes of pixels.
 fn decode_within(bytes: &[u8], budget: usize) -> Option<Gif> {
-    if !bytes.starts_with(b"GIF87a") && !bytes.starts_with(b"GIF89a") {
-        return None;
+    if is_gif(bytes) {
+        let mut decoder = image::codecs::gif::GifDecoder::new(Cursor::new(bytes)).ok()?;
+        limit(&mut decoder)?;
+        animation(decoder, budget)
+    } else if is_webp(bytes) {
+        let mut decoder = image::codecs::webp::WebPDecoder::new(Cursor::new(bytes)).ok()?;
+        limit(&mut decoder)?;
+        if decoder.has_animation() {
+            animation(decoder, budget)
+        } else {
+            still(decoder, budget)
+        }
+    } else {
+        None
     }
-    let mut decoder = image::codecs::gif::GifDecoder::new(std::io::Cursor::new(bytes)).ok()?;
+}
+
+/// Hold `decoder` to [`MAX_CANVAS`] and [`DECODER_ALLOC`]; `None` when the canvas
+/// stated in the header is over it or empty.
+fn limit(decoder: &mut impl ImageDecoder) -> Option<()> {
     let mut limits = image::Limits::default();
     limits.max_image_width = Some(MAX_CANVAS);
     limits.max_image_height = Some(MAX_CANVAS);
     limits.max_alloc = Some(DECODER_ALLOC);
     decoder.set_limits(limits).ok()?;
     let (width, height) = decoder.dimensions();
-    if width == 0 || height == 0 {
-        return None;
-    }
+    (width > 0 && height > 0).then_some(())
+}
+
+/// An animated file's frames, within [`MAX_FRAMES`] and `budget`.
+fn animation<'a>(decoder: impl ImageDecoder + AnimationDecoder<'a>, budget: usize) -> Option<Gif> {
+    let (width, height) = decoder.dimensions();
     let size = fitted([width, height]);
     let frame_bytes = size[0] as usize * size[1] as usize * 4;
     let mut frames = Vec::new();
@@ -137,6 +173,26 @@ fn decode_within(bytes: &[u8], budget: usize) -> Option<Gif> {
         size,
         frames,
         length_ms,
+    })
+}
+
+/// A still picture as a one-frame [`Gif`].
+fn still(decoder: impl ImageDecoder, budget: usize) -> Option<Gif> {
+    let (width, height) = decoder.dimensions();
+    let size = fitted([width, height]);
+    if size[0] as usize * size[1] as usize * 4 > budget {
+        return None;
+    }
+    let image = image::DynamicImage::from_decoder(decoder)
+        .ok()?
+        .into_rgba8();
+    Some(Gif {
+        size,
+        frames: vec![Frame {
+            rgba: scaled(image, size).into_raw().into_boxed_slice(),
+            delay_ms: SLOW_DELAY_MS,
+        }],
+        length_ms: 0,
     })
 }
 
@@ -182,8 +238,14 @@ pub(crate) fn encode_for_test(size: [u32; 2], frames: &[(Vec<u8>, u32)]) -> Vec<
 /// blue field, `delay` milliseconds each.
 #[cfg(test)]
 pub(crate) fn test_animation(size: [u32; 2], count: usize, delay: u32) -> Vec<u8> {
+    encode_for_test(size, &test_frames(size, count, delay))
+}
+
+/// [`test_animation`]'s frames, RGBA with their delays.
+#[cfg(test)]
+fn test_frames(size: [u32; 2], count: usize, delay: u32) -> Vec<(Vec<u8>, u32)> {
     let [width, height] = size;
-    let frames: Vec<(Vec<u8>, u32)> = (0..count)
+    (0..count)
         .map(|index| {
             let centre = [
                 (index as f32 + 0.5) / count as f32 * width as f32,
@@ -207,13 +269,110 @@ pub(crate) fn test_animation(size: [u32; 2], count: usize, delay: u32) -> Vec<u8
             }
             (rgba, delay)
         })
-        .collect();
-    encode_for_test(size, &frames)
+        .collect()
+}
+
+/// An animated WebP file of `frames` (each `size`, RGBA, with its delay in
+/// milliseconds), made for the tests: each frame encoded lossless by `image-webp`,
+/// the frames put together in an `ANIM`/`ANMF` container as the WebP container
+/// specification lays it out. One frame gives a still, simple-format file.
+#[cfg(test)]
+pub(crate) fn encode_webp_for_test(size: [u32; 2], frames: &[(Vec<u8>, u32)]) -> Vec<u8> {
+    fn chunk(kind: &[u8; 4], body: &[u8]) -> Vec<u8> {
+        let mut bytes = kind.to_vec();
+        bytes.extend_from_slice(&(body.len() as u32).to_le_bytes());
+        bytes.extend_from_slice(body);
+        if body.len() % 2 == 1 {
+            bytes.push(0);
+        }
+        bytes
+    }
+    fn u24(value: u32) -> [u8; 3] {
+        let [a, b, c, _] = value.to_le_bytes();
+        [a, b, c]
+    }
+    let still = |rgba: &[u8]| {
+        let mut bytes = Vec::new();
+        image::codecs::webp::WebPEncoder::new_lossless(&mut bytes)
+            .encode(rgba, size[0], size[1], image::ExtendedColorType::Rgba8)
+            .expect("webp frame");
+        bytes
+    };
+    if let [(rgba, _)] = frames {
+        return still(rgba);
+    }
+    let mut body = b"WEBP".to_vec();
+    let mut header = vec![0x12, 0, 0, 0]; // animation and alpha
+    header.extend(u24(size[0] - 1));
+    header.extend(u24(size[1] - 1));
+    body.extend(chunk(b"VP8X", &header));
+    body.extend(chunk(b"ANIM", &[0, 0, 0, 0, 0, 0]));
+    for (rgba, delay) in frames {
+        let file = still(rgba);
+        assert_eq!(&file[12..16], b"VP8L", "a simple lossless file");
+        let mut frame = [
+            u24(0),
+            u24(0),
+            u24(size[0] - 1),
+            u24(size[1] - 1),
+            u24(*delay),
+        ]
+        .concat();
+        frame.push(0b10); // drawn over nothing: no blending, no disposal
+        frame.extend_from_slice(&file[12..]);
+        body.extend(chunk(b"ANMF", &frame));
+    }
+    chunk(b"RIFF", &body)
+}
+
+/// [`test_animation`]'s frames as an animated WebP.
+#[cfg(test)]
+pub(crate) fn test_webp(size: [u32; 2], count: usize, delay: u32) -> Vec<u8> {
+    encode_webp_for_test(size, &test_frames(size, count, delay))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn an_animated_webp_keeps_its_frames_and_delays() {
+        let bytes = test_webp([40, 20], 4, 80);
+        assert!(is_webp(&bytes));
+        let gif = decode(&bytes).expect("decoded");
+        assert_eq!(gif.size, [40, 20]);
+        assert_eq!(gif.frames.len(), 4);
+        assert!(gif.frames.iter().all(|frame| frame.delay_ms == 80));
+        assert_eq!(gif.length_ms, 320);
+        assert_ne!(gif.frames[0].rgba, gif.frames[3].rgba);
+        // Lossless: the same pixels as the GIF made of the same frames.
+        let same = decode(&test_animation([40, 20], 4, 80)).expect("gif");
+        assert_eq!(gif.frames[2].rgba, same.frames[2].rgba);
+        assert_eq!(gif.frame_at(80), 1);
+        // A WebP's fast delays are slowed as a GIF's are.
+        let fast = decode(&test_webp([16, 16], 3, 0)).expect("decoded");
+        assert!(fast.frames.iter().all(|frame| frame.delay_ms == 100));
+    }
+
+    #[test]
+    fn a_still_webp_is_one_frame_and_webp_limits_are_the_gif_ones() {
+        let gif = decode(&test_webp([960, 240], 1, 0)).expect("still");
+        assert_eq!(
+            (gif.size, gif.frames.len(), gif.length_ms),
+            ([480, 120], 1, 0)
+        );
+        assert_eq!(gif.frames[0].rgba.len(), 480 * 120 * 4);
+        let gif = decode(&test_webp([8, 8], MAX_FRAMES + 1, 40)).expect("decoded");
+        assert_eq!(gif.frames.len(), 1, "over the frame cap: still");
+        let budget = 10 * 16 * 16 * 4;
+        let gif = decode_within(&test_webp([16, 16], 11, 40), budget).expect("decoded");
+        assert_eq!(gif.frames.len(), 1, "over the pixel budget: still");
+        // A canvas wider than the cap, stated in the VP8X header.
+        let mut wide = test_webp([8, 8], 2, 40);
+        wide[24..27].copy_from_slice(&MAX_CANVAS.to_le_bytes()[..3]);
+        assert!(decode(&wide).is_none());
+        assert!(decode(b"RIFF   WEBP").is_none());
+    }
 
     #[test]
     fn an_animation_keeps_its_frames_and_delays() {

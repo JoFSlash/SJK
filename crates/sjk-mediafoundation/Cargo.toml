@@ -1,0 +1,32 @@
+[package]
+name = "sjk-mediafoundation"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+description = "Silent H.264 MP4 decoding through Windows Media Foundation, behind a safe API"
+
+[features]
+# `encode_h264_mp4`, Windows' own H.264 encoder, used by tests to make clips.
+test-encoder = []
+
+[target.'cfg(windows)'.dependencies]
+windows = { version = "0.62.2", features = [
+    "Win32_Foundation",
+    "Win32_Media_MediaFoundation",
+    "Win32_System_Com",
+    "Win32_System_Com_StructuredStorage",
+    "Win32_System_LibraryLoader",
+] }
+
+# The one crate allowed `unsafe`: every Media Foundation call is a COM call. Each
+# block says why it is sound (undocumented_unsafe_blocks); the rest of the workspace
+# keeps `unsafe_code = "forbid"`.
+[lints.rust]
+unsafe_code = "allow"
+unsafe_op_in_unsafe_fn = "deny"
+
+[lints.clippy]
+dbg_macro = "deny"
+todo = "deny"
+undocumented_unsafe_blocks = "deny"

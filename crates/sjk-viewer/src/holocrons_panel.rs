@@ -1220,9 +1220,14 @@ mod tests {
         for viewport in [[1920.0, 1080.0], [3840.0, 2160.0], [1440.0, 1080.0]] {
             // One by one: the unseal, the spin, the entrance and the words, every tenth.
             for finish in ["normal", "holo", "solar"] {
+                // The second a pack, its shards' tile sliding out too.
+                let pack = sjk_identity::Opened {
+                    shards: 3,
+                    ..opened("rare", finish)
+                };
                 let shown = vec![
                     opening::Prize::of(&opened("mythical", finish)).unwrap(),
-                    opening::Prize::of(&opened("rare", finish)).unwrap(),
+                    opening::Prize::of(&pack).unwrap(),
                 ];
                 panel.show(shown, start);
                 for tenth in 0..110 {
@@ -1253,6 +1258,22 @@ mod tests {
             for quarter in 0..120 {
                 panel.build_at(viewport, start + Duration::from_millis(quarter * 250));
                 assert!(!panel.overflowed(), "batch at {quarter} in {viewport:?}");
+            }
+            // Twenty Holo cards, the most shapes a light tile takes (its credits, its card
+            // tucked in its corner, the rainbow across it).
+            let holo: Vec<opening::Prize> = (0..20)
+                .map(|at| {
+                    let tier = ["uncommon", "rare", "legendary", "mythical"][at % 4];
+                    opening::Prize::of(&opened(tier, "holo")).unwrap()
+                })
+                .collect();
+            panel.show(holo, start);
+            for quarter in 0..60 {
+                panel.build_at(viewport, start + Duration::from_millis(quarter * 250));
+                assert!(
+                    !panel.overflowed(),
+                    "holo batch at {quarter} in {viewport:?}"
+                );
             }
             let _ = panel.ask(vec![3], start);
             panel.ceremony = Some(opening::Ceremony::Waiting {

@@ -809,7 +809,7 @@ that mode for the visit and leaves the player's choice as it was.
     weapon moved to Gameplay's camera rows), and the scoreboard's rows under a
     Scoreboard heading; Chat the chat box (Chat box: visibility, text size,
     emojis, remembered channel and letter spacing) and the SJK chat (SJK
-    chat, its GIFs and the GIPHY key); Mods the asset browser (Packs), JA+ and
+    chat, its GIFs, its video clips opt-in and the GIPHY key); Mods the asset browser (Packs), JA+ and
     JoF tools (Server mods), JoF content's card and host (JoF content),
     invisible brushes (Map tools) and the showcase tools (Experimental); Network SJK online and Connection. A test checks that
     every setting is on exactly one of Advanced's categories. The classic+
@@ -1201,8 +1201,8 @@ and out as the classic board does, settling into place as it opens.
   52 tall at most, with a hairline under it: the place (Rajdhani; ties share
   it), the name with its colours (Exo 2), SJK's emblem right after it for a
   player the hub knows (gold when vouched for, as elsewhere), at intermission a
-  gold "Ready", then the score, the deaths when `cg_scoredeaths` counts them,
-  the minutes played, and the ping as the browser's signal bars and the number.
+  gold "Ready", then the score (as `score/deaths` when `cg_scoreDeaths` provides
+  deaths), the minutes played, and the ping as the browser's signal bars and the number.
   Your row has the UI's band with its gold bar, and its place, score, bars and
   ping in gold. Bots and players still joining are muted, with "Bot", "Joining"
   or "Connecting" for their ping.
@@ -1222,12 +1222,13 @@ and out as the classic board does, settling into place as it opens.
   or, where that would put it over the chat column, stands 40 right of the
   column (as near the middle as the chat allows); it never ends past 1824 or
   grows wider than the full board, the name column giving way (to 100 at the
-  least). A duel's cards keep their size about that middle, the players
+  least). Deaths share the score column rather than adding another column. A duel's
+  cards keep their size about that middle, the players
   waiting centred under them. The dim behind the columns follows the board,
   fading out on both sides, and "Watching" starts at its left edge. In the UI's
   families at 1080 lines (`scoreboard::shot` tests, on the world shot's made-up
-  names), a free for all of 8 is 440 frame pixels wide (500 with deaths
-  counted) and of 32, 411 (471), centred; a Team FFA of 6 a side is 835 and
+  names), a free for all of 8 is 440 frame pixels wide and of 32 is 411,
+  centred; a Team FFA of 6 a side is 835 and
   capture the flag of 6 a side 1142, both from 680 beside the chat column
   (four number columns and a player's three medal bars leave capture little to
   gain), against 1144 for the full board in every mode. Off, the sizes below
@@ -2196,6 +2197,17 @@ group in the script (`SYMBOLS`) and gets its name in `symbols.rs`.
   is drawn on the HUD's layer with a canvas of its own, its text routed to the
   families when they are loaded (`quick_wheel::append`), else to Inter; it does
   not load them itself.
+
+## Chat media sources
+
+SJK chat's GIF picker includes a Sources tab in every menu style. It edits the
+profile's exact-host trust list, keeps GIPHY by default, and requires an explicit
+Trust source action after typing or selecting a host. A selected message's Manage
+GIF source action opens the same editor. Discovered media CDN hosts are listed for
+separate approval; removing a source stops cached playback. See
+[trusted media sources](hub-chat.md#trusted-media-sources) for formats and privacy.
+The field uses the shared text-entry handler, including selection, clipboard and
+held-key editing.
 
 ## Plan
 

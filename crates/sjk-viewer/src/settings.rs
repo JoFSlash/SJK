@@ -711,6 +711,10 @@ impl SettingsMenu {
         let Some(setting) = self.rows().get(self.selected) else {
             return;
         };
+        // A switch for what this system lacks stays off ([`PLATFORM_ROWS`]).
+        if !available_here(setting.cvar) {
+            return;
+        }
         if let Some(switch) = derived_switch(setting.cvar) {
             (switch.toggle)(console);
             self.refresh(console);
@@ -1037,6 +1041,21 @@ fn renderer_setting(cvar: &str) -> bool {
 }
 
 /// The derived switch row `cvar` names, if it is one: the strafe lines.
+/// Rows that work only on some systems, each with whether this build is one: shown
+/// everywhere (their help says where they work), but elsewhere their switch stays off.
+const PLATFORM_ROWS: &[(&str, bool)] = &[
+    // Media Foundation, Windows' own decoder, plays chat MP4 clips (`chat_gifs/video.rs`).
+    (crate::chat_gifs::VIDEO_CVAR, cfg!(windows)),
+];
+
+/// Whether row `cvar` can be switched on this system ([`PLATFORM_ROWS`]).
+pub(super) fn available_here(cvar: &str) -> bool {
+    PLATFORM_ROWS
+        .iter()
+        .find(|(row, _)| row.eq_ignore_ascii_case(cvar))
+        .is_none_or(|(_, available)| *available)
+}
+
 pub(super) fn derived_switch(cvar: &str) -> Option<DerivedSwitch> {
     match cvar {
         crate::hud::movement::LINES_ROW => Some(DerivedSwitch {
@@ -1216,6 +1235,12 @@ mod tests {
         // Its GIFs under the sound, on by default.
         assert_eq!(network.get(hub + 3), Some(&crate::chat_gifs::CVAR));
         assert_eq!(console.bool_cvar(crate::chat_gifs::CVAR), Some(true));
+        // Video clips under the GIFs, off by default (Sol's condition), and only
+        // switchable where Windows' decoder exists.
+        assert_eq!(network.get(hub + 4), Some(&crate::chat_gifs::VIDEO_CVAR));
+        assert_eq!(console.bool_cvar(crate::chat_gifs::VIDEO_CVAR), Some(false));
+        assert_eq!(available_here(crate::chat_gifs::VIDEO_CVAR), cfg!(windows));
+        assert!(available_here("cl_sjkChat"));
     }
 
     #[test]

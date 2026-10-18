@@ -7,7 +7,9 @@
 //! The neighbours are what the holocron's tier can drop and nothing else: the cards it can
 //! hold (each rarity and finish with odds above zero), the droppable shaders it can bring
 //! and its pile of kyber shards, each weighted by its chance, by the hub's odds
-//! ([`crate::loot_odds`]); the hub decides, this only dresses it.
+//! ([`crate::loot_odds`]); the hub decides, this only dresses it. A card shows as its
+//! credits, with the card tucked face down in a corner (18/10/2026): the prize's are what
+//! the hub gave, a neighbour's a whole number in its tier's range.
 
 use crate::cards::{FINISHES, RARITIES};
 use crate::unlockables::{self, Rarity, Unlockable};
@@ -51,8 +53,17 @@ pub(crate) const STACKED: Geometry = Geometry {
 /// What a tile shows.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(crate) enum Item {
-    /// A card of rarity and finish (positions in [`RARITIES`] and [`FINISHES`]).
-    Card { rarity: usize, finish: usize },
+    /// A card of rarity and finish (positions in [`RARITIES`] and [`FINISHES`]) out of a
+    /// holocron of tier `tier`, with its credits: the strip shows it as its credits with
+    /// the card tucked face down in a corner, its back in the holocron's colour
+    /// (18/10/2026). `credits` is what the hub gave for the prize, and for a neighbour an
+    /// amount in its tier's range (0 in [`pool`], filled in by [`strip`]).
+    Card {
+        rarity: usize,
+        finish: usize,
+        tier: usize,
+        credits: u64,
+    },
     /// A saber shader.
     Shader(&'static Unlockable),
     /// A saber shader newer than this client (only ever the prize).
@@ -78,7 +89,7 @@ impl Item {
     /// shader's tier or a card's rarity (Common to Legendary), then a card's finish.
     pub(crate) fn grade(self) -> u32 {
         match self {
-            Self::Card { rarity, finish } => rarity as u32 * 10 + finish as u32 * 4,
+            Self::Card { rarity, finish, .. } => rarity as u32 * 10 + finish as u32 * 4,
             Self::Shader(skin) => skin.tier as u32 * 10 + 1,
             Self::New => 21,
             // A consolation: above a plain Common card, below everything rarer.
@@ -90,7 +101,7 @@ impl Item {
     /// shader.
     pub(crate) fn grand(self) -> bool {
         match self {
-            Self::Card { rarity, finish } => rarity == 3 || finish == 2,
+            Self::Card { rarity, finish, .. } => rarity == 3 || finish == 2,
             Self::Shader(skin) => skin.tier >= Rarity::Legendary,
             Self::New | Self::Shards { .. } => false,
         }
@@ -144,7 +155,15 @@ pub(crate) fn pool(tier: usize) -> Vec<(Item, u64)> {
                 * u64::from(odds.rarity[rarity])
                 * u64::from(odds.finish[finish]);
             if weight > 0 {
-                pool.push((Item::Card { rarity, finish }, weight));
+                pool.push((
+                    Item::Card {
+                        rarity,
+                        finish,
+                        tier,
+                        credits: 0,
+                    },
+                    weight,
+                ));
             }
         }
     }
@@ -195,21 +214,42 @@ impl Mix {
 }
 
 /// The strip of a holocron of tier `tier` numbered `holocron` that ends on `prize`: made-up
-/// neighbours picked by the tier's odds and the prize in place [`WIN`].
+/// neighbours picked by the tier's odds and the prize in place [`WIN`]; a neighbouring
+/// card's credits are a whole number in the tier's range (the hub's `credits`).
 pub(crate) fn strip(tier: usize, holocron: u64, prize: Item) -> Vec<Item> {
     let pool = pool(tier);
     let total: u64 = pool.iter().map(|(_, weight)| weight).sum();
     let mut mix = Mix(holocron ^ 0x5EED_C4A7_E000_0000);
+    // Its own generator, so the credits do not change which neighbours come up.
+    let mut amounts = Mix(holocron ^ 0xC4ED_175E_ED00_0000);
+    let (least, most) = crate::loot_odds::current().credits[tier.min(crate::holocrons::COUNT - 1)];
+    let (least, most) = (u64::from(least), u64::from(most.max(least)));
     let mut tiles: Vec<Item> = (0..TILES)
         .map(|_| {
             let mut roll = mix.next() % total.max(1);
+            let mut picked = pool[0].0;
             for (item, weight) in &pool {
                 if roll < *weight {
-                    return *item;
+                    picked = *item;
+                    break;
                 }
                 roll -= weight;
             }
-            pool[0].0
+            let credits = least + amounts.next() % (most - least + 1);
+            match picked {
+                Item::Card {
+                    rarity,
+                    finish,
+                    tier,
+                    ..
+                } => Item::Card {
+                    rarity,
+                    finish,
+                    tier,
+                    credits,
+                },
+                other => other,
+            }
         })
         .collect();
     tiles[WIN] = prize;
@@ -271,7 +311,13 @@ mod tests {
             for (item, weight) in &pool {
                 assert!(*weight > 0);
                 match item {
-                    Item::Card { rarity, finish } => {
+                    Item::Card {
+                        rarity,
+                        finish,
+                        tier: of,
+                        credits,
+                    } => {
+                        assert_eq!((*of, *credits), (tier, 0), "a pool's card, no credits yet");
                         assert!(cards::ODDS[tier].rarity[*rarity] > 0);
                         assert!(cards::ODDS[tier].finish[*finish] > 0);
                     }
@@ -348,7 +394,9 @@ mod tests {
             pile.grade()
                 > Item::Card {
                     rarity: 0,
-                    finish: 0
+                    finish: 0,
+                    tier: 0,
+                    credits: 0,
                 }
                 .grade()
         );
@@ -356,7 +404,9 @@ mod tests {
             pile.grade()
                 < Item::Card {
                     rarity: 1,
-                    finish: 0
+                    finish: 0,
+                    tier: 0,
+                    credits: 0,
                 }
                 .grade()
         );
@@ -368,12 +418,50 @@ mod tests {
         let prize = Item::Card {
             rarity: 3,
             finish: 1,
+            tier: 2,
+            credits: 97,
         };
         let strip_a = strip(2, 17, prize);
         assert_eq!(strip_a.len(), TILES);
         assert_eq!(strip_a[WIN], prize);
         assert_eq!(strip_a, strip(2, 17, prize));
         assert_ne!(strip_a, strip(2, 18, prize));
+    }
+
+    /// A card on the strip shows its credits: the prize what the hub gave, a neighbour a
+    /// whole number in its tier's range, not all the same.
+    #[test]
+    fn a_strips_cards_carry_credits_in_their_tiers_range() {
+        let table = crate::loot_odds::current();
+        for (tier, (holocron_tier, (least, most))) in TIERS.iter().zip(table.credits).enumerate() {
+            let prize = Item::Card {
+                rarity: 0,
+                finish: 0,
+                tier,
+                credits: 1_234,
+            };
+            let mut seen = Vec::new();
+            for holocron in 0..40 {
+                let tiles = strip(tier, holocron, prize);
+                assert_eq!(tiles[WIN], prize);
+                for (at, tile) in tiles.iter().enumerate() {
+                    if let (false, Item::Card { credits, .. }) = (at == WIN, tile) {
+                        assert!(
+                            (u64::from(least)..=u64::from(most)).contains(credits),
+                            "{} {credits}",
+                            holocron_tier.id
+                        );
+                        seen.push(*credits);
+                    }
+                }
+            }
+            seen.sort_unstable();
+            seen.dedup();
+            assert!(seen.len() > 3, "{}: {seen:?}", holocron_tier.id);
+        }
+        // The hub's copy: Uncommon 10 to 20 credits, Mythical 250 to 350.
+        assert_eq!(crate::loot_odds::BUILT_IN.credits[0], (10, 20));
+        assert_eq!(crate::loot_odds::BUILT_IN.credits[3], (250, 350));
     }
 
     #[test]
@@ -406,7 +494,12 @@ mod tests {
 
     #[test]
     fn the_finest_finds_come_first_and_the_grand_ones_are_marked() {
-        let card = |rarity, finish| Item::Card { rarity, finish };
+        let card = |rarity, finish| Item::Card {
+            rarity,
+            finish,
+            tier: 0,
+            credits: 0,
+        };
         let shader = |id| Item::Shader(unlockables::find(id).unwrap());
         assert!(card(3, 0).grand() && card(0, 2).grand());
         assert!(!card(2, 1).grand());

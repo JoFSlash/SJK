@@ -27,7 +27,7 @@ const BIG: f32 = 200.0;
 const BIG_ROWS: usize = gem::ROWS;
 const SMALL_ROWS: usize = 9;
 /// The Holo sheen's bands and their hues, red to violet.
-const HOLO_BANDS: [[f32; 3]; 6] = [
+pub(crate) const HOLO_BANDS: [[f32; 3]; 6] = [
     [1.0, 0.35, 0.45],
     [1.0, 0.75, 0.3],
     [0.55, 1.0, 0.45],

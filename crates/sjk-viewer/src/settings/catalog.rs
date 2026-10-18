@@ -1032,6 +1032,11 @@ pub(super) const NETWORK: &[Setting] = &[
         kind: ValueKind::Bool,
     },
     Setting {
+        label: "Play chat video clips (Windows)",
+        cvar: crate::chat_gifs::VIDEO_CVAR,
+        kind: ValueKind::Bool,
+    },
+    Setting {
         label: "GIPHY key",
         cvar: crate::chat_gifs::search::KEY_CVAR,
         kind: ValueKind::Text,

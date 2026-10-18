@@ -193,6 +193,9 @@ fn parse(body: &[u8]) -> Result<Page, Failure> {
 
 /// One request: the status and, for a 200, the body.
 fn get(agent: &ureq::Agent, url: &str) -> Result<Page, Failure> {
+    if !super::enabled() || !super::sources::trusted_host("giphy.com") {
+        return Err(Failure::Status(403));
+    }
     let mut response = agent
         .get(url)
         .header("Accept", "application/json")

@@ -229,25 +229,32 @@ fn duel6_sjk_economy_shots() {
     });
 }
 
-/// A card as a pack (17/10/2026): a sealed Rare card with its credits and shards in
-/// tiles beside it, coming in, counted and with its words; then a card with a face, and
-/// the pack in a 4:3 window.
+/// A card as a pack (17/10/2026; its credits on the strip, 18/10/2026): the strip running
+/// and at rest on a card's credits, the card tucked face down in the tile's corner, for an
+/// Uncommon, a Rare Holo and a Mythical holocron's Legendary card; then the Rare Holo pack's
+/// credits rising, sliding aside as the card slides out, the card flipping, its flourish,
+/// the shards counting and its words; one with a face, and the pack in a 4:3 window.
 #[test]
 #[ignore = "renders with the GPU and the installed game data named by JKA_GAME_DATA"]
 fn duel6_sjk_card_pack() {
     on_big_stack(|| {
-        let pack = |card: Option<String>| {
-            Prize::Card(Shown {
-                holocron: 21,
-                tier: 1,
-                rarity: &crate::cards::RARITIES[1],
-                finish: &crate::cards::FINISHES[1],
-                edition: "Alpha Edition".to_owned(),
-                credits: 42,
-                shards: 4,
-                card,
-            })
+        let pack = |holocron: u64, tier: usize, [rarity, finish]: [usize; 2], credits: u64| {
+            move |card: Option<String>| {
+                Prize::Card(Shown {
+                    holocron,
+                    tier,
+                    rarity: &crate::cards::RARITIES[rarity],
+                    finish: &crate::cards::FINISHES[finish],
+                    edition: "Alpha Edition".to_owned(),
+                    credits,
+                    shards: 4,
+                    card,
+                })
+            }
         };
+        let rare = pack(21, 1, [1, 1], 42);
+        let uncommon = pack(23, 0, [0, 0], 14);
+        let mythical = pack(27, 3, [3, 2], 312);
         // Sol's first card, as the card shots show it (from the hub's packs).
         let face = Some("sol_lore_001".to_owned());
         let mut moments = Vec::new();
@@ -261,20 +268,30 @@ fn duel6_sjk_card_pack() {
                 println!("{}", path.display());
                 moments.push(image::open(path).expect("the shot").to_rgba8());
             };
-            let moments_here: &[(f32, &str, bool)] = if name.is_empty() {
+            type Pack<'a> = &'a dyn Fn(Option<String>) -> Prize;
+            let moments_here: &[(Pack<'_>, f32, &str, bool)] = if name.is_empty() {
                 &[
-                    (1.15, "sliding", false),
-                    (1.6, "counting", false),
-                    (3.0, "words", false),
-                    (3.0, "face", true),
+                    (&uncommon, -1.6, "running-uncommon", false),
+                    (&uncommon, -0.2, "rest-uncommon", false),
+                    (&rare, -0.2, "rest-rare", false),
+                    (&mythical, -0.2, "rest-mythical", false),
+                    (&rare, 0.7, "rising", false),
+                    (&rare, 1.3, "sliding", false),
+                    (&rare, 1.68, "flipping", false),
+                    (&rare, 1.85, "flipped", false),
+                    (&rare, 2.15, "flourish", false),
+                    (&mythical, 2.15, "flourish-solar", false),
+                    (&rare, 2.45, "counting", false),
+                    (&rare, 3.1, "words", false),
+                    (&rare, 3.1, "face", true),
                 ]
             } else {
-                &[(3.0, "words", false)]
+                &[(&rare, 3.1, "words", false)]
             };
-            for &(elapsed, moment, with_face) in moments_here {
+            for &(prize, elapsed, moment, with_face) in moments_here {
                 let card = if with_face { face.clone() } else { None };
                 if let Some(console) = gpu.console.as_mut() {
-                    console.preview_opening(Some(vec![pack(card)]), elapsed, 3.1);
+                    console.preview_opening(Some(vec![prize(card)]), elapsed, 3.1);
                 }
                 keep(&mut gpu, 40, &format!("{moment}{name}"));
             }

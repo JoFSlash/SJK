@@ -1,3 +1,84 @@
+## Server-reported scoreboard deaths
+
+18/10/2026, `feat/scoreboard-deaths`, based on `origin/main` `96569426`: the
+15th field in JA+/jaPRO `scores` rows is now retained and shown by both
+scoreboard styles as `score/deaths` in the existing score column. Previously it
+was used only to identify the wider row, so the default `cg_scoreDeaths 1`
+still showed score alone. JoF EJK's modes are preserved: 0 hides deaths, 1 uses
+the server value, 2 uses it with a session-local fallback, and 3 forces the
+local counter; duel and CTF exclusions remain. Parser tests cover stock rows,
+plugin rows including a signed value, full servers and ambiguous row lengths;
+a focused policy test covers modes 0-3. On Linux x86_64 with Rust 1.99.1,
+formatting, the locked workspace build and test suite, all-target Clippy, and the
+locked release viewer/dedicated build pass; existing warnings remain.
+Live-server display remains unverified.
+
+## Trusted chat media sources
+
+18/10/2026, `feat/trusted-gif-sources`, based on `Sol-Vulpes/SJK` `96569426`:
+implemented the shared SJK chat Sources editor, profile-local exact-host approval
+and revocation, generic HTTPS direct/HTML media discovery, and silent AVC/H.264 MP4
+decoding. GIPHY remains the default trusted provider. Unknown sources stay text;
+redirect/CDN hosts require separate approval. Removing a host invalidates cached,
+queued and in-flight results. The existing media switch and muted-sender rules apply.
+See [hub-chat.md](hub-chat.md#trusted-media-sources) for limits and privacy.
+
+Reworked 18/10/2026 on `personal/pr-165` (Sol's decision: no C in the project).
+OpenH264 and the `mp4` and `h264-reader` crates are gone; MP4 clips decode through
+Windows Media Foundation in the new `sjk-mediafoundation` crate (the one crate allowed
+`unsafe`, DLLs loaded at run time), and are unavailable on Linux and on Windows N
+without the Media Feature Pack. Animated and still WebP were added (pure Rust
+`image-webp`). Verified on Windows 11 Pro, Rust 1.99: `cargo build --locked
+--workspace`, `cargo test --locked --workspace` (3302 passed, 0 failed, 165 ignored)
+and Clippy with no new warnings in the changed files. A 64 x 48 three-frame clip
+encoded at test time by Windows' H.264 encoder passes the box walk and decodes with
+its top/bottom colours (orientation), 100 ms delays and loop; animated WebP files
+built at test time decode with their delays and the GIF frame/pixel limits; box,
+picture-conversion, stride, aperture and delay rules have unit tests. `sjk.exe`
+imports nothing from `mfplat.dll`/`mfreadwrite.dll` (checked in the debug build).
+`cargo check` and Clippy for `x86_64-unknown-linux-gnu` pass with stubbed C build tools
+(no Linux run). `cargo tree` shows no OpenH264, `mp4` or `h264-reader` and no new `-sys`
+crate. Not verified: a Windows N edition, a real Media Feature Pack absence, clips from
+real sites, or the client in game. The MP4 and notice evidence in the next paragraph
+predates the rework.
+
+Sol's condition for the crate (18/10/2026): video clips are a player opt-in,
+`cl_sjkChatVideo` (archived, default 0, Settings > Chat > Play chat video clips
+(Windows), classic+ under Network), because the files come from the internet and are
+parsed by Windows code outside SJK's Rust. While off, MP4 is unavailable exactly as
+without Media Foundation and its DLLs are never loaded; a switch either way starts a
+new source-policy revision (cache and queued work dropped), no restart. On Linux the
+row stays off. The Sources page says clips need the setting. Tests cover the default
+(off, no MF), the Accept header and pre-body refusal without video, discovery taking
+`og:image`, a switch only invalidating on a change, the invalidation dropping decoded
+media, and the settings row (position, default, Windows-only switch); the MF round
+trip calls the decoder directly.
+
+Verified on Windows 11 Pro, Rust 1.99.0: workspace formatting, locked build, tests
+and clippy pass (warnings remain). Focused tests cover exact hosts, credential/local
+URL refusal, public-address filtering, blocked initial requests/redirects/CDNs,
+HTML media resolution without scripts, stale job rejection, untrusted links staying
+text, URL favourites, shared field editing and explicit source selection. An original
+three-frame MP4 encoded in memory decodes with its colours and timing; malformed box
+sizes and oversized tables are refused before third-party parsing. An isolated
+optimized-build profile check verifies saved approval/removal, cached-media invalidation,
+removing the GIPHY default and a failed save leaving the policy unchanged. The release
+CPU measurement on a Ryzen 7 5800X3D formats/checks 24 messages (12 repeats each
+of one GIPHY and one untrusted HTTPS link) with a warm 512-entry parse cache in
+2.662 microseconds per iteration (100,000 iterations). It
+excludes cold parsing, HTTP, decoding, layout, uploads and whole-scene frame time.
+The offscreen picker test passes with ten 1080p/4K captures. Focused Sources captures
+with a typed URL and an uncontacted CDN pass at 1080p with classic menus and at 4K
+with SJK menus, visually inspected on an RTX 5070 Ti. Windows release dependency
+notice collection succeeds, including the then-bundled codec's upstream notice and
+bindings' declared license/author manifest. No automated chat or live game server was used.
+
+Not verified: arbitrary third-party site compatibility or Linux runtime. Private
+APIs, login/script players, non-AVC codecs, fragmented MP4 and streaming playlists
+are unsupported. The bounded MP4 path loops its retained beginning on long clips;
+already-started network traffic cannot be recalled after revocation. These checks
+are not a gameplay parity or whole-scene performance certification.
+
 ## Siege objective notices
 
 18/10/2026, `feat/siege-objective-notice`, based on `Sol-Vulpes/SJK` `3483b1b`: on

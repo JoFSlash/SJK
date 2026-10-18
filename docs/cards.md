@@ -380,6 +380,17 @@ how its art was made; the footer reads "Art: <artist>".
     streaks across it and trails it. At rest (`sub_select`) the prize lifts and lights
     up in its colour, breathing, the others dim to a third, and a grand prize (a
     Legendary or Solar card, a Legendary or Mythical shader) turns slow rays behind it.
+  - **A card shows as its credits** on the strip (Sol's request, 18/10/2026): a card is
+    the commonest and least wanted prize, so its tile is a stack of three credit coins
+    with the amount ("+42 credits"), washed from above in the holocron's colour, and the
+    card tucked face down in its top right corner, turned a little, its back in the
+    holocron's colour with the holocron's gem (edged in gold for Solar, a rainbow across it
+    for Holo), so a strip of cards is never grey. The prize's amount is what the hub gave;
+    a neighbour's is a whole number in the tier's credits range (Uncommon 10 to 20, Rare 30
+    to 50, Legendary 80 to 120, Mythical 250 to 350, from the loot tables), the same each
+    time for the same holocron, drawn apart from which neighbours come up. The tile's edge
+    and its band stay in the card's rarity colour (gold for Solar), and a grand card keeps
+    its rays. No shards on the tile: they show on the pack once the strip stops.
   - **A pile of kyber shards** (17/10/2026) is a tile of its own on the strip: "Kyber
     shards", three crystals in a kyber glow and the tier's range ("25 to 50"), or for the
     prize how many ("+37"); stacked, the crystals alone. Its entrance is the burst, then
@@ -391,11 +402,16 @@ how its art was made; the footer reads "Art: <artist>".
     piles skips such an opening (nothing it knows: an opening of piles alone says "Nothing
     this client knows came out."); the profile carries the shards either way.
   - **The entrance:** the burst in its tier's light (rings, turning rays, the gem
-    flaring away), the card turning in, the credits counting up beside the mark (a card
-    pack, 17/10/2026: two tiles slide out from beside the card instead, its credits on
-    the left, its kyber shards on the right, each with its mark, counting up), and
-    its words: "Rare card, Holo", "Alpha Edition. From a Rare Holocron", what the finish
-    is, that it is sealed, "1 of 3", Next or Done. A shader instead of a card shows its
+    flaring away), then the card's pack (18/10/2026, 3.1 seconds): the credits' tile, as
+    the strip showed it, rises where the strip stopped with the card tucked in its corner
+    and its credits counting up; it slides aside to the left while the card slides out of
+    its corner to the middle, growing and straightening, and flips over (it narrows
+    edge-on and opens on its front, its rarity and finish or its face); a Holo, Solar or
+    Legendary card flips into a flourish, a glow, a ring running out and rays turning
+    (gold for Solar, the rainbow for Holo, its rarity's colour for a plain Legendary);
+    then the kyber shards' tile slides out on the right and counts up (none while the
+    hub's economy is off). Then its words: "Rare card, Holo", "Alpha Edition. From a Rare
+    Holocron", what the finish is, that it is sealed, "1 of 3", Next or Done. A shader instead of a card shows its
     blade framed in its tier's colour, its name, "Common saber shader. From a Rare
     Holocron", what it looks like and how many the player holds. A Solar finish or a
     Legendary card plays the medals' fanfare, another card the unlocks' chime.
@@ -405,8 +421,9 @@ how its art was made; the footer reads "Art: <artist>".
     time, stacked, each named by its holocron's tier at its left and marked in its
     colour, each stopping 0.35 seconds after the one above (3.6 seconds for the top);
     the next five follow on their own ("Holocrons 6 to 10 of 12"). The stacked tiles are
-    light: a plate washed from below in the prize's colour, a card's rarity symbol
-    (ringed in gold for Solar, a rainbow under it for Holo) or a shader's blade. A grand
+    light: a plate washed from below in the prize's colour, a card's credits (two coins,
+    the amount and the card tucked in its corner, its plate alone, in the holocron's
+    colour, with three rainbow bands for Holo; 18/10/2026) or a shader's blade. A grand
     prize plays the fanfare as its strip stops. Then everything found is laid out, the
     finest first, ten to a row, each coming in on its beat, with its name and its
     credits or how many the player holds, the credits they brought together, and Done.
@@ -506,6 +523,18 @@ rest on the strip, coming in and its words, twelve opened with three piles at re
 out, the Cards tab's balances; `duel6_sjk_card_pack`: a sealed Rare pack sliding out,
 counting and with its words, one with a face, and the pack in 4:3. Not tried: against a running hub, in a running client, a
 purchase's or a turned day's flow live.
+
+A card's credits on the strip (18/10/2026, Windows 11, `personal/credits-roll`): unit tests
+for the strip's credits (the prize's kept, every neighbour's in its tier's range and not
+all alike, in every tier) and every moment of a single opening and of twenty at once,
+twenty Holo cards among them, fitting the canvas in three windows. World shots
+`duel6_sjk_card_pack` (the hub's packs mounted) were looked at: an Uncommon strip running
+and at rest, a Rare and a Mythical one at rest (a Legendary Solar card's rays), the Rare
+Holo pack rising, sliding aside as the card slides out, edge-on in its flip, flipped, its
+rainbow flourish, a Solar one's gold flourish, the shards counting, its words, one with a
+face and the words in 4:3; `duel6_sjk_crate_open` and `duel6_sjk_economy_shots` for the
+stacked strips' light tiles at rest (their peak, 1 569 of the canvas's 2 400 shapes). Not
+tried: in a running client (no motion seen; the flip plays no sound of its own).
 
 The crate opening (17/10/2026, Windows 11): unit tests for the 3D holocron's motion
 (glide, hum carried into the unseal, spin-up, swell, light, shake bounds, gone in the

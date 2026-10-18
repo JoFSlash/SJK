@@ -23,7 +23,7 @@ def bin_name(source, crate):
 
 
 def command(source, *args):
-    return subprocess.check_output(args, cwd=source, text=True).strip()
+    return subprocess.check_output(args, cwd=source, text=True, encoding="utf-8").strip()
 
 
 def text_name(stem, name):
@@ -45,6 +45,10 @@ def add_file(archive, source, name, executable=False):
 CANONICAL_TEXTS = {
     "Apache-2.0": "Apache-2.0",
     "MIT OR Apache-2.0": "Apache-2.0",
+    # Older Cargo declarations use a slash for the same dual-license choice.
+    "Apache-2.0/MIT": "Apache-2.0",
+    "MIT/Apache-2.0": "Apache-2.0",
+    "MPL-2.0": "MPL-2.0",
     "BSL-1.0": "BSL-1.0",
 }
 
@@ -68,7 +72,7 @@ def dependency_notices(source, target, name="SJK"):
             yield f"{prefix}/{path.relative_to(root).as_posix()}", path.read_bytes()
         selected_license = None
         if not files:
-            # Some crates declare Apache-2.0 (or BSL-1.0, clipboard-win) but omit its
+            # Some crates declare a license in Cargo.toml but omit its
             # text from their crate. Select that offered license and include the
             # canonical text plus the original package manifest (authors and license
             # declaration).

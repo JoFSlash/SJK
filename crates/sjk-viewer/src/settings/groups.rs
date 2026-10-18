@@ -92,6 +92,7 @@ const CHAT_ROWS: &[&str] = &[
     crate::text::charset::CVAR,
     "cl_sjkChat",
     crate::chat_gifs::CVAR,
+    crate::chat_gifs::VIDEO_CVAR,
     crate::chat_gifs::search::KEY_CVAR,
 ];
 

@@ -150,7 +150,7 @@ pub(super) fn register_daily_cvars(cvars: &mut CvarRegistry) -> Result<(), sjk_s
             "cg_scoreDeaths",
             1_i64,
             archive,
-            "Deaths: 1 plugin, 2/3 observed",
+            "Scoreboard deaths: 0 off, 1 server, 2 server/local fallback, 3 local",
         ),
         CvarDefinition::new(
             "cg_hitsounds",
@@ -867,6 +867,12 @@ pub(super) fn register_daily_cvars(cvars: &mut CvarRegistry) -> Result<(), sjk_s
             true,
             archive,
             "Show the GIF of a GIPHY link in SJK chat, fetched from GIPHY by this PC, which GIPHY sees (0 keeps links as text and fetches nothing)",
+        ),
+        CvarDefinition::new(
+            crate::chat_gifs::VIDEO_CVAR,
+            false,
+            archive,
+            "Play silent MP4 clips from trusted SJK chat sources with Windows' built-in decoder (off by default: Windows code, not SJK's Rust, reads these internet files)",
         ),
         CvarDefinition::new(
             crate::chat_gifs::search::KEY_CVAR,

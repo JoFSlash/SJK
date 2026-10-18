@@ -84,6 +84,7 @@ fn row(client: u8, name: &str, team: u8, score: i32) -> ScoreRow {
         name: name.to_owned(),
         team,
         score,
+        reported_deaths: None,
         deaths: None,
         ping: if bot {
             0

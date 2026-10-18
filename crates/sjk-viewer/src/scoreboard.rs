@@ -44,7 +44,9 @@ pub(super) struct ScoreRow {
     pub(super) name: String,
     pub(super) team: u8,
     pub(super) score: i32,
-    /// Optional session-observed count; no fabricated authoritative plugin statistic.
+    /// Deaths reported by a compatible server plugin, before display policy.
+    pub(super) reported_deaths: Option<i32>,
+    /// Optional count selected for display from the report or session observer.
     pub(super) deaths: Option<i32>,
     pub(super) ping: i32,
     pub(super) time: i32,
@@ -196,7 +198,7 @@ impl Scoreboard {
     ) {
         self.refresh(session);
         for row in &mut self.rows {
-            row.deaths = self.deaths.count(row.client_num);
+            row.deaths = self.deaths.count(row.client_num, row.reported_deaths);
         }
         self.mark_away(afk::enabled(options));
         live_flags::apply(
@@ -362,6 +364,7 @@ impl Scoreboard {
                 name,
                 team,
                 score: score.score,
+                reported_deaths: score.deaths,
                 deaths: None,
                 ping: score.ping,
                 time: score.time_minutes,
@@ -398,6 +401,7 @@ impl Scoreboard {
                 name,
                 team,
                 score: 0,
+                reported_deaths: None,
                 deaths: None,
                 ping: 0,
                 time: 0,

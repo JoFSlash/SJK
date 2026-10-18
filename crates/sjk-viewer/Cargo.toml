@@ -12,7 +12,7 @@ path = "src/main.rs"
 [dependencies]
 bytemuck = { version = "1.25.0", features = ["derive"] }
 glam = "0.33.0"
-image = { version = "0.25.9", default-features = false, features = ["gif", "jpeg", "png", "tga"] }
+image = { version = "0.25.9", default-features = false, features = ["gif", "jpeg", "png", "tga", "webp"] }
 half = "2.7.1"
 fontdue = "0.9.3"
 # Glyphs beyond the code-page atlases, outlined on demand (`text/wide.rs`).
@@ -55,6 +55,11 @@ wgpu = { version = "30.0.1", default-features = false, features = ["dx12", "gles
 winit = { version = "0.30.13", default-features = false, features = ["rwh_06", "wayland", "wayland-dlopen", "x11"] }
 ureq = { version = "3", default-features = false, features = ["rustls", "gzip"] }
 sha2 = "0.11.0"
+# Trusted chat media: exact URL hosts, lock-free policy snapshots and bounded HTML
+# discovery. Silent MP4 clips use the system's Media Foundation on Windows (below).
+url = "2"
+arc-swap = "1"
+scraper = { version = "0.24", default-features = false }
 
 [features]
 default = ["mod-japlus", "mod-jof"]
@@ -65,6 +70,12 @@ mod-jof = ["dep:sjk-mod-jof", "dep:sjk-jof-content"]
 # Ctrl+V and copies read and set the clipboard directly: starting PowerShell for them
 # took about a quarter of a second, a hitch in the middle of play.
 clipboard-win = "5.4.0"
+# Chat MP4 clips (`chat_gifs/video.rs`): Windows Media Foundation, its DLLs loaded at
+# run time so Windows N editions still start.
+sjk-mediafoundation.workspace = true
+
+[target.'cfg(windows)'.dev-dependencies]
+sjk-mediafoundation = { workspace = true, features = ["test-encoder"] }
 
 [target.'cfg(target_os = "linux")'.dependencies]
 # Ctrl+V and copies talk to the X11 or Wayland clipboard in process: they used to need

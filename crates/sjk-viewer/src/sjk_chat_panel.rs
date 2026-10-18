@@ -27,6 +27,8 @@ use winit::keyboard::{KeyCode, PhysicalKey};
 
 #[path = "sjk_chat_gif_picker.rs"]
 mod gif_picker;
+#[path = "sjk_chat_gif_sources.rs"]
+mod gif_sources;
 #[path = "sjk_chat_people.rs"]
 mod people;
 #[path = "sjk_chat_panel_view.rs"]
@@ -132,6 +134,7 @@ struct Shown {
     chosen: Option<(u64, String, String, bool)>,
     /// The chosen message's GIF, when it has one on show.
     chosen_gif: Option<crate::chat_gifs::GifId>,
+    chosen_source: Option<crate::chat_gifs::GifId>,
     /// How many messages there are in all.
     total: usize,
     /// Whether the sender card's player is muted here.
@@ -341,7 +344,12 @@ impl Panel {
         self.gifs.choose_tab(gif_picker::Tab::ALL[tab]);
         self.gifs.typed = typed.to_owned();
         self.gifs.search_now();
-        self.focus = gif_picker::TILE_BASE + 1;
+        if self.gifs.tab == gif_picker::Tab::Sources {
+            self.gifs.sources.typed = typed.to_owned();
+            self.focus = gif_sources::FIELD;
+        } else {
+            self.focus = gif_picker::TILE_BASE + 1;
+        }
     }
 
     /// Open the GIF picker's key card with `typed` in its field, the keyboard on it,
@@ -385,6 +393,14 @@ impl Panel {
         };
         if !self.gifs.open {
             return None;
+        }
+        if self.gifs.tab == Tab::Sources && self.gifs.sources.activate(token) {
+            self.focus = if token == gif_sources::TRUST || token == gif_sources::REMOVE {
+                token
+            } else {
+                gif_sources::FIELD
+            };
+            return Some(PanelAction::None);
         }
         match token {
             KEY_ASK_TOKEN => {
@@ -470,6 +486,25 @@ impl Panel {
         };
         if !self.gifs.open {
             return None;
+        }
+        if self.gifs.tab == Tab::Sources
+            && key == KeyCode::ArrowDown
+            && (TAB_BASE..TAB_BASE + Tab::ALL.len() as u16).contains(&self.focus)
+        {
+            self.focus = gif_sources::FIELD;
+            return Some(PanelAction::None);
+        }
+        if self.gifs.tab == Tab::Sources && self.focus == gif_sources::FIELD {
+            match key {
+                KeyCode::Enter | KeyCode::NumpadEnter => {
+                    return self.activate_gifs(gif_sources::TRUST);
+                }
+                KeyCode::Escape | KeyCode::Tab => {}
+                _ => {
+                    self.gifs.sources.edit(key, text, shift, control);
+                    return Some(PanelAction::None);
+                }
+            }
         }
         if self.gifs.key_card.is_some() {
             // The key card has the keyboard: Escape is Not now, Enter in the field saves,
@@ -571,6 +606,15 @@ impl Panel {
         }
         if let Some(action) = self.activate_gifs(token) {
             return action;
+        }
+        if token == gif_sources::OPEN {
+            self.open_sources(
+                self.shown
+                    .chosen_source
+                    .as_ref()
+                    .map(|id| id.host().to_owned()),
+            );
+            return PanelAction::None;
         }
         if token == GIF_TOKEN {
             self.toggle_gifs();
@@ -761,6 +805,7 @@ impl Panel {
             FIELD_TOKEN,
             gif_picker::SEARCH_TOKEN,
             gif_picker::KEY_FIELD_TOKEN,
+            gif_sources::FIELD,
         ];
         if event.repeat && !field.contains(&self.focus) {
             return PanelAction::None;

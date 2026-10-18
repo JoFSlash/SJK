@@ -180,7 +180,6 @@ impl Panel {
             FontWeight::Semibold,
             TextAlign::Center,
         );
-        let faces = cards::faces::current();
         let geometry = strip::STACKED;
         let height = strip_height();
         for (row, prize) in these.iter().enumerate() {
@@ -253,7 +252,6 @@ impl Panel {
                 let dim = if won { 1.0 } else { 1.0 - 0.65 * lit };
                 self.strip_tile(
                     frame,
-                    &faces,
                     *tile,
                     [x, top - lift, geometry.tile],
                     if won { lit } else { 0.0 },
@@ -403,14 +401,7 @@ impl Panel {
                     1.0,
                 ),
                 Prize::Shader(_) | Prize::Shards(_) => {
-                    self.tile(
-                        frame,
-                        &faces,
-                        item,
-                        [x, y + rise, FOUND_WIDTH],
-                        1.0,
-                        seconds,
-                    );
+                    self.tile(frame, item, [x, y + rise, FOUND_WIDTH], 1.0, seconds);
                 }
             }
             let _ = self.ui.draw_list_mut().push(DrawCommand::RoundedRect {

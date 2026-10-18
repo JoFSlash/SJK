@@ -687,6 +687,18 @@ test: debug_open rare: the card turns in, the two tiles slide out and count up.
 test: debug_open rare x5: the summary's cards say "+N credits, +M shards".
 note: Needs the hub's feat/card-pack; without it a card shows its credits alone, as before.
 
+[credits-roll]
+area: Menus & settings
+title: A card on the holocron strip shows as its credits, the card tucked in a corner
+change: Strip: a card's tile is coins and "+N credits", a face-down card in the top right.
+change: The card back is in the holocron's colour; neighbours show amounts in the tier's range.
+change: Pack: credits rise, the card slides out and flips (Holo/Solar/Legendary flourish).
+test: debug_open uncommon: the card tiles are green, with coins and amounts 10 to 20.
+test: debug_open mythical solar: card tiles gold, 250 to 350; it lands on its own amount.
+test: After the stop: the credits tile rises, slides left, the card slides out and flips.
+test: debug_open rare holo: a rainbow flourish on the flip; plain: none unless Legendary.
+test: debug_open rare x5: the stacked strips' small tiles show coins, amount and tucked card.
+
 [economy]
 area: Menus & settings
 title: Kyber shards and the shop: shatter duplicates, craft shaders, four offers a day

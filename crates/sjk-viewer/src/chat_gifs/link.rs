@@ -17,14 +17,14 @@
 //! is GIPHY's: 6 to 40 ASCII letters and digits with at least one capital or digit (a
 //! slug's last word such as `birthday` is not an id).
 
-use std::ops::Range;
+use std::{ops::Range, sync::Arc};
 
 /// The address SJK's GIPHY requests go to: GIPHY's media host, and nothing else.
 pub(crate) const MEDIA_HOST: &str = "media.giphy.com";
 
 /// A GIPHY GIF's id, checked ([`GifId::new`]).
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
-pub(crate) struct GifId(String);
+pub(crate) struct GifId(Arc<str>, Option<Arc<str>>);
 
 impl GifId {
     /// `value` as an id: 6 to 40 ASCII letters and digits, at least one a capital or a
@@ -36,7 +36,22 @@ impl GifId {
             && value
                 .bytes()
                 .any(|byte| byte.is_ascii_uppercase() || byte.is_ascii_digit());
-        valid.then(|| Self(value.to_owned()))
+        valid.then(|| Self(value.into(), None))
+    }
+
+    /// A canonical HTTPS media/page link, independent of any provider.
+    pub(crate) fn from_url(value: &str) -> Option<Self> {
+        let url = super::sources::checked_url(value)?;
+        let host = url.host_str()?.to_owned();
+        Some(Self(url.as_str().into(), Some(host.into())))
+    }
+
+    pub(crate) fn host(&self) -> &str {
+        self.1.as_deref().unwrap_or("giphy.com")
+    }
+
+    pub(crate) fn is_url(&self) -> bool {
+        self.1.is_some()
     }
 
     pub(crate) fn as_str(&self) -> &str {
@@ -58,6 +73,9 @@ pub(crate) enum Rendition {
 
 /// The one address fetched for `id`'s `rendition`, on [`MEDIA_HOST`].
 pub(crate) fn media_url(id: &GifId, rendition: Rendition) -> String {
+    if id.is_url() {
+        return id.as_str().to_owned();
+    }
     let file = match rendition {
         Rendition::Small => "200.gif",
         Rendition::Original => "giphy.gif",
@@ -171,14 +189,48 @@ fn trim_end(word: &str) -> &str {
     word.trim_end_matches(['.', ',', '!', '?', ';', ':', ')', ']', '>', '\'', '"'])
 }
 
-/// The first GIPHY link in `text`: its id and the bytes of the link (without the
+/// A provider link or a generic HTTPS media/page link. Parsing performs no I/O.
+pub(crate) fn candidate(word: &str) -> Option<GifId> {
+    let word = trim_end(word);
+    let is_url = word
+        .get(..8)
+        .is_some_and(|prefix| prefix.eq_ignore_ascii_case("https://"))
+        || word
+            .get(..7)
+            .is_some_and(|prefix| prefix.eq_ignore_ascii_case("http://"));
+    if !is_url || word.len() > super::sources::MAX_URL_BYTES {
+        return None;
+    }
+    CANDIDATES.with(|cache| {
+        let mut cache = cache.borrow_mut();
+        if let Some(known) = cache.get(word) {
+            return known.clone();
+        }
+        let id = parse(word).or_else(|| GifId::from_url(word));
+        if cache.len() >= CANDIDATES_MAX {
+            cache.clear();
+        }
+        cache.insert(word.to_owned(), id.clone());
+        id
+    })
+}
+
+/// A bounded per-UI-thread parse cache, independent of the live trust policy. IDs
+/// share immutable strings, so repeating a visible link neither reparses URLs nor
+/// allocates another URL/host. Approval is still checked at every use/request.
+const CANDIDATES_MAX: usize = 512;
+thread_local! {
+    static CANDIDATES: std::cell::RefCell<std::collections::HashMap<String,Option<GifId>>> = std::cell::RefCell::new(std::collections::HashMap::new());
+}
+
+/// The first media candidate in `text`: its id and the bytes of the link (without the
 /// punctuation after it). Words are split on spaces, as the chat's rules tidy them.
 pub(crate) fn find(text: &str) -> Option<(GifId, Range<usize>)> {
     let mut start = 0;
     for word in text.split(' ') {
         let at = start;
         start += word.len() + 1;
-        if let Some(id) = parse(word) {
+        if let Some(id) = candidate(word) {
             return Some((id, at..at + trim_end(word).len()));
         }
     }
@@ -201,6 +253,9 @@ pub(crate) fn shortened(text: &str) -> String {
 /// `id`'s shortest link, `https://giphy.com/gifs/<id>`: what a pasted link becomes and
 /// what the GIF picker writes in the message.
 pub(crate) fn page_url(id: &GifId) -> String {
+    if id.is_url() {
+        return id.as_str().to_owned();
+    }
     format!("https://giphy.com/gifs/{}", id.as_str())
 }
 
@@ -211,14 +266,14 @@ pub(crate) const LABEL: &str = "GIF";
 /// [`LABEL`] (the GIF shows under the line); `text` unchanged and no GIF without one.
 pub(crate) fn with_label(text: &str) -> (String, Option<GifId>) {
     match find(text) {
-        Some((id, range)) => {
+        Some((id, range)) if super::sources::trusted(&id) => {
             let mut shown = String::with_capacity(text.len());
             shown.push_str(&text[..range.start]);
             shown.push_str(LABEL);
             shown.push_str(&text[range.end..]);
             (shown, Some(id))
         }
-        None => (text.to_owned(), None),
+        _ => (text.to_owned(), None),
     }
 }
 
@@ -400,5 +455,22 @@ mod tests {
             sjk_identity::chat::check(&longer),
             Err(sjk_identity::chat::ChatError::Length)
         );
+    }
+}
+
+#[cfg(test)]
+mod generic_link_tests {
+    use super::*;
+    #[test]
+    fn generic_links_keep_their_query_and_have_a_canonical_exact_host() {
+        let id = candidate("https://MEDIA.EXAMPLE.ORG/clip.mp4?version=2#top").unwrap();
+        assert_eq!(id.host(), "media.example.org");
+        assert_eq!(
+            page_url(&id),
+            "https://media.example.org/clip.mp4?version=2"
+        );
+        assert_eq!(media_url(&id, Rendition::Preview), page_url(&id));
+        assert!(id.is_url());
+        assert!(!GifId::new("3o7TKSjRrfIPjeiVyM").unwrap().is_url());
     }
 }

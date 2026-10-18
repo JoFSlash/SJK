@@ -997,6 +997,7 @@ impl Panel {
                     (changes, "CHANGES"),
                     (tally.pulls, "PULL REQUESTS"),
                     (tally.commits, "COMMITS"),
+                    (card.reviewed, "REVIEWED & MERGED"),
                 ] {
                     if count == 0 {
                         continue;

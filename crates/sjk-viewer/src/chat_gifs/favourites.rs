@@ -13,7 +13,7 @@ pub(crate) const FILE: &str = "gif-favourites.txt";
 /// The most favourites kept; adding one past it lets the oldest go.
 pub(crate) const MAX: usize = 500;
 /// The file's largest size read: every line a full id.
-const MAX_FILE_BYTES: u64 = (MAX * 48) as u64;
+const MAX_FILE_BYTES: u64 = (MAX * 2050) as u64;
 
 /// Favourite GIFs, newest first, each once.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
@@ -60,7 +60,7 @@ impl Favourites {
             if list.ids.len() == MAX {
                 break;
             }
-            if let Some(id) = GifId::new(line.trim())
+            if let Some(id) = GifId::new(line.trim()).or_else(|| GifId::from_url(line.trim()))
                 && !list.ids.contains(&id)
             {
                 list.ids.push(id);
@@ -221,5 +221,18 @@ mod tests {
         list.set(&id(7), true);
         save_file(&path, &list).unwrap();
         assert_eq!(load_file(&path).unwrap(), list);
+    }
+}
+
+#[cfg(test)]
+mod generic_link_tests {
+    #[test]
+    fn url_favourites_roundtrip_without_granting_trust() {
+        let url = "https://media.example.org/clip.mp4?token=a%2Bb&v=2";
+        let list = super::Favourites::parse(&format!("3o7TKSjRrfIPjeiVyM\n{url}\n{url}\n"));
+        assert_eq!(list.ids().len(), 2);
+        assert_eq!(super::Favourites::parse(&list.to_text()), list);
+        assert_eq!(list.ids()[1].as_str(), url);
+        assert!(!super::super::sources::trusted(&list.ids()[1]));
     }
 }

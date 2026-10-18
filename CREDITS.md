@@ -8,9 +8,10 @@ and changes are kept as separate topic branches merged into SJK's `main`.
 
 ## Sol JK, by Sol
 
-Sol develops SJK and sets its direction, and has reviewed and merged the
-contributors' 124 pull requests (Creyon 52, Lumaya 49, Lukas 9, Slash 12, Milamber 2). Sol's
-work includes:
+Sol develops SJK and sets its direction, and reviews and merges every
+contributor's pull request: the credits page counts them on Sol's card
+("REVIEWED & MERGED", beside Sol's own pull requests and commits). Sol's work
+includes:
 
 - the Sol JK name, README, credits and website;
 - the SJK emblem, provided by Sol: in the classic menu's ring (in place of the
@@ -79,7 +80,9 @@ work includes:
   and from holocrons craft the shader you choose; credits buy four shaders a day),
   prepared for when the SJK hub turns them on;
 - the card pack: a card from a holocron with its credits and a few kyber shards beside
-  it (17/10/2026, Sol's request), prepared for when the SJK hub turns the shards on;
+  it (17/10/2026, Sol's request), prepared for when the SJK hub turns the shards on; since
+  18/10/2026 a card shows on the holocron's strip as its credits, the card tucked face
+  down in a corner, and slides out of them and flips over once the strip stops;
 - the shop in kyber shards, a Mythical offer one day in four, and holocrons bought with
   credits (17/10/2026, Sol's decisions), prepared for when the SJK hub turns them on;
 - the four holocrons, each tier an object of its own with moving parts (17/10/2026,
@@ -304,7 +307,7 @@ pull requests merged into SJK, most of them bringing SJK in line with EternalJK
   its next seven the Sketch, Hourglass, Fiber Optic, Serpent, Monarch, Phoenix and Quantum
   blades, and its last three the Comic, Quicksilver and Obsidian Edge blades.
 
-Lumaya ([lumayaa](https://github.com/lumayaa)), contributor, has 49 pull requests
+Lumaya ([lumayaa](https://github.com/lumayaa)), contributor, has 50 pull requests
 merged into SJK
 ([all of them](https://github.com/Sol-Vulpes/SJK/pulls?q=is%3Apr+author%3Alumayaa)):
 
@@ -406,6 +409,9 @@ merged into SJK
   base SJK forwarding unhandled server commands to the mod.
 - #149 JoF client mod: the `jofejk` EJK opt-in (`jof.ejkOptIn`) and Stasis/Repulse firing
   confirmations (`jof.abilitySounds`), through generic mod userinfo fields.
+- #165 trusted chat media sources: each player approves the sites whose GIFs show inline,
+  with bounded discovery and fetching; reworked at the merge for animated WebP and
+  opt-in MP4 through Windows Media Foundation (`cl_sjkChatVideo`, off) instead of OpenH264.
 
 Lukas ([LukasMoudry](https://github.com/LukasMoudry)), contributor, has 9 pull requests
 merged into SJK
