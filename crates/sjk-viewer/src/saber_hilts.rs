@@ -305,6 +305,7 @@ fn load_hilt_model(
         draws,
         center: [0.0; 3],
         flash_bolt: None,
+        pivot: None,
     });
     let cached = (mesh_index, sockets);
     model_cache.insert(definition.model.clone(), cached);

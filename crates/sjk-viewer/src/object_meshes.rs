@@ -36,6 +36,9 @@ pub(super) struct StaticModelMesh {
     pub(super) draws: Vec<ActorDraw>,
     pub(super) center: [f32; 3],
     pub(super) flash_bolt: Option<bolt::BoltMatrix>,
+    /// Where a part drawn apart from its model turns, in the model's frame
+    /// ([`emplaced_barrel`]).
+    pub(super) pivot: Option<[f32; 3]>,
 }
 
 /// Gather preload defaults and the initial world's rigid appearances and append
@@ -88,6 +91,16 @@ pub(super) fn load<'a>(
                 variant: String::new(),
             }),
     );
+    // An emplaced gun's barrel is a model of its own (`emplaced_barrel`).
+    if appearances
+        .iter()
+        .any(|appearance| appearance.model == emplaced_barrel::MODEL)
+    {
+        appearances.insert(Appearance {
+            model: emplaced_barrel::BARREL.to_owned(),
+            variant: String::new(),
+        });
+    }
     // CS_MODELS advertises possibilities, not the models in this snapshot.
     // Unused entries load through model_demand when an entity needs them.
     let mut meshes = Vec::with_capacity(appearances.len());
@@ -125,11 +138,11 @@ pub(super) fn load_one(
     appearance: &Appearance,
     flattened: &mut FlattenedScene,
 ) -> Result<StaticModelMesh, Box<dyn Error>> {
-    let asset = vfs
-        .read(&appearance.model)?
-        .ok_or("network model asset was not found")?;
+    let (path, part) = emplaced_barrel::part(&appearance.model);
+    let asset = vfs.read(path)?.ok_or("network model asset was not found")?;
     let vertex_start = flattened.vertices.len();
-    let (draws, flash_bolt) = if appearance.model.to_ascii_lowercase().ends_with(".glm") {
+    let mut pivot = None;
+    let (draws, flash_bolt) = if path.to_ascii_lowercase().ends_with(".glm") {
         let model = Glm::parse(&asset.bytes)?;
         let identity = [
             [1.0, 0.0, 0.0, 0.0],
@@ -138,7 +151,29 @@ pub(super) fn load_one(
         ];
         let pose = vec![identity; model.bone_count];
         let flash = model.surface_bolt_matrix(muzzle_flash::FLASH_BOLT, 0, &pose)?;
-        (append_static_glm_mesh(flattened, &model)?, flash)
+        // The emplaced gun's barrel is drawn apart, turned where its gunner aims.
+        let split = match part {
+            emplaced_barrel::Part::Whole => None,
+            _ => emplaced_barrel::Split::read(vfs, &model),
+        };
+        let draws = match (part, &split) {
+            (emplaced_barrel::Part::Barrel, None) => {
+                return Err("the emplaced gun's skeleton has no barrel bone".into());
+            }
+            (emplaced_barrel::Part::Barrel, Some(split)) => {
+                pivot = Some(split.pivot);
+                append_static_glm_part(flattened, &model, |surface, triangle| {
+                    split.in_barrel(surface, triangle)
+                })?
+            }
+            (emplaced_barrel::Part::Base, Some(split)) => {
+                append_static_glm_part(flattened, &model, |surface, triangle| {
+                    !split.in_barrel(surface, triangle)
+                })?
+            }
+            _ => append_static_glm_mesh(flattened, &model)?,
+        };
+        (draws, flash)
     } else {
         let model = Md3::parse(&asset.bytes)?;
         (append_md3_mesh(flattened, &model)?, None)
@@ -148,5 +183,6 @@ pub(super) fn load_one(
         draws,
         center: mesh_center(&flattened.vertices[vertex_start..]),
         flash_bolt,
+        pivot,
     })
 }

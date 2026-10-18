@@ -119,6 +119,42 @@ struct Sinks<'a> {
     team_outline: crate::hud::team_outline::Groups,
 }
 
+/// An emplaced gun's barrel, drawn apart from the gun and turned where its gunner aims
+/// (`emplaced_barrel`); unworked, it stays as the model has it.
+fn submit_barrel(
+    sinks: &mut Sinks<'_>,
+    entity: &sjk_runtime::SceneEntity,
+    gun: sjk_runtime::Transform,
+    snapshot: Option<&Snapshot>,
+) {
+    let Some(mesh) = sinks
+        .object_meshes
+        .iter()
+        .position(|mesh| mesh.appearance.model == emplaced_barrel::BARREL)
+    else {
+        return;
+    };
+    let Some(pivot) = sinks.object_meshes[mesh].pivot else {
+        return;
+    };
+    let view = sinks.predicted_local_state.map(|state| state.view_angles);
+    let angles = u16::try_from(entity.id.get().saturating_sub(1))
+        .ok()
+        .zip(snapshot)
+        .and_then(|(number, snapshot)| {
+            let at = snapshot
+                .entities
+                .binary_search_by_key(&number, sjk_protocol::EntityState::number)
+                .ok()?;
+            emplaced_barrel::angles(&snapshot.entities[at], snapshot, view)
+        })
+        .unwrap_or([0.0; 3]);
+    let (translation, rotation) = emplaced_barrel::placement(gun, pivot, angles);
+    let mut instance = ActorInstance::new(translation, rotation, gun.scale);
+    instance.view_flags = sinks.entity_view_flags;
+    sinks.object_groups[mesh].push(instance);
+}
+
 /// Submit all presented actor-like entities without allocating frame storage.
 pub(crate) fn submit(
     gpu: &mut GpuState,
@@ -410,6 +446,9 @@ pub(crate) fn submit(
                 ActorInstance::new(transform.translation, transform.rotation, transform.scale);
             instance.view_flags = sinks.entity_view_flags;
             sinks.object_groups[mesh].push(instance);
+            if sinks.object_meshes[mesh].appearance.model == emplaced_barrel::MODEL {
+                submit_barrel(&mut sinks, entity, transform, snapshot);
+            }
         }
     }
     if let Some(audio) = sinks.game_audio.as_mut() {
