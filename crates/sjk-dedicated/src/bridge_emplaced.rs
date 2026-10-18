@@ -261,6 +261,20 @@ impl NativeGame {
                 let mut raise = |event: sjk_game_jka::event_entity::EventEntity| {
                     let _ = pool.spawn_temporary(event.state(), level_time, None);
                 };
+                // DEBUG (testing only, not for a pull request): a gunner let go, and why.
+                let debug_before = mounted.guns[index].1.activator;
+                let debug_seen = gunner.as_ref().map(|gunner| {
+                    let origin = gunner.state.origin();
+                    let gun = &mounted.guns[index].1;
+                    let to: [f32; 3] = std::array::from_fn(|axis| gun.origin[axis] - origin[axis]);
+                    (
+                        gunner.state.raw_field(112).unwrap_or(0),
+                        gunner.buttons,
+                        (to[0] * to[0] + to[1] * to[1] + to[2] * to[2]).sqrt(),
+                        gun.use_held,
+                        gun.dying,
+                    )
+                });
                 emplaced::update_gunner(
                     &mut mounted.guns[index].1,
                     level_time,
@@ -270,6 +284,14 @@ impl NativeGame {
                     },
                     gunner,
                 );
+                if debug_before.is_some() && mounted.guns[index].1.activator.is_none() {
+                    eprintln!(
+                        "DEBUG emplaced: gun {} let go of {debug_before:?} at {level_time}: \
+                         (emplaced_index, buttons, distance, use_held, dying) before = \
+                         {debug_seen:?}",
+                        mounted.guns[index].1.number
+                    );
+                }
                 if let Some(peer) = user.and_then(|number| self.peer_mut(usize::from(number))) {
                     peer.movement = peer.movement.reseeded(&peer.state);
                 }
