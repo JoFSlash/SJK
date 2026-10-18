@@ -78,6 +78,7 @@ impl NativeGame {
             power_duel_full: self.power_duel_full(ignore),
             ..Sides::default()
         };
+        let siege = self.gametype == super::GAMETYPE_SIEGE;
         for other in 0..self.players.places() {
             if other == ignore {
                 continue;
@@ -85,7 +86,15 @@ impl NativeGame {
             let Some(peer) = self.peer_mut(other) else {
                 continue;
             };
-            match peer.session.team {
+            // `TeamCount`: in siege a player waiting for the round counts on the side it
+            // wants (`siegeDesiredTeam`), or a bot added before the round begins would
+            // pick the side a waiting player already took and leave the other empty.
+            let team = match peer.session.team {
+                1 | 2 => peer.session.team,
+                _ if siege => peer.session.siege_desired_team,
+                _ => 0,
+            };
+            match team {
                 1 => sides.red_players += 1,
                 2 => sides.blue_players += 1,
                 _ => {}

@@ -15,6 +15,14 @@ unplayable, some doors would not open). Implemented, after OpenJK `codemp`
 
 See [server](server.md#siege-doors).
 
+Follow-up (18/10/2026, tester: still stuck at the start with a bot, every door red).
+Cause: `PickTeam`'s side counts ignored `siegeDesiredTeam`. Before the round, every player
+waits as a spectator, so a bot always picked blue. With the human also on blue, the red
+side stayed empty and the round never began. Without the round, no trigger fires and the
+use key does nothing. The counts now follow `TeamCount`. The client also shows the round's
+`CS_SIEGE_STATE` ("WAITING FOR PLAYERS", "STARTS IN: n") in the warmup line, which it
+never drew before. A unit test pins that line. The side-count fix has no automated test.
+
 Four unit tests pin the locked/teamallow and use-key rules. The `sjk-game-jka` and
 `sjk-dedicated` tests, fmt and clippy passed on Linux. The full workspace build was not
 run: `alsa-sys` needs the ALSA development package, which this container lacks.

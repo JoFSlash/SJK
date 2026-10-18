@@ -167,3 +167,7 @@ spawns locked carries `EF_SHADER_ANIM`. Its `s.frame` is 0 while locked and 1 on
 unlocked (`LockDoors`, `UnLockDoors`), so the client draws the lock lights by state.
 `trigger_multiple` and `trigger_once` take their team from `team`, or else from the generic
 `teamuser`/`alliedteam` spawn fields.
+
+Before the round begins, `PickTeam`'s side counts include the side each waiting player wants
+(`siegeDesiredTeam`, as `TeamCount` does). A bot added then joins the empty side.
+The client shows the round's state (`CS_SIEGE_STATE`) in the warmup line.
