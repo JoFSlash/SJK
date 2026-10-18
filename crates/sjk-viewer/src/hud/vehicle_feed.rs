@@ -62,26 +62,6 @@ pub(crate) fn sample(gpu: &mut GpuState, time: i32) {
             .and_then(|console| console.integer_cvar("cg_dynamiccrosshair"))
             .unwrap_or(1),
     };
-    // DEBUG (test build only): which of the vehicle HUD's conditions holds.
-    thread_local! {
-        static LAST: std::cell::Cell<Option<(u16, bool, bool, bool, bool)>> = const { std::cell::Cell::new(None) };
-    }
-    let id = EntityId::new(u64::from(number) + 1);
-    let has_mesh = gpu.actor_meshes.iter().any(|mesh| mesh.entity_id == Some(id));
-    let now = (number, sample.piloted, sample.profile.is_some(), sample.alive, has_mesh);
-    if LAST.with(|last| last.replace(Some(now))) != Some(now) {
-        crate::log::progress(format_args!(
-            "DEBUG vehicle hud: vehicle={number} piloted={} profile={} alive={} mesh={has_mesh} health={} pm_type={} team={} hull={} ammo={:?}",
-            sample.piloted,
-            sample.profile.is_some(),
-            sample.alive,
-            player.health(),
-            player.movement_type(),
-            player.team(),
-            sample.hull,
-            sample.ammo,
-        ));
-    }
     gpu.hud.vehicle.update(&sample);
     if let Some(vfs) = &gpu.vfs {
         let (shaders, renderer, queue) = (&gpu.shaders, &gpu.ui_shapes, &gpu.queue);
