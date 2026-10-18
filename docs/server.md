@@ -171,3 +171,8 @@ unlocked (`LockDoors`, `UnLockDoors`), so the client draws the lock lights by st
 Before the round begins, `PickTeam`'s side counts include the side each waiting player wants
 (`siegeDesiredTeam`, as `TeamCount` does). A bot added then joins the empty side.
 The client shows the round's state (`CS_SIEGE_STATE`) in the warmup line.
+
+The server log (`last-server.log` for a game the client starts) records a siege level's
+start: a map without a `.siege` file, or a `.siege` file that cannot be read, the classes
+and teams read and each side's classes, then, once per change, how many clients want each
+side until the round begins, and when it begins.

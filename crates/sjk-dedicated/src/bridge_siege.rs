@@ -84,6 +84,9 @@ pub(super) struct SiegeState {
     pub(super) points: Vec<SiegePoint>,
     /// The carried and breakable objectives (`bridge_siege_items`).
     pub(super) items: Vec<super::bridge_siege_items::PlacedItem>,
+    /// What the server log last said of the round's start (begun, and the clients
+    /// wanting each side), so it is told once per change.
+    pub(super) logged: Option<(bool, [usize; 2])>,
 }
 
 /// What outlives a level: the engine's memory of the first round (`SiegePersSet`), and
@@ -104,6 +107,10 @@ impl NativeGame {
             return;
         }
         let Some(files) = self.map.as_ref().and_then(|map| map.siege.clone()) else {
+            eprintln!(
+                "siege: the map has no .siege file; the level runs without siege rounds, \
+                 objectives or triggers"
+            );
             return;
         };
         let overrides = [
@@ -121,6 +128,15 @@ impl NativeGame {
         let sides = files
             .registry
             .sides(info.themes[0].as_deref(), info.themes[1].as_deref());
+        eprintln!(
+            "siege: {} classes, {} teams; team 1 {:?} ({} classes), team 2 {:?} ({} classes)",
+            files.registry.classes.len(),
+            files.registry.themes.len(),
+            info.themes[0],
+            sides.team1.as_ref().map_or(0, |side| side.classes.len()),
+            info.themes[1],
+            sides.team2.as_ref().map_or(0, |side| side.classes.len()),
+        );
         let team_switch = self.cvars.integer(b"g_siegeTeamSwitch") != 0;
         let persistent = self.siege_keep.persistent;
         let mut strings = Vec::new();
@@ -141,6 +157,7 @@ impl NativeGame {
             entities: Vec::new(),
             points: Vec::new(),
             items: Vec::new(),
+            logged: None,
         }));
         self.spawn_siege_entities();
     }
@@ -521,6 +538,43 @@ impl NativeGame {
         }
         let intermission = self.match_end.intermission_time != 0;
         siege::check_timers(self, level_time, intermission);
+        self.log_siege_start();
+    }
+
+    /// The server log's account of the round's start: whether it has begun and, until it
+    /// does, how many clients want each side (`SiegeCheckTimers` begins it only with both
+    /// sides wanted). Told once per change.
+    fn log_siege_start(&mut self) {
+        // Once the round's start is told, nothing more is counted until the next level.
+        if self
+            .siege
+            .as_ref()
+            .is_none_or(|siege| siege.logged.is_some_and(|(begun, _)| begun))
+        {
+            return;
+        }
+        let mut wanted = [0; 2];
+        for player in SiegeWorld::players(self) {
+            if player.connected && (1..=2).contains(&player.desired_team) {
+                wanted[player.desired_team as usize - 1] += 1;
+            }
+        }
+        let Some(siege) = self.siege.as_mut() else {
+            return;
+        };
+        let now = (siege.round.begun, wanted);
+        if siege.logged == Some(now) {
+            return;
+        }
+        siege.logged = Some(now);
+        if siege.round.begun {
+            eprintln!("siege: the round has begun");
+        } else {
+            eprintln!(
+                "siege: waiting for the round: {} client(s) want team 1, {} want team 2",
+                wanted[0], wanted[1]
+            );
+        }
     }
 
     /// `imperial_attackers`/`rebel_attackers` for side `side` (0 or 1), which the bots read.
