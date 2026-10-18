@@ -41,6 +41,7 @@ Review fixes (18/10/2026, tester: the respawn sometimes came late after the coun
 - `TeamCount` counts a player for both the side it is on and the side it wants.
 - The HUD countdown rounds up, and it forgets the wave once the player is back in play.
 - The siege start log counts without allocating.
+
 The full workspace fmt, build, test and clippy passed on Linux. The ALSA packages were
 installed in the container to build the client.
 

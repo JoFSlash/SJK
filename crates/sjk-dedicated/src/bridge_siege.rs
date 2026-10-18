@@ -87,9 +87,9 @@ pub(super) struct SiegeState {
     /// What the server log last said of the round's start (begun, and the clients
     /// wanting each side), so it is told once per change.
     pub(super) logged: Option<(bool, [usize; 2])>,
-    /// The names the server log last told as fired, with when, so a trigger firing
-    /// every frame is told once every few seconds.
-    pub(super) fired_logged: Vec<(String, i32)>,
+    /// The names the server log last told as fired, with what fired them and when, so a
+    /// trigger firing every frame is told once every few seconds.
+    pub(super) fired_logged: Vec<(String, usize, i32)>,
 }
 
 /// What outlives a level: the engine's memory of the first round (`SiegePersSet`), and
@@ -172,8 +172,10 @@ impl NativeGame {
     /// followed: every entity that names, fires or is fired by something, or that is a
     /// siege objective, spawn point, door, breakable or turret, with the keys that wire it.
     fn log_siege_map(&self) {
-        const CLASSES: [&str; 12] = [
+        const CLASSES: [&str; 14] = [
             "info_siege_objective",
+            "info_siege_radaricon",
+            "misc_siege_item",
             "info_siege_decomplete",
             "target_siege_end",
             "info_player_siegeteam1",
@@ -186,12 +188,18 @@ impl NativeGame {
             "trigger_once",
             "func_usable",
         ];
-        const KEYS: [&str; 16] = [
+        const KEYS: [&str; 22] = [
             "targetname",
             "target",
             "target2",
             "target3",
             "target4",
+            "target5",
+            "target6",
+            "paintarget",
+            "deathtarget",
+            "npc_targetname",
+            "team",
             "opentarget",
             "goaltarget",
             "objective",
@@ -373,17 +381,18 @@ impl NativeGame {
         let Some(siege) = self.siege.as_mut() else {
             return;
         };
-        match siege.fired_logged.iter_mut().find(|(told, _)| told == name) {
-            Some((_, at)) if level_time - *at < 2_000 => return,
-            Some((_, at)) => *at = level_time,
-            None => siege.fired_logged.push((name.to_owned(), level_time)),
+        match siege
+            .fired_logged
+            .iter_mut()
+            .find(|(told, by, _)| told == name && *by == activator)
+        {
+            Some((_, _, at)) if level_time - *at < 2_000 => return,
+            Some((_, _, at)) => *at = level_time,
+            None => siege
+                .fired_logged
+                .push((name.to_owned(), activator, level_time)),
         }
-        let by = if activator == usize::MAX {
-            "the world".to_owned()
-        } else {
-            format!("entity {activator}")
-        };
-        eprintln!("siege: '{name}' fired by {by}");
+        eprintln!("siege: '{name}' fired by {}", activator_name(activator));
     }
 
     /// `G_UseTargets2` reaching the siege entities called `name`, used by entity
@@ -446,7 +455,8 @@ impl NativeGame {
                         .and_then(|state| state.raw_field(ES_EFLAGS))
                         .unwrap_or(0);
                     eprintln!(
-                        "siege: objective {objective} of team {side} used by entity {activator}"
+                        "siege: objective {objective} of team {side} used by {}",
+                        activator_name(activator)
                     );
                     let user = SiegeUser {
                         other: activator as i32,
@@ -777,4 +787,14 @@ pub(super) fn siege_spec_event(origin: [f32; 3], client: usize, wave: i32) -> En
     state.set_raw_field(ES_TIME, wave as u32);
     state.set_raw_field(ES_OWNER, client as u32);
     state
+}
+
+/// How the server log names an activator: `usize::MAX` (and the callers' 0 for the world
+/// are indistinguishable from client 0, so both are told as numbers) is the world.
+fn activator_name(activator: usize) -> String {
+    if activator == usize::MAX {
+        "the world".to_owned()
+    } else {
+        format!("entity {activator}")
+    }
 }

@@ -205,19 +205,21 @@ impl NativeGame {
                 continue;
             }
             let activator = (client != usize::MAX).then_some(client);
-            let before = self.doors[index].1.clone();
+            // A slave's use is its master's: the log reads the master's state.
+            let master = self.doors[index].1.team_master.unwrap_or(index);
+            let watch = |door: &movers::Door| (door.spawnflags, door.state, door.waiting);
+            let before = self.siege.is_some().then(|| watch(&self.doors[master].1));
             let fired = mover_team::use_mover(&mut self.doors, index, level_time, activator);
-            if self.siege.is_some() {
-                let after = &self.doors[index].1;
-                let what = if before.spawnflags & movers::MOVER_LOCKED != 0
-                    && after.spawnflags & movers::MOVER_LOCKED == 0
-                {
-                    "unlocked"
-                } else if before.state != after.state || before.waiting != after.waiting {
-                    "used"
-                } else {
-                    "used, nothing changed"
-                };
+            if let Some((flags, state, waiting)) = before {
+                let after = watch(&self.doors[master].1);
+                let what =
+                    if flags & movers::MOVER_LOCKED != 0 && after.0 & movers::MOVER_LOCKED == 0 {
+                        "unlocked"
+                    } else if (state, waiting) != (after.1, after.2) {
+                        "used"
+                    } else {
+                        "used, nothing changed"
+                    };
                 eprintln!("siege: door '{name}' (mover {index}) {what}");
             }
             self.publish_team(index);

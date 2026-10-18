@@ -50,12 +50,12 @@ impl HudOverlay {
         };
         match warmup {
             // `CG_DrawSiegeDeathTimer` (`cg_draw.c:8319-8335`): a siege player waiting
-            // for its respawn wave sees the seconds left until it comes, rounded up so
-            // the count reaches 0 when the wave does.
+            // for its respawn wave sees the whole seconds left until it comes
+            // (`timeRemaining /= 1000`, as the reference truncates).
             WarmupText::Hidden => {
                 let left = obituaries.siege_respawn_at() - server_time;
                 if left > 0 {
-                    let _ = write!(self.warmup_text, "RESPAWN IN: {}", (left + 999) / 1_000);
+                    let _ = write!(self.warmup_text, "RESPAWN IN: {}", left / 1_000);
                 }
             }
             WarmupText::WaitingForPlayers => {

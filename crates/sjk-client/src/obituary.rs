@@ -14,7 +14,7 @@ pub const EV_OBITUARY: u16 = 93;
 /// event's `time` (`g_siegeRespawnCheck`).
 const EV_SIEGESPEC: u16 = 191;
 /// `PM_SPECTATOR`: how a siege player waiting for its wave moves.
-const PM_SPECTATOR: u8 = 4;
+use sjk_game_jka::PM_SPECTATOR;
 
 /// Gender used by the gendered self-kill strings in `CG_Obituary`.
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
@@ -395,7 +395,7 @@ mod tests {
         tracker.observe(&snapshot(vec![siege_spec(300, 5, 20_000)]), &game);
         assert_eq!(tracker.siege_respawn_at(), 0);
         let mut waiting = snapshot(vec![siege_spec(301, 0, 40_000)]);
-        waiting.player.set_raw_field(63, u32::from(PM_SPECTATOR));
+        waiting.player.set_movement_type(PM_SPECTATOR);
         tracker.observe(&waiting, &game);
         assert_eq!(tracker.siege_respawn_at(), 40_000);
         waiting.entities.clear();
