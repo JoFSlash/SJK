@@ -12,6 +12,7 @@ mod follow;
 pub(crate) use follow::shown as follow_shown;
 mod force_streams;
 pub(crate) mod force_wheel;
+mod hack_bar;
 pub(crate) mod icons;
 pub(crate) mod identification;
 mod info;
@@ -226,6 +227,9 @@ pub(crate) struct HudOverlay {
     /// The followed player's name (`CG_DrawFollow`), empty when not following.
     followed_name: String,
     interrupted: bool,
+    /// The share of the player's hack still to go (`hack_bar`), `None` while it hacks
+    /// nothing.
+    hack_left: Option<f32>,
     lagometer: sjk_client::LagometerSamples,
     default_document: HudLayoutDocument,
     classic_document: HudLayoutDocument,
@@ -349,6 +353,7 @@ impl HudOverlay {
             warmup_text: String::with_capacity(48),
             followed_name: String::with_capacity(64),
             interrupted: false,
+            hack_left: None,
             lagometer: sjk_client::LagometerSamples::new(),
             default_document: HudLayoutDocument::from_json(DEFAULT_LAYOUT)
                 .expect("bundled default HUD document is valid"),
@@ -492,6 +497,9 @@ impl HudOverlay {
         self.draw_list.clear();
         self.tints.emit(&mut self.draw_list, viewport);
         self.rocket_lock.emit(&mut self.draw_list);
+        if visibility.hud {
+            hack_bar::emit(&mut self.draw_list, viewport, self.hack_left);
+        }
         self.binoculars.emit(&mut self.draw_list, viewport);
         // A pilot's crosshair is doubled, and is the vehicle's own picture when its
         // `.veh` names one that loaded.
