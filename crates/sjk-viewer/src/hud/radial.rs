@@ -213,6 +213,7 @@ mod tests {
         let visibility = HudVisibility {
             hud: true,
             status: true,
+            vehicle: true,
             weapon: true,
             selection: true,
             crosshair: false,
@@ -338,6 +339,7 @@ mod tests {
             let visibility = HudVisibility {
                 hud: true,
                 status: true,
+                vehicle: true,
                 weapon: true,
                 selection: true,
                 crosshair: true,
