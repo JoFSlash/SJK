@@ -8,7 +8,11 @@ run of an unseen binary while Defender scans it. On Windows 11 a fresh copy of t
 server took 1.85 s to start and 0.17 s on the next run; the tester's 10.8 s
 matches a cloud lookup. The process is now created on the output-copy thread and
 `LocalServer::poll` takes it over; a server dropped before it exists is shut down
-by that thread. The dedicated server itself starts in 1.4-1.6 s for
+by that thread (the hand-over is a slot under a lock, so a process is never lost
+between them), and the current game is left only once the process exists, so a
+server that cannot start no longer disconnects the player. Unit tests cover a
+binary that cannot be created failing through `poll` and a process created after
+its owner left. The dedicated server itself starts in 1.4-1.6 s for
 `mp/siege_hoth`, `mp/ctf1` and `mp/ffa1` alike, so no game type is slower to host.
 Not yet re-tested through the menu on a fresh unpack.
 

@@ -15,6 +15,7 @@ use std::net::{IpAddr, Ipv4Addr, SocketAddr, UdpSocket};
 use std::path::{Path, PathBuf};
 use std::process::{Child, ChildStdin, Command, Stdio};
 use std::sync::mpsc::{self, Receiver, Sender, TryRecvError};
+use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 /// File name of the server binary next to the client.
@@ -250,15 +251,34 @@ pub(crate) enum ServerPoll {
     Failed(String),
 }
 
-/// The process handed back by the spawning thread, or why there is none.
-type Spawned = std::io::Result<(Child, Option<ChildStdin>)>;
+/// Where the spawning thread leaves the process for its owner. Both sides
+/// change it under its lock, so a process is either taken over by the owner or
+/// stopped by the spawning thread, never lost between them.
+enum Slot {
+    /// The process is being created.
+    Pending,
+    /// Created, waiting for the owner to take it.
+    Ready(Child, Option<ChildStdin>),
+    /// It could not be created.
+    Failed(std::io::Error),
+    /// The owner went first; the spawning thread stops what it creates.
+    Abandoned,
+}
+
+/// The slot shared by an owner and its spawning thread.
+type SharedSlot = Arc<Mutex<Slot>>;
+
+fn lock(slot: &SharedSlot) -> std::sync::MutexGuard<'_, Slot> {
+    slot.lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+}
 
 /// A running `sjk-server` child owned by the client.
 pub(crate) struct LocalServer {
     child: Option<Child>,
     stdin: Option<ChildStdin>,
-    /// The spawning thread's answer, until it is taken.
-    spawning: Option<Receiver<Spawned>>,
+    /// The spawning thread's slot, until the process is taken from it.
+    spawning: Option<SharedSlot>,
     events: Receiver<Event>,
     address: Option<SocketAddr>,
     ready: bool,
@@ -273,7 +293,8 @@ impl LocalServer {
     /// The process is created on its own thread: creating it can stall for
     /// seconds (Windows scans a binary it has not seen run before, about 10 s
     /// when it asks the cloud), and the menu must keep drawing meanwhile.
-    /// [`Self::poll`] takes the process over once it exists.
+    /// [`Self::poll_spawn`] (or [`Self::poll`]) takes the process over once it
+    /// exists.
     pub(crate) fn start(
         program: &Path,
         arguments: &[OsString],
@@ -295,14 +316,15 @@ impl LocalServer {
             .stdout(Stdio::piped())
             .stderr(Stdio::from(log.try_clone()?));
         let (sender, events) = mpsc::channel();
-        let (spawned, spawning) = mpsc::channel();
+        let slot = Arc::new(Mutex::new(Slot::Pending));
+        let spawned = Arc::clone(&slot);
         std::thread::Builder::new()
             .name("local-server-log".into())
             .spawn(move || spawn_and_copy(command, log, &spawned, sender))?;
         Ok(Self {
             child: None,
             stdin: None,
-            spawning: Some(spawning),
+            spawning: Some(slot),
             events,
             address: None,
             ready: false,
@@ -314,24 +336,54 @@ impl LocalServer {
     /// Take the process over once the spawning thread has created it; the
     /// error, if it could not be.
     fn take_spawned(&mut self) -> Option<std::io::Error> {
-        let result = self.spawning.as_ref()?.try_recv();
-        match result {
-            Err(TryRecvError::Empty) => None,
-            Ok(Ok((child, stdin))) => {
+        let slot = self.spawning.as_ref()?;
+        // A pending slot no one else holds lost its thread before it answered.
+        let orphaned = Arc::strong_count(slot) == 1;
+        let taken = std::mem::replace(&mut *lock(slot), Slot::Pending);
+        match taken {
+            Slot::Pending if !orphaned => None,
+            Slot::Ready(child, stdin) => {
                 self.spawning = None;
                 self.child = Some(child);
                 self.stdin = stdin;
                 None
             }
-            Ok(Err(error)) => {
+            Slot::Failed(error) => {
                 self.spawning = None;
                 Some(error)
             }
-            Err(TryRecvError::Disconnected) => {
+            Slot::Pending | Slot::Abandoned => {
                 self.spawning = None;
                 Some(std::io::Error::other("the spawning thread ended"))
             }
         }
+    }
+
+    /// Give up the process: take it if it was created, else leave the
+    /// spawning thread to stop it once it is.
+    fn abandon(&mut self) {
+        if let Some(slot) = self.spawning.take()
+            && let Slot::Ready(child, stdin) = std::mem::replace(&mut *lock(&slot), Slot::Abandoned)
+        {
+            self.child = Some(child);
+            self.stdin = stdin;
+        }
+    }
+
+    /// Whether the process exists yet: `None` while it is being created, then
+    /// whether it was. Takes the process over once it exists.
+    pub(crate) fn poll_spawn(&mut self) -> Option<Result<(), String>> {
+        if let Some(error) = self.take_spawned() {
+            return Some(Err(format!("could not start the server: {error}")));
+        }
+        if self.spawning.is_some() {
+            return None;
+        }
+        Some(if self.child.is_some() {
+            Ok(())
+        } else {
+            Err("the server was stopped".to_owned())
+        })
     }
 
     /// Where the server's output is written.
@@ -347,11 +399,10 @@ impl LocalServer {
     /// Advance the start-up without blocking: note what the watchers saw,
     /// and type the bot lines the moment the server answers.
     pub(crate) fn poll(&mut self) -> ServerPoll {
-        if let Some(error) = self.take_spawned() {
-            return ServerPoll::Failed(format!("could not start the server: {error}"));
-        }
-        if self.spawning.is_some() {
-            return ServerPoll::Starting;
+        match self.poll_spawn() {
+            None => return ServerPoll::Starting,
+            Some(Err(reason)) => return ServerPoll::Failed(reason),
+            Some(Ok(())) => {}
         }
         if let Some(status) = self
             .child
@@ -411,7 +462,7 @@ impl LocalServer {
     /// Stop the server without blocking the caller: it is asked to `quit`
     /// and, on a helper thread, killed if it has not within the grace time.
     pub(crate) fn stop(mut self) {
-        let _ = self.take_spawned();
+        self.abandon();
         let (Some(child), stdin) = (self.child.take(), self.stdin.take()) else {
             return;
         };
@@ -427,7 +478,7 @@ impl LocalServer {
 impl Drop for LocalServer {
     /// The client is going: stop the server before returning.
     fn drop(&mut self) {
-        let _ = self.take_spawned();
+        self.abandon();
         if let Some(child) = self.child.take() {
             shut_down(child, self.stdin.take());
         }
@@ -461,32 +512,33 @@ fn shut_down(mut child: Child, stdin: Option<ChildStdin>) {
 }
 
 /// Create the server process, hand it to its owner, then copy its output
-/// ([`copy_output`]). An owner gone before the process exists (the player
-/// left the screen) gets none: the process is stopped here instead. One that
-/// goes after the hand-over but before taking it drops the console pipe, and
-/// `--quit-on-eof` ends the server.
-fn spawn_and_copy(
-    mut command: Command,
-    log: File,
-    spawned: &Sender<Spawned>,
-    events: Sender<Event>,
-) {
+/// ([`copy_output`]). An owner that gave the process up before it existed
+/// (the player left the screen) finds the slot [`Slot::Abandoned`], and the
+/// process is stopped here instead.
+fn spawn_and_copy(mut command: Command, log: File, slot: &SharedSlot, events: Sender<Event>) {
+    let fail = |error: std::io::Error| {
+        let mut slot = lock(slot);
+        if matches!(*slot, Slot::Pending) {
+            *slot = Slot::Failed(error);
+        }
+    };
     let mut child = match command.spawn() {
         Ok(child) => child,
-        Err(error) => {
-            let _ = spawned.send(Err(error));
-            return;
-        }
+        Err(error) => return fail(error),
     };
     let stdin = child.stdin.take();
     let Some(stdout) = child.stdout.take() else {
         shut_down(child, stdin);
-        let _ = spawned.send(Err(std::io::Error::other("no server output")));
-        return;
+        return fail(std::io::Error::other("no server output"));
     };
-    if let Err(mpsc::SendError(Ok((child, stdin)))) = spawned.send(Ok((child, stdin))) {
-        shut_down(child, stdin);
-        return;
+    {
+        let mut slot = lock(slot);
+        if matches!(*slot, Slot::Abandoned) {
+            drop(slot);
+            shut_down(child, stdin);
+            return;
+        }
+        *slot = Slot::Ready(child, stdin);
     }
     copy_output(stdout, log, events);
 }
@@ -525,4 +577,51 @@ fn probe(address: SocketAddr, events: &Sender<Event>) {
         std::thread::sleep(Duration::from_millis(100));
     }
     let _ = events.send(Event::Silent);
+}
+
+#[cfg(test)]
+mod spawn_tests {
+    use super::*;
+
+    #[test]
+    fn a_server_that_cannot_be_created_fails_through_its_poll() {
+        let directory = std::env::temp_dir().join(format!("sjk-spawn-test-{}", std::process::id()));
+        let mut server = LocalServer::start(
+            Path::new("sjk-no-such-server-binary"),
+            &[],
+            Vec::new(),
+            &directory.join("server.log"),
+        )
+        .expect("the log opens; the process is created later");
+        let deadline = Instant::now() + Duration::from_secs(10);
+        let spawned = loop {
+            if let Some(result) = server.poll_spawn() {
+                break result;
+            }
+            assert!(Instant::now() < deadline, "the spawn never answered");
+            std::thread::sleep(Duration::from_millis(5));
+        };
+        assert!(spawned.is_err(), "{spawned:?}");
+        assert!(matches!(server.poll(), ServerPoll::Failed(_)));
+        drop(server);
+        let _ = std::fs::remove_dir_all(directory);
+    }
+
+    #[test]
+    fn a_process_created_after_its_owner_left_is_stopped_by_the_spawning_thread() {
+        let slot: SharedSlot = Arc::new(Mutex::new(Slot::Pending));
+        let mut owner = LocalServer {
+            child: None,
+            stdin: None,
+            spawning: Some(Arc::clone(&slot)),
+            events: mpsc::channel().1,
+            address: None,
+            ready: false,
+            console: Vec::new(),
+            log_path: PathBuf::new(),
+        };
+        owner.abandon();
+        assert!(matches!(*lock(&slot), Slot::Abandoned));
+        assert!(owner.child.is_none());
+    }
 }

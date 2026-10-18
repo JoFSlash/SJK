@@ -69,6 +69,17 @@ impl ClientMenu {
         MenuAction::CancelJoin
     }
 
+    /// The application is creating the server process for `map`.
+    pub(crate) fn local_server_spawning(&mut self, server: LocalServer, map: &str) {
+        self.create_game.server_spawning(server, map);
+    }
+
+    /// The server being created and its map once its process exists; a
+    /// failure is already shown on the Create game screen.
+    pub(crate) fn take_spawned_local_server(&mut self) -> Option<(LocalServer, String)> {
+        self.create_game.take_spawned()?.ok()
+    }
+
     /// The application started the server `settings` asked for.
     pub(crate) fn local_server_started(&mut self, server: LocalServer, map: &str) {
         self.create_game.server_started(server);

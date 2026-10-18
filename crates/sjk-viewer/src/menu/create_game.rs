@@ -246,6 +246,9 @@ pub(crate) struct CreateGameMenu {
     /// One status line under the rows (starting, failures).
     pub(super) status: String,
     server: Option<LocalServer>,
+    /// A server whose process is still being created, with its map: the
+    /// current game is left only once it exists ([`Self::take_spawned`]).
+    spawning: Option<(LocalServer, String)>,
     /// The server answered: its address waits to be joined.
     join_pending: Option<SocketAddr>,
     /// The answering server's address was handed out for joining.
@@ -268,6 +271,7 @@ impl CreateGameMenu {
             editing: None,
             status: String::with_capacity(160),
             server: None,
+            spawning: None,
             join_pending: None,
             joined: false,
             picker: MapPicker::new(),
@@ -374,9 +378,9 @@ impl CreateGameMenu {
         self.levelshots.size(map)
     }
 
-    /// Whether a server this screen started is running.
+    /// Whether a server this screen started is running or being created.
     pub(crate) fn hosting(&self) -> bool {
-        self.server.is_some()
+        self.server.is_some() || self.spawning.is_some()
     }
 
     /// Whether the server is started but not yet answering.
@@ -502,6 +506,29 @@ impl CreateGameMenu {
         CreateGameResult::Start(self.draft.host_settings(self.catalogue.bots(), seed))
     }
 
+    /// Hold a server for `map` whose process is being created; the screen says
+    /// it is starting meanwhile.
+    pub(crate) fn server_spawning(&mut self, server: LocalServer, map: &str) {
+        self.status.clear();
+        self.status.push_str("Starting the server...");
+        self.spawning = Some((server, map.to_owned()));
+    }
+
+    /// The held server and its map once its process exists, or why it could
+    /// not be created (then shown on the screen). `None` while it is being
+    /// created or when none is held.
+    pub(crate) fn take_spawned(&mut self) -> Option<Result<(LocalServer, String), String>> {
+        let (server, _) = self.spawning.as_mut()?;
+        match server.poll_spawn()? {
+            Ok(()) => self.spawning.take().map(Ok),
+            Err(reason) => {
+                self.spawning = None;
+                self.server_failed(&reason);
+                Some(Err(reason))
+            }
+        }
+    }
+
     /// Take ownership of the server just started.
     pub(crate) fn server_started(&mut self, server: LocalServer) {
         crate::log::progress(format_args!(
@@ -554,6 +581,11 @@ impl CreateGameMenu {
     pub(crate) fn stop_server(&mut self) -> bool {
         self.join_pending = None;
         self.joined = false;
+        if let Some((server, _)) = self.spawning.take() {
+            server.stop();
+            self.status.clear();
+            return true;
+        }
         match self.server.take() {
             Some(server) => {
                 server.stop();

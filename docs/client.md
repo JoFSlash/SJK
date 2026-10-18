@@ -113,7 +113,9 @@ lifetime is managed by the client and defaults to local access; see
 [local_server.rs](../crates/sjk-viewer/src/local_server.rs). The process is
 created on a helper thread: Windows can hold the first run of a binary it has
 not seen before for up to about ten seconds while it scans it, and the menu keeps
-drawing "Starting the server..." meanwhile instead of freezing.
+drawing "Starting the server..." meanwhile instead of freezing. The current game is
+left only once the process exists, so a server that cannot start leaves the player
+where they were, with the reason on the Create game screen.
 
 Map previews (`levelshots/<map>.jpg`, `.tga` or `.png`) keep the resolution they
 ship in, so an HD levelshot pack stays sharp in a large preview and on the

@@ -58,30 +58,43 @@ impl crate::GpuState {
                 .collect::<Vec<_>>()
                 .join(" ")
         ));
+        // The process is created on a helper thread; the current game is kept
+        // until it exists, so a server that cannot start costs the player nothing.
         match LocalServer::start(&program, &arguments, settings.console_lines(), &log) {
-            Ok(server) => {
-                // Detach before replacing the old owned child, so its disconnect
-                // cannot be mistaken for a failure of the new local game.
-                self.leave_session();
-                self.game_menu = false;
-                self.gameplay_input.clear();
-                self.release_pointer();
-                if let Some(console) = &mut self.console {
-                    console.close_for_connection();
-                }
-                if let Some(menu) = &mut self.client_menu {
-                    menu.local_server_started(server, &settings.map);
-                    menu.state_loading(&settings.map);
-                }
-            }
+            Ok(server) => menu.local_server_spawning(server, &settings.map),
             Err(error) => {
                 menu.local_server_failed(&format!("Could not start {}: {error}", program.display()))
             }
         }
     }
 
-    /// Join the hosted server once it answers (each frame).
+    /// Leave the current game for the hosted server `server`, whose process exists.
+    fn adopt_local_server(&mut self, server: LocalServer, map: &str) {
+        // Detach before replacing the old owned child, so its disconnect
+        // cannot be mistaken for a failure of the new local game.
+        self.leave_session();
+        self.game_menu = false;
+        self.gameplay_input.clear();
+        self.release_pointer();
+        if let Some(console) = &mut self.console {
+            console.close_for_connection();
+        }
+        if let Some(menu) = &mut self.client_menu {
+            menu.local_server_started(server, map);
+            menu.state_loading(map);
+        }
+    }
+
+    /// Take over the hosted server once its process exists, and join it once it
+    /// answers (each frame).
     pub(crate) fn join_local_game(&mut self) {
+        if let Some((server, map)) = self
+            .client_menu
+            .as_mut()
+            .and_then(crate::menu::ClientMenu::take_spawned_local_server)
+        {
+            self.adopt_local_server(server, &map);
+        }
         if let Some(address) = self
             .client_menu
             .as_mut()
