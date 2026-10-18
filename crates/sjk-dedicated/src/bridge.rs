@@ -718,6 +718,7 @@ impl NativeGame {
             return self.shoot_mover(number, usize::from(owner), level_time);
         };
         let brush = &self.breakables[index].1;
+        let asked = damage;
         let Some(damage) = self.brush_take(
             number,
             brush.takes_damage,
@@ -726,8 +727,19 @@ impl NativeGame {
             means,
             owner,
         ) else {
+            eprintln!(
+                "DEBUG breakable {number} (*{}): blow of {asked} means {means} by {owner} refused (takes damage {}, teamnodmg {})",
+                brush.model, brush.takes_damage, brush.team_no_damage
+            );
             return true;
         };
+        eprintln!(
+            "DEBUG breakable {number} (*{}): blow of {damage} means {means} by {owner}, health {} flags {:#x} may hurt {}",
+            brush.model,
+            brush.health,
+            brush.flags,
+            sjk_game_jka::breakables::may_hurt(brush, means, false)
+        );
         let from = self
             .peer_mut(usize::from(owner))
             .map(|peer| peer.state.origin());
