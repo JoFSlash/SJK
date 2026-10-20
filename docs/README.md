@@ -25,6 +25,7 @@ and changed together. Begin with the status page, then the architecture.
 | [JoF content](jof-content.md) | JoF's maps, skins, hilts and packs from JoF's repository (`jof.downloads`), opt in |
 | [Rig models](rig-models.md) | glTF player models with their own skeleton, driven by the game's animations: manifest, bone maps, limits |
 | [Unlockables and looks](unlockables.md) | Blade skins and other unlockables, and looks every SJK player sees through the hub |
+| [Holo Tactics (planned)](mockups/holo-tactics-rules.md) | Proposed Star Wars auto-battler mini-game: rules and HTML mockups, not implemented |
 
 [AGENTS.md](../AGENTS.md) defines the documentation maintenance rules. Update the
 page that owns a fact rather than adding a second account elsewhere. New facts
