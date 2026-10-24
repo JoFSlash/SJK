@@ -7,7 +7,6 @@ and changed together. Begin with the status page, then the architecture.
 | Page | Contents |
 | --- | --- |
 | [Status and priorities](status.md) | Current scope, verification and open work |
-| [Status history](history/status-2026.md) | Earlier per-change notes, archived; not required reading |
 | [Architecture](architecture.md) | Crate ownership and compatibility boundaries |
 | [Development](development.md) | Build, validation and contribution workflow |
 | [Distributable packages](packages.md) | Windows/Linux ZIP layout, builds and startup checks |

@@ -2,7 +2,7 @@
 
 A rig model is a player model drawn from a glTF file with its own skeleton (any
 number of joints, fingers, face, cloth), animated by the game's ordinary
-`_humanoid` animations. Built 14/10/2026 ([status](history/status-2026.md#rig-models-gltf-players-with-their-own-skeleton)).
+`_humanoid` animations. Built 14/10/2026 ([status](status.md#rig-models-gltf-players-with-their-own-skeleton)).
 
 ## Why this design
 

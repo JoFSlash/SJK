@@ -919,7 +919,7 @@ ask GIPHY only for the GIFs themselves.
   families and looked at.
 - Muting a player: unit tests for the list and its file, matching slots by claim and
   by name, the card on a name in the feed, the dock and the page, the hidden lines,
-  Kyle and the default saber, and the sound filter ([status.md](history/status-2026.md#muting-a-player-from-a-name-in-chat)).
+  Kyle and the default saber, and the sound filter ([status.md](status.md#muting-a-player-from-a-name-in-chat)).
   Not seen or heard in a game.
 
 - The chat's sound (10/10/2026, Windows 11): unit tests for its making (0.74 seconds

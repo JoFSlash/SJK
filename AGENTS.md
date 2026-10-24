@@ -3,9 +3,7 @@
 SJK is a native Rust engine, client and dedicated server for Jedi Academy
 multiplayer. Read [docs/status.md](docs/status.md),
 [docs/architecture.md](docs/architecture.md) and the relevant page in the
-[project wiki](docs/README.md) before changing code. Read only the sections of
-a large page that the task touches (search its headings first), and do not read
-[docs/history](docs/history/) unless the task needs an earlier note.
+[project wiki](docs/README.md) before changing code.
 
 ## Compatibility and architecture
 
@@ -58,13 +56,11 @@ a large page that the task touches (search its headings first), and do not read
 
 ## Verification and scope
 
-- Follow [development.md](docs/development.md). While iterating, check only the
-  touched crates (`cargo test --locked -q -p <crate>`,
-  `cargo clippy --locked -q -p <crate> --all-targets --message-format short`).
-  Before handing off a change, run `cargo fmt --all --check`,
-  `cargo build --locked --workspace`, `cargo test --locked --workspace` and
-  `cargo clippy --locked --workspace --all-targets`, quietly, keeping only the
-  failures. Explain any check that could not run.
+- Follow [development.md](docs/development.md). Before handing off a change, run
+  `cargo fmt --all --check`, `cargo build --locked --workspace`,
+  `cargo test --locked --workspace` and
+  `cargo clippy --locked --workspace --all-targets`. Explain any check that could
+  not run.
 - Passing Cargo tests currently does not establish gameplay parity: the repository
   has no bundled regression suite. Use focused external evidence for affected behavior.
   Small unit tests and fixtures that pin the changed behavior, such as the byte
@@ -98,12 +94,8 @@ a large page that the task touches (search its headings first), and do not read
 
 - When behavior, architecture, configuration or build instructions change, update
   the relevant wiki page in the same change and commit. Add new pages to the index.
-- Update `docs/status.md` only when the baseline verification, a known limitation
-  or agreed priorities change; it is read at the start of every task and stays
-  short. Record a change's own verification (revision, environment, evidence and
-  limits) in its commit or pull request description and, where it bounds behavior,
-  in the subsystem page that owns it, never as a new status section.
-  [docs/history](docs/history/) is a closed archive: do not add to it.
+- Update `docs/status.md` when verification, a known limitation or agreed priorities
+  change. Record the revision, environment, evidence and limits of new verification.
 - Distinguish implemented, verified and planned. Code presence is not proof of
   correctness; a smoke check is not full compatibility or performance certification.
 - Keep durable decisions and current facts in the wiki. Do not append chat transcripts,

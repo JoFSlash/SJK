@@ -354,7 +354,7 @@ struct TagPlacement {
 /// own axes, so `scale` squashes the child axis closest to that direction
 /// (exact when the tag only rolls about the parent's forward axis, as most
 /// retail hand rigs do; the blasters' tag is tilted about 13 degrees and is
-/// approximated, see `docs/history/status-2026.md`).
+/// approximated, see `docs/status.md`).
 fn position_on_tag(
     parent_origin: Vec3,
     parent_rotation: Quat,
