@@ -687,6 +687,17 @@ second build: about 3 s in release, 1.4 s of it hidden behind the file read, abo
 | --- | --- | --- | --- |
 | 2208 MiB | 3719 MiB | 1436 MiB | 3045 MiB |
 
+[scripts/vram-estimate.ps1](../scripts/vram-estimate.ps1) estimates each map's
+texture memory from the pk3 files alone, with no game, build or graphics card: run
+`powershell -ExecutionPolicy Bypass -File vram-estimate.ps1 -Path <GameData\base>,<mod folder>`.
+It reads each map's shader list from its BSP, the shader scripts and the image headers,
+and prints RGBA8 with mips at `r_picmip` 0 to 2, the size with block compression (BC1
+opaque, BC3/BC7 with alpha, which SJK does not use yet), the material maps beside them,
+and the largest textures of all the pk3 files. Map textures only: not models placed on
+the map, skins, effects, lightmaps or screen targets, and texture arrays fitted to a
+common layer size can take more. Written 24/10/2026 without a Windows PowerShell to try
+it on.
+
 ## Eye adaptation
 
 SJK adapts the exposure to what the camera sees, as eyes do: in a dark area the
