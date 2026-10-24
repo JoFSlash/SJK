@@ -9,7 +9,8 @@
 //!
 //! Run: `JKA_GAME_DATA=<GameData> cargo test -p sjk-viewer map_changes_vram --
 //! --ignored --test-threads=1 --nocapture`. `SJK_TEST_PICMIP=<n>` measures it at that
-//! texture detail (`r_picmip`).
+//! texture detail (`r_picmip`), `SJK_TEST_COMPRESSION=0` with textures uncompressed
+//! (`r_textureCompression`).
 
 use super::*;
 use std::collections::BTreeMap;
@@ -47,10 +48,17 @@ fn map_changes_vram() {
     on_big_stack(|| {
         let size = [1920, 1080];
         let picmip = std::env::var("SJK_TEST_PICMIP").unwrap_or_else(|_| "0".to_owned());
-        let cvars = [(
-            crate::world_materials::filtering::mips::PICMIP_CVAR,
-            picmip.as_str(),
-        )];
+        let compression = std::env::var("SJK_TEST_COMPRESSION").unwrap_or_else(|_| "1".to_owned());
+        let cvars = [
+            (
+                crate::world_materials::filtering::mips::PICMIP_CVAR,
+                picmip.as_str(),
+            ),
+            (
+                crate::world_materials::filtering::mips::compression::CVAR,
+                compression.as_str(),
+            ),
+        ];
         let Some((mut gpu, _profile)) = open("maps/mp/duel6.bsp", size, None, &cvars) else {
             return;
         };

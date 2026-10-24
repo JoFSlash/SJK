@@ -48,6 +48,13 @@ pub(crate) fn register(cvars: &mut CvarRegistry) -> Result<(), CvarError> {
             "Texture detail: 0 full, each step halves textures larger than 128 pixels \
              (a quarter of their video memory); the next map applies it",
         ),
+        CvarDefinition::new(
+            mips::compression::CVAR,
+            1_i64,
+            CvarFlags::ARCHIVE,
+            "Compress map and model textures (BC1/BC3): a quarter to an eighth of their \
+             video memory; the next map applies it",
+        ),
     ] {
         cvars.register(definition)?;
     }
@@ -67,6 +74,11 @@ pub(crate) fn register(cvars: &mut CvarRegistry) -> Result<(), CvarError> {
     cvars.on_change(mips::PICMIP_CVAR, |change| {
         if let sjk_shell::CvarValue::Integer(levels) = change.current {
             mips::set_picmip(levels);
+        }
+    })?;
+    cvars.on_change(mips::compression::CVAR, |change| {
+        if let sjk_shell::CvarValue::Integer(on) = change.current {
+            mips::compression::set_enabled(on != 0);
         }
     })?;
     Ok(())

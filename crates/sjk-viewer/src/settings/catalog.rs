@@ -1458,6 +1458,11 @@ pub(super) const RENDER_IMAGE: &[Setting] = &[
         },
     },
     Setting {
+        label: "Texture compression (next map)",
+        cvar: crate::world_materials::filtering::mips::compression::CVAR,
+        kind: ValueKind::Bool,
+    },
+    Setting {
         label: "Soft particles",
         cvar: "r_softParticles",
         kind: ValueKind::Bool,

@@ -17,6 +17,8 @@ use std::{
 
 #[path = "texture_mip_cache.rs"]
 pub(crate) mod cache;
+#[path = "texture_compression.rs"]
+pub(crate) mod compression;
 
 /// The texture detail setting: the levels left off.
 pub(crate) const PICMIP_CVAR: &str = "r_picmip";
@@ -136,6 +138,21 @@ pub(crate) fn find_shared(images: &[Arc<RgbaImage>]) -> Option<wgpu::TextureView
         .map(|(view, _)| view)
 }
 
+/// Mip chains and, when compressed ([`compression`]), their blocks: what a worker
+/// prepares for [`upload_chains`].
+pub(crate) type Prepared = (
+    Arc<Vec<Vec<RgbaImage>>>,
+    Option<Arc<compression::Compressed>>,
+);
+
+/// The chains of `images` as a `width` x `height` array ([`cache::prepare`]) and their
+/// blocks: loading work, for a worker where there is one.
+pub(crate) fn prepare(images: &[Arc<RgbaImage>], width: u32, height: u32) -> Prepared {
+    let chains = cache::prepare(images, width, height);
+    let compressed = compression::compress(&chains, upload_skip(width, height, &chains), images);
+    (chains, compressed)
+}
+
 /// [`upload_chains`] of `images`, or another world's copy of the same array.
 pub(crate) fn upload_shared(
     device: &wgpu::Device,
@@ -143,13 +160,14 @@ pub(crate) fn upload_shared(
     images: &[Arc<RgbaImage>],
     width: u32,
     height: u32,
-    chains: impl FnOnce() -> Arc<Vec<Vec<RgbaImage>>>,
+    prepared: impl FnOnce() -> Prepared,
 ) -> Result<wgpu::TextureView, Box<dyn Error>> {
     let key = shared_key(images, width, height);
     if let Some((view, _)) = crate::shared_textures::find::<Shared>(SHARED, key) {
         return Ok(view);
     }
-    let view = upload_chains(device, queue, width, height, &chains())?;
+    let (chains, compressed) = prepared();
+    let view = upload_chains(device, queue, width, height, &chains, compressed.as_deref())?;
     let shared: Shared = (view.clone(), images.into());
     crate::shared_textures::share(SHARED, key, || shared);
     Ok(view)
@@ -163,22 +181,36 @@ pub(crate) fn upload(
 ) -> Result<wgpu::TextureView, Box<dyn Error>> {
     let (width, height) = extent(images);
     upload_shared(device, queue, images, width, height, || {
-        cache::prepare(images, width, height)
+        prepare(images, width, height)
     })
 }
 
+/// The levels of `chains`, a `width` x `height` array, that `r_picmip` leaves off now
+/// ([`skipped`]), keeping at least one.
+pub(crate) fn upload_skip(width: u32, height: u32, chains: &[Vec<RgbaImage>]) -> u32 {
+    let shortest = chains.iter().map(Vec::len).min().unwrap_or(0);
+    skipped(width, height, PICMIP.load(Ordering::Relaxed))
+        .min(u32::try_from(shortest.saturating_sub(1)).unwrap_or(u32::MAX))
+}
+
 /// Upload one [`chain`] per layer of a `width` x `height` array, less the levels
-/// `r_picmip` leaves off ([`skipped`]).
+/// `r_picmip` leaves off ([`skipped`]): as `compressed`'s blocks when they were made for
+/// those levels, else as RGBA8.
 pub(crate) fn upload_chains(
     device: &wgpu::Device,
     queue: &crate::frame_queue::FrameQueue,
     width: u32,
     height: u32,
     chains: &[Vec<RgbaImage>],
+    compressed: Option<&compression::Compressed>,
 ) -> Result<wgpu::TextureView, Box<dyn Error>> {
-    let shortest = chains.iter().map(Vec::len).min().unwrap_or(0);
-    let skip = skipped(width, height, PICMIP.load(Ordering::Relaxed))
-        .min(u32::try_from(shortest.saturating_sub(1))?);
+    let skip = upload_skip(width, height, chains);
+    // `r_picmip` changed since the worker compressed them: those blocks are other levels.
+    if let Some(compressed) = compressed
+        .filter(|compressed| compressed.skip == skip && compressed.layers.len() == chains.len())
+    {
+        return compression::upload(device, queue, compressed);
+    }
     let (width, height) = ((width >> skip).max(1), (height >> skip).max(1));
     let texture = device.create_texture(&wgpu::TextureDescriptor {
         label: Some("SJK optional mipmapped material"),

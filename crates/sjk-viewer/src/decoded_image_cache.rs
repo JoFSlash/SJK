@@ -10,6 +10,9 @@ use std::sync::{Arc, Mutex, OnceLock};
 type ImageKey = (String, [u8; 16]);
 
 static DECODED_IMAGES: OnceLock<Mutex<HashMap<ImageKey, Arc<RgbaImage>>>> = OnceLock::new();
+/// The MD4 of the file each cached image was decoded from, by the image's address: the
+/// cache keeps every image for the process, so an address never names other pixels.
+static DIGESTS: OnceLock<Mutex<HashMap<usize, [u8; 16]>>> = OnceLock::new();
 type ResolvedKey = (AssetCacheIdentity, String);
 static RESOLVED_IMAGES: OnceLock<Mutex<HashMap<ResolvedKey, Arc<RgbaImage>>>> = OnceLock::new();
 
@@ -75,11 +78,28 @@ fn read_decoded_image(
         return Ok(None);
     };
     let decoded = Arc::new(decoded.into_rgba8());
+    let digest = key.1;
     let mut cache = shared_images().lock().expect("decoded image cache lock");
-    Ok(Some(
-        cache
-            .entry(key)
-            .or_insert_with(|| Arc::clone(&decoded))
-            .clone(),
-    ))
+    let image = cache
+        .entry(key)
+        .or_insert_with(|| Arc::clone(&decoded))
+        .clone();
+    DIGESTS
+        .get_or_init(Default::default)
+        .lock()
+        .expect("decoded image digest lock")
+        .insert(Arc::as_ptr(&image) as usize, digest);
+    Ok(Some(image))
+}
+
+/// The MD4 of the file `image` was decoded from, when it came from this cache: what the
+/// texture store names compressed textures by
+/// ([`crate::world_materials::filtering::mips::compression`]).
+pub(crate) fn content_digest(image: &Arc<RgbaImage>) -> Option<[u8; 16]> {
+    DIGESTS
+        .get()?
+        .lock()
+        .expect("decoded image digest lock")
+        .get(&(Arc::as_ptr(image) as usize))
+        .copied()
 }

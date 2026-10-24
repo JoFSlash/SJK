@@ -187,6 +187,7 @@ impl Context {
         } else {
             1
         };
+        crate::world_materials::filtering::mips::compression::sample(console, &device);
         Ok(Arc::new(Self {
             hdr,
             sun_shadows: crate::world_materials::shadows::settings::Settings::sample(console),
@@ -239,6 +240,7 @@ impl Context {
     /// shafts, material maps and filtering) read again: the graphics reload
     /// ([`crate::graphics_reload`]) builds the current world on it.
     pub(crate) fn resampled(&self, console: Option<&crate::console::ViewerConsole>) -> Arc<Self> {
+        crate::world_materials::filtering::mips::compression::sample(console, &self.device);
         Arc::new(Self {
             hdr: crate::frame_target::aa::hdr::Settings::sample(console),
             sun_shadows: crate::world_materials::shadows::settings::Settings::sample(console),

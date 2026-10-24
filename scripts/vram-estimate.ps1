@@ -319,7 +319,7 @@ try {
     $all | Sort-Object MiB -Descending | Select-Object -First $Top | Format-Table -AutoSize | Out-String -Width 400 | Write-Host
     $total = ($all | Measure-Object MiB -Sum).Sum
     Write-Host ("All {0} textures in these folders: {1:N0} MiB if every one were on the card at once." -f @($all).Count, $total)
-    Write-Host 'MiB BC = with block compression (BC1 opaque, BC3/BC7 with alpha); SJK does not compress yet.'
+    Write-Host 'MiB BC = with block compression (BC1 opaque, BC3 with alpha), as r_textureCompression uploads them.'
     Write-Host 'Missing = images the map names that are in none of the folders (often retail base: pass it too).'
 } finally {
     foreach ($zip in $archives) { $zip.Dispose() }

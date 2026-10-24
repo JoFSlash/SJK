@@ -17,6 +17,9 @@ bytemuck = { version = "1.25.0", features = ["derive"] }
 glam = "0.33.0"
 image = { version = "0.25.9", default-features = false, features = ["gif", "jpeg", "png", "tga", "webp"] }
 half = "2.7.1"
+# Map and model textures as BC1/BC3 blocks (`texture_compression.rs`): the CPU
+# encoders only, pure Rust (a port of Intel's ISPC kernels), no compute shaders.
+block_compression = { version = "0.11.0", default-features = false, features = ["bc15"] }
 fontdue = "0.9.3"
 # Glyphs beyond the code-page atlases, outlined on demand (`text/wide.rs`).
 ab_glyph = { version = "0.2.32", default-features = false, features = ["std"] }

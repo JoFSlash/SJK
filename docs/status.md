@@ -1,3 +1,19 @@
+## Texture compression
+
+24/10/2026, `claude/sweet-pasteur-xnol26`, based on `main` `ca5643de` (Slash: SJK on
+small and built-in graphics cards; `scripts/vram-estimate.ps1` on JoF's maps showed
+`amjh3te`, `jofball_tournament_practice`, `duneeden_temple` and `atlantica` at 1.1 to
+1.3 GB of RGBA8 map textures, mostly a few 4096-pixel images, retail maps at 50 to
+200 MB). `r_textureCompression` (Settings > Renderer, on by default, from the next map)
+uploads map and model textures as BC1 (opaque) or BC3 blocks, compressed on the loading
+workers and kept in `cache/textures` named by their source files' MD4, so maps JoF
+updates are compressed again and the store trims itself to 2 GiB
+([rendering.md](rendering.md#gpu-memory)). Checked by unit tests (block sizes and colours
+through every mip level, alpha, the store's round trip, refusals and trim), the build and
+the viewer's settings and changelog tests on Linux without a GPU. Not verified: any
+texture on a real card (look, missing or black textures), the memory saved, load times
+with and without the store, Windows.
+
 ## macOS build
 
 24/10/2026, `personal/macos-build`, based on `main` `cbf6e41d`. GitHub builds an

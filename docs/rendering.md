@@ -583,6 +583,29 @@ Windows that memory also shows in the process's RAM in Task Manager.
   out in the main menu). The rest of that menu: the game font atlases (128 MiB, RGBA),
   the UI icon atlas (56 MiB) and the world's shadow, GI and froxel targets (about
   200 MiB) a picture menu does not draw.
+- Texture compression (`r_textureCompression`, on by default,
+  [texture_compression.rs](../crates/sjk-viewer/src/texture_compression.rs)) uploads map
+  and model textures as BC1 blocks when every texel is opaque (an eighth of RGBA8) and
+  BC3 otherwise (a quarter), sRGB like the RGBA8 path, on devices with
+  `TEXTURE_COMPRESSION_BC`. The loading workers compress each mip chain after building it
+  (`mips::prepare`), only the levels `r_picmip` uploads, with
+  [block_compression](https://crates.io/crates/block_compression)'s CPU encoders (a Rust
+  port of Intel's ISPC kernels): BC1 about 0.15 s and BC3 0.22 s for 2048x2048 on one
+  core of the cloud runner, close to libsquish's cluster fit (texpresso's range fit was as
+  fast and a third worse; BC7 took 2 to 20 s and is not used). Levels below 4x4 or of odd
+  sizes repeat their edge texels into whole blocks. Uncompressed: textures under 64
+  pixels or not whole 4x4 blocks at the uploaded size, the non-mipmapped path, fonts, UI,
+  effects and lightmaps. The blocks are kept in `cache/textures` beside the configuration
+  ([texture_compression_store.rs](../crates/sjk-viewer/src/texture_compression_store.rs)),
+  one file per array named by the MD4 of each source image file
+  (`decoded_image_cache::content_digest`), the array's size, the levels left off and a
+  version: a map or pack updated with other images names other files and is compressed
+  again, and each start deletes the files used longest ago beyond 2 GiB. A file that does
+  not match the asked size or layout is ignored and written again. The load logs
+  `texture compression: N arrays (M from the store), X MiB as RGBA8, Y MiB as blocks`.
+  `scripts/vram-estimate.ps1` estimated 1332 MiB of RGBA8 textures for `amjh3te` and
+  182 MiB as blocks, 99 and 14 MiB for mp/siege_desert. Not measured on a GPU yet: the
+  ignored `map_changes_vram` takes `SJK_TEST_COMPRESSION=0` for the comparison.
 - Work on the render thread after a world is built runs inside wgpu error scopes
   ([gpu_guard.rs](../crates/sjk-viewer/src/gpu_guard.rs)) where it can fail alone: the
   menu stage's model (the creator's head, torso and legs), which then is not shown and
@@ -692,7 +715,7 @@ texture memory from the pk3 files alone, with no game, build or graphics card: r
 `powershell -ExecutionPolicy Bypass -File vram-estimate.ps1 -Path <GameData\base>,<mod folder>`.
 It reads each map's shader list from its BSP, the shader scripts and the image headers,
 and prints RGBA8 with mips at `r_picmip` 0 to 2, the size with block compression (BC1
-opaque, BC3/BC7 with alpha, which SJK does not use yet), the material maps beside them,
+opaque, BC3 with alpha, as `r_textureCompression` uploads them), the material maps beside them,
 and the largest textures of all the pk3 files. Map textures only: not models placed on
 the map, skins, effects, lightmaps or screen targets, and texture arrays fitted to a
 common layer size can take more. Written 24/10/2026 without a Windows PowerShell to try

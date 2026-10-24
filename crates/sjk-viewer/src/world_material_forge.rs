@@ -714,7 +714,7 @@ pub(crate) fn warm_entity_materials(
                     key: key.clone(),
                     width,
                     height,
-                    chains: super::filtering::mips::cache::prepare(pixels, width, height),
+                    prepared: super::filtering::mips::prepare(pixels, width, height),
                 });
             }
         }
@@ -727,7 +727,7 @@ pub(crate) struct PreparedTexture {
     key: String,
     width: u32,
     height: u32,
-    chains: Arc<Vec<Vec<RgbaImage>>>,
+    prepared: super::filtering::mips::Prepared,
 }
 
 impl Runtime {
@@ -764,7 +764,8 @@ impl Runtime {
                 queue,
                 texture.width,
                 texture.height,
-                &texture.chains,
+                &texture.prepared.0,
+                texture.prepared.1.as_deref(),
             )
         });
         match uploaded {
