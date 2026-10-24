@@ -394,6 +394,35 @@ mod tests {
         });
     }
 
+    /// `sjk_arena1` (`scripts/arena_map.py`, installed in `base`) from four
+    /// places: a duel spawn, a balcony, a corner by the stairs and under a
+    /// balcony, on one sheet.
+    #[test]
+    #[ignore = "renders with the GPU and the installed game data named by JKA_GAME_DATA"]
+    fn sjk_arena1_tour() {
+        on_big_stack(|| {
+            let Some((mut gpu, _profile)) = open("maps/sjk_arena1.bsp", [1280, 720], None, &[])
+            else {
+                return;
+            };
+            let views = [
+                ([0.0, -200.0, 80.0], [0.0, 400.0, 120.0]),
+                ([0.0, 600.0, 230.0], [0.0, -300.0, 0.0]),
+                ([560.0, -150.0, 90.0], [-400.0, 250.0, 100.0]),
+                ([300.0, 590.0, 70.0], [-500.0, 560.0, 60.0]),
+            ];
+            let shots: Vec<_> = views
+                .iter()
+                .map(|&(from, at)| {
+                    let (yaw, pitch) = look(from, at);
+                    aim(&mut gpu, from, yaw, pitch);
+                    frame(&mut gpu, 40)
+                })
+                .collect();
+            println!("{}", sheet(&shots, 2, 960, "sjk_arena1-tour").display());
+        });
+    }
+
     /// The console's looks over duel6, half open on made-up scrollback with a
     /// command being typed (its unique completion ghosted) and two rows
     /// selected: the SJK UI's deck and the classic console; the deck

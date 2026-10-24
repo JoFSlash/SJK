@@ -9,13 +9,14 @@ Writes, in --out (default S:/Tools/arena):
 
 - home/base/maps/sjk_arena1.map: the source map, a closed hall with a two-step
   dais in the middle, four pillars, a balcony on the north and south walls
-  with stairs at their west and east ends, light entities, two
-  `info_player_duel` and six `info_player_deathmatch` spawn points.
+  with stairs at their west and east ends, glowing light panels in the
+  ceiling and under the balconies, two `info_player_duel` and six
+  `info_player_deathmatch` spawn points.
 - sjk_arena1.pk3: the compiled map, its textures (drawn here, not taken from
   the game) and shaders/sjk_arena.shader. --install copies it to GameData/base,
   where both SJK and EternalJK load it (`devmap sjk_arena1`).
-- --preview: a plan of the brushes (shaded by height), lights and spawn
-  points, for checking a layout without compiling it.
+- --preview: a plan of the brushes (shaded by height), light panels and
+  spawn points, for checking a layout without compiling it.
 
 Every brush is an axis-aligned box. Interior units: the hall is 1280 square
 and 512 high; steps are 16 high (pmove climbs 18) and 24 deep.
@@ -161,15 +162,22 @@ def balconies():
     return north + [mirror_y(b) for b in north]
 
 
-def lights():
+def light_panels():
+    """Glowing panels in the ceiling and under the balconies.
+
+    The light is on surfaces, not in `light` entities: q3map2 strips those
+    from the BSP, and SJK's real-time lighting (`r_dayNight 1`) replaces the
+    lightmaps with lamps found in emissive materials only.
+    """
+    lit = {"*": "trim", "-z": "light"}
     out = []
     for x in (-480, 0, 480):  # off the pillars at +-384
         for y in (-480, 0, 480):
-            out.append(((x, y, HEIGHT - 64), 450, "1 0.92 0.8"))
+            out.append(Brush((x - 64, y - 64, HEIGHT - 8), (x + 64, y + 64, HEIGHT), lit))
     for x in (-384, 0, 384):
-        for y in (HALF - 64, -HALF + 64):
-            out.append(((x, y, BALCONY_Z - 48), 200, "0.6 0.75 1"))
-            out.append(((x, y, BALCONY_Z + 128), 250, "1 0.92 0.8"))
+        for sy in (-1, 1):
+            y0, y1 = sorted((sy * (HALF - BALCONY_D + 16), sy * (HALF - 16)))
+            out.append(Brush((x - 48, y0, BALCONY_Z - 24), (x + 48, y1, BALCONY_Z - 16), lit))
     return out
 
 
@@ -189,12 +197,9 @@ def spawns():
 
 
 def build():
-    brushes = shell() + dais() + pillars() + balconies()
+    brushes = shell() + dais() + pillars() + balconies() + light_panels()
     ents = [entity({"classname": "worldspawn", "message": "SJK Arena",
                     "_ambient": "8", "gridsize": "64 64 64"}, brushes)]
-    for origin, level, color in lights():
-        ents.append(entity({"classname": "light", "origin": "%d %d %d" % origin,
-                            "light": str(level), "_color": color}))
     for cls, origin, angle in spawns():
         ents.append(entity({"classname": cls, "origin": "%d %d %d" % origin,
                             "angle": str(angle)}))
@@ -202,10 +207,9 @@ def build():
 
 
 def check(brushes):
-    """Spawn points need room for a player's box, and no light may be inside a brush."""
+    """Spawn points need room for a player's box."""
     boxes = [(cls, (x - 16, y - 16, z - 23), (x + 16, y + 16, z + 40))
              for cls, (x, y, z), _ in spawns()]
-    boxes += [("light", o, o) for o, _, _ in lights()]
     for name, lo, hi in boxes:
         for b in brushes:
             if all(b.mins[k] <= hi[k] and lo[k] <= b.maxs[k] for k in range(3)):
@@ -249,10 +253,40 @@ def draw_textures(folder):
         d.rectangle([x, 0, x + 8, 127], fill=(120, 112, 96))
     pillar.save(folder / "pillar.tga")
     noise_tile(128, (55, 55, 62), 4, 5).save(folder / "ceiling.tga")
+    light = Image.new("RGB", (64, 64), (255, 240, 215))
+    ImageDraw.Draw(light).rectangle([0, 0, 63, 63], outline=(40, 40, 44), width=3)
+    light.save(folder / "light.tga")
+
+
+# A lit panel: its light both in the compile (surfacelight, the dark frame
+# masked out by the light image) and in SJK's lamps (the glow stage).
+LIGHT_SHADER = """%(full)s
+{
+\tqer_editorimage %(full)s.tga
+\tq3map_surfacelight %(power)d
+\tq3map_lightimage %(full)s.tga
+\tsurfaceparm nomarks
+\t{
+\t\tmap $lightmap
+\t\trgbGen identity
+\t}
+\t{
+\t\tmap %(full)s.tga
+\t\tblendFunc GL_DST_COLOR GL_ZERO
+\t\trgbGen identity
+\t}
+\t{
+\t\tmap %(full)s.tga
+\t\tblendFunc GL_ONE GL_ONE
+\t\tglow
+\t}
+}
+"""
+LIGHT_POWER = 2500
 
 
 def shader_text():
-    out = []
+    out = [LIGHT_SHADER % {"full": "textures/%s/light" % PREFIX, "power": LIGHT_POWER}]
     for name in TEXTURES:
         full = "textures/%s/%s" % (PREFIX, name)
         out.append("%s\n{\n\tqer_editorimage %s.tga\n\t{\n\t\tmap $lightmap\n\t\trgbGen identity\n"
@@ -284,16 +318,17 @@ def preview(brushes, path):
 
     img = Image.new("RGB", (size, size), (20, 20, 24))
     d = ImageDraw.Draw(img)
-    floor = [b for b in brushes if b.maxs[2] <= HEIGHT]
+    panels = [b for b in brushes if "light" in b.faces.values()]
+    floor = [b for b in brushes if b.maxs[2] <= HEIGHT and b not in panels]
     for b in sorted(floor, key=lambda b: b.maxs[2]):
         t = max(0.0, min(1.0, b.maxs[2] / BALCONY_Z))
         color = (60, 60, 70) if b.maxs[2] >= HEIGHT else (
             int(70 + 130 * t), int(90 + 80 * t), int(110 - 40 * t))
         (x0, y0), (x1, y1) = px(b.mins[0], b.maxs[1]), px(b.maxs[0], b.mins[1])
         d.rectangle([x0, y0, x1, y1], fill=color, outline=(15, 15, 18))
-    for (x, y, _), _, _ in lights():
-        cx, cy = px(x, y)
-        d.ellipse([cx - 4, cy - 4, cx + 4, cy + 4], fill=(255, 230, 120))
+    for b in panels:  # outlined, as they hang above what is drawn
+        (x0, y0), (x1, y1) = px(b.mins[0], b.maxs[1]), px(b.maxs[0], b.mins[1])
+        d.rectangle([x0, y0, x1, y1], outline=(255, 230, 120), width=2)
     for cls, (x, y, _), angle in spawns():
         cx, cy = px(x, y)
         color = (230, 70, 60) if cls == "info_player_duel" else (90, 200, 110)

@@ -4268,18 +4268,30 @@ python scripts/arena_map.py --no-compile --preview plan.png
   stairs at both ends (16-unit steps), two `info_player_duel` spawn points
   facing each other on the dais and six `info_player_deathmatch` around the
   hall. Every brush is an axis-aligned box.
+- **Light.** All of it comes from glowing panels (`textures/sjk_arena/light`:
+  `q3map_surfacelight`, a light image and a `glow` stage) in the ceiling and
+  under the balconies, not from `light` entities. q3map2 strips point lights
+  from the BSP, and real-time lighting (`r_dayNight 1`) replaces the lightmaps
+  with lamps found in emissive materials only
+  ([fixture inference](#inferring-fixture-light-from-legacy-materials)): with
+  point lights alone the hall rendered almost black and SJK found 0 lamps; with
+  the panels it finds 60. A map made for SJK puts its light on surfaces.
 - **Checks.** Before writing, the script stops if a spawn point's player box
-  or a light touches a brush. `--preview` draws a plan of the brushes (shaded
-  by height), lights and spawn points, to check a layout without compiling it.
+  touches a brush. `--preview` draws a plan of the brushes (shaded by height),
+  light panels and spawn points, to check a layout without compiling it.
 - **Stairs.** Each step is its own box beside the next; stacked, overlapping
   step boxes made q3map2's `-meta` warn of duplicate or flipped triangles.
 - **Checked** (24/10/2026, Linux): q3map2 from NetRadiant-custom `8216133`
   (built with GCC 14; GCC 13 and clang 18 reject its C++20) compiles it with no
-  warning or leak, 3 lightmaps (mean 40 of 255), with an empty `GameData/base`.
-  `sjk-bsp` parses the BSP; player-box traces land each spawn point (raised 9
-  as `SelectSpawnPoint` does) on its floor, stop at the walls and ceiling, and
-  climb the stairs onto a balcony 18 units at a time.
-- **Not checked:** the map in a game, on a server and in EternalJK.
+  warning or leak, with an empty `GameData/base`. `sjk-bsp` parses the BSP;
+  player-box traces land each spawn point (raised 9 as `SelectSpawnPoint`
+  does) on its floor, stop at the walls and ceiling, and climb the stairs onto
+  a balcony 18 units at a time. The ignored test `sjk_arena1_tour`
+  (`world_shot.rs`) rendered four views on llvmpipe (Mesa software Vulkan),
+  with the pk3 and placeholder images for the saber shaders the client
+  requires standing in for the retail data.
+- **Not checked:** the map in a game, on a server and in EternalJK; the baked
+  lighting (`r_dayNight 0`, lightmap mean 33 of 255) looked at.
 
 ## Default visual profile
 
