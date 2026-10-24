@@ -12,7 +12,14 @@ updates are compressed again and the store trims itself to 2 GiB
 through every mip level, alpha, the store's round trip, refusals and trim), the build and
 the viewer's settings and changelog tests on Linux without a GPU. Not verified: any
 texture on a real card (look, missing or black textures), the memory saved, load times
-with and without the store, Windows.
+with and without the store, Windows. A code review's findings were fixed: no encoding
+on the render thread (lazily compiled materials stay RGBA8), the store read before any
+mip chain is built, a test no longer depending on other tests' GPU contexts, headless
+contexts uncompressed, the log line counting only the map's textures, the shared-texture
+key following the setting, the store trimmed during long sessions, and the PowerShell
+estimate leaving small and odd-sized textures uncompressed. Not changed: the store's
+own aging code beside `avatars/store.rs` (different files and budget) and the copy of
+each level out of a read file (one texture at a time).
 
 ## macOS build
 

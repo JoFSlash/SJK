@@ -14,8 +14,10 @@
 //! file (generated pictures) are compressed again on each load.
 //!
 //! Left uncompressed: textures whose uploaded size is not whole 4x4 blocks or is smaller
-//! than [`SMALLEST`], the non-mipmapped filtering path, devices without
-//! `TEXTURE_COMPRESSION_BC`, and every other texture (fonts, UI, effects, lightmaps).
+//! than [`SMALLEST`], the non-mipmapped filtering path, textures no worker prepared (a
+//! material compiled during play uploads on the thread that needs it, never encoding
+//! there), devices without `TEXTURE_COMPRESSION_BC`, contexts without a console, and
+//! every other texture (fonts, UI, effects, lightmaps).
 //! The change applies to textures uploaded after it, so from the next map.
 use super::RgbaImage;
 use block_compression::{CompressionVariant, encode::compress_rgba8};
@@ -137,10 +139,11 @@ pub(crate) fn sample(console: Option<&crate::console::ViewerConsole>, device: &w
             .contains(wgpu::Features::TEXTURE_COMPRESSION_BC),
         Ordering::Relaxed,
     );
+    // A context without a console (GPU tests, tools) keeps RGBA8: nothing chose it.
     set_enabled(
         console
             .and_then(|console| console.integer_cvar(CVAR))
-            .unwrap_or(1)
+            .unwrap_or(0)
             != 0,
     );
     if let Some(console) = console {
@@ -168,10 +171,48 @@ pub(crate) fn active() -> bool {
     ENABLED.load(Ordering::Relaxed) && SUPPORTED.load(Ordering::Relaxed)
 }
 
+/// The blocks of a `width` x `height` array of `sources` from level `skip` on, as the
+/// store keeps them, or `None` (not stored, not compressible, compression off). Checked
+/// before the mip chains are built: a stored texture needs none.
+pub(crate) fn stored(
+    sources: &[Arc<RgbaImage>],
+    width: u32,
+    height: u32,
+    skip: u32,
+) -> Option<Arc<Compressed>> {
+    if !active() {
+        return None;
+    }
+    let (first_width, first_height) = ((width >> skip).max(1), (height >> skip).max(1));
+    whole_blocks(first_width, first_height).then_some(())?;
+    let name = stored_name(sources, width, height, skip)?;
+    let directory = DIRECTORY
+        .lock()
+        .expect("texture store folder lock")
+        .clone()?;
+    let levels = (super::levels(width, height) - skip) as usize;
+    let compressed = store::load(
+        &directory,
+        &name,
+        first_width,
+        first_height,
+        sources.len(),
+        levels,
+    )?;
+    let rgba: u64 = (0..levels as u32)
+        .map(|level| {
+            u64::from((first_width >> level).max(1)) * u64::from((first_height >> level).max(1)) * 4
+        })
+        .sum::<u64>()
+        * sources.len() as u64;
+    count(true, rgba, compressed.bytes());
+    Some(Arc::new(compressed))
+}
+
 /// The blocks of `chains` (one mip chain per layer, from [`super::chain`]) from level
-/// `skip` on, or `None` when they stay RGBA8. `sources` are the decoded images the
-/// chains were made from, which name the stored copy. Loading work only: a large texture
-/// takes a few hundred milliseconds the first time.
+/// `skip` on, or `None` when they stay RGBA8, kept in the store when `sources` (the
+/// decoded images the chains were made from) name them. Loading work for a worker: a
+/// large texture takes a few hundred milliseconds.
 pub(crate) fn compress(
     chains: &[Vec<RgbaImage>],
     skip: u32,
@@ -180,41 +221,37 @@ pub(crate) fn compress(
     if !active() {
         return None;
     }
-    let (width, height) = compressible(chains, skip)?;
-    let levels = chains[0].len() - skip as usize;
-    let name = stored_name(sources, chains, skip);
+    compressible(chains, skip)?;
+    let compressed = encode(chains, skip);
+    let (width, height) = chains[0][0].dimensions();
     let directory = DIRECTORY.lock().expect("texture store folder lock").clone();
-    let stored = name
-        .as_ref()
-        .zip(directory.as_ref())
-        .and_then(|(name, directory)| {
-            store::load(directory, name, width, height, chains.len(), levels)
-        });
-    let from_disk = stored.is_some();
-    let compressed = match stored {
-        Some(compressed) => compressed,
-        None => {
-            let compressed = encode(chains, skip);
-            if let Some((name, directory)) = name.as_ref().zip(directory.as_ref())
-                && let Err(error) = store::save(directory, name, &compressed)
-            {
-                crate::log::progress(format_args!("texture compression: not stored ({error})"));
-            }
-            compressed
-        }
-    };
-    ARRAYS.fetch_add(1, Ordering::Relaxed);
-    FROM_DISK.fetch_add(u64::from(from_disk), Ordering::Relaxed);
-    RGBA_BYTES.fetch_add(
+    if let Some((name, directory)) = stored_name(sources, width, height, skip).zip(directory)
+        && let Err(error) = store::save(&directory, &name, &compressed)
+    {
+        crate::log::progress(format_args!("texture compression: not stored ({error})"));
+    }
+    count(
+        false,
         chains
             .iter()
             .flat_map(|chain| &chain[skip as usize..])
             .map(|level| level.as_raw().len() as u64)
             .sum(),
-        Ordering::Relaxed,
+        compressed.bytes(),
     );
-    BLOCK_BYTES.fetch_add(compressed.bytes(), Ordering::Relaxed);
     Some(Arc::new(compressed))
+}
+
+fn count(from_disk: bool, rgba: u64, blocks: u64) {
+    ARRAYS.fetch_add(1, Ordering::Relaxed);
+    FROM_DISK.fetch_add(u64::from(from_disk), Ordering::Relaxed);
+    RGBA_BYTES.fetch_add(rgba, Ordering::Relaxed);
+    BLOCK_BYTES.fetch_add(blocks, Ordering::Relaxed);
+}
+
+/// Whether a first uploaded level of `width` x `height` is worth blocks and is whole ones.
+fn whole_blocks(width: u32, height: u32) -> bool {
+    width.is_multiple_of(4) && height.is_multiple_of(4) && width.max(height) >= SMALLEST
 }
 
 /// The first uploaded level's size when `chains` can become blocks from level `skip`:
@@ -225,8 +262,7 @@ fn compressible(chains: &[Vec<RgbaImage>], skip: u32) -> Option<(u32, u32)> {
     let same = chains.iter().all(|chain| {
         chain.len() == first.len() && chain[skip as usize].dimensions() == (width, height)
     });
-    (same && width.is_multiple_of(4) && height.is_multiple_of(4) && width.max(height) >= SMALLEST)
-        .then_some((width, height))
+    (same && whole_blocks(width, height)).then_some((width, height))
 }
 
 /// BC1 when every texel of the first uploaded level of every layer is opaque, else BC3.
@@ -288,20 +324,13 @@ pub(crate) fn encode_level(format: Format, level: &RgbaImage) -> Vec<u8> {
     blocks
 }
 
-/// The stored copy's name: what the texture is made from, or `None` when a source has
-/// no file behind it.
-fn stored_name(sources: &[Arc<RgbaImage>], chains: &[Vec<RgbaImage>], skip: u32) -> Option<String> {
+/// The stored copy's name: what the `width` x `height` array is made from and the
+/// levels left off, or `None` when a source has no file behind it.
+fn stored_name(sources: &[Arc<RgbaImage>], width: u32, height: u32, skip: u32) -> Option<String> {
     let mut hash = Md5::new();
     hash.update(b"sjk texture blocks");
     hash.update(VERSION.to_le_bytes());
-    let (width, height) = chains[0][0].dimensions();
-    for value in [
-        width,
-        height,
-        skip,
-        chains.len() as u32,
-        sources.len() as u32,
-    ] {
+    for value in [width, height, skip, sources.len() as u32] {
         hash.update(value.to_le_bytes());
     }
     for source in sources {

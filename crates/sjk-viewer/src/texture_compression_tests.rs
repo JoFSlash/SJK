@@ -98,13 +98,5 @@ fn alpha_survives_bc3() {
 #[test]
 fn images_without_a_file_behind_them_are_not_stored() {
     let source = Arc::new(gradient(64, 64, 255));
-    assert_eq!(stored_name(&[source], &[chain(64, 64, 255)], 0), None);
-}
-
-#[test]
-fn nothing_is_compressed_while_the_device_cannot_take_blocks() {
-    // `sample` was never called here: no device has said it takes BC textures.
-    assert!(!active());
-    let source = Arc::new(gradient(64, 64, 255));
-    assert!(compress(&[chain(64, 64, 255)], 0, &[source]).is_none());
+    assert_eq!(stored_name(&[source], 64, 64, 0), None);
 }

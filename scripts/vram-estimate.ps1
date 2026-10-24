@@ -7,10 +7,10 @@ alone (no game, no build, no graphics card needed).
 Reads every .pk3 in the given folders (as the game does: in order, a later file
 replacing an earlier one), each map's shader list from its .bsp, the .shader scripts
 and the image headers (TGA, PNG, JPG). For each map it prints the memory its map
-textures take uncompressed as SJK uploads them today (RGBA8 with a full mip chain) at
-texture detail r_picmip 0, 1 and 2, what block compression (BC1 without alpha, BC3/BC7
-with alpha) would take, and the extra material maps (_n, _s, _e ...) found beside
-them. Then the largest textures of all the pk3 files.
+textures take uncompressed (RGBA8 with a full mip chain) at texture detail r_picmip
+0, 1 and 2, what they take as blocks (BC1 without alpha, BC3 with alpha, as
+r_textureCompression uploads them; textures under 64 pixels or not whole 4x4 blocks
+stay RGBA8), and the extra material maps (_n, _s, _e ...) found beside them. Then the largest textures of all the pk3 files.
 
 An estimate of map textures only: not models placed on the map, players' skins,
 effects, fonts, lightmaps, screen targets or lighting caches. Textures the map uses
@@ -273,7 +273,9 @@ try {
             $count++
             for ($p = 0; $p -lt 3; $p++) { $sum[$p] += Get-Bytes $info.W $info.H $p }
             $full = Get-Bytes $info.W $info.H 0
-            if ($info.Alpha) { $compressed += $full / 4 } else { $compressed += $full / 8 }
+            # As r_textureCompression: under 64 pixels or not whole 4x4 blocks stays RGBA8.
+            if ($info.W % 4 -ne 0 -or $info.H % 4 -ne 0 -or [Math]::Max($info.W, $info.H) -lt 64) { $compressed += $full }
+            elseif ($info.Alpha) { $compressed += $full / 4 } else { $compressed += $full / 8 }
             if ($full -gt $biggestBytes) { $biggestBytes = $full; $biggest = "$image ($($info.W)x$($info.H))" }
             foreach ($suffix in $MaterialSuffixes) {
                 $extra = Find-Image "$image$suffix"

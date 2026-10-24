@@ -600,7 +600,13 @@ Windows that memory also shows in the process's RAM in Task Manager.
   one file per array named by the MD4 of each source image file
   (`decoded_image_cache::content_digest`), the array's size, the levels left off and a
   version: a map or pack updated with other images names other files and is compressed
-  again, and each start deletes the files used longest ago beyond 2 GiB. A file that does
+  again, and each start, and each 256 MiB written since, deletes the files used longest
+  ago beyond 2 GiB. The store is read before the mip chain is built (`mips::prepare`):
+  a stored texture is read and uploaded without one. Textures no worker prepared (a
+  material compiled during play, uploaded on the thread that needs it) stay RGBA8, never
+  encoding there, and so does a context without a console (GPU tests). The shared map
+  textures' key includes whether compression is on, so a change takes from the next map
+  even for textures the last one held. A file that does
   not match the asked size or layout is ignored and written again. The load logs
   `texture compression: N arrays (M from the store), X MiB as RGBA8, Y MiB as blocks`.
   `scripts/vram-estimate.ps1` estimated 1332 MiB of RGBA8 textures for `amjh3te` and

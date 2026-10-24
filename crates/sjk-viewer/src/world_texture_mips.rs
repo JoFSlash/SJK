@@ -122,7 +122,13 @@ const SHARED: &str = "map texture";
 /// one `Arc` per mounted file and content for the process
 /// ([`crate::decoded_image_cache`]), so two maps using the same file give one key.
 fn shared_key(images: &[Arc<RgbaImage>], width: u32, height: u32) -> u64 {
-    let mut parts = vec![width.to_le_bytes().to_vec(), height.to_le_bytes().to_vec()];
+    // Compressed or not: after `r_textureCompression` changes, the next map does not take
+    // the last one's copy in the other format.
+    let mut parts = vec![
+        width.to_le_bytes().to_vec(),
+        height.to_le_bytes().to_vec(),
+        vec![u8::from(compression::active())],
+    ];
     parts.extend(
         images
             .iter()
@@ -146,10 +152,15 @@ pub(crate) type Prepared = (
 );
 
 /// The chains of `images` as a `width` x `height` array ([`cache::prepare`]) and their
-/// blocks: loading work, for a worker where there is one.
+/// blocks: loading work for a worker. A texture the store holds as blocks needs no
+/// chains: they are left empty.
 pub(crate) fn prepare(images: &[Arc<RgbaImage>], width: u32, height: u32) -> Prepared {
+    let skip = upload_skip(width, height);
+    if let Some(stored) = compression::stored(images, width, height, skip) {
+        return (Arc::new(Vec::new()), Some(stored));
+    }
     let chains = cache::prepare(images, width, height);
-    let compressed = compression::compress(&chains, upload_skip(width, height, &chains), images);
+    let compressed = compression::compress(&chains, skip, images);
     (chains, compressed)
 }
 
@@ -180,22 +191,23 @@ pub(crate) fn upload(
     images: &[Arc<RgbaImage>],
 ) -> Result<wgpu::TextureView, Box<dyn Error>> {
     let (width, height) = extent(images);
+    // Not compressed here: this runs on whichever thread needs the texture, the render
+    // thread for a material compiled during play.
     upload_shared(device, queue, images, width, height, || {
-        prepare(images, width, height)
+        (cache::prepare(images, width, height), None)
     })
 }
 
-/// The levels of `chains`, a `width` x `height` array, that `r_picmip` leaves off now
+/// The levels of a `width` x `height` array that `r_picmip` leaves off now
 /// ([`skipped`]), keeping at least one.
-pub(crate) fn upload_skip(width: u32, height: u32, chains: &[Vec<RgbaImage>]) -> u32 {
-    let shortest = chains.iter().map(Vec::len).min().unwrap_or(0);
-    skipped(width, height, PICMIP.load(Ordering::Relaxed))
-        .min(u32::try_from(shortest.saturating_sub(1)).unwrap_or(u32::MAX))
+pub(crate) fn upload_skip(width: u32, height: u32) -> u32 {
+    skipped(width, height, PICMIP.load(Ordering::Relaxed)).min(levels(width, height) - 1)
 }
 
 /// Upload one [`chain`] per layer of a `width` x `height` array, less the levels
-/// `r_picmip` leaves off ([`skipped`]): as `compressed`'s blocks when they were made for
-/// those levels, else as RGBA8.
+/// `r_picmip` leaves off ([`skipped`]), or `compressed`'s blocks when there are some
+/// (`chains` may then be empty: [`prepare`] found them stored). Blocks made before an
+/// `r_picmip` change keep their size: a world built while it changes may mix the two.
 pub(crate) fn upload_chains(
     device: &wgpu::Device,
     queue: &crate::frame_queue::FrameQueue,
@@ -204,13 +216,11 @@ pub(crate) fn upload_chains(
     chains: &[Vec<RgbaImage>],
     compressed: Option<&compression::Compressed>,
 ) -> Result<wgpu::TextureView, Box<dyn Error>> {
-    let skip = upload_skip(width, height, chains);
-    // `r_picmip` changed since the worker compressed them: those blocks are other levels.
-    if let Some(compressed) = compressed
-        .filter(|compressed| compressed.skip == skip && compressed.layers.len() == chains.len())
-    {
+    if let Some(compressed) = compressed {
         return compression::upload(device, queue, compressed);
     }
+    let shortest = chains.iter().map(Vec::len).min().unwrap_or(0);
+    let skip = upload_skip(width, height).min(u32::try_from(shortest.saturating_sub(1))?);
     let (width, height) = ((width >> skip).max(1), (height >> skip).max(1));
     let texture = device.create_texture(&wgpu::TextureDescriptor {
         label: Some("SJK optional mipmapped material"),

@@ -49,6 +49,8 @@ pub(super) fn upload(
         return Ok(());
     }
     let started = Instant::now();
+    // This map's figures only: models compressed during the last match counted too.
+    let _ = mips::compression::take_stats();
     let mut seen = HashSet::new();
     let mut jobs = Vec::new();
     for stage in materials.iter().flat_map(|material| &material.stages) {

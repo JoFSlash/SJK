@@ -1,14 +1,16 @@
 //! The compressed textures kept on disk (`cache/textures` beside the configuration), so
 //! a map loaded again skips the encoder. One file per texture array, named by what it is
 //! made from ([`super::stored_name`]); a file that does not match what is asked for, in
-//! size or layout, is ignored and written again. At most [`BUDGET`] bytes: each start
-//! deletes the files used longest ago (a load touches the file it reads).
+//! size or layout, is ignored and written again. At most [`BUDGET`] bytes: each start,
+//! and each eighth of it written since, deletes the files used longest ago (a load
+//! touches the file it reads).
 use super::{Compressed, Format};
 use std::{
     error::Error,
     fs,
     io::Write,
     path::{Path, PathBuf},
+    sync::atomic::{AtomicU64, Ordering},
     time::SystemTime,
 };
 
@@ -18,6 +20,8 @@ const MAGIC: &[u8; 8] = b"SJKBLKS1";
 const EXTENSION: &str = "blocks";
 /// Magic, format, skip, layers, levels, width, height.
 const HEADER: usize = 8 + 1 + 1 + 2 + 2 + 4 + 4;
+/// Bytes written since the last trim: a long session of new maps trims again.
+static WRITTEN: AtomicU64 = AtomicU64::new(0);
 
 fn path(directory: &Path, name: &str) -> PathBuf {
     directory.join(format!("{name}.{EXTENSION}"))
@@ -117,14 +121,20 @@ pub(super) fn save(
 ) -> Result<(), Box<dyn Error>> {
     fs::create_dir_all(directory)?;
     let mut file = tempfile::NamedTempFile::new_in(directory)?;
-    file.write_all(&serialize(compressed)?)?;
+    let bytes = serialize(compressed)?;
+    file.write_all(&bytes)?;
     file.persist(path(directory, name))?;
+    let written = WRITTEN.fetch_add(bytes.len() as u64, Ordering::Relaxed) + bytes.len() as u64;
+    if written > BUDGET / 8 && WRITTEN.swap(0, Ordering::Relaxed) > 0 {
+        trim_in_background(directory.to_path_buf());
+    }
     Ok(())
 }
 
 /// Delete the files used longest ago until the store is within [`BUDGET`], on a thread
 /// of its own.
 pub(super) fn trim_in_background(directory: PathBuf) {
+    WRITTEN.store(0, Ordering::Relaxed);
     let _ = std::thread::Builder::new()
         .name("sjk-texture-store".into())
         .spawn(move || {
