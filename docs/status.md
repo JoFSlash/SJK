@@ -7272,6 +7272,15 @@ release, isolated native server, retail `mp/duel1`, 1280x720): starting
 freecam during a player-name peek returns the view to the local camera.
 PVS/portal pause and resumption remain unverified in game.
 
+Peek consent (`claude/blissful-curie-l4b5ps`): an SJK player on the hub is asked over
+toy events (`peek`, `request_<ms>`, `allow`, `deny`, `end`) and sees the peek card
+(Allow/Deny, then Stop on both sides; Insert/Delete while unbound, clicks over the
+game menu). The request, answer, repeat, expiry and end rules have unit tests in
+`peek_consent.rs`; built and tested on Linux (`cargo test -p sjk-viewer`), clippy not
+run. Not checked in game: the card's look and place over play and the game menu,
+clicks, and two SJK clients through the hub. Stock clients are still watched without
+asking.
+
 ## Centre-print line breaks
 
 Branch `fix/center-print-space-break`: centre-print rows break only at a space, as

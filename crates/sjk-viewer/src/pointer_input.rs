@@ -359,6 +359,11 @@ impl GpuState {
         if self.update_card_pointer(event) {
             return true;
         }
+        // The peek card's buttons, over play or the game menu.
+        if let Some(choice) = self.peek.card.handle_pointer(event) {
+            self.peek_card_choice(Some(choice));
+            return true;
+        }
         if self
             .client_menu
             .as_ref()

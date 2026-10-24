@@ -56,6 +56,7 @@ impl GpuState {
         self.update_cardboard_box(Instant::now(), &toy_events);
         self.update_order66(&toy_events);
         self.update_hax(&toy_events);
+        self.update_peek(&toy_events);
         self.update_e2e_whispers();
         if !due {
             return;

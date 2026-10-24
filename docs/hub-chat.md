@@ -1080,6 +1080,16 @@ ahead) and 30 seconds or more after the last one it took on that server; the hub
 quota (one toy event a second, ten a minute per key) still applies. The client takes
 the hub's toy events once a frame and hands them to every toy (`identity_frame.rs`).
 
+The third (since 24/10/2026, no hub change) is the question before a
+[peek](client.md#timed-player-peek): toy `peek`, from the watcher event
+`request_<milliseconds>` (1 to 60000) to the player they want to watch, who answers
+`allow` or `deny`; either sends `end` when they stop early. Each side keeps its own
+timer in its snapshots' server time, so nothing says when a peek is over. A reader
+takes them, like the others, only when the game shows the sender's claimed name in
+their slot, and only those addressed to its own slot. Both sides are within the hub's
+quota (one toy event a second); an `end` sent in the same second as another event can
+be refused, and then the other side's timer ends it.
+
 ## Toy relay
 
 The toy relay (since 21/10/2026, Sol-Vulpes/SJK-hub, `PROTOCOL.md`, "Toy relay")

@@ -224,6 +224,11 @@ pub(super) const COMMANDS: &[(&str, &str)] = &[
         "peek",
         "Watch a player briefly: peek [id|name] [seconds], peek off",
     ),
+    ("peek_allow", "Let the player who asks watch you (peek)"),
+    (
+        "peek_deny",
+        "Do not let the player who asks watch you (peek)",
+    ),
     (
         "fakenoclip",
         "Fly locally while the server sees you standing still (toggle)",
@@ -1207,6 +1212,8 @@ impl crate::GpuState {
             crate::gameplay_fps::COMMAND => return self.gameplay_fps_command(args),
             "freecam" => return self.free_camera_command(args),
             "peek" => return self.peek_command(args),
+            "peek_allow" => return Ok(self.answer_peek(true)),
+            "peek_deny" => return Ok(self.answer_peek(false)),
             "cosmetics" => return self.cosmetics_command(args),
             crate::saber_colour_command::COMMAND => return self.saber_colour_command(args),
             crate::saber_hilt_command::COMMAND => return self.saber_hilt_command(args),

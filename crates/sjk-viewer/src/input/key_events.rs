@@ -219,6 +219,10 @@ impl GpuState {
             }
             return;
         }
+        // The peek card's keys (Insert, Delete), while bound to nothing else.
+        if self.peek_key(&event) {
+            return;
+        }
         // Escape unpins a pinned player card, or drops a waiting `worldnote` selection,
         // before it opens the game menu.
         if key == KeyCode::Escape

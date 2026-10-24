@@ -2361,6 +2361,26 @@ before expiry. Players outside the
 received snapshot cannot be watched. Player input and server authority remain
 unchanged. The command is bindable under Settings > Key bindings > Other.
 
+A player who runs SJK online (the hub knows them under the name the game shows) is
+asked first. Their client shows the peek card at the top centre of play: "Name wants
+to watch you", the length and the seconds left to answer, with Allow (gold) and Deny.
+Insert allows and Delete denies while those keys are bound to nothing else; Escape
+opens the game menu as always, and the card stays over it, at the top, so its buttons
+take a click. A request not answered in 15 seconds lapses. Allowed, the watcher's
+camera starts and the watched player's card says "Name is watching you" with the
+seconds left; refused or unanswered, the console tells the asker. While a peek runs,
+both cards carry Stop (Delete, a click, or `/peek off`): the watcher returns to their
+camera, the watched player ends the peek on the watcher's screen. A bare `/peek`
+during the own peek or question stops it, so the peek bind toggles. `peek_allow`,
+`peek_deny` and `peek off` are bindable under Other (Allow a peek request, Deny a
+peek request, Stop peek). One request is shown at a time and a player watches nobody
+else while someone watches them; a sender's new request counts 10 seconds after the
+last. Players on stock clients, older SJK builds and anyone the hub does not know
+cannot be asked: they are watched as before and the console says so (an older SJK
+build does not answer, so its request lapses). The question rides the hub's
+[toy events](hub-chat.md#toy-events); see [peek_consent.rs](../crates/sjk-viewer/src/peek_consent.rs)
+and [peek_card.rs](../crates/sjk-viewer/src/peek_card.rs).
+
 ### Chat in other alphabets
 
 Chat, names and every other text show Russian, Japanese, Chinese, Korean and colour

@@ -189,6 +189,8 @@ mod order66;
 mod particle_atlas;
 mod particle_draw;
 mod peek;
+mod peek_card;
+mod peek_consent;
 mod portal;
 mod prediction_preview;
 mod scene_views;
@@ -2327,6 +2329,11 @@ impl GpuState {
         // An achievement unlocked, or a medal or holocron in a match: its card over play or
         // the menus, never input-taking.
         let unlock_toast = self.append_unlock_toast(viewport, console_covers_frame || medal_popup);
+        // A peek that concerns the player: its card over play, taking only its keys.
+        let peek_card = self.append_peek_card(
+            viewport,
+            console_covers_frame || medal_popup || self.text_dialog.is_open(),
+        );
         self.world_notes.draw_highlight(viewport);
         // The menu camera tour's fades, over the menu world only.
         let world_fade = menu_backdrop::standalone_menu_visible(self)
@@ -2380,6 +2387,7 @@ impl GpuState {
             whisper_shown.then(|| self.e2e_whispers.card.draw_list()),
             mod_notice_shown.then(|| self.mod_notice.card.draw_list()),
             alpha_shown.then(|| self.alpha_card.draw_list()),
+            peek_card.then(|| self.peek.card.draw_list()),
             unlock_toast.then(|| self.unlock_toast.draw_list()),
         ];
         self.ui_shapes

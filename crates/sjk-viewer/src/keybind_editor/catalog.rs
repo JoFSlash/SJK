@@ -203,6 +203,9 @@ pub(crate) const ACTIONS: &[BindableAction] = &[
     // SJK: the camera and sun panel; F8 opens it too while F8 is unbound.
     action(Other, "Camera control", "cameracontrol", ""),
     action(Other, "Peek at crosshair player", "peek", ""),
+    action(Other, "Stop peek", "peek off", ""),
+    action(Other, "Allow a peek request", "peek_allow", ""),
+    action(Other, "Deny a peek request", "peek_deny", ""),
     // SJK: off, names only, bars on the target and duel opponent, bars on everyone.
     action(Other, "Nameplate mode", "nameplates", "v"),
     // SJK: one wheel with pages (Settings > Quick wheel). A bare `+wheel` opens

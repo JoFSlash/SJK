@@ -31,6 +31,7 @@ Add each release's notes here when it is tagged (docs/sjk.md "Releases").
 ## Unreleased
 
 - Kyber crystals: every achievement now brings one, once, from Uncommon to Mythical (shown on the Achievements tab, its hover card and its unlock card). Opening one always gives a saber shader, the ones you do not have yet first, and every tenth crystal in a row without a Legendary or Mythical shader gives one: the Holocrons tab shows your crystals, how soon that is, and their loot table _(Sol)_
+- Peek asks first: an SJK player you `peek` gets a card to allow or deny it (Ins / Del, or a click from the game menu) and sees who watches them; both sides can stop it with Stop or Del _(Slash)_
 
 ## 2026.1023.3 (Alpha) | 23/10/2026
 
