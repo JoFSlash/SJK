@@ -610,8 +610,12 @@ Windows that memory also shows in the process's RAM in Task Manager.
   not match the asked size or layout is ignored and written again. The load logs
   `texture compression: N arrays (M from the store), X MiB as RGBA8, Y MiB as blocks`.
   `scripts/vram-estimate.ps1` estimated 1332 MiB of RGBA8 textures for `amjh3te` and
-  182 MiB as blocks, 99 and 14 MiB for mp/siege_desert. Not measured on a GPU yet: the
-  ignored `map_changes_vram` takes `SJK_TEST_COMPRESSION=0` for the comparison.
+  182 MiB as blocks, 99 and 14 MiB for mp/siege_desert. In game on Slash's built-in
+  Radeon (24/10/2026): the menu 156 to 20 MiB, JoF's FFA3 Night 163 to 20 MiB, FFA3 at
+  1920x1080 after a graphics reload 452 to 64 MiB (147 of 288 arrays from the store),
+  texture preparation 1.1 to 4.3 s instead of 0.4 to 0.5 s; the textures looked right.
+  The ignored `map_changes_vram` takes `SJK_TEST_COMPRESSION=0` for an off-screen
+  comparison.
 - Work on the render thread after a world is built runs inside wgpu error scopes
   ([gpu_guard.rs](../crates/sjk-viewer/src/gpu_guard.rs)) where it can fail alone: the
   menu stage's model (the creator's head, torso and legs), which then is not shown and

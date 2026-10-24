@@ -10,9 +10,14 @@ workers and kept in `cache/textures` named by their source files' MD4, so maps J
 updates are compressed again and the store trims itself to 2 GiB
 ([rendering.md](rendering.md#gpu-memory)). Checked by unit tests (block sizes and colours
 through every mip level, alpha, the store's round trip, refusals and trim), the build and
-the viewer's settings and changelog tests on Linux without a GPU. Not verified: any
-texture on a real card (look, missing or black textures), the memory saved, load times
-with and without the store, Windows. A code review's findings were fixed: no encoding
+the viewer's settings and changelog tests on Linux without a GPU. Played by Slash on
+Windows on a built-in AMD Radeon (495 MiB, Vulkan), a `x86_64-pc-windows-gnu` release
+build of this branch, 24/10/2026: textures looked right, no errors in the log; the menu
+went from 156 to 20 MiB of map textures, JoF's FFA3 Night from 163 to 20 MiB, and FFA3
+after a graphics reload at 1920x1080 from 452 to 64 MiB, 147 of its 288 arrays from the
+store; texture preparation took 1.1, 2.3 and 4.3 s (0.4 to 0.5 s before). Not verified:
+a discrete card, the MSVC build, the largest JoF maps, a second load with every texture
+stored. A code review's findings were fixed: no encoding
 on the render thread (lazily compiled materials stay RGBA8), the store read before any
 mip chain is built, a test no longer depending on other tests' GPU contexts, headless
 contexts uncompressed, the log line counting only the map's textures, the shared-texture
