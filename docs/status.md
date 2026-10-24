@@ -1,3 +1,19 @@
+## Release packages with link-time optimization
+
+24/10/2026, `claude/wonderful-cannon-3culee`, based on `main` `62a5ac44`: published
+packages are built with the new `dist` profile (`release` with `lto = "fat"` and
+`codegen-units = 1`; [development](development.md#build-and-checks)); local `--release`
+builds keep the ordinary profile. Measured on Linux (4 cores, 15 GB, Rust 1.97, clean
+target directory): `sjk-viewer` and `sjk-dedicated` built in 341 s with `release` and
+663 s with `dist`, rustc peaking at about 3.8 GB; the client shrank from 97.8 to
+78.4 MB and the server from 9.1 to 6.3 MB. CPU microbenchmarks show no difference
+beyond run-to-run noise (two runs each): `sjk-game-jka` `release_command_cost`
+0.23-0.39 microseconds a command in both, and the `sjk-viewer` release microbenchmarks
+(holster placement for 64 actors 15.9-16.3 against 15.5-15.7 microseconds a frame;
+Force policy, voice throttle and cosmetic visibility within noise). Not measured: a
+whole frame, a populated match or the dedicated server's tick; the release workflow
+itself and the Windows build have not run with the profile.
+
 ## Heimdall's time nudge kicks after a hitch
 
 23/10/2026, `personal/heimdall-nudge`, based on `main` `8e4cce32`, Slash's report
