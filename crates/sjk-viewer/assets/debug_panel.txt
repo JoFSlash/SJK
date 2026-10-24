@@ -24,6 +24,18 @@
 
 # ---- Console & chat ----
 
+[announcements]
+area: Console & chat
+title: SJK team announcements and contributor reward rounds (Claim)
+change: Announcements show in SJK chat (SJK logo, title, Read more card); releases offer update.
+change: Reward rounds list who was rewarded and why; your own reward opens a window with Claim.
+test: debug_announce: a line in the game chat and the card opens. Try debug_announce release / long.
+test: announcement reopens the newest; in the dock and chat page a click on the line opens it.
+test: debug_reward, then back to the main menu: the claim window shows; Claim and Later close it.
+test: In a match, debug_reward: the "Contributor reward waiting" card, the window on game menu.
+test: debug_reward list (and rewards): the round list scrolls with Up, Down and the wheel.
+note: The live hub does not have it yet (hub branch announcements): real rounds need a deploy.
+
 [japlus-names]
 area: Console & chat
 title: JA+ settings renamed to japlus.* (old names still work)
@@ -56,6 +68,19 @@ test: A: peek B with B's Drone off: "has not let drones follow them". B turns it
 test: While A peeks, B reads "A's drone is watching you" and sees the remote behind them.
 test: B turns toy_drone off: A's view returns, "B sent your drone away"; the remote fades.
 test: Collection > Toys shows six niches, Drone's switch "Peek me" stays on after a restart.
+
+[ragdoll-physics]
+area: Gameplay
+title: Ragdoll: movers carry the body, every part heard on what it hits
+change: Lifts, trains and turning platforms carry the limp body; closing doors push it.
+change: Each part (trunk, head, arms, legs) knocks on its own: flesh + the surface's footstep.
+change: Sliding along the ground scrapes; harder hits are louder.
+test: Go limp on a lift, ride it: the body stays on and rises with it, the camera too.
+test: Go limp standing on a lift that is still, then call it: the body wakes and rides.
+test: Fall down stairs or off a ledge: several knocks, limbs lighter than the trunk.
+test: Fall on metal, then grass or snow: the knocks sound of the floor.
+test: Run and go limp: the body slides and scrapes.
+test: A second SJK client near you sees the body ride the lift the same way.
 
 [ragdoll-toy]
 area: Gameplay

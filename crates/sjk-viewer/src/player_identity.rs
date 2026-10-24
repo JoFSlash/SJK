@@ -886,6 +886,13 @@ pub(crate) fn is_staff() -> bool {
     })
 }
 
+/// Whether the player's own key is SJK's creator, as the hub's profile says.
+pub(crate) fn is_creator() -> bool {
+    lock().service.as_ref().is_some_and(|service| {
+        service.with_snapshot(|snapshot| snapshot.me.as_ref().is_some_and(|me| me.creator))
+    })
+}
+
 /// Whether the hub vouches for the player's own key (verified or staff): such a
 /// player may ban unverified players from the SJK chat ([`crate::chat_ban`]).
 pub(crate) fn can_ban() -> bool {

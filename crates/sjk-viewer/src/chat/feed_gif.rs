@@ -129,6 +129,7 @@ mod tests {
             client: String::new(),
             text: text.to_owned(),
             holocron: None,
+            official: None,
         }
     }
 

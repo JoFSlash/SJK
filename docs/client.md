@@ -4248,8 +4248,16 @@ every fall ends with the map or the server.
   It starts standing where the player stood, turned their way, with their speed, and
   pushed off balance (back, to a side, the knees buckling), so a running or jumping
   player tumbles on. It falls at `g_gravity`'s 800, slides and bounces a little on the
-  world's brushes (the map's own, not movers), and sleeps once it has lain still for a
-  second (or after 40 seconds whatever it does).
+  world's brushes, and sleeps once it has lain still for a second (or after 40 seconds
+  whatever it does), until a mover stirs it.
+- **Movers:** since 25/10/2026 lifts, doors, trains and the map's other brush movers are
+  in its way too ([scene.rs](../crates/sjk-viewer/src/ragdoll/scene.rs)). Each stands
+  where its trajectory puts it at the step's own moment, read from the first snapshot
+  at or after that moment, so every client places it alike. A point lying on a mover
+  goes with it (a lift takes the body up, a train along, a turning platform round) and
+  keeps the mover's speed when it leaves it; a mover that moves into a point pushes it
+  along (a closing door shoves the body). A sleeping body wakes when a mover it lies on
+  starts, or one comes into it.
 - **The model:** the player's own model is drawn posed by it
   ([skin.rs](../crates/sjk-viewer/src/ragdoll/skin.rs)): the `_humanoid` skeleton is cut
   into eleven rigid parts (pelvis, chest, head, upper arms, forearms, thighs, shins),
@@ -4285,10 +4293,20 @@ every fall ends with the map or the server.
 - **The sounds:** going limp plays a flatline (`sound/sjk/ragdoll/flatline.wav`, two
   monitor beeps then the long tone, SJK's own, made by
   [ragdoll_assets.py](../scripts/ragdoll_assets.py)), to the player and at the body for
-  the others; a PK3 that has the same path replaces it. Each point that hits the world
-  hard enough knocks, at most every 140 ms per body: the game's own body falls
-  (`sound/player/bodyfall_human1.mp3` to `3`), its slams for the hardest
-  (`sound/effects/body_slam1.mp3`, `2`).
+  the others; a PK3 that has the same path replaces it. Since 25/10/2026 every part of
+  the body is heard on its own, as in the sandbox games
+  ([sounds.rs](../crates/sjk-viewer/src/ragdoll/sounds.rs)): the trunk, the head and
+  each arm and leg knock when they hit the world (110 units a second into it, 150 for a
+  limb), each at most every 120 ms and at most three parts of a body in a frame, louder
+  the harder (a limb a quarter quieter). A knock is two sounds at once: the flesh (the
+  trunk the game's body falls, `sound/player/bodyfall_human1.mp3` to `3`, or slams from
+  420 units a second, `sound/effects/body_slam1.mp3`, `2`; a limb or the head the melee
+  punches, `sound/weapons/melee/punch1.mp3` to `4`, a limb's hard one the kicks,
+  `kick1.mp3` to `5`, the head's `sound/effects/thud.mp3`) and what it hit: the
+  footstep of its material (stone, metal, wood, grass, sand, snow, mud, gravel,
+  carpet..., the footsteps' own families and name guess, a hard knock the run's). A part
+  dragged along a surface faster than 120 units a second scrapes on it (its footsteps,
+  quiet, at most every 220 ms a body).
 
 The icon (a limp figure slumped against a wall) is drawn by the same script. World shots:
 `world_shot::ragdoll_shots::ragdoll_on_a_demo` (with `SJK_TEST_DEMO`). See

@@ -80,6 +80,7 @@ fn duel6_jof_sjk_chat_feed() {
             client: client.to_owned(),
             text: text.to_owned(),
             holocron: None,
+            official: None,
         };
         let state = |messages: Vec<sjk_identity::ChatMessage>| sjk_identity::ChatState {
             messages: messages.into_iter().collect(),

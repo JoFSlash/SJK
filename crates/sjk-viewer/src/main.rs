@@ -187,6 +187,7 @@ mod notice;
 mod npc_refresh;
 mod object_meshes;
 mod oblique_clip;
+mod official;
 mod order66;
 mod particle_atlas;
 mod particle_draw;
@@ -422,6 +423,8 @@ struct GpuState {
     mod_notice: mod_notice_card::State,
     /// What the update brought ([`whats_new_card`]).
     whats_new_card: whats_new_card::Card,
+    /// The SJK team's announcements and contributor rewards ([`official`]).
+    official: official::Official,
     window: Option<Arc<Window>>,
     post_aa: Option<frame_target::aa::Runtime>,
     render_scale: Option<frame_target::scale::Runtime>,
@@ -1408,6 +1411,7 @@ impl GpuState {
             log_request_card: log_request_card::Card::default(),
             mod_notice: mod_notice_card::State::default(),
             whats_new_card: whats_new_card::Card::default(),
+            official: official::Official::default(),
 
             screenshots: screenshot_setup.manager,
             menu_pictures: menu_pictures::Painter::default(),
@@ -2037,6 +2041,19 @@ impl GpuState {
                 || self.medal_popup.pending()
                 || self.holocron_popup.pending(),
         );
+        // The SJK team's windows: an announcement or the rounds asked for (over the
+        // console too), or a reward waiting.
+        let official_shown = self.prepare_official(
+            alpha_shown
+                || self.alpha_card.wants()
+                || medal_shown
+                || holocron_shown
+                || reload_shown
+                || fps_shown
+                || logs_shown
+                || self.medal_popup.pending()
+                || self.holocron_popup.pending(),
+        );
         // And what the update brought, last.
         let news_shown = self.prepare_whats_new_card(
             covered
@@ -2045,6 +2062,7 @@ impl GpuState {
                 || reload_shown
                 || fps_shown
                 || logs_shown
+                || official_shown
                 || self.medal_popup.pending()
                 || self.holocron_popup.pending(),
         );
@@ -2056,6 +2074,7 @@ impl GpuState {
                 || reload_shown
                 || fps_shown
                 || logs_shown
+                || official_shown
                 || news_shown
                 || self.medal_popup.pending()
                 || self.holocron_popup.pending(),
@@ -2068,6 +2087,7 @@ impl GpuState {
                 || reload_shown
                 || fps_shown
                 || logs_shown
+                || official_shown
                 || news_shown
                 || emote_help_shown
                 || self.medal_popup.pending()
@@ -2081,6 +2101,7 @@ impl GpuState {
                 || reload_shown
                 || fps_shown
                 || logs_shown
+                || official_shown
                 || news_shown
                 || emote_help_shown
                 || emote_picker_shown
@@ -2095,6 +2116,7 @@ impl GpuState {
                 || reload_shown
                 || fps_shown
                 || logs_shown
+                || official_shown
                 || news_shown
                 || emote_help_shown
                 || emote_picker_shown
@@ -2103,6 +2125,7 @@ impl GpuState {
                 || self.holocron_popup.pending(),
         );
         let medal_popup = alpha_shown
+            || official_shown
             || mod_notice_shown
             || medal_shown
             || holocron_shown
@@ -2330,6 +2353,8 @@ impl GpuState {
             self.append_fps_card(viewport);
         } else if logs_shown {
             self.append_log_request_card(viewport);
+        } else if official_shown {
+            self.append_official(viewport);
         } else if news_shown {
             self.append_whats_new_card(viewport);
         } else if emote_help_shown {
@@ -2392,6 +2417,7 @@ impl GpuState {
             reload_shown.then(|| self.graphics_reload.card.draw_list()),
             fps_shown.then(|| self.fps_card.draw_list()),
             logs_shown.then(|| self.log_request_card.draw_list()),
+            official_shown.then(|| self.official.window.draw_list()),
             news_shown.then(|| self.whats_new_card.draw_list()),
             emote_help_shown.then(|| self.emote_help.card.draw_list()),
             emote_picker_shown.then(|| self.emote_picker.card.draw_list()),

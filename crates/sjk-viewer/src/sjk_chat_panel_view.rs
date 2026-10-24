@@ -96,6 +96,9 @@ struct Laid {
     /// does, there is no colon, and the text is in the tier's colour.
     tier: Option<&'static crate::holocrons::Tier>,
     drop: bool,
+    /// The SJK team's line (`official.rs`): "SJK" in gold, its mark where the tick goes,
+    /// the title in bold; a click opens it.
+    official: Option<crate::official::words::Look>,
     /// The message's GIF ([`crate::chat_gifs`]) and what it shows this frame.
     gif: Option<crate::chat_gifs::Shown>,
 }
@@ -134,8 +137,9 @@ fn lay(message: &ChatMessage, inputs: &Inputs<'_>, measure: &Measure<'_>, s: f32
     // tier's gem for the tick, no colon.
     let drop = message.holocron.is_some();
     let words = crate::holocrons::line::words(message);
+    let official = crate::official::words::words(message, "Read more");
     let mark = crate::ui_renderer::mark_texture(message.verified, message.trust).filter(|_| !drop);
-    let tick = if mark.is_some() || drop {
+    let tick = if mark.is_some() || drop || official.is_some() {
         sjk_chat_look::tick_room(NAME_SIZE)
     } else {
         0.0
@@ -166,9 +170,11 @@ fn lay(message: &ChatMessage, inputs: &Inputs<'_>, measure: &Measure<'_>, s: f32
     let when = ago(u64::try_from(message.at).unwrap_or(0), inputs.now);
     let meta = format!("{staff}{when}");
     let meta_room = width(&meta, META_SIZE, TextFace::Regular) + 24.0;
-    let muted = inputs.muted.contains(&message.key_id);
+    let muted = inputs.muted.contains(&message.key_id) && official.is_none();
     let mut gif = None;
-    let text = if muted {
+    let text = if let Some(official) = &official {
+        official.text.clone()
+    } else if muted {
         "Blocked on this PC".to_owned()
     } else if let Some(words) = &words {
         words.rest.clone()
@@ -202,6 +208,7 @@ fn lay(message: &ChatMessage, inputs: &Inputs<'_>, measure: &Measure<'_>, s: f32
         muted,
         tier: words.map(|words| words.tier),
         drop,
+        official: official.map(|official| official.look),
         gif,
     }
 }
@@ -374,6 +381,7 @@ impl Panel {
     ) -> Option<Shows> {
         let s = frame.s;
         self.shown.messages.clear();
+        self.shown.officials.clear();
         let empty = std::collections::VecDeque::new();
         let messages = inputs.chat.map_or(&empty, |chat| &chat.messages);
         self.shown.total = messages.len();
@@ -421,13 +429,13 @@ impl Panel {
             if self.focus == token || self.selected == Some(message.id) {
                 kit::band(&mut self.ui, frame, row);
             }
-            self.message(frame, laid, y);
+            self.message(frame, laid, y, measure);
             self.ui
                 .hit_region(token, frame.rect(row[0], row[1], row[2], row[3]));
             // The name over its row: resting the pointer on it shows the card.
             let name = frame.rect(LIST_X + laid.jof, y, laid.name_width + 2.0, NAME_ROW - 2.0);
             self.ui.hit_region(NAME_BASE + index as u16, name);
-            if self.ui.token_hovered(NAME_BASE + index as u16) {
+            if self.ui.token_hovered(NAME_BASE + index as u16) && laid.official.is_none() {
                 let person = crate::sender_card::Person {
                     name: laid.name.clone(),
                     key_id: Some(message.key_id.clone()),
@@ -449,6 +457,9 @@ impl Panel {
             self.shown
                 .messages
                 .push((message.id, message.key_id.clone()));
+            self.shown
+                .officials
+                .push(laid.official.map(|look| look.target));
             y += tall;
         }
         if first > 0 {
@@ -482,7 +493,7 @@ impl Panel {
     /// name, the tick, the
     /// colon and the text going on after them, then its other rows from the left
     /// edge, and what is said of it on the right of the first row.
-    fn message(&mut self, frame: &Frame, laid: &Laid, y: f32) {
+    fn message(&mut self, frame: &Frame, laid: &Laid, y: f32, measure: &Measure<'_>) {
         let s = frame.s;
         let first = frame.rect(LIST_X, y, LIST_WIDTH, NAME_ROW - 2.0);
         if let Some(clan) = crate::jof_tag::clan(&laid.name) {
@@ -503,7 +514,11 @@ impl Panel {
             format_args!("{}", laid.name),
             frame.rect(LIST_X + laid.jof, y, laid.name_width + 2.0, NAME_ROW - 2.0),
             NAME_SIZE * s,
-            color::TEXT,
+            if laid.official.is_some() {
+                sjk_chat_look::ACCENT
+            } else {
+                color::TEXT
+            },
             FontWeight::Semibold,
             TextAlign::Start,
         );
@@ -522,7 +537,32 @@ impl Panel {
             );
             x += laid.emoji_width;
         }
-        if let Some(tier) = laid.tier {
+        if let Some(look) = laid.official {
+            let [left, _] = frame.point(x, y);
+            let mut gift = None;
+            sjk_chat_look::official_mark(
+                self.ui.draw_list_mut(),
+                look,
+                left,
+                first.y + first.height * 0.5,
+                NAME_SIZE * s,
+                1.0,
+                |c, rect, colour| gift = Some((c, rect, colour)),
+            );
+            if let Some((c, rect, colour)) = gift {
+                text(
+                    &mut self.ui,
+                    TextFamily::Body,
+                    format_args!("{c}"),
+                    rect,
+                    NAME_SIZE * s * 1.1,
+                    colour,
+                    FontWeight::Regular,
+                    TextAlign::Start,
+                );
+            }
+            x += sjk_chat_look::tick_room(NAME_SIZE);
+        } else if let Some(tier) = laid.tier {
             let [left, _] = frame.point(x, y);
             sjk_chat_look::gem_mark(
                 self.ui.draw_list_mut(),
@@ -595,16 +635,54 @@ impl Panel {
                     BODY_ROW - 2.0,
                 )
             };
-            text(
-                &mut self.ui,
-                TextFamily::Body,
-                format_args!("{}", &laid.text[range.clone()]),
-                rect,
-                TEXT_SIZE * s,
-                colour,
-                FontWeight::Regular,
-                TextAlign::Start,
-            );
+            let shown = &laid.text[range.clone()];
+            // The SJK team's title, in bold where it starts the first row.
+            let bold = laid
+                .official
+                .map_or(0, |look| look.bold)
+                .saturating_sub(range.start)
+                .min(shown.len());
+            if bold > 0 && shown.is_char_boundary(bold) {
+                let (title, rest) = shown.split_at(bold);
+                text(
+                    &mut self.ui,
+                    TextFamily::Body,
+                    format_args!("{title}"),
+                    rect,
+                    TEXT_SIZE * s,
+                    colour,
+                    FontWeight::Semibold,
+                    TextAlign::Start,
+                );
+                let after = measure.width(title, TEXT_SIZE * s, TextFace::Semibold);
+                let rest_rect = sjk_ui::Rect::new(
+                    rect.x + after,
+                    rect.y,
+                    (rect.width - after).max(1.0),
+                    rect.height,
+                );
+                text(
+                    &mut self.ui,
+                    TextFamily::Body,
+                    format_args!("{rest}"),
+                    rest_rect,
+                    TEXT_SIZE * s,
+                    colour,
+                    FontWeight::Regular,
+                    TextAlign::Start,
+                );
+            } else {
+                text(
+                    &mut self.ui,
+                    TextFamily::Body,
+                    format_args!("{shown}"),
+                    rect,
+                    TEXT_SIZE * s,
+                    colour,
+                    FontWeight::Regular,
+                    TextAlign::Start,
+                );
+            }
         }
         if let Some(shown) = laid.gif {
             let under = y + NAME_ROW + laid.rows.len().saturating_sub(1) as f32 * BODY_ROW;
@@ -1159,9 +1237,12 @@ impl Panel {
         );
         self.shown.chosen_bannable = false;
         let message = self.selected.and_then(|id| {
-            inputs
-                .chat
-                .and_then(|chat| chat.messages.iter().find(|message| message.id == id))
+            inputs.chat.and_then(|chat| {
+                // The SJK team's lines have no sender to act on.
+                chat.messages
+                    .iter()
+                    .find(|message| message.id == id && message.official.is_none())
+            })
         });
         self.shown.chosen_gif = None;
         self.shown.chosen_source = None;

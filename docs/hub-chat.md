@@ -50,12 +50,14 @@ The hub's side is described in Sol-Vulpes/SJK-hub (`PROTOCOL.md`, "Chat", "Emote
 | Emotes | [emotes.rs](../crates/sjk-viewer/src/emotes.rs), [emotes_frame.rs](../crates/sjk-viewer/src/emotes_frame.rs) |
 | GIFs from GIPHY: links, fetching, decoding, the cache, drawing | [chat_gifs.rs](../crates/sjk-viewer/src/chat_gifs.rs) and its `link`, `fetch`, `decode`, `draw` modules; textures in [gif_textures.rs](../crates/sjk-viewer/src/ui_renderer/gif_textures.rs) |
 | The GIF picker: tabs, tiles, picking; favourites; GIPHY's search | [sjk_chat_gif_picker.rs](../crates/sjk-viewer/src/sjk_chat_gif_picker.rs); [chat_gifs/favourites.rs](../crates/sjk-viewer/src/chat_gifs/favourites.rs); [chat_gifs/search.rs](../crates/sjk-viewer/src/chat_gifs/search.rs) |
+| Announcements and reward rounds: wire types, rules, requests | [news.rs](../crates/sjk-identity/src/news.rs), [hub.rs](../crates/sjk-identity/src/hub.rs), [feed.rs](../crates/sjk-identity/src/feed.rs), [service.rs](../crates/sjk-identity/src/service.rs) |
+| Announcements and reward rounds: lines, seen file, windows, commands | [official.rs](../crates/sjk-viewer/src/official.rs) and its `words`, `seen`, `window` modules |
 
 ## Hub protocol (additions to version 1)
 
 Old clients ignore all of it, so it stays `/v1/`.
 
-- A message in the feed carries `client` (hub since 21/10/2026): `sjk` when it was
+- A message in the feed carries `client` (hub since 25/10/2026): `sjk` when it was
   sent with SJK's User-Agent, `ejk` with JoF EternalJK's (`EJK/...`), left out for
   any other (`ChatMessage::client`, empty then). It picks the line's emblem ([How a
   line looks](#how-a-line-looks)).
@@ -107,6 +109,14 @@ Old clients ignore all of it, so it stays `/v1/`.
   `target_verified` (403, the target is verified or staff), `bad_target` (400, oneself).
   `POST /v1/chat` then refuses the banned player `chat_banned` (403) with `until`. Staff
   lift bans with `/v1/staff/chat-unban` `{"key_id"}` (answer `{"lifted":<n>}`).
+
+- Announcements and reward rounds (25/10/2026, [below](#announcements-and-reward-rounds)):
+  `GET /v1/announcements`, `GET /v1/rewards`, `POST /v1/rewards/claim` `{"id":n}` and the
+  creator's `POST /v1/creator/announce`; the feed's `announcements`
+  (`[{"id":<feed id>,"announcement":{..}}]`) and `rounds`
+  (`[{"id":<feed id>,"round","at","title","count"}]`), every reader told, kept 5 minutes,
+  a fresh reader getting those of the last 60 seconds, left out when none. The hub's
+  side is `PROTOCOL.md`, "Announcements" and "Reward rounds".
 
 ## Client service
 
@@ -1234,6 +1244,81 @@ hub sees who whispers to whom, when, and how long the box is. A whisper not read
 within 60 seconds, or held when the hub restarts, is lost without the sender knowing
 (the hub had taken it). Staff cannot read whispers to judge a report; a recipient can
 show one, signed by its sender, but nothing sends that yet.
+
+## Announcements and reward rounds
+
+25/10/2026, `personal/announcements` (Sol's decisions the same day: only the creator
+announces for now; rewards are claimed with a Claim button; a round's public list shows
+names and reasons, and what each person got stays private to them). The hub's side is
+the hub's `announcements` branch (`PROTOCOL.md`, "Announcements", "Reward rounds"); the
+wire is the contract between the two.
+
+**Announcements** are official messages from the SJK team, shown in the SJK chat only,
+never in a game server's chat.
+
+- The identity service reads `GET /v1/announcements` (the newest 10 not removed, at most
+  30 days old) at the registration and every 30 minutes, and the feed relays new ones as
+  they are made (`FeedNews`, told to the worker once per feed id); `Snapshot::announcements`
+  keeps them newest first. A hub without the route answers 404: the service treats it as
+  none and asks again in an hour, and the player is told nothing.
+- `announcements_seen.txt` beside `identity.key` keeps the key id and the highest
+  announcement number shown ([official/seen.rs](../crates/sjk-viewer/src/official/seen.rs),
+  as `holocrons_seen.txt`). Announcements above it, at most the newest three, go to the end
+  of the SJK chat oldest first (`Service::post_announcements`); with no file for the key
+  only the newest shows, so a fresh install is not flooded. They go in only once the hub
+  being read has answered (its backlog first), and only with the chat on (`cl_sjkChat`); an
+  announcement is counted as shown once the chat holds it. One the feed relayed is already
+  in the chat and is not added twice. An announcement put in this way takes the id of the
+  chat's newest message, so the feed's next message still follows it; the game's feed
+  tells these lines by their announcement number and shows each once.
+- The line, in all three places the SJK chat shows (the game's chat feed, the docked
+  chat, the chat page; [official/words.rs](../crates/sjk-viewer/src/official/words.rs)):
+  SJK's logo where a player's tick goes, "SJK" in the SJK UI's accent gold, then the
+  title in bold and a colon, the text's first line (cut with "..." past 110 characters)
+  and "Read more" when the text says more. The game's chat draws the logo before the name
+  as for every SJK sender and cannot draw the title in bold or be clicked, so its line
+  ends with "Read more: /announcement" instead. The line is kept with the chat's last
+  200, is not a message (no sound, no sender card, nothing to mute or ban) and is never
+  sent to a game server.
+- "Read more": a click on the line in the dock or on the chat page (Up and Down on the
+  page pass over it), or the console's `announcement [number]` (no number: the newest),
+  opens the announcement's card ([sjk-ui.md](sjk-ui.md#announcements-and-reward-rounds)).
+
+**Reward rounds** are the SJK team's contributor rewards, posted by the hub's operator.
+
+- The service reads `GET /v1/rewards` at the registration, every 30 minutes, soon after
+  the feed tells of a round, and when the round list opens (`Service::refresh_rewards`,
+  at most every 30 seconds); `Snapshot::rewards` holds the player's pending and claimed
+  rewards and the newest rounds.
+- A round's line, for everyone: the "from the SJK team" gift box (SJK Symbols U+E028) in
+  the accent gold where the tick goes, "SJK", then "Contributor rewards #1: 7 players
+  rewarded. See the list" ("1 player rewarded"); the game's chat starts it with the gift
+  box and ends it with ": /rewards". A click (or `rewards`) opens the round list.
+- A reward waiting for the player opens the claim window as the medal pop-up opens: on
+  the main menu, or when the game menu opens in a match, never over play; in a match an
+  unlock card says "Contributor reward waiting" / "Open the game menu to claim it" once
+  per reward. Claim calls `POST /v1/rewards/claim`; the hub's answer brings the profile
+  (its new gift holocrons then arrive through the holocron pop-up) and the rewards, and
+  the window shows the next reward or closes. A refusal says why in the window
+  ("This reward was claimed already.", "This reward is not waiting for you any more.",
+  else the hub's words). Later puts the window away until the menus close and open again.
+- `debug_announce [news|release|long]` and `debug_reward [list]` rehearse the lines (in
+  the game's chat) and the windows offline: nothing is sent, nothing is written to
+  `announcements_seen.txt`, a rehearsed Claim only closes the reward.
+
+**The creator** writes announcements in game: the `announce` window (Kind News or Release
+with its version, Title, Text; a live preview of the chat line; Ctrl+Enter or Send, then
+a confirmation) sends `POST /v1/creator/announce`, checked first with the hub's rules
+(`news::check`: a title of 1 to 80 characters on one line, a text of 1 to 2000 characters
+on at most 30 lines, the chat's alphabet without `^`, a release's version like
+`2026.1025.1`). Anyone else is told "Only SJK's creator can announce", and the hub refuses
+them too.
+
+Checked (25/10/2026): unit tests for the wire types (the spec's examples), the rules,
+the request bodies, the feed's merging and its news, the posting of read announcements,
+the service's readings, claims and announcements against a fake hub, the seen file, the
+line words, the windows' keys, and the round list. Not checked: anything against the real
+hub, or in a game.
 
 ## Vitals
 

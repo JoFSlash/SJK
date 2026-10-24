@@ -1363,6 +1363,12 @@ fn identity_page(shots: &Snapshot, art: ArtSet) {
         kyber: None,
         shop: None,
         trade: None,
+        announcements: Vec::new(),
+        announcements_revision: 0,
+        rewards: None,
+        rewards_revision: 0,
+        claim: None,
+        announce: None,
         public_key: String::new(),
     };
     let online = hub(Status::Online, "^1Sol", &["^4Vulpes", "Padawan"]);
@@ -1720,6 +1726,7 @@ fn sjk_home_snapshot() {
             key_id: "0123456789abcdef",
             tier: None,
             gif: None,
+            official: None,
         },
         DockLine {
             name: "^1Fox",
@@ -1732,6 +1739,7 @@ fn sjk_home_snapshot() {
             key_id: "fedcba9876543210",
             tier: None,
             gif: None,
+            official: None,
         },
         DockLine {
             name: "Kyle",
@@ -1744,6 +1752,7 @@ fn sjk_home_snapshot() {
             key_id: "00000000000000ff",
             tier: None,
             gif: None,
+            official: None,
         },
     ];
     // Name, window, page, chosen entry, focused server, servers.
@@ -2668,6 +2677,12 @@ fn medals_snapshot() {
         kyber: None,
         shop: None,
         trade: None,
+        announcements: Vec::new(),
+        announcements_revision: 0,
+        rewards: None,
+        rewards_revision: 0,
+        claim: None,
+        announce: None,
         public_key: String::new(),
     };
     let with = hub(shot_medals());

@@ -78,6 +78,9 @@ pub(crate) struct DockLine<'a> {
     pub(crate) tier: Option<&'static crate::holocrons::Tier>,
     /// The GIF the message links to, shown under it ([`crate::chat_gifs`]).
     pub(crate) gif: Option<&'a crate::chat_gifs::GifId>,
+    /// The SJK team's line (`official.rs`): "SJK" in gold, its mark, the title in bold;
+    /// a click on it opens it.
+    pub(crate) official: Option<crate::official::words::Look>,
 }
 
 /// A blank line for the dock's array.
@@ -92,6 +95,7 @@ pub(crate) const BLANK: DockLine<'static> = DockLine {
     key_id: "",
     tier: None,
     gif: None,
+    official: None,
 };
 
 /// Where a page docks the chat, in frame pixels: the left edge of its text, its top
@@ -185,6 +189,8 @@ pub(crate) struct Dock {
     muting: Option<(String, String)>,
     /// The view's messages the last frame showed: the first one's index and how many.
     shown: (usize, usize),
+    /// What a click on each message shown opens, for the SJK team's lines.
+    targets: [Option<crate::official::words::Target>; LINES],
 }
 
 impl Dock {
@@ -339,6 +345,14 @@ impl Dock {
             }
             return Some(None);
         }
+        if tokens.is_name(token)
+            && activate
+            && let Some(target) = self.targets[usize::from(token - tokens.names)]
+        {
+            // The SJK team's line: a click reads it.
+            crate::official::request(target);
+            return Some(None);
+        }
         (token == tokens.card || tokens.is_name(token)).then_some(None)
     }
 
@@ -371,13 +385,14 @@ struct Line {
     key_id: String,
     tier: Option<&'static crate::holocrons::Tier>,
     gif: Option<crate::chat_gifs::GifId>,
+    official: Option<crate::official::words::Look>,
 }
 
 impl Line {
     /// The message with its text `text` (as a line shows it), which may link to a GIF:
     /// the link worded "GIF" and the GIF kept, unless GIFs are off.
     fn with_gif(mut self, text: &str) -> Self {
-        if self.tier.is_none() {
+        if self.tier.is_none() && self.official.is_none() {
             (self.text, self.gif) = crate::chat_gifs::for_message(text, false);
         } else {
             text.clone_into(&mut self.text);
@@ -454,6 +469,7 @@ impl DockCache {
                     key_id: message.key_id.clone(),
                     tier: shown.tier,
                     gif: None,
+                    official: shown.official,
                 };
                 self.lines.push(line.with_gif(&shown.text));
             }
@@ -494,6 +510,7 @@ impl DockCache {
                 key_id: &line.key_id,
                 tier: line.tier,
                 gif: line.gif.as_ref(),
+                official: line.official,
             };
         }
         let notice = if !self.local.is_empty() {
@@ -533,6 +550,7 @@ impl DockCache {
                     key_id: format!("{:016x}", index + 1),
                     tier: None,
                     gif: None,
+                    official: None,
                 }
                 .with_gif(text)
             })
@@ -595,6 +613,7 @@ impl Lay<'_> {
     fn indent(&self, line: &DockLine<'_>) -> f32 {
         let tick = if crate::ui_renderer::mark_texture(line.verified, line.trust).is_some()
             || line.tier.is_some()
+            || line.official.is_some()
         {
             sjk_chat_look::tick_room(self.size)
         } else {
@@ -873,6 +892,10 @@ fn messages(
     }
     let first = view.lines.len() - count;
     dock.shown = (first, count);
+    dock.targets = [None; LINES];
+    for (slot, line) in dock.targets.iter_mut().zip(&view.lines[first..]) {
+        *slot = line.official.map(|look| look.target);
+    }
     let bottom = place.top + BOX_TOP + BOX;
     if count == 0 {
         text(
@@ -891,8 +914,21 @@ fn messages(
     for (index, line) in view.lines[first..].iter().enumerate() {
         let rows = taken[count - 1 - index];
         let name = message(canvas, frame, &lay, line, [place.x, y], pitch, rows);
-        // Resting the pointer on the name shows the sender's sender card.
-        canvas.hit_region(tokens.name(index), name);
+        if line.official.is_some() {
+            // The SJK team's line is clicked anywhere on it, and lit under the pointer.
+            let whole = frame.rect(place.x, y, place.width, pitch.height(rows));
+            if canvas.token_hovered(tokens.name(index)) {
+                let _ = canvas.draw_list_mut().push(DrawCommand::RoundedRect {
+                    rect: whole,
+                    radius: 6.0 * s,
+                    color: color::alpha(color::HOLO, 0.08),
+                });
+            }
+            canvas.hit_region(tokens.name(index), whole);
+        } else {
+            // Resting the pointer on the name shows the sender's sender card.
+            canvas.hit_region(tokens.name(index), name);
+        }
         y += pitch.height(rows);
         let gif = gifs[count - 1 - index];
         if let Some(shown) = gif {
@@ -953,7 +989,12 @@ fn message(
     let name_width = lay.name_width(line);
     let name = Rect::new(first.x + jof, first.y, name_width + 1.0, first.height);
     if !line.name.is_empty() {
-        run(canvas, name, color::TEXT, format_args!("{}", line.name));
+        let colour = if line.official.is_some() {
+            sjk_chat_look::ACCENT
+        } else {
+            color::TEXT
+        };
+        run(canvas, name, colour, format_args!("{}", line.name));
     }
     let mut x = first.x + jof + name_width;
     if !line.emoji.is_empty() {
@@ -967,7 +1008,31 @@ fn message(
         );
         x += room;
     }
-    if let Some(tier) = line.tier {
+    if let Some(look) = line.official {
+        let mut gift = None;
+        sjk_chat_look::official_mark(
+            canvas.draw_list_mut(),
+            look,
+            x,
+            first.y + first.height * 0.5,
+            lay.size,
+            1.0,
+            |c, rect, colour| gift = Some((c, rect, colour)),
+        );
+        if let Some((c, rect, colour)) = gift {
+            text(
+                canvas,
+                TextFamily::Body,
+                format_args!("{c}"),
+                rect,
+                lay.size * 1.1,
+                colour,
+                FontWeight::Regular,
+                TextAlign::Start,
+            );
+        }
+        x += sjk_chat_look::tick_room(lay.size);
+    } else if let Some(tier) = line.tier {
         sjk_chat_look::gem_mark(
             canvas.draw_list_mut(),
             x,
@@ -1018,14 +1083,38 @@ fn message(
         let shown = if cut && index + 1 == rows {
             &line.text[range.start..]
         } else {
-            &line.text[range]
+            &line.text[range.clone()]
         };
-        run(
-            canvas,
-            rect,
-            sjk_chat_look::text_colour(line.tier),
-            format_args!("{shown}"),
-        );
+        // The SJK team's title, in bold where it starts the first row.
+        let bold = line
+            .official
+            .map_or(0, |look| look.bold)
+            .saturating_sub(range.start)
+            .min(shown.len());
+        let colour = sjk_chat_look::text_colour(line.tier);
+        if bold > 0 && shown.is_char_boundary(bold) {
+            let (title, rest) = shown.split_at(bold);
+            text(
+                canvas,
+                TextFamily::Body,
+                format_args!("{title}"),
+                rect,
+                lay.size,
+                colour,
+                FontWeight::Semibold,
+                TextAlign::Start,
+            );
+            let after = lay.width(title, TextFace::Semibold);
+            let rest_rect = Rect::new(
+                rect.x + after,
+                rect.y,
+                (rect.width - after).max(1.0),
+                rect.height,
+            );
+            run(canvas, rest_rect, colour, format_args!("{rest}"));
+        } else {
+            run(canvas, rect, colour, format_args!("{shown}"));
+        }
     });
     name
 }
@@ -1043,7 +1132,14 @@ pub(crate) fn sender_card(
     tokens: Tokens,
 ) {
     let (first, shown) = dock.shown;
-    let hovered = (0..shown).find(|index| canvas.token_hovered(tokens.name(*index)));
+    // The SJK team's lines have no sender to show.
+    let hovered = (0..shown).find(|index| {
+        canvas.token_hovered(tokens.name(*index))
+            && view
+                .lines
+                .get(first + index)
+                .is_some_and(|line| line.official.is_none())
+    });
     match hovered.and_then(|index| Some((index, view.lines.get(first + index)?))) {
         Some((index, line)) => {
             let anchor = canvas.rect_for(tokens.name(index)).unwrap_or_default();
@@ -1168,6 +1264,7 @@ mod tests {
             key_id: "0123456789abcdef",
             tier: None,
             gif: None,
+            official: None,
         }
     }
 

@@ -25,17 +25,23 @@ impl ChatOverlay {
     pub(super) fn push_sjk(&mut self, message: &ChatMessage, muted: bool, now: Instant) {
         // A holocron drop is one sentence with no sender column, in its tier's colour.
         let drop = crate::holocrons::line::words(message);
+        // The SJK team's line: "SJK", then its words; the game's chat cannot be clicked,
+        // so it names the command that opens it.
+        let official = crate::official::words::game_words(message);
         let name = if drop.is_some() {
             String::new()
+        } else if official.is_some() {
+            crate::official::words::SENDER.to_owned()
         } else {
             sjk_identity::chat::name_for_display(&message.name)
         };
-        let body = match &drop {
-            Some(words) => words.text.clone(),
-            None => crate::sjk_chat_look::message_text(&message.text),
+        let body = match (&drop, &official) {
+            (Some(words), _) => words.text.clone(),
+            (None, Some(words)) => words.clone(),
+            (None, None) => crate::sjk_chat_look::message_text(&message.text),
         };
         // A message's GIPHY link reads "GIF", its GIF under it (`chat/feed_gif.rs`).
-        let (body, emojis, gif) = if drop.is_none() {
+        let (body, emojis, gif) = if drop.is_none() && official.is_none() {
             self.with_gif(body)
         } else {
             (body, Vec::new(), None)
@@ -65,6 +71,7 @@ impl ChatOverlay {
                 in_all: false,
                 key_id: message.key_id.clone(),
                 tier: drop.map(|words| words.tier),
+                official: official.is_some(),
             }),
             gif,
             encrypted: false,
@@ -98,6 +105,28 @@ impl ChatOverlay {
                 own: true,
                 find: None,
             }),
+            official: None,
+        };
+        self.push_sjk(&message, false, now);
+    }
+
+    /// Put the SJK team's line `official` into the feed, for `debug_announce` and
+    /// `debug_reward`. The real lines come from the hub's feed ([`Self::sync_sjk`]).
+    pub(crate) fn rehearse_official(&mut self, official: sjk_identity::Official, now: Instant) {
+        let message = ChatMessage {
+            id: u64::MAX,
+            at: 0,
+            key_id: String::new(),
+            name: crate::official::words::SENDER.to_owned(),
+            verified: false,
+            staff: false,
+            creator: false,
+            trust: None,
+            emoji: String::new(),
+            client: String::new(),
+            text: String::new(),
+            holocron: None,
+            official: Some(official),
         };
         self.push_sjk(&message, false, now);
     }
@@ -219,9 +248,34 @@ impl ChatOverlay {
             if feed {
                 self.push_sjk(message, muted, now);
             }
+            self.note_official(message);
+        }
+        // An announcement the service put at the chat's end holds the id of the message
+        // before it, which the feed had seen: it joins once, by its own number.
+        for message in messages.iter().filter(|message| message.id <= seen) {
+            if let Some(sjk_identity::Official::Announcement(shown)) = &message.official
+                && !self.sjk_officials.contains(&shown.id)
+            {
+                if feed {
+                    self.push_sjk(message, false, now);
+                }
+                self.note_official(message);
+            }
         }
         self.sjk_seen = Some(newest);
         (newest > seen).then_some(seen)
+    }
+
+    /// Remember that the feed showed `message`'s announcement, if it is one.
+    fn note_official(&mut self, message: &ChatMessage) {
+        if let Some(sjk_identity::Official::Announcement(shown)) = &message.official
+            && !self.sjk_officials.contains(&shown.id)
+        {
+            if self.sjk_officials.len() >= 64 {
+                self.sjk_officials.remove(0);
+            }
+            self.sjk_officials.push(shown.id);
+        }
     }
 
     /// Whether the SJK chat's sound may play at `now`: at most once in
@@ -250,9 +304,12 @@ pub(crate) fn worth_a_sound<'a>(
     after: u64,
     muted: impl Fn(&str) -> bool,
 ) -> bool {
-    messages
-        .into_iter()
-        .any(|message| message.id > after && message.holocron.is_none() && !muted(&message.key_id))
+    messages.into_iter().any(|message| {
+        message.id > after
+            && message.holocron.is_none()
+            && message.official.is_none()
+            && !muted(&message.key_id)
+    })
 }
 
 /// Console text for the live SJK messages newer than `after`. The initial hub
@@ -300,6 +357,7 @@ mod tests {
             client: String::new(),
             text: text.to_owned(),
             holocron: None,
+            official: None,
         }
     }
 

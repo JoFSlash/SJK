@@ -9,6 +9,21 @@
 #                               made it when that is not the piece's owner.
 
 = Sol
++ 25/10/2026 | - | Reapply kyber crystals on main after release 2026.1025.1
+- d45aae0 |  | Reapply kyber crystals on main after release 2026.1025.1
++ 25/10/2026 | - | Release 2026.1025.1
+- 532695e |  | Revert "Reapply kyber crystals on main after release 2026.1024.1"
+- f771466 |  | Reward window: holocron icons by the tier's index, which works with or without kyber crystals
+- f4badc7 |  | Release 2026.1025.1 (Alpha)
++ 25/10/2026 | - | SJK team announcements in SJK chat and contributor reward rounds with Claim
+- 0f35492 |  | Announcements and contributor reward rounds (client)
+- 05f68f8 |  | Announcements: credits, test panel entry, and every release announced in SJK chat
++ 25/10/2026 | - | hub-chat docs: client field date
+- fdbb4b7 |  | SJK chat docs: the hub names a message's client since 25/10, not 21/10
++ 25/10/2026 | - | Ragdoll: movers carry the body, every part heard on what it hits
+- b205670 |  | Ragdoll: movers carry and push the body, every part heard on what it hits
++ 25/10/2026 | - | JA+ settings under japlus.*, old names kept as aliases
+- 256fb04 |  | JA+ names: every JA+-only setting under japlus.*
 + 24/10/2026 | - | macOS build: Metal backend and an Apple Silicon package from GitHub
 - b1c1c8a |  | macOS build: Metal backend and an Apple Silicon package from GitHub
 - 0d0102e |  | package_client.py: accept the macos-arm64 platform

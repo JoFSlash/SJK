@@ -136,6 +136,8 @@ pub(crate) struct StaffShown<'a> {
 struct Shown {
     /// The messages on show, by token, as (id, sender's key), oldest first.
     messages: Vec<(u64, String)>,
+    /// What a click on each message on show opens, for the SJK team's lines.
+    officials: Vec<Option<crate::official::words::Target>>,
     /// The chosen message's id, its sender's key and name, and whether they are
     /// muted here.
     chosen: Option<(u64, String, String, bool)>,
@@ -768,12 +770,26 @@ impl Panel {
                 })
             }
             token if (MESSAGE_BASE..MESSAGE_BASE + MESSAGES_SHOWN as u16).contains(&token) => {
-                if let Some((id, _)) = self.shown.messages.get(usize::from(token - MESSAGE_BASE)) {
-                    self.selected = Some(*id);
+                // The SJK team's line: a click (or Enter) reads it.
+                if let Some(Some(target)) =
+                    self.shown.officials.get(usize::from(token - MESSAGE_BASE))
+                {
+                    crate::official::request(*target);
+                    return PanelAction::None;
                 }
+                self.select_message(token);
                 PanelAction::None
             }
             _ => PanelAction::None,
+        }
+    }
+
+    /// Put the keyboard on message `token` and choose it, without opening an SJK team's
+    /// line (Up and Down pass over it).
+    fn select_message(&mut self, token: u16) {
+        self.focus = token;
+        if let Some((id, _)) = self.shown.messages.get(usize::from(token - MESSAGE_BASE)) {
+            self.selected = Some(*id);
         }
     }
 
@@ -803,19 +819,19 @@ impl Panel {
                 self.scroll += 1;
                 self.selected = None;
             }
-            let _ = self.activate(MESSAGE_BASE);
+            self.select_message(MESSAGE_BASE);
             return;
         }
         if index >= count {
             if self.scroll > 0 {
                 self.scroll -= 1;
-                let _ = self.activate(MESSAGE_BASE + (count - 1) as u16);
+                self.select_message(MESSAGE_BASE + (count - 1) as u16);
             } else {
                 self.focus = FIELD_TOKEN;
             }
             return;
         }
-        let _ = self.activate(MESSAGE_BASE + index as u16);
+        self.select_message(MESSAGE_BASE + index as u16);
     }
 
     /// A key.
@@ -977,6 +993,7 @@ mod tests {
             client: String::new(),
             text: text.to_owned(),
             holocron: None,
+            official: None,
         }
     }
 

@@ -287,6 +287,14 @@ section; the tests reject a dated release from 12/10/2026 on without one, and th
 release notes' introduction may repeat it. A player who skips releases sees the recaps
 of each, so a recap must read on its own.
 
+Every release is also announced in SJK chat (Sol's rule, 25/10/2026), small ones too:
+an announcement of kind `release` with the release's version, titled "SJK <version>",
+its text (the card a click on the line opens, [hub-chat.md](hub-chat.md)) filled in
+full from the recap and the notable changes in player words, never a title alone. The
+draft is shown to Sol, then posted on the hub's host with
+`sjk-hub announce --release <version> "SJK <version>" <file>` once the release's
+download is live. Staff tools stay out of it, as they stay out of the changelog.
+
 A release that changes what a setting does, or its default, asks players to choose it
 again with a line `= <cvar>: <one sentence>` beside the recap, before the changes
 (17/10/2026), in place of a migration marker cvar of its own: the what's-new card
