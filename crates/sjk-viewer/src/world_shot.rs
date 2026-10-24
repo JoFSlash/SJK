@@ -394,23 +394,18 @@ mod tests {
         });
     }
 
-    /// `sjk_arena1` (`scripts/arena_map.py`, installed in `base`) from four
-    /// places: a duel spawn, a balcony, a corner by the stairs and under a
-    /// balcony, on one sheet.
-    #[test]
-    #[ignore = "renders with the GPU and the installed game data named by JKA_GAME_DATA"]
-    fn sjk_arena1_tour() {
-        on_big_stack(|| {
-            let Some((mut gpu, _profile)) = open("maps/sjk_arena1.bsp", [1280, 720], None, &[])
-            else {
+    /// `map` seen from each (from, at) of `views`, on one sheet `columns` wide
+    /// saved as `name`.png.
+    fn tour(
+        map: &'static str,
+        views: &'static [([f32; 3], [f32; 3])],
+        columns: u32,
+        name: &'static str,
+    ) {
+        on_big_stack(move || {
+            let Some((mut gpu, _profile)) = open(map, [1280, 720], None, &[]) else {
                 return;
             };
-            let views = [
-                ([0.0, -200.0, 80.0], [0.0, 400.0, 120.0]),
-                ([0.0, 600.0, 230.0], [0.0, -300.0, 0.0]),
-                ([560.0, -150.0, 90.0], [-400.0, 250.0, 100.0]),
-                ([300.0, 590.0, 70.0], [-500.0, 560.0, 60.0]),
-            ];
             let shots: Vec<_> = views
                 .iter()
                 .map(|&(from, at)| {
@@ -419,8 +414,48 @@ mod tests {
                     frame(&mut gpu, 40)
                 })
                 .collect();
-            println!("{}", sheet(&shots, 2, 960, "sjk_arena1-tour").display());
+            println!("{}", sheet(&shots, columns, 960, name).display());
         });
+    }
+
+    /// `sjk_arena1` (`scripts/arena_map.py`, installed in `base`) from four
+    /// places: a duel spawn, a balcony, a corner by the stairs and under a
+    /// balcony.
+    #[test]
+    #[ignore = "renders with the GPU and the installed game data named by JKA_GAME_DATA"]
+    fn sjk_arena1_tour() {
+        tour(
+            "maps/sjk_arena1.bsp",
+            &[
+                ([0.0, -200.0, 80.0], [0.0, 400.0, 120.0]),
+                ([0.0, 600.0, 230.0], [0.0, -300.0, 0.0]),
+                ([560.0, -150.0, 90.0], [-400.0, 250.0, 100.0]),
+                ([300.0, 590.0, 70.0], [-500.0, 560.0, 60.0]),
+            ],
+            2,
+            "sjk_arena1-tour",
+        );
+    }
+
+    /// `sjk_sith1` (`scripts/sith_map.py`, installed in `base`): the throne
+    /// from a duel spawn, the platform from the south, a corner statue, the
+    /// throne, the moat by the west bridge and the hall from high in the east.
+    #[test]
+    #[ignore = "renders with the GPU and the installed game data named by JKA_GAME_DATA"]
+    fn sjk_sith1_tour() {
+        tour(
+            "maps/sjk_sith1.bsp",
+            &[
+                ([0.0, -300.0, 90.0], [0.0, 900.0, 150.0]),
+                ([0.0, -950.0, 300.0], [0.0, 0.0, 0.0]),
+                ([450.0, 450.0, 120.0], [720.0, 720.0, 220.0]),
+                ([0.0, 560.0, 120.0], [0.0, 940.0, 140.0]),
+                ([-700.0, -300.0, 100.0], [-500.0, 300.0, -40.0]),
+                ([850.0, 600.0, 550.0], [-300.0, -300.0, 0.0]),
+            ],
+            3,
+            "sjk_sith1-tour",
+        );
     }
 
     /// The console's looks over duel6, half open on made-up scrollback with a

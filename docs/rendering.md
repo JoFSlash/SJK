@@ -4293,6 +4293,34 @@ python scripts/arena_map.py --no-compile --preview plan.png
 - **Not checked:** the map in a game, on a server and in EternalJK; the baked
   lighting (`r_dayNight 0`, lightmap mean 33 of 255) looked at.
 
+## Sith temple map
+
+[sith_map.py](../scripts/sith_map.py) builds `sjk_sith1`, a dark temple made
+the same way: a 2048-unit hall with chamfered corners, an octagonal duelling
+platform with a glowing emblem, a lava moat crossed by four bridges, a throne,
+pillars, beams, braziers, rune bands, banners and six hooded statues. Every
+texture is drawn by the script (NumPy noise), and the statue is an MD3 the
+script generates, which q3map2 bakes into the BSP (`misc_model`, spawnflags
+4); an invisible octagonal player clip stands in for its shape, as q3map2's
+model clip made over a thousand brushes per statue.
+
+```sh
+python scripts/sith_map.py --install           # then: devmap sjk_sith1
+```
+
+- **Brushes.** Prisms of a convex polygon (octagons, trapezoids, triangles),
+  written with their outward-winding plane points. The script stops if a spawn
+  point's player box touches a brush or has no solid, lava-free floor under it.
+- **Light.** Lava, braziers, runes, the emblem's inlay and nine dim lamps under
+  the beam crossings, all emissive surfaces. With only the lava, runes and
+  braziers and the darker first textures, real-time lighting showed little but
+  the emitters.
+- **Checked** (24/10/2026, Linux, q3map2 `8216133`): no compile warning or
+  leak, 139 brushes; `sjk-bsp` traces land all ten spawn points; the ignored
+  test `sjk_sith1_tour` rendered six views on llvmpipe (1,148 lamps).
+- **Not checked:** the map in a game; baked lighting (`r_dayNight 0`) is too
+  dark (lightmap mean 19 of 255).
+
 ## Default visual profile
 
 New profiles use the owner-approved rendering setup: day/night enabled at a fixed
