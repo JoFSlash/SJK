@@ -161,6 +161,7 @@ try {
     # --- Image sizes, read from the headers. ---
     $sizes = @{}
     function Get-ImageInfo($entry) {
+        if ($null -eq $entry) { return $null }
         $id = "$($entry.Archive.GetHashCode())|$($entry.FullName)"
         if ($sizes.ContainsKey($id)) { return $sizes[$id] }
         $info = $null
@@ -290,7 +291,11 @@ try {
 
     # --- The largest textures of all the pk3 files. ---
     $all = foreach ($key in $images.Keys) {
-        $file = Find-Image $key
+        # The key is already without its extension: a name with another dot in it
+        # ("skin.v2") must not lose that part too.
+        $file = $null
+        foreach ($ext in $ImageExtensions) { if (-not $file -and $images[$key].ContainsKey($ext)) { $file = $images[$key][$ext] } }
+        if (-not $file) { continue }
         $info = Get-ImageInfo $file
         if ($info) {
             [pscustomobject]@{ Texture = $key; Size = "$($info.W)x$($info.H)"; MiB = [Math]::Round((Get-Bytes $info.W $info.H 0) / $Mib, 1); Alpha = $info.Alpha }
