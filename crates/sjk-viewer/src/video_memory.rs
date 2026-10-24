@@ -2,6 +2,8 @@
 //! ([`sjk_gpu_memory`]) and, on a card of 4 GB or less, lowers the texture detail
 //! (`r_picmip`) and stands the menus on pictures ([`crate::menu_pictures`]) before the
 //! first map is built, so a 3 GB card does not have to run out first (Vin's, 21/10/2026).
+//! A built-in GPU (under 1 GB of its own) also draws the 3D view at 75% of the window
+//! (`r_renderScale`): it is limited by the pixels it draws (Slash's, 24/10/2026).
 //!
 //! It chooses once a card: [`CVAR`] keeps the size it chose for, so a player who sets
 //! the texture detail back is not overridden at the next start, and a new card is
@@ -35,6 +37,17 @@ pub(crate) fn picmip_for(dedicated: u64) -> Option<i64> {
         0 => None,
         mib if mib < 3584 => Some(2),
         mib if mib < 4608 => Some(1),
+        _ => None,
+    }
+}
+
+/// The 3D resolution (`r_renderScale`) a card with `dedicated` bytes of its own starts
+/// on: `None` for the window's. Built-in GPUs report a few hundred MB; a 1 GB discrete
+/// card or more keeps it.
+pub(crate) fn render_percent_for(dedicated: u64) -> Option<i64> {
+    match dedicated / MIB {
+        0 => None,
+        mib if mib < 1024 => Some(75),
         _ => None,
     }
 }
@@ -83,6 +96,16 @@ fn apply(console: &mut ViewerConsole, dedicated: u64) -> Vec<String> {
     {
         lines.push("The menus use pictures to save video memory (Settings, Menu pictures).".into());
     }
+    let scale = crate::frame_target::scale::PERCENT_CVAR;
+    if let Some(percent) = render_percent_for(dedicated)
+        && console.integer_cvar(scale).unwrap_or(100) == 100
+        && console.set_cvar(scale, &percent.to_string())
+    {
+        lines.push(format!(
+            "Built-in graphics: the 3D view is drawn at {percent}% of the window, HUD and text \
+             stay sharp (Settings, Renderer, 3D resolution)."
+        ));
+    }
     lines
 }
 
@@ -111,6 +134,30 @@ mod tests {
         assert_eq!(picmip_for(4 * GIB), Some(1));
         assert_eq!(picmip_for(6 * GIB), None);
         assert_eq!(picmip_for(0), None, "a driver that does not say");
+    }
+
+    #[test]
+    fn built_in_graphics_start_on_a_smaller_3d_view() {
+        assert_eq!(
+            render_percent_for(495 * MIB),
+            Some(75),
+            "Slash's built-in Radeon"
+        );
+        assert_eq!(render_percent_for(GIB), None);
+        assert_eq!(render_percent_for(3 * GIB), None);
+        assert_eq!(render_percent_for(0), None, "a driver that does not say");
+        let (_directory, mut console) = fresh();
+        let scale = crate::frame_target::scale::PERCENT_CVAR;
+        assert_eq!(apply(&mut console, 495 * MIB).len(), 3);
+        assert_eq!(console.integer_cvar(scale), Some(75));
+        let (_other, mut console) = fresh();
+        console.set_cvar(scale, "90");
+        apply(&mut console, 495 * MIB);
+        assert_eq!(
+            console.integer_cvar(scale),
+            Some(90),
+            "the player's own choice stays"
+        );
     }
 
     #[test]

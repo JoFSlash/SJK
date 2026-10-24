@@ -1,3 +1,17 @@
+## 3D resolution
+
+24/10/2026, `claude/sweet-pasteur-render-scale`, based on `main` `ca5643de` (Slash: 125
+FPS steady on EternalJK, not always on SJK, on a built-in AMD Radeon with 495 MiB; its
+GPU took 9.8 ms a frame on mp/ffa2 at 1920x1080 and a 1600x900 window ran better).
+`r_renderScale` (Settings > Renderer, 50 to 100%, default 100, after a graphics reload)
+draws the 3D view smaller and stretches it before postprocessing and the HUD, which stay
+at the window's size; built-in GPUs start at 75% ([rendering.md](rendering.md#3d-resolution)).
+Checked by unit tests (sizes, the stretch shader through naga, the built-in default and
+the player's own choice) and the viewer's settings, reload and changelog tests on Linux
+without a GPU. Not verified: any frame on a real card (look, FPS gained, effects or
+reflections at the reduced size), Windows. A player whose card was already checked
+(`r_videoMemoryChecked`) keeps 100% until they choose.
+
 ## macOS build
 
 24/10/2026, `personal/macos-build`, based on `main` `cbf6e41d`. GitHub builds an

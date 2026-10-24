@@ -52,6 +52,7 @@ struct Startup {
     hdr: u32,
     fxaa: bool,
     scale: u32,
+    percent: u32,
     day: bool,
     /// Sun shadows on, with world casters, then the sharp and close cascades' depths
     /// (bits), the map's side, the filter's taps and whether static casters are held.
@@ -69,6 +70,7 @@ impl Startup {
             hdr: context.hdr.mode,
             fxaa: context.fxaa,
             scale: context.render_scale,
+            percent: context.render_percent,
             day: sun.day.enabled,
             shadows: (
                 sun.enabled,
@@ -93,6 +95,7 @@ impl Startup {
             hdr: crate::frame_target::aa::hdr::Settings::sample(console).mode,
             fxaa: crate::frame_target::aa::enabled(console),
             scale: crate::frame_target::scale::requested(console),
+            percent: crate::frame_target::scale::percent(console),
             day: sun.day.enabled,
             shadows: (
                 sun.enabled,
@@ -116,6 +119,7 @@ impl Startup {
             ("HDR", self.hdr != wanted.hdr),
             ("FXAA", self.fxaa != wanted.fxaa),
             ("supersampling", self.scale != wanted.scale),
+            ("3D resolution", self.percent != wanted.percent),
             ("normal maps", maps.normal != other.normal),
             ("specular maps", maps.specular != other.specular),
             ("parallax", maps.parallax != other.parallax),

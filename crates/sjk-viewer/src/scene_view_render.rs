@@ -105,7 +105,60 @@ impl GpuState {
             crate::log::progress(format_args!(
                 "scene scale requested={requested}; native fallback"
             ));
+            return;
         }
+        self.install_reduced_scene(output);
+    }
+
+    /// The 3D view drawn smaller than the window (`r_renderScale`) and stretched to it,
+    /// with its depth and secondary views at that size; native on failure.
+    fn install_reduced_scene(&mut self, output: [u32; 2]) {
+        let percent = self.context.render_percent;
+        let Some(size) = crate::frame_target::scale::reduced(output, percent) else {
+            return;
+        };
+        let views = &self.scene_views;
+        let candidate = crate::frame_target::scale::checked(&self.device, || {
+            let scaled = crate::frame_target::scale::Runtime::new_reduced(
+                &self.device,
+                self.context.scene_format(),
+                output,
+                size,
+            );
+            let depth = crate::DepthTarget::new(&self.device, size[0], size[1]);
+            let target = |present: bool| {
+                present.then(|| {
+                    gpu::Target::new(
+                        &self.device,
+                        &views.camera_layout,
+                        &views.sample_layout,
+                        views.format,
+                        size,
+                    )
+                })
+            };
+            let sky = target(views.sky_target.is_some());
+            let portal = target(views.portal_target.is_some());
+            let floors = target(views.floors.target.is_some());
+            (scaled, depth, sky, portal, floors)
+        });
+        let Some((scaled, depth, sky, portal, floors)) = candidate else {
+            crate::log::progress(format_args!("3D resolution {percent}%: native fallback"));
+            return;
+        };
+        self.depth = depth;
+        self.scene_views.sky_target = sky;
+        self.scene_views.portal_target = portal;
+        self.scene_views.floors.set_target(floors, &self.device);
+        self.render_scale = Some(scaled);
+        if let Some(aa) = &mut self.post_aa {
+            aa.fit_effects(&self.device, size);
+        }
+        self.world_materials.fit_light_buffer(&self.device, size, 1);
+        crate::log::progress(format_args!(
+            "3D resolution {percent}%: {}x{} for a {}x{} window",
+            size[0], size[1], output[0], output[1]
+        ));
     }
 
     /// Select visible secondary views and upload their small camera uniforms.

@@ -1449,6 +1449,15 @@ pub(super) const RENDER_IMAGE: &[Setting] = &[
         },
     },
     Setting {
+        label: "3D resolution % (reload)",
+        cvar: crate::frame_target::scale::PERCENT_CVAR,
+        kind: ValueKind::Integer {
+            min: crate::frame_target::scale::PERCENT_MIN as i64,
+            max: 100,
+            step: 5,
+        },
+    },
+    Setting {
         label: "Texture detail, 0 full (next map)",
         cvar: crate::world_materials::filtering::mips::PICMIP_CVAR,
         kind: ValueKind::Integer {

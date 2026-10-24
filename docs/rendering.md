@@ -500,10 +500,30 @@ loader does (`world_texture_prepare.rs`). Built on the render thread, a chain co
 182 ms hitches for two player models in Sol's log, with their pipelines already off
 the thread.
 
+## 3D resolution
+
+`r_renderScale` (Settings > Renderer, "3D resolution %", 50 to 100 in steps of 5,
+default 100; [render_scale.rs](../crates/sjk-viewer/src/render_scale.rs)) draws the 3D
+view smaller than the window and stretches it to the window before postprocessing and
+the HUD, through the same scene target as `r_superSample`, which wins while it is above
+1. The scene colour, its depth and the sky, portal and floor-mirror views take the
+reduced size (`install_reduced_scene` in
+[scene_view_render.rs](../crates/sjk-viewer/src/scene_view_render.rs)); the light
+buffer stays at half the scene; the stretch is one bilinear pass
+([render_scale_stretch.wgsl](../crates/sjk-viewer/src/render_scale_stretch.wgsl)). The
+HUD, text and menus are drawn at the window's size, so they stay sharp, unlike a lower
+`r_resolution`; FXAA, bloom and glow still run at the window's size. At 75% on a
+1920x1080 window the scene is 1440x810, 56% of the pixels. A built-in GPU (under 1 GB
+of its own, [video_memory.rs](../crates/sjk-viewer/src/video_memory.rs)) starts at 75%,
+once a card, only from the default. Slash's built-in Radeon (495 MiB) took 9.8 ms of GPU
+time a frame on mp/ffa2 at 1920x1080 (`SJK_GPU_PHASES`: scene-world 5.2 ms,
+overlays+post+hud 2.5 ms, effect-encode 1.5 ms) and ran better at a 1600x900 window. Not
+measured with `r_renderScale` yet.
+
 ## Graphics reload
 
 The settings read only when the graphics context is made (`r_sceneHdr`, `r_fxaa`,
-`r_superSample`, `r_dayNight`, the sun-shadow cvars and `r_volumetrics`, the
+`r_superSample`, `r_renderScale`, `r_dayNight`, the sun-shadow cvars and `r_volumetrics`, the
 material-map controls with `r_cubeMapping`/`r_cubeMapSize`, and texture filtering)
 used to need a restart. They now apply with a graphics reload
 ([graphics_reload.rs](../crates/sjk-viewer/src/graphics_reload.rs)), offered by a

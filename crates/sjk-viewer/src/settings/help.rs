@@ -1103,6 +1103,10 @@ const HELP: &[(&str, &str)] = &[
         "Draws the scene 2 or 3 times larger each way and shrinks it: very sharp, very costly.",
     ),
     (
+        crate::frame_target::scale::PERCENT_CVAR,
+        "Draws the 3D view smaller and stretches it, HUD and text stay sharp: more FPS on weak graphics.",
+    ),
+    (
         crate::world_materials::filtering::mips::PICMIP_CVAR,
         "Each step halves large textures: a quarter of their video memory. For graphics cards of 4 GB or less.",
     ),

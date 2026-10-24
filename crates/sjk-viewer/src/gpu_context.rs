@@ -24,6 +24,9 @@ pub(crate) struct Context {
     pub(crate) sun_shadows: crate::world_materials::shadows::settings::Settings,
     /// Startup scene multiplier, retained across console-free map installs.
     pub(crate) render_scale: u32,
+    /// Startup 3D resolution in percent of the window (`r_renderScale`), used while
+    /// `render_scale` is 1.
+    pub(crate) render_percent: u32,
     /// Startup FXAA policy, preserved through background map installation.
     pub(crate) fxaa: bool,
 
@@ -191,6 +194,7 @@ impl Context {
             hdr,
             sun_shadows: crate::world_materials::shadows::settings::Settings::sample(console),
             render_scale: crate::frame_target::scale::requested(console),
+            render_percent: crate::frame_target::scale::percent(console),
             fxaa: crate::frame_target::aa::enabled(console),
 
             post_color: console.map(|c| c.post_color.clone()).unwrap_or_default(),
@@ -243,6 +247,7 @@ impl Context {
             hdr: crate::frame_target::aa::hdr::Settings::sample(console),
             sun_shadows: crate::world_materials::shadows::settings::Settings::sample(console),
             render_scale: crate::frame_target::scale::requested(console),
+            render_percent: crate::frame_target::scale::percent(console),
             fxaa: crate::frame_target::aa::enabled(console),
             post_color: self.post_color.clone(),
             dynamic_light_settings: self.dynamic_light_settings.clone(),

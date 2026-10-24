@@ -1,5 +1,15 @@
-//! Optional single-sample supersampling. Target ownership stays in the viewer.
+//! Optional single-sample supersampling, or a 3D view drawn smaller than the window
+//! (`r_renderScale`): the scene raster is resolved to the window's size before
+//! postprocessing and the HUD, so text and menus stay at the window's resolution
+//! either way. Target ownership stays in the viewer.
 use sjk_shell::{CvarDefinition, CvarError, CvarFlags, CvarRegistry};
+
+/// The 3D view's size in percent of the window's, each way: below 100 the world is
+/// drawn smaller and stretched to the window, for graphics cards (built-in ones above
+/// all) limited by the pixels they draw. Ignored while `r_superSample` is above 1.
+pub(crate) const PERCENT_CVAR: &str = "r_renderScale";
+/// The smallest `r_renderScale` taken: below it the world is too blurred to play.
+pub(crate) const PERCENT_MIN: u32 = 50;
 
 /// Register startup policy; changing attachment dimensions takes a graphics reload.
 pub(crate) fn register(cvars: &mut CvarRegistry) -> Result<(), CvarError> {
@@ -9,13 +19,36 @@ pub(crate) fn register(cvars: &mut CvarRegistry) -> Result<(), CvarError> {
         CvarFlags::ARCHIVE,
         "Scene supersampling: 1 off, 2 or 3 per axis; applies after a graphics reload (vid_restart)",
     ))?;
-    cvars.on_change("r_superSample", |_| {
-        crate::log::progress(format_args!(
-            "r_superSample changed: {}",
-            crate::graphics_reload::APPLY
-        ));
-        crate::graphics_reload::notice();
-    })
+    cvars.register(CvarDefinition::new(
+        PERCENT_CVAR,
+        100_i64,
+        CvarFlags::ARCHIVE,
+        "3D resolution in percent of the window, 50..100 (HUD and text stay sharp); \
+         applies after a graphics reload (vid_restart)",
+    ))?;
+    for name in ["r_superSample", PERCENT_CVAR] {
+        cvars.on_change(name, move |_| {
+            crate::log::progress(format_args!(
+                "{name} changed: {}",
+                crate::graphics_reload::APPLY
+            ));
+            crate::graphics_reload::notice();
+        })?;
+    }
+    Ok(())
+}
+
+/// `r_renderScale` as a context made now takes it, [`PERCENT_MIN`] to 100.
+pub(crate) fn percent(console: Option<&crate::console::ViewerConsole>) -> u32 {
+    console
+        .and_then(|c| c.integer_cvar(PERCENT_CVAR))
+        .unwrap_or(100)
+        .clamp(i64::from(PERCENT_MIN), 100) as u32
+}
+
+/// The 3D view's size for a window of `output` at `percent`, when smaller than it.
+pub(crate) fn reduced(output: [u32; 2], percent: u32) -> Option<[u32; 2]> {
+    (percent < 100).then(|| output.map(|n| ((n * percent + 50) / 100).max(1)))
 }
 
 /// Sample the actual loaded config, not a parallel default-only settings object.
@@ -53,7 +86,8 @@ pub(crate) fn checked<T>(device: &wgpu::Device, build: impl FnOnce() -> T) -> Op
         .ok()
 }
 
-/// Retained scene colour and integer box resolve; HUD depth remains output-sized.
+/// Retained scene colour and its resolve to the window's size (an integer box above it,
+/// a bilinear stretch below); HUD depth remains output-sized.
 pub(crate) struct Runtime {
     /// Scene colour at the same dimensions as main depth and secondary views.
     pub(crate) scene: wgpu::TextureView,
@@ -73,7 +107,32 @@ impl Runtime {
         output: [u32; 2],
         scale: u32,
     ) -> Self {
-        let size = output.map(|n| n * scale);
+        Self::build(
+            device,
+            format,
+            output,
+            output.map(|n| n * scale),
+            Resolve::Box(scale),
+        )
+    }
+
+    /// [`Self::new`] for a scene of `size`, smaller than `output` ([`reduced`]).
+    pub(crate) fn new_reduced(
+        device: &wgpu::Device,
+        format: wgpu::TextureFormat,
+        output: [u32; 2],
+        size: [u32; 2],
+    ) -> Self {
+        Self::build(device, format, output, size, Resolve::Stretch)
+    }
+
+    fn build(
+        device: &wgpu::Device,
+        format: wgpu::TextureFormat,
+        output: [u32; 2],
+        size: [u32; 2],
+        resolve: Resolve,
+    ) -> Self {
         let texture = device.create_texture(&wgpu::TextureDescriptor {
             label: Some("SJK supersampled scene"),
             size: wgpu::Extent3d {
@@ -89,9 +148,24 @@ impl Runtime {
             view_formats: &[],
         });
         let scene = texture.create_view(&Default::default());
+        let (label, source, constants) = match resolve {
+            Resolve::Box(scale) => (
+                "SJK integer box resolve",
+                include_str!("render_scale.wgsl"),
+                vec![("SCALE", f64::from(scale))],
+            ),
+            Resolve::Stretch => (
+                "SJK reduced scene stretch",
+                include_str!("render_scale_stretch.wgsl"),
+                vec![
+                    ("OUTPUT_WIDTH", f64::from(output[0])),
+                    ("OUTPUT_HEIGHT", f64::from(output[1])),
+                ],
+            ),
+        };
         let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
-            label: Some("SJK integer box resolve"),
-            source: wgpu::ShaderSource::Wgsl(include_str!("render_scale.wgsl").into()),
+            label: Some(label),
+            source: wgpu::ShaderSource::Wgsl(source.into()),
         });
         let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
             label: Some("SJK supersample resolve before scene postprocessing"),
@@ -106,7 +180,7 @@ impl Runtime {
                 module: &shader,
                 entry_point: Some("fragment"),
                 compilation_options: wgpu::PipelineCompilationOptions {
-                    constants: &[("SCALE", f64::from(scale))],
+                    constants: &constants,
                     ..Default::default()
                 },
                 targets: &[Some(wgpu::ColorTargetState {
@@ -121,13 +195,28 @@ impl Runtime {
             multiview_mask: None,
             cache: None,
         });
+        let sampler = matches!(resolve, Resolve::Stretch).then(|| {
+            device.create_sampler(&wgpu::SamplerDescriptor {
+                label: Some("SJK reduced scene stretch"),
+                mag_filter: wgpu::FilterMode::Linear,
+                min_filter: wgpu::FilterMode::Linear,
+                ..Default::default()
+            })
+        });
+        let mut entries = vec![wgpu::BindGroupEntry {
+            binding: 0,
+            resource: wgpu::BindingResource::TextureView(&scene),
+        }];
+        if let Some(sampler) = &sampler {
+            entries.push(wgpu::BindGroupEntry {
+                binding: 1,
+                resource: wgpu::BindingResource::Sampler(sampler),
+            });
+        }
         let bind = device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: None,
             layout: &pipeline.get_bind_group_layout(0),
-            entries: &[wgpu::BindGroupEntry {
-                binding: 0,
-                resource: wgpu::BindingResource::TextureView(&scene),
-            }],
+            entries: &entries,
         });
         Self {
             scene,
@@ -138,7 +227,8 @@ impl Runtime {
         }
     }
 
-    /// Average every covered linear-light texel, without filtering the later HUD.
+    /// Average every covered linear-light texel (or stretch a reduced scene), without
+    /// filtering the later HUD.
     pub(crate) fn draw(&self, encoder: &mut wgpu::CommandEncoder, output: &wgpu::TextureView) {
         let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
             label: Some("SJK supersample box resolve"),
@@ -162,6 +252,15 @@ impl Runtime {
     }
 }
 
+/// How a scene raster becomes the window's size.
+#[derive(Clone, Copy)]
+enum Resolve {
+    /// The mean of each `scale` x `scale` box of a supersampled scene.
+    Box(u32),
+    /// A bilinear stretch of a scene smaller than the window.
+    Stretch,
+}
+
 impl crate::GpuState {
     /// Window resize retains native output dimensions, then rebuilds scene attachments.
     pub(crate) fn resize(&mut self, size: winit::dpi::PhysicalSize<u32>) {
@@ -179,7 +278,7 @@ impl crate::GpuState {
         self.resize_scene_depth(size);
     }
 
-    /// Output aspect is unchanged; only raster dimensions increase.
+    /// Output aspect is unchanged; only raster dimensions change.
     pub(crate) fn scene_size(&self) -> [u32; 2] {
         self.render_scale
             .as_ref()
@@ -199,5 +298,33 @@ impl crate::GpuState {
     pub(crate) fn with_render_scale(mut self) -> Self {
         self.install_render_scale();
         self
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_reduced_3d_view_keeps_the_window_shape_and_100_percent_is_native() {
+        assert_eq!(reduced([1920, 1080], 100), None);
+        assert_eq!(reduced([1920, 1080], 75), Some([1440, 810]));
+        assert_eq!(reduced([1920, 1080], 50), Some([960, 540]));
+        assert_eq!(reduced([1, 1], 50), Some([1, 1]));
+        assert_eq!(percent(None), 100);
+    }
+
+    #[test]
+    fn the_stretch_shader_validates() {
+        use wgpu::naga;
+        let source = include_str!("render_scale_stretch.wgsl");
+        let module = naga::front::wgsl::parse_str(source)
+            .unwrap_or_else(|error| panic!("{}", error.emit_to_string(source)));
+        naga::valid::Validator::new(
+            naga::valid::ValidationFlags::all(),
+            naga::valid::Capabilities::all(),
+        )
+        .validate(&module)
+        .unwrap_or_else(|error| panic!("{}", error.emit_to_string(source)));
     }
 }
