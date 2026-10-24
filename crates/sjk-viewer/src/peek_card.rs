@@ -1,6 +1,7 @@
 //! The peek card (`docs/client.md`, "Timed player peek"): a small SJK card at the top
 //! centre of play, under the unlock pop-up, while a peek concerns the player. It asks
-//! when someone wants to watch them (Allow, gold, Insert; Deny, Delete), and otherwise
+//! when someone wants to watch them (Allow, gold, Insert; Deny, Delete; Block, which
+//! also blocks the sender on this PC), and otherwise
 //! says whom they watch, whom they asked or who watches them, with the seconds left and
 //! Stop (Delete). It is not modal: play goes on under it and only those keys are taken
 //! (`GpuState::peek_key`). It stays over the game menu, at the frame's top, so Escape
@@ -14,11 +15,12 @@ use sjk_ui::{FontWeight, InputEvent, TextAlign, UiEventKind};
 const ALLOW_TOKEN: u16 = 1;
 const DENY_TOKEN: u16 = 2;
 const STOP_TOKEN: u16 = 3;
+const BLOCK_TOKEN: u16 = 4;
 
 /// The card's left edge, top and width in frame pixels: centred, under the unlock
 /// pop-up (`unlock_toast.rs`), above the centre prints; over the game menu, at the top,
 /// clear of its arc and match card.
-const CARD_WIDTH: f32 = 640.0;
+const CARD_WIDTH: f32 = 720.0;
 const CARD_X: f32 = (1920.0 - CARD_WIDTH) * 0.5;
 const PLAY_TOP: f32 = 236.0;
 const MENU_TOP: f32 = 14.0;
@@ -32,6 +34,7 @@ const BUTTON_HEIGHT: f32 = 40.0;
 const BUTTON_GAP: f32 = 12.0;
 const ALLOW_WIDTH: f32 = 140.0;
 const DENY_WIDTH: f32 = 120.0;
+const BLOCK_WIDTH: f32 = 120.0;
 const STOP_WIDTH: f32 = 120.0;
 
 /// What the card shows; names keep their colour codes, which the card leaves out.
@@ -99,6 +102,8 @@ impl View {
 pub(crate) enum Choice {
     Allow,
     Deny,
+    /// Deny and block the sender.
+    Block,
     Stop,
 }
 
@@ -142,6 +147,7 @@ impl Card {
             Some(ALLOW_TOKEN) => Some(Choice::Allow),
             Some(DENY_TOKEN) => Some(Choice::Deny),
             Some(STOP_TOKEN) => Some(Choice::Stop),
+            Some(BLOCK_TOKEN) => Some(Choice::Block),
             _ => None,
         }
     }
@@ -231,6 +237,21 @@ impl Card {
                 true,
                 false,
                 DENY_TOKEN,
+            );
+            kit::button(
+                ui,
+                &frame,
+                [
+                    right - ALLOW_WIDTH - DENY_WIDTH - BLOCK_WIDTH - BUTTON_GAP * 2.0,
+                    buttons_y,
+                    BLOCK_WIDTH,
+                    BUTTON_HEIGHT,
+                ],
+                "Block",
+                false,
+                true,
+                false,
+                BLOCK_TOKEN,
             );
             let [x, y] = frame.point(TEXT_X, buttons_y + (BUTTON_HEIGHT - 24.0) * 0.5);
             let x = key_hint(ui, &["Ins"], "allow", x, y, s);

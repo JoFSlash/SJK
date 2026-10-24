@@ -206,6 +206,7 @@ pub(crate) const ACTIONS: &[BindableAction] = &[
     action(Other, "Stop peek", "peek off", ""),
     action(Other, "Allow a peek request", "peek_allow", ""),
     action(Other, "Deny a peek request", "peek_deny", ""),
+    action(Other, "Block who asks to peek", "peek_block", ""),
     // SJK: off, names only, bars on the target and duel opponent, bars on everyone.
     action(Other, "Nameplate mode", "nameplates", "v"),
     // SJK: one wheel with pages (Settings > Quick wheel). A bare `+wheel` opens

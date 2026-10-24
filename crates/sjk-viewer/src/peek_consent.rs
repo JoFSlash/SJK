@@ -5,12 +5,14 @@
 //! from either side when they stop early. Both sides keep their own timers in their
 //! own snapshots' server time, so no event has to say when a peek is over.
 //!
-//! Against a card popping up over and over: a sender's request counts once in
-//! [`REPEAT`]; one denied, unanswered or called off makes their next ones go unseen for
-//! a while, twice as long each time ([`QUIET`] up to [`QUIET_MOST`], forgotten after
-//! [`FORGIVE`] without one, reset by an allow); and at most [`SHOWN_A_MINUTE`] cards
-//! show in a minute, from everyone together. The asker's own client waits [`RETRY`]
-//! before asking a player who said no or did not answer again.
+//! Against a card popping up over and over, senders are told apart by their SJK key, so
+//! a new name or slot changes nothing: a sender's request counts once in [`REPEAT`];
+//! one denied, unanswered or called off makes their next ones go unseen for a while,
+//! twice as long each time ([`QUIET`] up to [`QUIET_MOST`], forgotten after [`FORGIVE`]
+//! without one, reset by an allow); and at most [`SHOWN_LIMIT`] cards show in
+//! [`SHOWN_WINDOW`], from everyone together, against players taking turns. The card's
+//! Block answers no and blocks the sender (`peek.rs`). The asker's own client waits
+//! [`RETRY`] before asking a player who said no or did not answer again.
 //!
 //! This is the pure state; `peek.rs` sends the events and moves the camera.
 
@@ -37,9 +39,9 @@ const QUIET: i64 = 60_000;
 const QUIET_MOST: i64 = 600_000;
 /// A sender's strikes are forgotten this long after their quiet time ends.
 const FORGIVE: i64 = 600_000;
-/// The most request cards shown in a minute, from every sender together.
-const SHOWN_A_MINUTE: usize = 3;
-const MINUTE: i64 = 60_000;
+/// The most request cards shown in [`SHOWN_WINDOW`], from every sender together.
+const SHOWN_LIMIT: usize = 3;
+const SHOWN_WINDOW: i64 = 300_000;
 /// How long the asker waits before asking a player who said no or did not answer.
 pub(crate) const RETRY: i64 = 30_000;
 /// The longest peek, as `/peek` clamps it.
@@ -75,6 +77,8 @@ pub(crate) enum Gate {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) struct Party {
     pub(crate) slot: u16,
+    /// Their SJK key, for a request (empty for the player asked).
+    pub(crate) key: String,
     /// Their name as the game shows it, colours kept.
     pub(crate) name: String,
     /// The peek's length.
@@ -113,17 +117,16 @@ pub(crate) struct Consent {
     pub(crate) watcher: Option<Party>,
     /// Who asked lately, against a stream of requests.
     senders: Vec<Sender>,
-    /// When the request cards of the last minute showed.
+    /// When the request cards of the last [`SHOWN_WINDOW`] showed.
     shown: Vec<i64>,
     /// The players asked who said no or did not answer, and until when not to ask again.
     retry: Vec<(u16, i64)>,
 }
 
-/// A player who asked to watch the local one, for the limits.
+/// A player who asked to watch the local one, for the limits, by their SJK key.
 #[derive(Clone, Debug, Eq, PartialEq)]
 struct Sender {
-    slot: u16,
-    name: String,
+    key: String,
     /// Their last request, heard or not.
     last: i64,
     /// Requests denied, unanswered or called off, since the last allow or forgiving.
@@ -152,9 +155,10 @@ impl Consent {
         self.retry.push((slot, now + RETRY));
     }
 
-    /// A strike for `slot`'s request: their next ones go unseen for a while.
-    fn strike(&mut self, slot: u16, now: i64) {
-        if let Some(sender) = self.senders.iter_mut().find(|sender| sender.slot == slot) {
+    /// A strike for the request of the sender with `key`: their next ones go unseen
+    /// for a while.
+    fn strike(&mut self, key: &str, now: i64) {
+        if let Some(sender) = self.senders.iter_mut().find(|sender| sender.key == key) {
             sender.strikes = sender.strikes.saturating_add(1);
             let quiet = QUIET
                 .saturating_mul(1 << (sender.strikes - 1).min(10))
@@ -167,35 +171,33 @@ impl Consent {
     pub(crate) fn ask(&mut self, slot: u16, name: String, milliseconds: i64, now: i64) {
         self.asking = Some(Party {
             slot,
+            key: String::new(),
             name,
             milliseconds,
             until: now + ANSWER_WINDOW,
         });
     }
 
-    /// An event from `sender` (shown as `name`) to the local player; `gate` is what
+    /// An event from `sender` (key `key`, shown as `name`) to the local player; `gate` is what
     /// becomes of a request from them. A request counts once in [`REPEAT`] from a sender
     /// (each one, heard or not, starts the wait again), not while their strikes keep
     /// them quiet, and is shown only while nobody else asks or watches and fewer than
-    /// [`SHOWN_A_MINUTE`] cards showed in the last minute.
+    /// [`SHOWN_LIMIT`] cards showed in the last [`SHOWN_WINDOW`].
     pub(crate) fn hear(
         &mut self,
         sender: u16,
+        key: &str,
         name: &str,
         event: &str,
         now: i64,
         gate: Gate,
     ) -> Option<Heard> {
         if let Some(milliseconds) = request_length(event) {
-            // Another player in the slot starts afresh.
-            self.senders
-                .retain(|known| known.slot != sender || known.name == name);
-            let known = match self.senders.iter().position(|known| known.slot == sender) {
+            let known = match self.senders.iter().position(|known| known.key == key) {
                 Some(index) => &mut self.senders[index],
                 None => {
                     self.senders.push(Sender {
-                        slot: sender,
-                        name: name.to_owned(),
+                        key: key.to_owned(),
                         last: i64::MIN,
                         strikes: 0,
                         quiet_until: i64::MIN,
@@ -212,21 +214,20 @@ impl Consent {
             match gate {
                 Gate::Ask => {}
                 Gate::Refuse => {
-                    self.strike(sender, now);
+                    self.strike(key, now);
                     return Some(Heard::Refused);
                 }
                 Gate::Ignore => return None,
             }
-            self.shown.retain(|at| now >= *at && now - at < MINUTE);
-            if self.request.is_some()
-                || self.watcher.is_some()
-                || self.shown.len() >= SHOWN_A_MINUTE
-            {
+            self.shown
+                .retain(|at| now >= *at && now - at < SHOWN_WINDOW);
+            if self.request.is_some() || self.watcher.is_some() || self.shown.len() >= SHOWN_LIMIT {
                 return None;
             }
             self.shown.push(now);
             self.request = Some(Party {
                 slot: sender,
+                key: key.to_owned(),
                 name: name.to_owned(),
                 milliseconds,
                 until: now + ANSWER_WINDOW,
@@ -247,8 +248,9 @@ impl Consent {
                 // A request called off counts as a strike: asking and taking it back
                 // over and over would flash the card.
                 let called_off = self.request.take_if(|party| party.slot == sender);
-                if called_off.is_some() {
-                    self.strike(sender, now);
+                if let Some(request) = called_off.as_ref() {
+                    let key = request.key.clone();
+                    self.strike(&key, now);
                 }
                 let watcher = self
                     .watcher
@@ -271,7 +273,7 @@ impl Consent {
             if let Some(sender) = self
                 .senders
                 .iter_mut()
-                .find(|sender| sender.slot == request.slot)
+                .find(|sender| sender.key == request.key)
             {
                 sender.strikes = 0;
             }
@@ -281,7 +283,7 @@ impl Consent {
             });
             Some((ALLOW, request))
         } else {
-            self.strike(request.slot, now);
+            self.strike(&request.key, now);
             Some((DENY, request))
         }
     }
@@ -291,7 +293,7 @@ impl Consent {
     pub(crate) fn expire(&mut self, now: i64) -> Option<Party> {
         let over = |party: &mut Party| now >= party.until || party.until - now > LONGEST * 2;
         if let Some(lapsed) = self.request.take_if(over) {
-            self.strike(lapsed.slot, now);
+            self.strike(&lapsed.key, now);
         }
         self.watcher.take_if(over);
         // Forget senders long quiet, and every time from before a rewind.
@@ -300,7 +302,8 @@ impl Consent {
                 && (sender.last == i64::MIN || now - sender.last < FORGIVE)
                 && (sender.quiet_until == i64::MIN || now < sender.quiet_until + FORGIVE)
         });
-        self.shown.retain(|at| now >= *at && now - at < MINUTE);
+        self.shown
+            .retain(|at| now >= *at && now - at < SHOWN_WINDOW);
         self.retry
             .retain(|(_, until)| now < *until && until - now <= RETRY);
         let unanswered = self.asking.take_if(over);
@@ -337,12 +340,12 @@ mod tests {
     fn an_allowed_request_makes_a_watcher_until_the_peek_is_over() {
         let mut consent = Consent::default();
         assert_eq!(
-            consent.hear(3, "Tox", "request_5000", 1000, Gate::Ask),
+            consent.hear(3, "kTox", "Tox", "request_5000", 1000, Gate::Ask),
             Some(Heard::Request)
         );
         // Another request waits for nobody: one question at a time.
         assert_eq!(
-            consent.hear(4, "Sol", "request_5000", 1100, Gate::Ask),
+            consent.hear(4, "kSol", "Sol", "request_5000", 1100, Gate::Ask),
             None
         );
         let (event, sender) = consent.answer(true, 2000).unwrap();
@@ -351,7 +354,7 @@ mod tests {
         assert!(consent.request.is_none());
         // Nobody else is heard while someone watches.
         assert_eq!(
-            consent.hear(4, "Sol", "request_5000", 3000, Gate::Ask),
+            consent.hear(4, "kSol", "Sol", "request_5000", 3000, Gate::Ask),
             None
         );
         assert_eq!(consent.expire(7999), None);
@@ -363,16 +366,16 @@ mod tests {
     #[test]
     fn a_denied_or_unanswered_request_lapses_and_repeats_wait() {
         let mut consent = Consent::default();
-        consent.hear(3, "Tox", "request_5000", 1000, Gate::Ask);
+        consent.hear(3, "kTox", "Tox", "request_5000", 1000, Gate::Ask);
         assert_eq!(consent.answer(false, 1500).unwrap().0, DENY);
         assert!(consent.watcher.is_none());
         // The same sender again too soon is not heard; after the quiet minute it is.
         assert_eq!(
-            consent.hear(3, "Tox", "request_5000", 5000, Gate::Ask),
+            consent.hear(3, "kTox", "Tox", "request_5000", 5000, Gate::Ask),
             None
         );
         assert_eq!(
-            consent.hear(3, "Tox", "request_5000", 62_000, Gate::Ask),
+            consent.hear(3, "kTox", "Tox", "request_5000", 62_000, Gate::Ask),
             Some(Heard::Request)
         );
         consent.expire(62_000 + ANSWER_WINDOW);
@@ -383,19 +386,20 @@ mod tests {
     fn answers_count_only_from_the_player_asked() {
         let mut consent = Consent::default();
         consent.ask(5, "Tox".into(), 30_000, 1000);
-        assert_eq!(consent.hear(6, "Sol", ALLOW, 1200, Gate::Ask), None);
-        let Some(Heard::Allowed(party)) = consent.hear(5, "Tox", ALLOW, 1300, Gate::Ask) else {
+        assert_eq!(consent.hear(6, "kSol", "Sol", ALLOW, 1200, Gate::Ask), None);
+        let Some(Heard::Allowed(party)) = consent.hear(5, "kTox", "Tox", ALLOW, 1300, Gate::Ask)
+        else {
             panic!("the asked player allowed");
         };
         assert_eq!((party.slot, party.milliseconds), (5, 30_000));
         assert_eq!(
-            consent.hear(5, "Tox", ALLOW, 1400, Gate::Ask),
+            consent.hear(5, "kTox", "Tox", ALLOW, 1400, Gate::Ask),
             None,
             "answered once"
         );
         consent.ask(5, "Tox".into(), 30_000, 2000);
         assert!(matches!(
-            consent.hear(5, "Tox", DENY, 2100, Gate::Ask),
+            consent.hear(5, "kTox", "Tox", DENY, 2100, Gate::Ask),
             Some(Heard::Denied(_))
         ));
         consent.ask(5, "Tox".into(), 30_000, 3000);
@@ -405,23 +409,25 @@ mod tests {
     #[test]
     fn an_end_from_the_watcher_or_asker_puts_them_away() {
         let mut consent = Consent::default();
-        consent.hear(3, "Tox", "request_5000", 1000, Gate::Ask);
-        let Some(Heard::Ended { slot: 3, watcher }) = consent.hear(3, "Tox", END, 1100, Gate::Ask)
+        consent.hear(3, "kTox", "Tox", "request_5000", 1000, Gate::Ask);
+        let Some(Heard::Ended { slot: 3, watcher }) =
+            consent.hear(3, "kTox", "Tox", END, 1100, Gate::Ask)
         else {
             panic!("ended");
         };
         assert_eq!(watcher.unwrap().slot, 3, "the request was called off");
         // Calling it off was a strike: the next request is heard after the quiet minute.
-        consent.hear(3, "Tox", "request_5000", 70_000, Gate::Ask);
+        consent.hear(3, "kTox", "Tox", "request_5000", 70_000, Gate::Ask);
         consent.answer(true, 70_100);
-        let Some(Heard::Ended { watcher, .. }) = consent.hear(3, "Tox", END, 71_000, Gate::Ask)
+        let Some(Heard::Ended { watcher, .. }) =
+            consent.hear(3, "kTox", "Tox", END, 71_000, Gate::Ask)
         else {
             panic!("ended");
         };
         assert!(watcher.is_some() && consent.watcher.is_none());
         // An end from someone else touches nothing here; the caller checks its peek.
         assert_eq!(
-            consent.hear(9, "Sol", END, 71_100, Gate::Ask),
+            consent.hear(9, "kSol", "Sol", END, 71_100, Gate::Ask),
             Some(Heard::Ended {
                 slot: 9,
                 watcher: None
@@ -433,30 +439,30 @@ mod tests {
     fn refused_and_ignored_requests_show_nothing() {
         let mut consent = Consent::default();
         assert_eq!(
-            consent.hear(3, "Tox", "request_5000", 0, Gate::Refuse),
+            consent.hear(3, "kTox", "Tox", "request_5000", 0, Gate::Refuse),
             Some(Heard::Refused)
         );
         // A refusal is sent once in the wait, however often they ask.
         assert_eq!(
-            consent.hear(3, "Tox", "request_5000", 500, Gate::Refuse),
+            consent.hear(3, "kTox", "Tox", "request_5000", 500, Gate::Refuse),
             None
         );
         assert_eq!(
-            consent.hear(4, "Sol", "request_5000", 0, Gate::Ignore),
+            consent.hear(4, "kSol", "Sol", "request_5000", 0, Gate::Ignore),
             None
         );
         assert!(consent.request.is_none());
         // Asking again within the wait starts it again.
         assert_eq!(
-            consent.hear(4, "Sol", "request_5000", 9_000, Gate::Ask),
+            consent.hear(4, "kSol", "Sol", "request_5000", 9_000, Gate::Ask),
             None
         );
         assert_eq!(
-            consent.hear(4, "Sol", "request_5000", 18_000, Gate::Ask),
+            consent.hear(4, "kSol", "Sol", "request_5000", 18_000, Gate::Ask),
             None
         );
         assert_eq!(
-            consent.hear(4, "Sol", "request_5000", 28_001, Gate::Ask),
+            consent.hear(4, "kSol", "Sol", "request_5000", 28_001, Gate::Ask),
             Some(Heard::Request)
         );
     }
@@ -464,8 +470,9 @@ mod tests {
     #[test]
     fn strikes_keep_a_sender_quiet_longer_each_time() {
         let mut consent = Consent::default();
-        let ask =
-            |consent: &mut Consent, now| consent.hear(3, "Tox", "request_5000", now, Gate::Ask);
+        let ask = |consent: &mut Consent, now| {
+            consent.hear(3, "kTox", "Tox", "request_5000", now, Gate::Ask)
+        };
         assert_eq!(ask(&mut consent, 0), Some(Heard::Request));
         consent.answer(false, 1000);
         // Quiet for a minute after the first no, even past the repeat wait.
@@ -487,42 +494,51 @@ mod tests {
     #[test]
     fn a_called_off_request_is_a_strike() {
         let mut consent = Consent::default();
-        consent.hear(3, "Tox", "request_5000", 0, Gate::Ask);
-        consent.hear(3, "Tox", END, 500, Gate::Ask);
+        consent.hear(3, "kTox", "Tox", "request_5000", 0, Gate::Ask);
+        consent.hear(3, "kTox", "Tox", END, 500, Gate::Ask);
         assert_eq!(
-            consent.hear(3, "Tox", "request_5000", 20_000, Gate::Ask),
+            consent.hear(3, "kTox", "Tox", "request_5000", 20_000, Gate::Ask),
             None
         );
         assert_eq!(
-            consent.hear(3, "Tox", "request_5000", 61_000, Gate::Ask),
+            consent.hear(3, "kTox", "Tox", "request_5000", 61_000, Gate::Ask),
             Some(Heard::Request)
         );
     }
 
     #[test]
-    fn at_most_three_cards_a_minute_from_everyone() {
+    fn at_most_three_cards_in_five_minutes_from_everyone() {
         let mut consent = Consent::default();
-        for (slot, now) in [(1, 0), (2, 1000), (3, 2000)] {
+        for (slot, key, now) in [(1, "k1", 0), (2, "k2", 1000), (3, "k3", 2000)] {
             assert_eq!(
-                consent.hear(slot, "P", "request_5000", now, Gate::Ask),
+                consent.hear(slot, key, "P", "request_5000", now, Gate::Ask),
                 Some(Heard::Request)
             );
             consent.request = None;
         }
-        assert_eq!(consent.hear(4, "P", "request_5000", 3000, Gate::Ask), None);
         assert_eq!(
-            consent.hear(5, "P", "request_5000", 60_001, Gate::Ask),
+            consent.hear(4, "k4", "P", "request_5000", 200_000, Gate::Ask),
+            None
+        );
+        assert_eq!(
+            consent.hear(5, "k5", "P", "request_5000", 300_001, Gate::Ask),
             Some(Heard::Request)
         );
     }
 
     #[test]
-    fn a_new_player_in_the_slot_starts_afresh() {
+    fn a_new_name_or_slot_does_not_start_afresh() {
         let mut consent = Consent::default();
-        consent.hear(3, "Tox", "request_5000", 0, Gate::Ask);
+        consent.hear(3, "kTox", "Tox", "request_5000", 0, Gate::Ask);
         consent.answer(false, 100);
+        // The same key under another name, in another slot: still quiet.
         assert_eq!(
-            consent.hear(3, "Sol", "request_5000", 1000, Gate::Ask),
+            consent.hear(7, "kTox", "Toxic", "request_5000", 20_000, Gate::Ask),
+            None
+        );
+        // Another key in the old slot is somebody else.
+        assert_eq!(
+            consent.hear(3, "kSol", "Sol", "request_5000", 21_000, Gate::Ask),
             Some(Heard::Request)
         );
     }
@@ -531,7 +547,7 @@ mod tests {
     fn the_asker_waits_before_asking_again_after_a_no() {
         let mut consent = Consent::default();
         consent.ask(5, "Tox".into(), 5000, 0);
-        consent.hear(5, "Tox", DENY, 1000, Gate::Ask);
+        consent.hear(5, "kTox", "Tox", DENY, 1000, Gate::Ask);
         assert_eq!(consent.retry_in(5, 11_000), Some(20_000));
         assert_eq!(consent.retry_in(6, 11_000), None);
         consent.expire(31_000);
@@ -545,7 +561,7 @@ mod tests {
     fn parties_leave_with_their_slot_name() {
         let mut consent = Consent::default();
         consent.ask(5, "Tox".into(), 5000, 0);
-        consent.hear(3, "Sol", "request_5000", 0, Gate::Ask);
+        consent.hear(3, "kSol", "Sol", "request_5000", 0, Gate::Ask);
         consent.keep_present(|slot, name| slot == 3 && name == "Sol");
         assert!(consent.asking.is_none());
         assert!(consent.request.is_some());

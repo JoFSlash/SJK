@@ -2366,7 +2366,9 @@ asked first. Their client shows the peek card at the top centre of play: "Name w
 to watch you", the length and the seconds left to answer, with Allow (gold) and Deny.
 Insert allows and Delete denies while those keys are bound to nothing else; Escape
 opens the game menu as always, and the card stays over it, at the top, so its buttons
-take a click. In play the card takes no click: a held pointer still reports where the
+take a click; Block there (or `peek_block`, bindable as Block who asks to peek) answers
+no and [blocks](hub-chat.md#blocking-a-player) the sender on this PC by their SJK key.
+In play the card takes no click: a held pointer still reports where the
 cursor was last, so an attack there could otherwise answer. A request not answered in 15 seconds lapses. Allowed, the watcher's
 camera starts and the watched player's card says "Name is watching you" with the
 seconds left; refused or unanswered, the console tells the asker. While a peek runs,
@@ -2375,12 +2377,13 @@ camera, the watched player ends the peek on the watcher's screen. A bare `/peek`
 during the own peek or question stops it, so the peek bind toggles. `peek_allow`,
 `peek_deny` and `peek off` are bindable under Other (Allow a peek request, Deny a
 peek request, Stop peek). One request is shown at a time and nobody else is heard while
-someone watches. Against a card popping up over and over: a sender's request counts
-only 10 seconds after their last one, heard or not; one denied, unanswered or called
-off keeps their next ones unseen for a minute, twice as long each time up to 10
-minutes (an allow resets it, 10 quiet minutes forget it, and another player in the
-slot starts afresh); and at most 3 request cards show in a minute, from everyone
-together. The asker's client waits 30 seconds before asking a player who said no or
+someone watches. Against a card popping up over and over, senders are told apart by
+their SJK key, so a new name or slot does not start them afresh: a sender's request
+counts only 10 seconds after their last one, heard or not; one denied, unanswered or
+called off keeps their next ones unseen for a minute, twice as long each time up to
+10 minutes (an allow resets it, 10 quiet minutes forget it); and at most 3 request
+cards show in 5 minutes, from everyone together, so players taking turns get no
+further. The asker's client waits 30 seconds before asking a player who said no or
 did not answer again. A [blocked](hub-chat.md#blocking-a-player)
 player's requests go unseen and lapse, blocking the player who watches ends their
 peek, and a blocked player cannot be peeked. A block cannot stop a player who peeks

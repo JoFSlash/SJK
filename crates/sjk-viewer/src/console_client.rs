@@ -230,6 +230,10 @@ pub(super) const COMMANDS: &[(&str, &str)] = &[
         "Do not let the player who asks watch you (peek)",
     ),
     (
+        "peek_block",
+        "Deny the peek request and block the player who asks",
+    ),
+    (
         "fakenoclip",
         "Fly locally while the server sees you standing still (toggle)",
     ),
@@ -1214,6 +1218,7 @@ impl crate::GpuState {
             "peek" => return self.peek_command(args),
             "peek_allow" => return Ok(self.answer_peek(true)),
             "peek_deny" => return Ok(self.answer_peek(false)),
+            "peek_block" => return Ok(self.block_peek_requester()),
             "cosmetics" => return self.cosmetics_command(args),
             crate::saber_colour_command::COMMAND => return self.saber_colour_command(args),
             crate::saber_hilt_command::COMMAND => return self.saber_hilt_command(args),

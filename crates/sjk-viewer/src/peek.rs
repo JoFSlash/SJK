@@ -314,6 +314,25 @@ impl GpuState {
         }]
     }
 
+    /// Answer the request on show no and block its sender on this PC
+    /// (`docs/hub-chat.md`, "Blocking a player"), by their SJK key.
+    pub(crate) fn block_peek_requester(&mut self) -> Vec<String> {
+        let Some(session) = self.live_session.as_ref() else {
+            return Vec::new();
+        };
+        let now = i64::from(session.latest_snapshot().server_time);
+        let Some((event, sender)) = self.peek.consent.answer(false, now) else {
+            return vec!["peek: nobody asks to watch you".to_owned()];
+        };
+        crate::player_identity::toy_event(peek_consent::TOY, event, sender.slot as u8);
+        let key = (!sender.key.is_empty()).then_some(sender.key.as_str());
+        crate::player_mutes::set_muted(key, &sender.name, true);
+        vec![format!(
+            "peek: {}^7 is blocked on this PC and cannot ask again (unblock to undo)",
+            sender.name
+        )]
+    }
+
     /// The frame's peek questions: the hub's events for this server (`events`), the
     /// answers waited for and the watcher's time.
     pub(crate) fn update_peek(&mut self, events: &[sjk_identity::ToyEvent]) {
@@ -354,7 +373,9 @@ impl GpuState {
             };
             let sender = u16::from(event.slot);
             // A muted player's requests go unseen; with requests off, each is refused.
-            let gate = if muted.contains(usize::from(event.slot)) {
+            let blocked = muted.contains(usize::from(event.slot))
+                || crate::player_mutes::is_muted(Some(&event.key_id), &shown);
+            let gate = if blocked {
                 Gate::Ignore
             } else if takes_requests {
                 Gate::Ask
@@ -364,7 +385,7 @@ impl GpuState {
             match self
                 .peek
                 .consent
-                .hear(sender, &shown, &event.event, now, gate)
+                .hear(sender, &event.key_id, &shown, &event.event, now, gate)
             {
                 Some(Heard::Refused) => {
                     crate::player_identity::toy_event(
@@ -476,6 +497,7 @@ impl GpuState {
                 self.answer_peek(true)
             }
             Some(crate::peek_card::Choice::Allow) => return,
+            Some(crate::peek_card::Choice::Block) => self.block_peek_requester(),
             Some(crate::peek_card::Choice::Deny) if self.peek.consent.request.is_some() => {
                 self.answer_peek(false)
             }
