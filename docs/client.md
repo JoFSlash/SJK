@@ -2375,8 +2375,13 @@ camera, the watched player ends the peek on the watcher's screen. A bare `/peek`
 during the own peek or question stops it, so the peek bind toggles. `peek_allow`,
 `peek_deny` and `peek off` are bindable under Other (Allow a peek request, Deny a
 peek request, Stop peek). One request is shown at a time and nobody else is heard while
-someone watches; a sender's request counts only 10 seconds after their last one, heard
-or not, so asking over and over is never heard. A [blocked](hub-chat.md#blocking-a-player)
+someone watches. Against a card popping up over and over: a sender's request counts
+only 10 seconds after their last one, heard or not; one denied, unanswered or called
+off keeps their next ones unseen for a minute, twice as long each time up to 10
+minutes (an allow resets it, 10 quiet minutes forget it, and another player in the
+slot starts afresh); and at most 3 request cards show in a minute, from everyone
+together. The asker's client waits 30 seconds before asking a player who said no or
+did not answer again. A [blocked](hub-chat.md#blocking-a-player)
 player's requests go unseen and lapse, blocking the player who watches ends their
 peek, and a blocked player cannot be peeked. A block cannot stop a player who peeks
 without asking (a stock client, an older SJK build, or one the hub does not know). Settings > Chat > Peek requests

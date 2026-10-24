@@ -205,6 +205,12 @@ impl GpuState {
             if self.peek.consent.asking.is_some() {
                 return Err("peek: still waiting for an answer; peek off cancels".into());
             }
+            if let Some(wait) = self.peek.consent.retry_in(client, now) {
+                return Err(format!(
+                    "peek: {shown}^7 said no or did not answer; ask again in {}s",
+                    (wait + 999) / 1000
+                ));
+            }
             if !crate::player_identity::toy_event(
                 peek_consent::TOY,
                 &peek_consent::request_event(milliseconds),
