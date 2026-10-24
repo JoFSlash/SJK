@@ -1299,7 +1299,7 @@ The view model follows EternalJK's `cg_fovViewmodel` (default 80; retail has no 
 cvar and behaves as 0): the hand's forward axis is scaled so the weapon looks as at
 that FOV, and the gun, barrels and muzzle socket go through the same transform
 ([view_weapon_offsets.rs](../crates/sjk-viewer/src/view_weapon_offsets.rs)). Details and
-limits are in [status.md](status.md#first-person-weapon-field-of-view).
+limits are in [status.md](history/status-2026.md#first-person-weapon-field-of-view).
 
 ### Zoom, scope and camera shakes
 
@@ -1380,7 +1380,7 @@ dynamic-glow image and emit no blade light. The renderer resolves installed
 or generates black alpha coverage from its neutral profiles. Its smooth
 capsule presentation and generated fallback are not a claim of pixel parity
 with EJK's sprite chain or community textures. See
-[status](status.md#ja-black-sabers) for verification and limits.
+[status](history/status-2026.md#ja-black-sabers) for verification and limits.
 
 ## First-person saber body
 
@@ -3445,7 +3445,7 @@ When sun and sky, light shafts and both sun shadows are off (the Vanilla style a
 SJK (recommended) presets; before 16/10/2026 the Performance and Vanilla levels), a map loads without extracting its lamps (`Lamps: none` in the
 log): no pass reads them there, the shadow runtime is never installed and the
 world shows its lightmaps. Lamp extraction, its grid and refinement took about
-4.5 s of `JoFTemple`'s load on 09/10/2026 (see [status](status.md#joftemple-frame-rate-and-ultra-low)).
+4.5 s of `JoFTemple`'s load on 09/10/2026 (see [status](history/status-2026.md#joftemple-frame-rate-and-ultra-low)).
 
 Saved values take precedence, including explicitly disabled effects. The client
 saves every archived setting, so a `config.cfg` written before a default changed

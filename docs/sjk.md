@@ -57,14 +57,14 @@ migrated, except where the table says so. Where each is documented:
 | `ui_gameFont` | on | [UI ownership](rendering.md#ui-ownership) |
 | `cg_scoreboardStyle` | `auto` (SJK UI's with its menus, else `classic`), saved `modern` reset | [Scoreboard styles](client.md#scoreboard-styles) |
 | `cg_compactScoreboard` | on (SJK UI's scoreboard in one column, as wide as its names, centred) | [SJK UI scoreboard](sjk-ui.md#scoreboard) |
-| `cg_drawTimer` | on | [status.md](status.md#gameplay-and-interface-defaults) |
+| `cg_drawTimer` | on | [status.md](history/status-2026.md#gameplay-and-interface-defaults) |
 | `cg_teamOutline` | on (red rings on enemies, green on teammates, in team games) | [Team outlines and logos](client.md#team-outlines-and-logos) |
 | `cg_killfeed` | on, saved 0 moved to 1 once | [Kill feed](client.md#kill-feed) |
 | `cg_hitMarker` | off (red damage-direction indicator) | [Client](client.md#launch) |
 | `cg_shieldBrightness` | 2 passes, old defaults 1 and 4 moved to 2 once | [Client](client.md#launch) |
 | `cg_duelGhost` | on: duellists as JoF EJK's blue figures (off: dark under the bubble) | [Rendering](rendering.md#entity-render-effects) |
 | `cg_dismember` | 2 | [Dismemberment](client.md#dismemberment-and-disintegration) |
-| `snaps` | 120 (slider to 125) | [status.md](status.md#gameplay-and-interface-defaults) |
+| `snaps` | 120 (slider to 125) | [status.md](history/status-2026.md#gameplay-and-interface-defaults) |
 | `com_maxfpsUnfocused` | 30 | [Configuration](client.md#configuration-and-content) |
 | `com_maxfpsMonitor` | off (`com_maxfps` AUTO caps at 125, the monitor's rate unread) | [Configuration](client.md#configuration-and-content) |
 | `cl_maxpackets` | 125 | [User commands and move packets](networking.md#user-commands-and-move-packets) |

@@ -228,7 +228,7 @@ Add a screen to the test when building a page.
 - Layout and token tests, and a look at it in the menu snapshots; no game window
   is opened to verify it.
 - [client.md](client.md#menu-style) describes what the page shows,
-  [status.md](status.md) records the verification, the `debug_panel` list says
+  the change description records the verification, the `debug_panel` list says
   how to test it, and [CREDITS.md](../CREDITS.md) names notable work.
 
 ## Pages

@@ -955,7 +955,7 @@ priority over the server's blade colour. Installed community black glow/core/
 trail images are used when available; otherwise SJK generates black alpha
 profiles locally. No extra content download is required. See
 [rendering](rendering.md#ja-black-sabers) and
-[verification](status.md#ja-black-sabers).
+[verification](history/status-2026.md#ja-black-sabers).
 
 ## EternalJK animation fixes
 
@@ -979,7 +979,7 @@ poses pass through unchanged.
 The change is visual: simulation, prediction inputs, attack timers and protocol
 26 remain unchanged. Source choices follow [JoF EJK #47](https://github.com/JediofFreedom/JoF_EJK/pull/47).
 Live appearance with installed animations remains unverified; see
-[status](status.md#tavion-and-desann-idle-poses).
+[status](history/status-2026.md#tavion-and-desann-idle-poses).
 
 ## Wall grab facing
 
@@ -1352,7 +1352,7 @@ including EJK #87's later attribution/channel correction. All variants are
 preloaded/registered before frame playback; choosing them does not read or
 decode sound assets during a frame. See [rendering](rendering.md) for the
 existing pack, flame and visibility behavior, and
-[status](status.md#jof-ejk-jetpack-sound-choices) for verification limits.
+[status](history/status-2026.md#jof-ejk-jetpack-sound-choices) for verification limits.
 
 ## Saber ignition and retraction sounds
 
@@ -1692,7 +1692,7 @@ The console notices say so: `HDR setting changed: reload the graphics to apply
 SJK's real-time lighting (lamps, sun, sky light, shadows, light shafts) is most of
 what a heavy map costs: on `JoFTemple` at 4K it was 5.6 of the frame's 8.1 ms before
 its floor fix, and turning its parts off one at a time barely changed it
-([status](status.md#joftemple-frame-rate-and-ultra-low)). Vanilla graphics (EJK
+([status](history/status-2026.md#joftemple-frame-rate-and-ultra-low)). Vanilla graphics (EJK
 graphics until 12/10/2026) turn it off as
 a whole. The low-FPS help
 ([fps_help.rs](../crates/sjk-viewer/src/fps_help.rs)) offers them when it matters:
@@ -3688,7 +3688,7 @@ vectors, with finite values bounded to +/-3600; invalid vectors use defaults:
 
 These are client presentation options; they change no gameplay, wire format
 or animation timing. See [rendering](rendering.md#holstered-saber-hilts) for
-attachment ownership and [status](status.md#holstered-saber-hilts) for limits.
+attachment ownership and [status](history/status-2026.md#holstered-saber-hilts) for limits.
 
 ## Blade skins
 
