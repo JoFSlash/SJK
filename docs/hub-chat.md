@@ -1088,7 +1088,8 @@ timer in its snapshots' server time, so nothing says when a peek is over. A read
 takes them, like the others, only when the game shows the sender's claimed name in
 their slot, and only those addressed to its own slot. Both sides are within the hub's
 quota (one toy event a second); an `end` sent in the same second as another event can
-be refused, and then the other side's timer ends it.
+be refused, and then the other side's timer ends it. These events are not encrypted:
+the hub sees who asked to watch whom, the answer and when either stopped.
 
 ## Toy relay
 

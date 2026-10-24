@@ -1199,6 +1199,11 @@ pub(super) const NETWORK: &[Setting] = &[
         kind: ValueKind::Bool,
     },
     Setting {
+        label: "Peek requests",
+        cvar: crate::peek_consent::CVAR,
+        kind: ValueKind::Bool,
+    },
+    Setting {
         label: "Send crash reports",
         cvar: crate::crash_report::CVAR,
         kind: ValueKind::Bool,

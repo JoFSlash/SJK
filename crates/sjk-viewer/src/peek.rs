@@ -2,7 +2,7 @@
 //! and CG_CalcViewValues. Only players in the received snapshot are available.
 //! A player who runs SJK online is asked first and sees who watches them
 //! (`peek_consent.rs`); either side can stop with the peek card (`peek_card.rs`).
-use crate::peek_consent::{self, Consent, Heard};
+use crate::peek_consent::{self, Consent, Gate, Heard};
 use crate::{GpuState, movement_collision};
 use glam::Vec3;
 use sjk_protocol::GameState;
@@ -107,6 +107,17 @@ fn duration(text: Option<&str>) -> Result<i64, String> {
     Ok((seconds.clamp(0., 60.) * 1000.) as i64)
 }
 
+/// Whether the own identity is on and registered at the SJK hub, so a peek's target can
+/// be asked and its events heard.
+fn on_hub(state: &GpuState) -> bool {
+    state
+        .console
+        .as_ref()
+        .and_then(|console| console.bool_cvar("cl_identity"))
+        == Some(true)
+        && crate::player_identity::with_snapshot(|snapshot| snapshot.me.is_some()) == Some(true)
+}
+
 /// Flight cancels monitoring even before the requested free-camera mode is synced.
 fn local_flight(state: &GpuState) -> bool {
     state.local_prediction.fake_noclip()
@@ -174,7 +185,13 @@ impl GpuState {
         let server = session.server();
         let now = i64::from(snapshot.server_time);
         let seconds = milliseconds as f64 / 1000.;
-        // An SJK player on the hub is asked first; a stock client cannot be.
+        // An SJK player on the hub is asked first; a stock client cannot be. Without the
+        // own identity on the hub nobody could be told, so a server peek waits for it.
+        if !session.is_local() && !on_hub(self) {
+            return Err(
+                "peek: turn on your SJK identity (cl_identity 1) so the player can be asked".into(),
+            );
+        }
         let shown = crate::player_identity::shown_name(game, usize::from(client));
         let askable = !session.is_local()
             && shown.as_deref().is_some_and(|shown| {
@@ -211,7 +228,7 @@ impl GpuState {
             asked: false,
         });
         Ok(vec![format!(
-            "peek: watching client {client} for {seconds:.1}s (they do not run SJK online, so \
+            "peek: watching client {client} for {seconds:.1}s (the SJK hub does not know them, so \
              they cannot be asked); Del or /peek off returns"
         )])
     }
@@ -306,6 +323,12 @@ impl GpuState {
         let game = session.game_state();
         let now = i64::from(session.latest_snapshot().server_time);
         let own = u8::try_from(game.client_num).ok();
+        let takes_requests = self
+            .console
+            .as_ref()
+            .and_then(|console| console.bool_cvar(peek_consent::CVAR))
+            != Some(false);
+        let muted = self.muted_players.slots();
         let mut lines = Vec::new();
         for event in events {
             if event.toy != peek_consent::TOY
@@ -321,7 +344,26 @@ impl GpuState {
                 continue;
             };
             let sender = u16::from(event.slot);
-            match self.peek.consent.hear(sender, &shown, &event.event, now) {
+            // A muted player's requests go unseen; with requests off, each is refused.
+            let gate = if muted.contains(usize::from(event.slot)) {
+                Gate::Ignore
+            } else if takes_requests {
+                Gate::Ask
+            } else {
+                Gate::Refuse
+            };
+            match self
+                .peek
+                .consent
+                .hear(sender, &shown, &event.event, now, gate)
+            {
+                Some(Heard::Refused) => {
+                    crate::player_identity::toy_event(
+                        peek_consent::TOY,
+                        peek_consent::DENY,
+                        event.slot,
+                    );
+                }
                 Some(Heard::Request) => {
                     let request = self.peek.consent.request.as_ref().expect("just heard");
                     lines.push(format!(

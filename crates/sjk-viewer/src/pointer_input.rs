@@ -359,8 +359,11 @@ impl GpuState {
         if self.update_card_pointer(event) {
             return true;
         }
-        // The peek card's buttons, over play or the game menu.
-        if let Some(choice) = self.peek.card.handle_pointer(event) {
+        // The peek card's buttons, only over the game menu: in play a click (an attack
+        // while the pointer is held) lands where the cursor was last, and must not answer.
+        if self.game_menu
+            && let Some(choice) = self.peek.card.handle_pointer(event)
+        {
             self.peek_card_choice(Some(choice));
             return true;
         }

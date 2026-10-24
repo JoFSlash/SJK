@@ -1009,6 +1009,12 @@ pub(super) fn register_daily_cvars(cvars: &mut CvarRegistry) -> Result<(), sjk_s
             "Whisper other SJK players end-to-end encrypted through the SJK hub: only the two of you can read it (0 sends every whisper through the game server)",
         ),
         CvarDefinition::new(
+            crate::peek_consent::CVAR,
+            true,
+            archive,
+            "Let other SJK players ask to watch you with peek (0 answers every request no at once, without showing it)",
+        ),
+        CvarDefinition::new(
             crate::chat_gifs::search::KEY_CVAR,
             "",
             archive,

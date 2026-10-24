@@ -7281,6 +7281,13 @@ run. Not checked in game: the card's look and place over play and the game menu,
 clicks, and two SJK clients through the hub. Stock clients are still watched without
 asking.
 
+Security review follow-up: the card takes clicks only over the game menu (a held
+pointer's stale position could otherwise turn an attack into Allow); a server peek
+needs the own identity on the hub; muted players' requests are ignored, repeated
+requests restart the 10-second wait, and `cl_peekRequests 0` (Settings > Chat) refuses
+all. Unit tests cover the request gate; not built or tested after these changes at the
+time of writing.
+
 ## Centre-print line breaks
 
 Branch `fix/center-print-space-break`: centre-print rows break only at a space, as

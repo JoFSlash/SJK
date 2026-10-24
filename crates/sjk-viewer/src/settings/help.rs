@@ -905,6 +905,10 @@ const HELP: &[(&str, &str)] = &[
         "Whispers to SJK players go end-to-end encrypted through the SJK hub: only you two can read them. Off sends them through the server.",
     ),
     (
+        crate::peek_consent::CVAR,
+        "Other SJK players may ask to watch your view with peek; you allow or deny each. Off says no to every request without showing it.",
+    ),
+    (
         super::catalog::IDENTITY_ROW,
         "Your SJK key: switch it on, back it up, copy its id. Enter opens it; the key stays hidden until Show.",
     ),

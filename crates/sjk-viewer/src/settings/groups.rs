@@ -100,6 +100,7 @@ const CHAT_ROWS: &[&str] = &[
     crate::chat::client_icons::CVAR,
     crate::chat_gifs::search::KEY_CVAR,
     crate::e2e_whispers::CVAR,
+    crate::peek_consent::CVAR,
 ];
 
 /// The rows Mods gathers from the classic Game options.

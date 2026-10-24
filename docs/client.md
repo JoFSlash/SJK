@@ -2366,18 +2366,26 @@ asked first. Their client shows the peek card at the top centre of play: "Name w
 to watch you", the length and the seconds left to answer, with Allow (gold) and Deny.
 Insert allows and Delete denies while those keys are bound to nothing else; Escape
 opens the game menu as always, and the card stays over it, at the top, so its buttons
-take a click. A request not answered in 15 seconds lapses. Allowed, the watcher's
+take a click. In play the card takes no click: a held pointer still reports where the
+cursor was last, so an attack there could otherwise answer. A request not answered in 15 seconds lapses. Allowed, the watcher's
 camera starts and the watched player's card says "Name is watching you" with the
 seconds left; refused or unanswered, the console tells the asker. While a peek runs,
 both cards carry Stop (Delete, a click, or `/peek off`): the watcher returns to their
 camera, the watched player ends the peek on the watcher's screen. A bare `/peek`
 during the own peek or question stops it, so the peek bind toggles. `peek_allow`,
 `peek_deny` and `peek off` are bindable under Other (Allow a peek request, Deny a
-peek request, Stop peek). One request is shown at a time and a player watches nobody
-else while someone watches them; a sender's new request counts 10 seconds after the
-last. Players on stock clients, older SJK builds and anyone the hub does not know
-cannot be asked: they are watched as before and the console says so (an older SJK
-build does not answer, so its request lapses). The question rides the hub's
+peek request, Stop peek). One request is shown at a time and nobody else is heard while
+someone watches; a sender's request counts only 10 seconds after their last one, heard
+or not, so asking over and over is never heard. A [muted](hub-chat.md#muting-a-player)
+player's requests go unseen and lapse. Settings > Chat > Peek requests
+(`cl_peekRequests`, on by default) off answers every request no at once, without
+showing it. On a server, peek needs the own identity on and registered
+(`cl_identity 1`): without it nobody could be asked, and the console says so. Players
+on stock clients, older SJK builds and anyone the hub does not know cannot be asked:
+they are watched as before and the console says so (an older SJK build does not
+answer, so its request lapses). The question is a courtesy, not privacy: every client
+already receives the player's position and moves, and a modified client can watch
+without asking. The question rides the hub's
 [toy events](hub-chat.md#toy-events); see [peek_consent.rs](../crates/sjk-viewer/src/peek_consent.rs)
 and [peek_card.rs](../crates/sjk-viewer/src/peek_card.rs).
 
