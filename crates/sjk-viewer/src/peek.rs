@@ -407,6 +407,20 @@ impl GpuState {
                 None => {}
             }
         }
+        // Blocking the watcher ends their peek.
+        if let Some(watcher) = self
+            .peek
+            .consent
+            .watcher
+            .take_if(|watcher| muted.contains(usize::from(watcher.slot)))
+        {
+            crate::player_identity::toy_event(
+                peek_consent::TOY,
+                peek_consent::END,
+                watcher.slot as u8,
+            );
+            lines.push(format!("peek: {}^7 no longer watches you", watcher.name));
+        }
         if let Some(asked) = self.peek.consent.expire(now) {
             lines.push(format!("peek: {}^7 did not answer", asked.name));
         }

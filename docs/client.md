@@ -2376,8 +2376,9 @@ during the own peek or question stops it, so the peek bind toggles. `peek_allow`
 `peek_deny` and `peek off` are bindable under Other (Allow a peek request, Deny a
 peek request, Stop peek). One request is shown at a time and nobody else is heard while
 someone watches; a sender's request counts only 10 seconds after their last one, heard
-or not, so asking over and over is never heard. A [muted](hub-chat.md#muting-a-player)
-player's requests go unseen and lapse. Settings > Chat > Peek requests
+or not, so asking over and over is never heard. A [blocked](hub-chat.md#blocking-a-player)
+player's requests go unseen and lapse, and blocking the player who watches ends their
+peek. Settings > Chat > Peek requests
 (`cl_peekRequests`, on by default) off answers every request no at once, without
 showing it. On a server, peek needs the own identity on and registered
 (`cl_identity 1`): without it nobody could be asked, and the console says so. Players

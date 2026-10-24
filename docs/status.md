@@ -7283,7 +7283,8 @@ asking.
 
 Security review follow-up: the card takes clicks only over the game menu (a held
 pointer's stale position could otherwise turn an attack into Allow); a server peek
-needs the own identity on the hub; muted players' requests are ignored, repeated
+needs the own identity on the hub; blocked players' requests are ignored (and a
+block ends their running peek), repeated
 requests restart the 10-second wait, and `cl_peekRequests 0` (Settings > Chat) refuses
 all. Unit tests cover the request gate; not built or tested after these changes at the
 time of writing.
