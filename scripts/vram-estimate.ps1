@@ -46,6 +46,14 @@ function Normalize([string]$name) {
     $name.Replace('\', '/').Trim('"').ToLowerInvariant()
 }
 
+# Only an image extension: "skin.v2" keeps its ".v2".
+function Strip-ImageExtension([string]$name) {
+    foreach ($ext in 'tga', 'png', 'jpg', 'jpeg') {
+        if ($name.EndsWith(".$ext")) { return $name.Substring(0, $name.Length - $ext.Length - 1) }
+    }
+    $name
+}
+
 function Strip-Extension([string]$name) {
     $dot = $name.LastIndexOf('.')
     $slash = $name.LastIndexOf('/')
@@ -137,7 +145,7 @@ try {
                 $lineDone = $true
                 if ($depth -eq 0) {
                     $current = New-Object System.Collections.Generic.List[string]
-                    $shaders[(Strip-Extension (Normalize $token))] = $current
+                    $shaders[(Strip-ImageExtension (Normalize $token))] = $current
                     continue
                 }
                 if ($null -eq $current) { continue }
@@ -204,7 +212,9 @@ try {
     }
 
     function Find-Image([string]$name) {
-        $found = $images[(Strip-Extension $name)]
+        # As named first ("skin.v2" may be the whole name), then without its extension.
+        $found = $images[$name]
+        if (-not $found) { $found = $images[(Strip-Extension $name)] }
         if (-not $found) { return $null }
         foreach ($ext in $ImageExtensions) { if ($found.ContainsKey($ext)) { return $found[$ext] } }
         $null
@@ -239,14 +249,18 @@ try {
         $used = New-Object 'System.Collections.Generic.HashSet[string]'
         for ($at = $offset; $at + 72 -le $offset + $length; $at += 72) {
             $name = [System.Text.Encoding]::ASCII.GetString($bsp, $at, 64).Split([char]0)[0]
-            $name = Strip-Extension (Normalize $name)
+            $name = Normalize $name
             if (-not $name -or $name -eq 'noshader') { continue }
             if ($shaders.ContainsKey($name)) {
                 foreach ($image in $shaders[$name]) {
-                    if (-not $image.StartsWith('$') -and -not $image.StartsWith('*')) { [void]$used.Add((Strip-Extension $image)) }
+                    if (-not $image.StartsWith('$') -and -not $image.StartsWith('*')) { [void]$used.Add((Strip-ImageExtension $image)) }
+                }
+            } elseif ($shaders.ContainsKey((Strip-ImageExtension $name))) {
+                foreach ($image in $shaders[(Strip-ImageExtension $name)]) {
+                    if (-not $image.StartsWith('$') -and -not $image.StartsWith('*')) { [void]$used.Add((Strip-ImageExtension $image)) }
                 }
             } else {
-                [void]$used.Add($name)
+                [void]$used.Add((Strip-ImageExtension $name))
             }
         }
         $sum = @(0, 0, 0); [int64]$compressed = 0; [int64]$material = 0
