@@ -198,6 +198,8 @@ def main():
     # declare (sjk and sjk-server).
     parser.add_argument("--client-bin")
     parser.add_argument("--server-bin")
+    parser.add_argument("--cargo-profile", default="release",
+                        help="Cargo profile the executables were built with")
     args = parser.parse_args()
     source, output = args.source.resolve(), args.output.resolve()
     args.client_bin = args.client_bin or bin_name(source, "sjk-viewer")
@@ -209,7 +211,7 @@ def main():
     stem = f"{args.name}-{args.version or revision[:7]}"
     package = output / f"{stem}-{args.platform}.zip"
     suffix = ".exe" if args.platform == "windows-x64" else ""
-    binaries = [source / "target" / args.target / "release" / (name + suffix)
+    binaries = [source / "target" / args.target / args.cargo_profile / (name + suffix)
                 for name in (args.client_bin, args.server_bin)]
     with zipfile.ZipFile(package, "w", zipfile.ZIP_DEFLATED, compresslevel=9) as archive:
         for binary in binaries:
@@ -233,7 +235,7 @@ def main():
     manifest.write_text(json.dumps({
         "revision": revision, "target": args.target,
         "rustc": command(source, "rustc", "--version"),
-        "profile": "release", "rustflags": os.environ.get("RUSTFLAGS", ""),
+        "profile": args.cargo_profile, "rustflags": os.environ.get("RUSTFLAGS", ""),
         "binaries": {p.name: hashlib.sha256(p.read_bytes()).hexdigest() for p in binaries},
     }, indent=2) + "\n", encoding="utf-8")
     if args.smoke_check:

@@ -72,6 +72,14 @@ serde = { version = "1.0.219", features = ["derive"] }
 serde_json = "1.0.143"
 zip = { version = "8.2.0", default-features = false, features = ["deflate-flate2-zlib-rs"] }
 
+# The published packages (.github/workflows/release.yml): whole-program optimization
+# for the client and server players run. Ordinary `--release` builds stay quick to
+# compile for local checks and world shots.
+[profile.dist]
+inherits = "release"
+lto = "fat"
+codegen-units = 1
+
 [workspace.lints.rust]
 unsafe_code = "forbid"
 

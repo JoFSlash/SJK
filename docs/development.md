@@ -35,6 +35,19 @@ manifest denies; its warnings do not fail the check. Use `-j2` to limit
 build parallelism on constrained machines. `CARGO_TARGET_DIR` can put build
 artifacts outside the checkout; do not commit binaries or generated output.
 
+Published packages use the `dist` profile ([workspace manifest](../Cargo.toml)):
+`release` with fat link-time optimization and one codegen unit, for the fastest
+executables at a much longer compile. Local `--release` builds and world shots keep
+the ordinary profile; to check what players get, build the same way as the
+[release workflow](../.github/workflows/release.yml):
+
+```sh
+cargo build --locked --profile dist -p sjk-viewer -p sjk-dedicated
+```
+
+The executables are then in `target/dist/` (or `target/<target>/dist/` with
+`--target`); `scripts/package_client.py --cargo-profile dist` packages them.
+
 On Windows, Git's `core.autocrlf` checks text out with CRLF line endings.
 [.gitattributes](../.gitattributes) keeps WGSL programs LF; a checkout made before
 it existed keeps CRLF `.wgsl` files until they are checked out again, for example

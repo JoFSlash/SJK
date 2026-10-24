@@ -115,12 +115,12 @@ jobs:
           key: release-${{ matrix.target }}
       - name: Build optimized client and dedicated server
         working-directory: source
-        run: cargo build --locked --release --target ${{ matrix.target }} -p sjk-viewer -p sjk-dedicated
+        run: cargo build --locked --profile dist --target ${{ matrix.target }} -p sjk-viewer -p sjk-dedicated
       - name: Package and smoke-check extracted executables
         run: >-
           python source/scripts/package_client.py
           --source source --target ${{ matrix.target }}
-          --platform ${{ matrix.platform }} --output dist --smoke-check
+          --platform ${{ matrix.platform }} --cargo-profile dist --output dist --smoke-check
           --name SJK --version ${{ env.VERSION }} --profile-dir SJK
           --repository ${{ github.server_url }}/${{ github.repository }}
       - name: Upload to the draft release
