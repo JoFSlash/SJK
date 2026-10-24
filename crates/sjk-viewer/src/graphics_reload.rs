@@ -95,7 +95,7 @@ impl Startup {
             hdr: crate::frame_target::aa::hdr::Settings::sample(console).mode,
             fxaa: crate::frame_target::aa::enabled(console),
             scale: crate::frame_target::scale::requested(console),
-            percent: crate::frame_target::scale::percent(console),
+            percent: crate::frame_target::scale::effective_percent(console),
             day: sun.day.enabled,
             shadows: (
                 sun.enabled,

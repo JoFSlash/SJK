@@ -513,9 +513,13 @@ buffer stays at half the scene; the stretch is one bilinear pass
 ([render_scale_stretch.wgsl](../crates/sjk-viewer/src/render_scale_stretch.wgsl)). The
 HUD, text and menus are drawn at the window's size, so they stay sharp, unlike a lower
 `r_resolution`; FXAA, bloom and glow still run at the window's size. At 75% on a
-1920x1080 window the scene is 1440x810, 56% of the pixels. A built-in GPU (under 1 GB
+1920x1080 window the scene is 1440x810, 56% of the pixels. A built-in GPU (under 900 MB
 of its own, [video_memory.rs](../crates/sjk-viewer/src/video_memory.rs)) starts at 75%,
-once a card, only from the default. Slash's built-in Radeon (495 MiB) took 9.8 ms of GPU
+once a card (`r_renderScaleChecked`, apart from the small-card settings' marker, so cards
+checked before it get it too), only from the default and not under `r_superSample`,
+which a change of `r_renderScale` then does not ask a reload for. Both scene sizes go
+through one allocation transaction (`install_scene`), and the stretch takes its
+coordinates from the full-screen triangle, so it needs no window size. Slash's built-in Radeon (495 MiB) took 9.8 ms of GPU
 time a frame on mp/ffa2 at 1920x1080 (`SJK_GPU_PHASES`: scene-world 5.2 ms,
 overlays+post+hud 2.5 ms, effect-encode 1.5 ms) and ran better at a 1600x900 window. Not
 measured with `r_renderScale` yet.

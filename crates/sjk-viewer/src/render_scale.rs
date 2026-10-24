@@ -46,6 +46,15 @@ pub(crate) fn percent(console: Option<&crate::console::ViewerConsole>) -> u32 {
         .clamp(i64::from(PERCENT_MIN), 100) as u32
 }
 
+/// `r_renderScale` as it applies: 100 while `r_superSample` supersamples, which wins.
+pub(crate) fn effective_percent(console: Option<&crate::console::ViewerConsole>) -> u32 {
+    if requested(console) > 1 {
+        100
+    } else {
+        percent(console)
+    }
+}
+
 /// The 3D view's size for a window of `output` at `percent`, when smaller than it.
 pub(crate) fn reduced(output: [u32; 2], percent: u32) -> Option<[u32; 2]> {
     (percent < 100).then(|| output.map(|n| ((n * percent + 50) / 100).max(1)))
@@ -80,7 +89,7 @@ pub(crate) fn checked<T>(device: &wgpu::Device, build: impl FnOnce() -> T) -> Op
     crate::gpu_guard::capture(device, build)
         .inspect_err(|error| {
             crate::log::progress(format_args!(
-                "supersampling allocation failed: {error}; reducing scale"
+                "scene scale allocation failed: {error}; trying the next size"
             ));
         })
         .ok()
@@ -97,6 +106,7 @@ pub(crate) struct Runtime {
     pub(crate) size: [u32; 2],
     bind: wgpu::BindGroup,
     pipeline: wgpu::RenderPipeline,
+    pass_label: &'static str,
 }
 
 impl Runtime {
@@ -134,7 +144,10 @@ impl Runtime {
         resolve: Resolve,
     ) -> Self {
         let texture = device.create_texture(&wgpu::TextureDescriptor {
-            label: Some("SJK supersampled scene"),
+            label: Some(match resolve {
+                Resolve::Box(_) => "SJK supersampled scene",
+                Resolve::Stretch => "SJK reduced scene",
+            }),
             size: wgpu::Extent3d {
                 width: size[0],
                 height: size[1],
@@ -157,10 +170,7 @@ impl Runtime {
             Resolve::Stretch => (
                 "SJK reduced scene stretch",
                 include_str!("render_scale_stretch.wgsl"),
-                vec![
-                    ("OUTPUT_WIDTH", f64::from(output[0])),
-                    ("OUTPUT_HEIGHT", f64::from(output[1])),
-                ],
+                Vec::new(),
             ),
         };
         let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
@@ -168,7 +178,10 @@ impl Runtime {
             source: wgpu::ShaderSource::Wgsl(source.into()),
         });
         let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-            label: Some("SJK supersample resolve before scene postprocessing"),
+            label: Some(match resolve {
+                Resolve::Box(_) => "SJK supersample resolve before scene postprocessing",
+                Resolve::Stretch => "SJK reduced scene stretch before scene postprocessing",
+            }),
             layout: None,
             vertex: wgpu::VertexState {
                 module: &shader,
@@ -223,6 +236,10 @@ impl Runtime {
             size,
             bind,
             pipeline,
+            pass_label: match resolve {
+                Resolve::Box(_) => "SJK supersample box resolve",
+                Resolve::Stretch => "SJK reduced scene stretch",
+            },
             hud_depth: crate::DepthTarget::new(device, output[0], output[1]),
         }
     }
@@ -231,7 +248,7 @@ impl Runtime {
     /// filtering the later HUD.
     pub(crate) fn draw(&self, encoder: &mut wgpu::CommandEncoder, output: &wgpu::TextureView) {
         let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-            label: Some("SJK supersample box resolve"),
+            label: Some(self.pass_label),
             color_attachments: &[Some(wgpu::RenderPassColorAttachment {
                 view: output,
                 resolve_target: None,

@@ -2,8 +2,10 @@
 //! ([`sjk_gpu_memory`]) and, on a card of 4 GB or less, lowers the texture detail
 //! (`r_picmip`) and stands the menus on pictures ([`crate::menu_pictures`]) before the
 //! first map is built, so a 3 GB card does not have to run out first (Vin's, 21/10/2026).
-//! A built-in GPU (under 1 GB of its own) also draws the 3D view at 75% of the window
-//! (`r_renderScale`): it is limited by the pixels it draws (Slash's, 24/10/2026).
+//! A built-in GPU (under 900 MB of its own) also draws the 3D view at 75% of the window
+//! (`r_renderScale`): it is limited by the pixels it draws (Slash's, 24/10/2026). That
+//! choice is made once a card too, kept in [`SCALE_CVAR`], so cards checked before it
+//! existed get it once.
 //!
 //! It chooses once a card: [`CVAR`] keeps the size it chose for, so a player who sets
 //! the texture detail back is not overridden at the next start, and a new card is
@@ -17,9 +19,12 @@ use std::sync::OnceLock;
 pub(crate) const CVAR: &str = "r_videoMemoryChecked";
 const MIB: u64 = 1 << 20;
 
+/// The video memory (MiB) the built-in-GPU 3D resolution was last chosen for; 0 never.
+pub(crate) const SCALE_CVAR: &str = "r_renderScaleChecked";
+
 static SUMMARY: OnceLock<String> = OnceLock::new();
 
-/// Register [`CVAR`] (archived).
+/// Register [`CVAR`] and [`SCALE_CVAR`] (archived).
 pub(crate) fn register(cvars: &mut sjk_shell::CvarRegistry) -> Result<(), sjk_shell::CvarError> {
     cvars.register(sjk_shell::CvarDefinition::new(
         CVAR,
@@ -27,6 +32,13 @@ pub(crate) fn register(cvars: &mut sjk_shell::CvarRegistry) -> Result<(), sjk_sh
         sjk_shell::CvarFlags::ARCHIVE,
         "The graphics card's video memory (MiB) SJK last chose the small-card settings for; \
          0 to choose them again at the next start",
+    ))?;
+    cvars.register(sjk_shell::CvarDefinition::new(
+        SCALE_CVAR,
+        0_i64,
+        sjk_shell::CvarFlags::ARCHIVE,
+        "The graphics card's video memory (MiB) SJK last chose the built-in-GPU 3D \
+         resolution for; 0 to choose it again at the next start",
     ))
 }
 
@@ -43,11 +55,11 @@ pub(crate) fn picmip_for(dedicated: u64) -> Option<i64> {
 
 /// The 3D resolution (`r_renderScale`) a card with `dedicated` bytes of its own starts
 /// on: `None` for the window's. Built-in GPUs report a few hundred MB; a 1 GB discrete
-/// card or more keeps it.
+/// card (which a driver may report a little under 1024 MiB) or more keeps it.
 pub(crate) fn render_percent_for(dedicated: u64) -> Option<i64> {
     match dedicated / MIB {
         0 => None,
-        mib if mib < 1024 => Some(75),
+        mib if mib < 900 => Some(75),
         _ => None,
     }
 }
@@ -62,7 +74,9 @@ pub(crate) fn at_start(console: &mut ViewerConsole) {
         let summary = format!("{} MiB video memory{budget}", memory.dedicated / MIB);
         crate::log::progress(format_args!("graphics card: {}, {summary}", memory.name));
         let _ = SUMMARY.set(summary);
-        for line in apply(console, memory.dedicated) {
+        let mut lines = apply(console, memory.dedicated);
+        lines.extend(apply_render_scale(console, memory.dedicated));
+        for line in lines {
             crate::log::progress(format_args!("{line}"));
             console.push_log_quiet(&line);
         }
@@ -96,17 +110,29 @@ fn apply(console: &mut ViewerConsole, dedicated: u64) -> Vec<String> {
     {
         lines.push("The menus use pictures to save video memory (Settings, Menu pictures).".into());
     }
+    lines
+}
+
+/// Choose the 3D resolution for a built-in GPU of `dedicated` bytes, once a card and
+/// only from the default, unless supersampling (`r_superSample`) is on, which wins: the
+/// line saying what changed.
+fn apply_render_scale(console: &mut ViewerConsole, dedicated: u64) -> Option<String> {
+    let mib = (dedicated / MIB) as i64;
+    if mib == 0 || console.integer_cvar(SCALE_CVAR) == Some(mib) {
+        return None;
+    }
+    console.set_cvar(SCALE_CVAR, &mib.to_string());
+    let percent = render_percent_for(dedicated)?;
     let scale = crate::frame_target::scale::PERCENT_CVAR;
-    if let Some(percent) = render_percent_for(dedicated)
+    (crate::frame_target::scale::requested(Some(console)) == 1
         && console.integer_cvar(scale).unwrap_or(100) == 100
-        && console.set_cvar(scale, &percent.to_string())
-    {
-        lines.push(format!(
+        && console.set_cvar(scale, &percent.to_string()))
+    .then(|| {
+        format!(
             "Built-in graphics: the 3D view is drawn at {percent}% of the window, HUD and text \
              stay sharp (Settings, Renderer, 3D resolution)."
-        ));
-    }
-    lines
+        )
+    })
 }
 
 /// The card's video memory for crash reports, once read.
@@ -146,18 +172,31 @@ mod tests {
         assert_eq!(render_percent_for(GIB), None);
         assert_eq!(render_percent_for(3 * GIB), None);
         assert_eq!(render_percent_for(0), None, "a driver that does not say");
-        let (_directory, mut console) = fresh();
+        assert_eq!(
+            render_percent_for(1008 * MIB),
+            None,
+            "a 1 GB card reported short"
+        );
         let scale = crate::frame_target::scale::PERCENT_CVAR;
-        assert_eq!(apply(&mut console, 495 * MIB).len(), 3);
+        // A card the small-card settings already chose for (r_videoMemoryChecked) still
+        // gets it once, and not again after the player sets it back.
+        let (_directory, mut console) = fresh();
+        console.set_cvar(CVAR, "495");
+        assert!(apply(&mut console, 495 * MIB).is_empty());
+        assert!(apply_render_scale(&mut console, 495 * MIB).is_some());
         assert_eq!(console.integer_cvar(scale), Some(75));
+        console.set_cvar(scale, "100");
+        assert!(apply_render_scale(&mut console, 495 * MIB).is_none());
+        assert_eq!(console.integer_cvar(scale), Some(100));
+        // The player's own choice stays, and supersampling wins.
         let (_other, mut console) = fresh();
         console.set_cvar(scale, "90");
-        apply(&mut console, 495 * MIB);
-        assert_eq!(
-            console.integer_cvar(scale),
-            Some(90),
-            "the player's own choice stays"
-        );
+        assert!(apply_render_scale(&mut console, 495 * MIB).is_none());
+        assert_eq!(console.integer_cvar(scale), Some(90));
+        let (_third, mut console) = fresh();
+        console.set_cvar("r_superSample", "2");
+        assert!(apply_render_scale(&mut console, 495 * MIB).is_none());
+        assert_eq!(console.integer_cvar(scale), Some(100));
     }
 
     #[test]

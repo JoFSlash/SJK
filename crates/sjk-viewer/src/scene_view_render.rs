@@ -57,44 +57,11 @@ impl GpuState {
             if self.context.hdr.mode == 1 { 48 } else { 32 },
         );
         for factor in (2..=scale).rev() {
-            let views = &self.scene_views;
-            let candidate = crate::frame_target::scale::checked(&self.device, || {
-                let scaled = crate::frame_target::scale::Runtime::new(
-                    &self.device,
-                    self.context.scene_format(),
-                    output,
-                    factor,
-                );
-                let size = scaled.size;
-                let depth = crate::DepthTarget::new(&self.device, size[0], size[1]);
-                let target = |present: bool| {
-                    present.then(|| {
-                        gpu::Target::new(
-                            &self.device,
-                            &views.camera_layout,
-                            &views.sample_layout,
-                            views.format,
-                            size,
-                        )
-                    })
-                };
-                let sky = target(views.sky_target.is_some());
-                let portal = target(views.portal_target.is_some());
-                let floors = target(views.floors.target.is_some());
-                (scaled, depth, sky, portal, floors)
-            });
-            if let Some((scaled, depth, sky, portal, floors)) = candidate {
-                self.depth = depth;
-                self.scene_views.sky_target = sky;
-                self.scene_views.portal_target = portal;
-                self.scene_views.floors.set_target(floors, &self.device);
-                self.render_scale = Some(scaled);
-                let scene = self.scene_size();
-                if let Some(aa) = &mut self.post_aa {
-                    aa.fit_effects(&self.device, scene);
-                }
-                self.world_materials
-                    .fit_light_buffer(&self.device, scene, factor);
+            let format = self.context.scene_format();
+            let device = self.device.clone();
+            if self.install_scene(factor, || {
+                crate::frame_target::scale::Runtime::new(&device, format, output, factor)
+            }) {
                 crate::log::progress(format_args!(
                     "scene scale requested={requested} effective={factor}"
                 ));
@@ -107,24 +74,37 @@ impl GpuState {
             ));
             return;
         }
-        self.install_reduced_scene(output);
-    }
-
-    /// The 3D view drawn smaller than the window (`r_renderScale`) and stretched to it,
-    /// with its depth and secondary views at that size; native on failure.
-    fn install_reduced_scene(&mut self, output: [u32; 2]) {
+        // The 3D view drawn smaller than the window (`r_renderScale`), stretched to it.
         let percent = self.context.render_percent;
         let Some(size) = crate::frame_target::scale::reduced(output, percent) else {
             return;
         };
+        let format = self.context.scene_format();
+        let device = self.device.clone();
+        if self.install_scene(1, || {
+            crate::frame_target::scale::Runtime::new_reduced(&device, format, output, size)
+        }) {
+            crate::log::progress(format_args!(
+                "3D resolution {percent}%: {}x{} for a {}x{} window",
+                size[0], size[1], output[0], output[1]
+            ));
+        } else {
+            crate::log::progress(format_args!("3D resolution {percent}%: native fallback"));
+        }
+    }
+
+    /// Allocate the scene raster `build` makes with its depth and the secondary views at
+    /// its size, all or none, and publish them: whether it succeeded. `factor` is the
+    /// supersampling the light buffer's divisor accounts for (1 for a reduced scene).
+    fn install_scene(
+        &mut self,
+        factor: u32,
+        build: impl FnOnce() -> crate::frame_target::scale::Runtime,
+    ) -> bool {
         let views = &self.scene_views;
         let candidate = crate::frame_target::scale::checked(&self.device, || {
-            let scaled = crate::frame_target::scale::Runtime::new_reduced(
-                &self.device,
-                self.context.scene_format(),
-                output,
-                size,
-            );
+            let scaled = build();
+            let size = scaled.size;
             let depth = crate::DepthTarget::new(&self.device, size[0], size[1]);
             let target = |present: bool| {
                 present.then(|| {
@@ -143,22 +123,20 @@ impl GpuState {
             (scaled, depth, sky, portal, floors)
         });
         let Some((scaled, depth, sky, portal, floors)) = candidate else {
-            crate::log::progress(format_args!("3D resolution {percent}%: native fallback"));
-            return;
+            return false;
         };
         self.depth = depth;
         self.scene_views.sky_target = sky;
         self.scene_views.portal_target = portal;
         self.scene_views.floors.set_target(floors, &self.device);
         self.render_scale = Some(scaled);
+        let scene = self.scene_size();
         if let Some(aa) = &mut self.post_aa {
-            aa.fit_effects(&self.device, size);
+            aa.fit_effects(&self.device, scene);
         }
-        self.world_materials.fit_light_buffer(&self.device, size, 1);
-        crate::log::progress(format_args!(
-            "3D resolution {percent}%: {}x{} for a {}x{} window",
-            size[0], size[1], output[0], output[1]
-        ));
+        self.world_materials
+            .fit_light_buffer(&self.device, scene, factor);
+        true
     }
 
     /// Select visible secondary views and upload their small camera uniforms.

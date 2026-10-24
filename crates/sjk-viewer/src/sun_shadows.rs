@@ -240,7 +240,8 @@ impl crate::GpuState {
             &self.queue,
             self.context.sun_shadows,
             scene,
-            scene[0] / self.size.width.max(1),
+            // The supersampling factor: 1 for a native or reduced scene (`r_renderScale`).
+            (scene[0] / self.size.width.max(1)).max(1),
         );
         self.world_materials
             .configure_light_preservation(&self.device, self.has_floor_surfaces());

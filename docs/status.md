@@ -9,8 +9,11 @@ at the window's size; built-in GPUs start at 75% ([rendering.md](rendering.md#3d
 Checked by unit tests (sizes, the stretch shader through naga, the built-in default and
 the player's own choice) and the viewer's settings, reload and changelog tests on Linux
 without a GPU. Not verified: any frame on a real card (look, FPS gained, effects or
-reflections at the reduced size), Windows. A player whose card was already checked
-(`r_videoMemoryChecked`) keeps 100% until they choose.
+reflections at the reduced size), Windows. A code review's eight findings were fixed:
+cards already checked by the small-card settings get the 75% once
+(`r_renderScaleChecked`), supersampling wins without a needless reload, 1 GB cards a
+driver reports short keep 100%, one allocation transaction for both scales, the stretch
+shader without per-size constants, and labels naming the reduced scene.
 
 ## macOS build
 

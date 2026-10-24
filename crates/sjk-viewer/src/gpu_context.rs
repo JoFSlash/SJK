@@ -194,7 +194,7 @@ impl Context {
             hdr,
             sun_shadows: crate::world_materials::shadows::settings::Settings::sample(console),
             render_scale: crate::frame_target::scale::requested(console),
-            render_percent: crate::frame_target::scale::percent(console),
+            render_percent: crate::frame_target::scale::effective_percent(console),
             fxaa: crate::frame_target::aa::enabled(console),
 
             post_color: console.map(|c| c.post_color.clone()).unwrap_or_default(),
@@ -247,7 +247,7 @@ impl Context {
             hdr: crate::frame_target::aa::hdr::Settings::sample(console),
             sun_shadows: crate::world_materials::shadows::settings::Settings::sample(console),
             render_scale: crate::frame_target::scale::requested(console),
-            render_percent: crate::frame_target::scale::percent(console),
+            render_percent: crate::frame_target::scale::effective_percent(console),
             fxaa: crate::frame_target::aa::enabled(console),
             post_color: self.post_color.clone(),
             dynamic_light_settings: self.dynamic_light_settings.clone(),
