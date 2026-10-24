@@ -4251,6 +4251,30 @@ python scripts/shader_testmap.py --install
   the retail lists miss some, so the script writes a complete one for the
   compile (it is not packed).
 
+## Arena test map
+
+[arena_map.py](../scripts/arena_map.py) builds `sjk_arena1`, a small duel
+arena generated from code rather than drawn in an editor, as a first test of
+making maps for SJK. It uses only textures the script draws itself, so it needs
+no retail asset, and compiles and packs the map as the shader test maps do.
+
+```sh
+python scripts/arena_map.py --install           # then: devmap sjk_arena1
+python scripts/arena_map.py --no-compile --preview plan.png
+```
+
+- **Layout.** A closed hall 1280 units square and 512 high: a two-step dais in
+  the middle, four pillars, a balcony on the north and south walls reached by
+  stairs at both ends (16-unit steps), two `info_player_duel` spawn points
+  facing each other on the dais and six `info_player_deathmatch` around the
+  hall. Every brush is an axis-aligned box.
+- **Checks.** Before writing, the script stops if a spawn point's player box
+  or a light touches a brush. `--preview` draws a plan of the brushes (shaded
+  by height), lights and spawn points, to check a layout without compiling it.
+- **Not verified** (24/10/2026, Linux, no q3map2 or game data): the compile,
+  the lighting and the map in game. Only the `.map`, the textures and the
+  preview were generated and looked at.
+
 ## Default visual profile
 
 New profiles use the owner-approved rendering setup: day/night enabled at a fixed
