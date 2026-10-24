@@ -45,4 +45,6 @@ pub(crate) struct ActorMesh {
     pub(crate) surfaces: crate::dismember::Surfaces,
     /// Set on a cut-off limb's mesh (`CG_General`'s client-limb case).
     pub(crate) limb: Option<crate::dismember::Limb>,
+    /// The Ragdoll toy's pose of this actor, while its player is limp.
+    pub(crate) ragdoll: crate::ragdoll::Scratch,
 }

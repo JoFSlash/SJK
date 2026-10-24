@@ -77,7 +77,7 @@ vec3 sig_vol(vec3 ro, vec3 rd, float px){
     vec3 h = rayAt(ro, rd, L*(fk < 0.5 ? 0.78 : 0.24) + sin(t*0.4 + fk*2.0));
     if (h.z > 0.0){
       float R = fk < 0.5 ? 3.2 : 2.6;
-      float d = abs((length(h.xy) + 1e3*behindBlade(ro, rd, h.z)) - R);
+      float d = hideD(abs(length(h.xy) - R), behindBlade(ro, rd, h.z));
       float side = 0.5 + 0.5*sin(atan(h.x, h.y) - t*0.2*(fk < 0.5 ? 1.0 : -1.0) + fk*3.1);
       col += (vec3(1.0)*halo(d, max(0.05, px))*0.8 + mix(MO_NIGHT, MO_DAY, side)*halo(d, 0.3)*0.5)*part(3.0);
     }

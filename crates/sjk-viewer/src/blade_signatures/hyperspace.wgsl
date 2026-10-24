@@ -101,7 +101,7 @@ fn r8_vol(ro: vec3<f32>, rd: vec3<f32>, px: f32) -> vec3<f32> {
             fxl += white * shellL * cl * 1.1 + ice * halo(dc, 3.0) * pow(cl, 3.0) * 1.4;
             let h = rayAt(ro, rd, o.y);
             if h.z > 0.0 {
-                fxl += white * halo(abs((length(h.xy) + 1.0e3 * behindBlade(ro, rd, h.z)) - R * 1.1), 0.15 + 0.3 * (1.0 - cl)) * cl * 1.4;
+                fxl += white * halo(hideD(abs(length(h.xy) - R * 1.1), behindBlade(ro, rd, h.z)), 0.15 + 0.3 * (1.0 - cl)) * cl * 1.4;
             }
         }
         light += fxl * fx;

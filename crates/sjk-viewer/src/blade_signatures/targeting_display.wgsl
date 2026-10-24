@@ -8,9 +8,16 @@
 // Targeting Display: an old starfighter's targeting computer, as a blade. A blocky blade of chunky
 // lit squares, a few of them blinking as the computer reads.
 fn targeting_display_glow0(g: vec3<f32>, b: vec2<f32>, r: f32, px: f32) -> vec3<f32> {
-    let q = floor(vec2(b.x * 4.0, b.y * 1.6));
-    let blink = step(0.85, h21(q + floor(uTime * 4.0))) * part(0.0);
-    let step_ = floor(lvl(g) * 5.0 + 0.5) / 5.0;
+    // round 23: the lit squares' and the levels' edges smoothed (they stair-stepped into a jagged
+    // outline); the blade keeps its blocky levels
+    let u = vec2(b.x * 4.0, b.y * 1.6);
+    let q = floor(u);
+    let tk = floor(uTime * 4.0);
+    let mx = cellMix(u.x, px * 4.0);
+    let my = cellMix(u.y, px * 1.6);
+    let blink = mix(mix(step(0.85, h21(q + tk)), step(0.85, h21(q + vec2<f32>(1.0, 0.0) + tk)), mx), mix(step(0.85, h21(q + vec2<f32>(0.0, 1.0) + tk)), step(0.85, h21(q + vec2<f32>(1.0, 1.0) + tk)), mx), my) * part(0.0);
+    let lv = lvl(g) * 5.0 + 0.5;
+    let step_ = (floor(lv) + smoothstep(0.85, 1.0, fract(lv))) / 5.0;
     return g / max(lvl(g), 0.001) * step_ * (1.0 + 0.5 * blink);
 }
 

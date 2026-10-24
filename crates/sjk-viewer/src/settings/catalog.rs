@@ -66,6 +66,9 @@ pub(super) enum ValueKind {
     ImportPage,
     /// Open the installed PK3 pack browser.
     AssetBrowser,
+    /// A chat kind's preview (not a cvar; its name is the console command that plays
+    /// the same, `chat_sounds.rs`): Enter or a click plays the kind's chosen sound.
+    SoundPreview,
     /// Open the JoF content card (`jof.downloads`, `crate::jof_content`).
     #[cfg_attr(not(feature = "mod-jof"), allow(dead_code))]
     JofContent,
@@ -274,6 +277,11 @@ pub(super) const AUDIO: &[Setting] = &[
         kind: ValueKind::Bool,
     },
     Setting {
+        label: "Typing keeps emote",
+        cvar: crate::emotes::TYPING_KEEP_CVAR,
+        kind: ValueKind::Bool,
+    },
+    Setting {
         label: "Away emote",
         cvar: crate::away_emote::SJK_CVAR,
         kind: ValueKind::Live(crate::away_emote::sjk_choices),
@@ -300,6 +308,76 @@ pub(super) const AUDIO: &[Setting] = &[
     Setting {
         label: "Unlock sound",
         cvar: crate::unlock_toast::SOUND_CVAR,
+        kind: ValueKind::Bool,
+    },
+    Setting {
+        label: "Chat sounds",
+        cvar: crate::chat_sounds::MASTER_CVAR,
+        kind: ValueKind::Choice(&["0", "1", "2"]),
+    },
+    Setting {
+        label: "Public chat",
+        cvar: crate::chat_sounds::Kind::Public.switch_cvar(),
+        kind: ValueKind::Bool,
+    },
+    Setting {
+        label: "Public chat sound",
+        cvar: crate::chat_sounds::Kind::Public.sound_cvar(),
+        kind: ValueKind::Choice(&crate::chat_sounds::SOUND_IDS),
+    },
+    Setting {
+        label: "Preview public chat",
+        cvar: crate::chat_sounds::Kind::Public.preview_row(),
+        kind: ValueKind::SoundPreview,
+    },
+    Setting {
+        label: "Team chat",
+        cvar: crate::chat_sounds::Kind::Team.switch_cvar(),
+        kind: ValueKind::Bool,
+    },
+    Setting {
+        label: "Team chat sound",
+        cvar: crate::chat_sounds::Kind::Team.sound_cvar(),
+        kind: ValueKind::Choice(&crate::chat_sounds::SOUND_IDS),
+    },
+    Setting {
+        label: "Preview team chat",
+        cvar: crate::chat_sounds::Kind::Team.preview_row(),
+        kind: ValueKind::SoundPreview,
+    },
+    Setting {
+        label: "Private messages",
+        cvar: crate::chat_sounds::Kind::Private.switch_cvar(),
+        kind: ValueKind::Bool,
+    },
+    Setting {
+        label: "Private message sound",
+        cvar: crate::chat_sounds::Kind::Private.sound_cvar(),
+        kind: ValueKind::Choice(&crate::chat_sounds::SOUND_IDS),
+    },
+    Setting {
+        label: "Preview private message",
+        cvar: crate::chat_sounds::Kind::Private.preview_row(),
+        kind: ValueKind::SoundPreview,
+    },
+    Setting {
+        label: "SJK chat messages",
+        cvar: crate::chat_sounds::Kind::Sjk.switch_cvar(),
+        kind: ValueKind::Bool,
+    },
+    Setting {
+        label: "SJK chat sound",
+        cvar: crate::chat_sounds::Kind::Sjk.sound_cvar(),
+        kind: ValueKind::Choice(&crate::chat_sounds::SOUND_IDS),
+    },
+    Setting {
+        label: "Preview SJK chat",
+        cvar: crate::chat_sounds::Kind::Sjk.preview_row(),
+        kind: ValueKind::SoundPreview,
+    },
+    Setting {
+        label: "Private message flash",
+        cvar: crate::chat_sounds::FLASH_CVAR,
         kind: ValueKind::Bool,
     },
 ];
@@ -576,6 +654,20 @@ pub(super) const HUD: &[Setting] = &[
         label: "Team scores",
         cvar: "cg_drawTeamScores",
         kind: ValueKind::Bool,
+    },
+    Setting {
+        label: "SJK team score boxes",
+        cvar: "cg_teamScoresBoxes",
+        kind: ValueKind::Bool,
+    },
+    Setting {
+        label: "Team score box size",
+        cvar: "cg_teamScoresScale",
+        kind: ValueKind::Float {
+            min: 0.5,
+            max: 2.0,
+            step: 0.1,
+        },
     },
     Setting {
         label: "Flag status (capture the flag)",
@@ -1032,6 +1124,11 @@ pub(super) const GAME: &[Setting] = &[
         },
     },
     Setting {
+        label: "Lock wall-grab camera",
+        cvar: "cg_wallGrabLock",
+        kind: ValueKind::Bool,
+    },
+    Setting {
         label: "Prediction error smoothing (ms)",
         cvar: "cg_errorDecay",
         kind: ValueKind::Float {
@@ -1161,11 +1258,6 @@ pub(super) const NETWORK: &[Setting] = &[
     Setting {
         label: "SJK chat in console",
         cvar: crate::sjk_chat_frame::CONSOLE_CVAR,
-        kind: ValueKind::Bool,
-    },
-    Setting {
-        label: "SJK chat sound",
-        cvar: crate::sjk_chat_frame::SOUND_CVAR,
         kind: ValueKind::Bool,
     },
     Setting {

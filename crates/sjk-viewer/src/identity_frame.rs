@@ -53,9 +53,21 @@ impl GpuState {
             .filter(|session| !session.is_local())
             .map(|session| player_identity::take_toy_events(Some(session.server())))
             .unwrap_or_default();
+        // The relay's, the same: on a game server the relay is read all the while, for
+        // the falls of the Ragdoll anyone may show.
+        let server = self
+            .live_session
+            .as_ref()
+            .filter(|session| !session.is_local())
+            .map(ClientSession::server);
+        player_identity::set_relay_listen(server.is_some());
+        let relay_events = server
+            .map(|server| player_identity::take_relay_events(Some(server)))
+            .unwrap_or_default();
         self.update_cardboard_box(Instant::now(), &toy_events);
         self.update_order66(&toy_events);
-        self.update_hax(&toy_events);
+        self.update_hax(&toy_events, &relay_events);
+        self.update_ragdoll(&relay_events);
         self.update_e2e_whispers();
         if !due {
             return;

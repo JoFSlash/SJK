@@ -174,7 +174,18 @@ pub(super) fn apply(
             .is_some_and(|play| stock.pose(driver, play, &mut mesh.preview.stock_pose)),
         _ => false,
     };
-    let matrices: &[[[f32; 4]; 3]] = if emote {
+    // A limp player (the Ragdoll toy) is drawn, bolts and all, as the ragdoll lies.
+    let ragdoll = mesh
+        .entity_id
+        .filter(|_| mesh.limb.is_none() && !mesh.corpse_pool)
+        .and_then(crate::ragdoll::shown_entity)
+        .is_some_and(|points| {
+            crate::ragdoll::pose(&mut mesh.ragdoll, &mesh.preview.animation, &points)
+        });
+    mesh.ragdoll.posed = ragdoll;
+    let matrices: &[[[f32; 4]; 3]] = if ragdoll {
+        &mesh.ragdoll.matrices
+    } else if emote {
         &mesh.preview.stock_pose.matrices
     } else {
         driver

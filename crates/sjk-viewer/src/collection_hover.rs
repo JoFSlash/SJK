@@ -85,6 +85,20 @@ impl Panel {
                 ],
             });
         }
+        if token == RAGDOLL_TOKEN {
+            return Some(Card {
+                title: "Ragdoll".to_owned(),
+                colour: color::GOLD_BRIGHT,
+                lines: vec![
+                    Line::how(
+                        "Every SJK player has it. Go limp here, from the quick wheel's Toys \
+                         page or with a key bound to toy_ragdoll; press it again to get up.",
+                    ),
+                    Line::status(crate::editions::name(crate::editions::ALPHA)),
+                    Line::held("Yours"),
+                ],
+            });
+        }
         if token == HAX_TOKEN {
             return Some(Card {
                 title: "The Hax".to_owned(),

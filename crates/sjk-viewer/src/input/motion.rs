@@ -1,6 +1,7 @@
 //! Input motion: OpenJK cl_input.cpp:480-510,822-917,1038-1182.
 use super::{GameButton, GameplayInput};
 use crate::{GpuState, pointer_input::MouseLook};
+use sjk_client::pmove::MovementState;
 
 pub(crate) struct Motion {
     pub now: u64,
@@ -126,6 +127,24 @@ impl GameButton {
 }
 
 impl GameplayInput {
+    /// Consume frame input while a wall move owns the local view. Movement and
+    /// button accounting still run; look input must not build up until release.
+    pub(crate) fn sample_view_motion(
+        &mut self,
+        now: u64,
+        settings: MouseLook,
+        view: Option<&MovementState>,
+    ) -> [f32; 2] {
+        let delta = self.sample_motion(now, settings);
+        if view.is_some_and(|view| view.wall_view_locked) {
+            // Filtering must not carry the final held sample into the release frame.
+            self.motion.previous_mouse = [0.0; 2];
+            [0.0; 2]
+        } else {
+            delta
+        }
+    }
+
     /// The share of the command `button` moves for; a press let go in no time (a
     /// wheel notch, [`super::state::KeyState::tapped`]) moves all of it.
     pub(super) fn movement_fraction(&self, button: GameButton) -> f32 {
@@ -261,7 +280,14 @@ impl GpuState {
         let Some(console) = &self.console else { return };
         let now = console.input_millis();
         self.gameplay_input.motion.zoom_sensitivity = self.scope.sensitivity;
-        let delta = self.gameplay_input.sample_motion(now, self.mouse_look);
+        let view = if self.local_prediction.fake_noclip() {
+            None
+        } else {
+            self.local_prediction.predicted_state()
+        };
+        let delta = self
+            .gameplay_input
+            .sample_view_motion(now, self.mouse_look, view);
         self.camera_yaw = crate::input::view_authority::wrap_yaw(self.camera_yaw + delta[0]);
         self.camera_pitch = (self.camera_pitch + delta[1]).clamp(
             -crate::input::view_authority::PITCH_LIMIT,
@@ -269,6 +295,102 @@ impl GpuState {
         );
         if self.live_session.is_none() {
             self.gameplay_input.finish_command();
+        }
+    }
+}
+
+#[cfg(test)]
+mod wall_view_tests {
+    use super::*;
+    use sjk_client::pmove::{MovementConfig, PMF_STUCK_TO_WALL, Predictor};
+    use sjk_game_jka::pmove_debug_melee::DebugMelee;
+    use sjk_protocol::InfoString;
+
+    #[test]
+    fn wall_grab_look_follows_the_profile_and_player_option() {
+        for step in [8, 7, 4, 3] {
+            for server in [
+                r"\gamename\basejka\g_debugMelee\2",
+                r"\gamename\JA+ Mod v2.4 Build 7\g_debugMelee\2",
+                r"\gamename\JA+ Mod v2.4 Build 7\sv_hostname\JoF\g_debugMelee\2",
+            ] {
+                for force_lock in [false, true] {
+                    let info = InfoString::parse(server).unwrap();
+                    let rules = DebugMelee::from_server_info(&info);
+                    let config = MovementConfig {
+                        debug_melee: rules,
+                        ..Default::default()
+                    };
+                    let held = MovementState {
+                        health: 100,
+                        movement_flags: PMF_STUCK_TO_WALL,
+                        view_angles: [12.0, 90.0, 0.0],
+                        ..Default::default()
+                    };
+                    let mut snapshot = sjk_protocol::PlayerState::default();
+                    held.write_player_state(&mut snapshot);
+                    let predictor = Predictor::from_player_state(&snapshot, config);
+                    let mut view = predictor.state().clone();
+                    // Presentation may force the profile's hold on, never off.
+                    view.wall_view_locked |= force_lock;
+                    let locked = !rules.free_wall_look || force_lock;
+                    assert_eq!(view.wall_view_locked, locked);
+                    let mut input = GameplayInput::default();
+                    input.motion.filter = true;
+                    for button in [
+                        GameButton::Forward,
+                        GameButton::Up,
+                        GameButton::Left,
+                        GameButton::Lookup,
+                    ] {
+                        input.held[button.slot()].event(true, None, 0);
+                    }
+                    let (mut pitch, mut yaw) = (-12.0_f32.to_radians(), 90.0_f32.to_radians());
+                    let baseline = input.user_command(0, pitch, yaw, [0; 3], 3, 0, 0).angles;
+                    for frame in 1..=3 {
+                        input.motion.raw = [80.0, -40.0];
+                        let delta = input.sample_view_motion(
+                            frame * step,
+                            MouseLook::default(),
+                            Some(&view),
+                        );
+                        yaw += delta[0];
+                        pitch += delta[1];
+                        let command =
+                            input.user_command((frame * step) as i32, pitch, yaw, [0; 3], 3, 0, 0);
+                        if locked {
+                            assert_eq!(
+                                command.angles, baseline,
+                                "{server}, {force_lock}, {step} ms"
+                            );
+                        } else {
+                            assert_ne!(command.angles[0], baseline[0]);
+                            assert_ne!(command.angles[1], baseline[1]);
+                        }
+                        assert_eq!((command.forward_move, command.up_move), (127, 127));
+                        input.finish_command();
+                    }
+                    let released = MovementState {
+                        movement_flags: 0,
+                        wall_view_locked: false,
+                        ..held
+                    };
+                    for button in [GameButton::Left, GameButton::Lookup] {
+                        input.held[button.slot()].event(false, None, 3 * step);
+                    }
+                    let delta =
+                        input.sample_view_motion(4 * step, MouseLook::default(), Some(&released));
+                    if locked {
+                        // Held mouse samples cannot leak out through the filter.
+                        assert_eq!(delta, [0.0; 2]);
+                    }
+                    input.motion.raw = [10.0, -5.0];
+                    let delta =
+                        input.sample_view_motion(5 * step, MouseLook::default(), Some(&released));
+                    assert_ne!(delta[0], 0.0);
+                    assert_ne!(delta[1], 0.0);
+                }
+            }
         }
     }
 }

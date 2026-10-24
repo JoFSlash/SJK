@@ -30,6 +30,23 @@ Add each release's notes here when it is tagged (docs/sjk.md "Releases").
 -->
 ## Unreleased
 
+= cg_emoteTypingKeep: New: a player typing in the chat or the console keeps their emote, even when pushed, until they move or attack after closing it.
+= cl_privateChatFlash: A private message flashes the game's taskbar button while you are away from the window. On by default; switch it off if you would rather not be called back.
+= cg_wallGrabLock: Optionally lock your camera to a grabbed wall. Off keeps JA+ free look and mouse-aimed kick-offs.
+= cg_teamScoresBoxes: Team scores in SJK team boxes, with each flag's state in capture the flag; off brings back the classic plates and flag icons.
+
+- New toy, the Ragdoll: `toy_ragdoll` (a bind, the quick wheel's Toys page or Collection > Toys) makes your body go limp and fall where physics takes it, sandbox style, with a flatline and body knocks; the camera follows the body, and every SJK player on the server sees the same fall. Press it again, or get hurt, to get up where you lie _(Sol)_
+- Emotes: a player typing (chat, console or a menu open: their talk balloon) keeps their emote until they move or attack after closing it, even if pushed meanwhile; Settings > Sound > Emotes: Typing keeps emote (`cg_emoteTypingKeep`, on) _(Sol, after Rollembones' idea)_
+- Alt-tabbing out or minimising the game always silences your emote's music, for everyone and for you, even with Away when alt-tabbed (`cg_awayAltTab`) off, which now only decides whether the away emote starts; coming back plays it again from where it is _(Sol)_
+- Chat names: with the chat open, click a player's name to pin their card, then Whisper them (encrypted when they use SJK too) or Block them _(Sol, after Bishop's and Sanjisan's ideas)_
+- Saber sounds of your choice: Profile > Saber > Sounds picks them apart from your saber shader. Follow the shader (as before), the stock sounds, or the sounds of any shader you own, with a Preview button; other SJK players hear your choice too (`cg_saberSounds`) _(Sol, after Nib's idea)_
+- Chat sounds by kind: public chat, team chat, private messages (a server's tells and encrypted whispers) and the SJK chat each have a switch and a sound to pick, with a Play button to hear it, in Settings > Sound > Chat sounds. Public chat off no longer silences private messages, and `cg_chatSounds` 2 gives team chat and private messages EJK's own sounds _(Sol, after Turin's and Nib's ideas)_
+- A private message flashes the game's taskbar button while you are away from the window (`cl_privateChatFlash`) _(Sol, after Turin's and Nib's ideas)_
+- Encrypted whispers: the safety code is now 60 digits in twelve groups of five, one half for each player's key, so the SJK hub can no longer make two keys of its own show matching codes on both screens (the 12-digit code allowed that in seconds). Players compare the new code only with players on this version or later; players already marked verified stay verified _(Slash)_
+- Wall grabs: on a stock server the camera no longer comes loose for a frame when a snapshot catches up with your moves while you hang on the wall. JA+ servers keep their free look, so you can still aim the kick-off with the mouse; Settings > Advanced > Gameplay or Game options > Lock wall-grab camera (`cg_wallGrabLock`, off) locks it there too and turns the camera to the wall _(Lumaya)_
+- Signature blades: no more rim of bright pixels round the tip (in game, in the Collection and on holocron cards) and no hard straight edges round their glow, sparks and smoke, up close or seen along the blade _(Creyon)_
+- After a long session, changing maps or reconnecting no longer fails with "Too many open files": the Profile menu's model icons, cosmetics and Force templates let go of the previous map's game files _(Lukas, after Sol's report)_
+- Capture the flag: the team scores at the top of the screen stand in two team boxes in SJK's colours, each with its flag and where it is: at base, who carries it, or how many seconds a dropped flag has before it goes home. While you carry a flag a line under them says "Take it home", or that your own flag must be back first; `cg_teamScoresBoxes` 0 brings back the classic plates and flag icons _(Slash)_
 - Kyber crystals: every achievement now brings one, once, from Uncommon to Mythical (shown on the Achievements tab, its hover card and its unlock card). Opening one always gives a saber shader, the ones you do not have yet first, and every tenth crystal in a row without a Legendary or Mythical shader gives one: the Holocrons tab shows your crystals, how soon that is, and their loot table _(Sol)_
 
 ## 2026.1023.3 (Alpha) | 23/10/2026

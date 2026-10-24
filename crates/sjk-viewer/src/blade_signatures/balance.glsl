@@ -66,7 +66,9 @@ vec3 ba_shade(){ float L = uLength; return around(2.6, uTime*0.12 + 0.5, L*(0.55
 vec3 sig_orbit(vec3 ro, vec3 rd, float px){
   float L = uLength, ta;
   vec3 fx = vec3(0.0);
-  if (fxNear(ro, rd, L*0.2, L*0.9) > 5.0) return fx;
+  // round 23: past the sun's and the orb's widest glow (2.6 out, glow 2 wide), which ended at a
+  // hard edge
+  if (fxNear(ro, rd, L*0.2, L*0.9) > 8.0) return fx;
   float ds = rayPt(ro, rd, ba_sun(), ta);
   fx += (vec3(1.0)*halo(ds, max(0.3, px))*2.0 + BA_LIGHT*halo(ds, 0.8)*1.2 + BA_LIGHT*halo(ds, 2.0)*0.3)*part(0.0)*bladeSeen(ro, rd, ba_sun());
   float dd = rayPt(ro, rd, ba_shade(), ta);

@@ -26,6 +26,9 @@ impl GpuState {
         if let Some(on) = console.take_hax_request() {
             self.hax.set_on(on);
         }
+        if let Some(on) = console.take_ragdoll_request() {
+            self.ragdoll.set_on(on);
+        }
         let mut actions = [None; MAX_ACTIONS_PER_FRAME];
         console.advance_command_frame();
         console.pump_console_socket();
@@ -70,6 +73,7 @@ impl GpuState {
             console.set_cardboard_box_on(self.cardboard_box.on());
             console.set_order66_on(self.order66.on());
             console.set_hax_on(self.hax.on());
+            console.set_ragdoll_on(self.ragdoll.on());
         }
         let connection = self
             .console

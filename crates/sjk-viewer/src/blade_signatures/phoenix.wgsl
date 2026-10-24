@@ -78,7 +78,7 @@ fn r8_vol(ro: vec3<f32>, rd: vec3<f32>, px: f32) -> vec3<f32> {
         let yc = uLength * 0.6;
         let h = rayAt(ro, rd, yc);
         if h.z > 0.0 {
-            let rr = abs((length(h.xy) + 1.0e3 * behindBlade(ro, rd, h.z)) - 0.6 - 5.5 * (1.0 - cl));
+            let rr = hideD(abs(length(h.xy) - 0.6 - 5.5 * (1.0 - cl)), behindBlade(ro, rd, h.z));
             col += pq_fire(cl) * (halo(rr, 0.3 + 0.5 * (1.0 - cl)) * 1.8) * cl;
         }
         let dc = rayPtRaw(ro, rd, vec3(0.0, yc, 0.0), &ta);

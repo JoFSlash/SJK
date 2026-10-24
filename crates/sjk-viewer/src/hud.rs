@@ -610,6 +610,7 @@ impl HudOverlay {
                 ),
             }
             top_right = top_right.max(self.emit_family(viewport));
+            self.icons.flags_in_boxes = self.flag_status.flags_in_boxes(visibility);
             top_right = top_right.max(self.icons.emit(
                 &mut self.draw_list,
                 viewport,

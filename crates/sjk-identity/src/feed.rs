@@ -1090,6 +1090,7 @@ mod tests {
             illuminate,
             saber_off: Vec::new(),
             toys: Vec::new(),
+            saber_sounds: String::new(),
         }
     }
 

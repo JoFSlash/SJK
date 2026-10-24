@@ -943,7 +943,9 @@ fn feed_path(after: u64, server: Option<&str>, wait: u64) -> String {
 /// `POST /v1/look`'s body: exactly the server and the look's fields. `saber_off` goes only
 /// when it names an option (and with a blade skin): a hub from before 11/10/2026 refuses
 /// the field, so a look with every part on stays as it was. `toys` goes only when a toy
-/// is out, for the same reason (hubs before 16/10/2026).
+/// is out, for the same reason (hubs before 16/10/2026). `saber_sounds` goes only when
+/// the player chose sounds apart from their blade (hubs before it refuse the field, and
+/// the service then sends the look without it).
 fn look_body(server: &str, look: &Look) -> Value {
     let mut body = json!({ "server": server, "saber": look.saber, "illuminate": look.illuminate });
     if !look.saber.is_empty() && !look.saber_off.is_empty() {
@@ -951,6 +953,9 @@ fn look_body(server: &str, look: &Look) -> Value {
     }
     if !look.toys.is_empty() {
         body["toys"] = json!(look.toys);
+    }
+    if !look.saber_sounds.is_empty() {
+        body["saber_sounds"] = json!(look.saber_sounds);
     }
     body
 }
@@ -1852,6 +1857,7 @@ mod tests {
             illuminate: true,
             saber_off: Vec::new(),
             toys: Vec::new(),
+            saber_sounds: String::new(),
         };
         assert_eq!(
             look_body("1.2.3.4:29070", &look),
@@ -1890,6 +1896,18 @@ mod tests {
             json!({"server": "1.2.3.4:29070", "saber": "", "illuminate": false,
                 "toys": ["cardboard_box"]})
         );
+        // The sounds chosen apart from the blade go only when chosen, stock or a skin's.
+        for sounds in ["stock", "saber_void"] {
+            let chosen = Look {
+                saber_sounds: sounds.to_owned(),
+                ..look.clone()
+            };
+            assert_eq!(
+                look_body("1.2.3.4:29070", &chosen),
+                json!({"server": "1.2.3.4:29070", "saber": "saber_sun", "illuminate": true,
+                    "saber_sounds": sounds})
+            );
+        }
     }
 
     #[test]

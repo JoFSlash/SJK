@@ -288,6 +288,8 @@ mod hax_shots;
 mod order66_shots;
 #[path = "world_shot_petals.rs"]
 mod petals;
+#[path = "world_shot_ragdoll.rs"]
+mod ragdoll_shots;
 
 #[path = "world_shot_blade_cards.rs"]
 mod blade_cards;
@@ -366,6 +368,8 @@ mod log_requests;
 #[path = "world_shot_whats_new.rs"]
 mod whats_new;
 
+#[path = "world_shot_chat_sounds.rs"]
+mod chat_sounds_shots;
 #[cfg(test)]
 #[path = "world_shot_footprints.rs"]
 mod footprints_shots;

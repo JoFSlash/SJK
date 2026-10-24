@@ -9,8 +9,9 @@
 
 vec3 flimsiplast_glow0(vec3 g, vec2 b, float r, float px){
   float k = floor(uTime/4.0), q = smoothstep(0.0, 0.3, fract(uTime/4.0));
-  float f0 = fract(b.y/3.0 + b.x*(0.8 + 0.4*h11(k))), f1 = fract(b.y/3.0 + b.x*(0.8 + 0.4*h11(k + 1.0)));
-  float s = mix(step(0.5, f0), step(0.5, f1), q);
+  // round 23: the creases' edges smoothed over a pixel (they stair-stepped)
+  float m0 = 0.8 + 0.4*h11(k), m1 = 0.8 + 0.4*h11(k + 1.0);
+  float s = mix(aaSquare(b.y/3.0 + b.x*m0, px*(0.34 + m0)), aaSquare(b.y/3.0 + b.x*m1, px*(0.34 + m1)), q);
   return g*(1.0 - 0.3*s*part(0.0));
 }
 vec3 sig_glow(vec3 g, vec2 b, float r, float px){

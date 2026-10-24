@@ -144,6 +144,7 @@ pub(crate) fn row_labels(
         cardboard_box: false,
         order66: false,
         hax: false,
+        ragdoll: false,
         name: "",
         stock: color::HOLO,
         grid: false,
@@ -261,6 +262,7 @@ impl Panel {
         self.box_on = inputs.cardboard_box;
         self.order66_on = inputs.order66;
         self.hax_on = inputs.hax;
+        self.ragdoll_on = inputs.ragdoll;
         self.share_on = inputs.share;
         let seconds = self.epoch.elapsed().as_secs_f32();
         #[cfg(test)]
@@ -504,6 +506,8 @@ impl Panel {
                     (2, _, _) => "turn on",
                     (3, _, _) if inputs.hax => "turn off",
                     (3, _, _) => "turn on",
+                    (4, _, _) if inputs.ragdoll => "get up",
+                    (4, _, _) => "go limp",
                     (_, true, _) => "put out",
                     _ => "light",
                 },

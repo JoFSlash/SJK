@@ -102,8 +102,8 @@ const BARS_BEFORE_PING: f32 = 76.0;
 /// the general dim.
 const BOARD_DIM: f32 = 0.5;
 /// A team's colour, muted: only its thin rule and its name wear it.
-const RED_TEAM: Color = Color::new(0.88, 0.38, 0.38, 1.0);
-const BLUE_TEAM: Color = Color::new(0.44, 0.64, 0.98, 1.0);
+const RED_TEAM: Color = color::RED_TEAM;
+const BLUE_TEAM: Color = color::BLUE_TEAM;
 
 /// The match's limits, from the server's info.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]

@@ -1,9 +1,10 @@
 //! The Collection's Toys tab: things to use in a match, everyone's. SJK's Illuminate
 //! holocron (`docs/client.md`, Illuminate), the cardboard box (`docs/client.md`,
-//! Cardboard box), Order 66 (`docs/client.md`, Order 66) and the Hax (`docs/client.md`,
-//! Hax) stand on plinths on the left; the chosen one is described beside the model with
-//! the switch that runs it (`toy_illuminate`, `toy_box`, `toy_order66`, `toy_hax`). The holocron floats lit by the model
-//! while it is chosen.
+//! Cardboard box), Order 66 (`docs/client.md`, Order 66), the Hax (`docs/client.md`,
+//! Hax) and the Ragdoll (`docs/client.md`, Ragdoll) stand on plinths on the left; the
+//! chosen one is described beside the model with the switch that runs it
+//! (`toy_illuminate`, `toy_box`, `toy_order66`, `toy_hax`, `toy_ragdoll`). The holocron
+//! floats lit by the model while it is chosen.
 
 use super::view::{LEFT_X, STAGE_TEXT_WIDTH, STAGE_TEXT_X, glow, left_lines};
 use super::*;
@@ -13,8 +14,8 @@ use sjk_ui::{Color, DrawCommand, FontWeight, TextAlign, TextureId};
 
 /// The first toy's niche: its corner and size; the next stands [`NICHE_STEP`] to the
 /// right.
-const NICHE: [f32; 3] = [LEFT_X, 300.0, 230.0];
-const NICHE_STEP: f32 = 250.0;
+const NICHE: [f32; 3] = [LEFT_X, 300.0, 200.0];
+const NICHE_STEP: f32 = 220.0;
 
 /// One toy as the tab shows it.
 struct Toy {
@@ -69,6 +70,15 @@ const TOYS: [Toy; TOY_COUNT] = [
         switch: "Hacker",
         token: HAX_TOKEN,
     },
+    Toy {
+        icon: "ragdoll",
+        name: "Ragdoll",
+        title: "Ragdoll",
+        what: "Go limp and fall where physics takes you, sandbox style, though you are not dead; the camera follows the body. Other SJK players see the same fall. Getting hurt gets you up.",
+        how: "Bind a key to toy_ragdoll, or use the quick wheel's Toys page; press it again to get up.",
+        switch: "Limp",
+        token: RAGDOLL_TOKEN,
+    },
 ];
 
 /// A toy's picture: the quick wheel's, uploaded into the atlas at start.
@@ -111,7 +121,7 @@ impl Panel {
     pub(super) fn toys(&mut self, frame: &Frame, inputs: &Inputs<'_>) {
         self.lead(
             frame,
-            "4 toys",
+            "5 toys",
             "Things to use in a match, from the quick wheel or a key.",
         );
         let chosen = self.toy.min(TOY_COUNT - 1);
@@ -128,6 +138,7 @@ impl Panel {
             1 => inputs.cardboard_box,
             2 => inputs.order66,
             3 => inputs.hax,
+            4 => inputs.ragdoll,
             _ => inputs.illuminate,
         };
         self.toy_beside_model(frame, &TOYS[chosen], on);
@@ -310,6 +321,7 @@ mod tests {
                         BOX_TOKEN,
                         ORDER_TOKEN,
                         HAX_TOKEN,
+                        RAGDOLL_TOKEN,
                         TOY_SWITCH_TOKEN,
                     ] {
                         let area = panel.ui.rect_for(token).expect("a target");

@@ -610,6 +610,10 @@ struct Worker {
     /// listed then: they are not sent again until those change.
     look_refused: Vec<String>,
     look_refused_for: Vec<Unlock>,
+    /// The hub refused a look's `saber_sounds` as an unknown field (a hub from before
+    /// 23/10/2026): looks go without it, so the blade and the rest still sync and other
+    /// players hear the sounds that follow the blade, until the hub changes.
+    look_sounds_unsupported: bool,
     /// The feed id of the last look the hub took from this worker.
     look_id: Option<u64>,
     /// When the own profile may next be read early ([`Worker::profile_soon`]).
@@ -843,6 +847,7 @@ impl Worker {
             look_held: Held::Unknown,
             due_look: now,
             look_refused: Vec::new(),
+            look_sounds_unsupported: false,
             look_refused_for: Vec::new(),
             look_id: None,
             profile_soon_after: now,
@@ -1246,6 +1251,7 @@ impl Worker {
         // first, on the hub that holds it.
         self.release();
         self.hub = None;
+        self.look_sounds_unsupported = false;
         self.registered = false;
         self.name_sent = None;
         self.update(Snapshot::clear_me);
@@ -2029,6 +2035,9 @@ impl Worker {
             look.saber.clear();
             look.saber_off.clear();
         }
+        if self.look_sounds_unsupported || self.look_refused.contains(&look.saber_sounds) {
+            look.saber_sounds.clear();
+        }
         look
     }
 
@@ -2068,6 +2077,29 @@ impl Worker {
                     .map(|me| me.unlocks.clone())
                     .unwrap_or_default();
                 self.look_refused.push(look.saber.clone());
+            }
+            // The sound set chosen apart from the blade is a skin the key does not hold:
+            // the look goes again without it (following the blade) until the profile
+            // changes.
+            Err(HubError::Rejected { code, .. })
+                if code == "sounds_not_unlocked" && !look.saber_sounds.is_empty() =>
+            {
+                self.profile_soon(now);
+                self.look_refused_for = lock(&self.snapshot)
+                    .me
+                    .as_ref()
+                    .map(|me| me.unlocks.clone())
+                    .unwrap_or_default();
+                self.look_refused.push(look.saber_sounds.clone());
+                self.due_look = now;
+            }
+            // A hub from before the sounds choice refuses the field: the look goes
+            // again at once without it, so the blade still reaches everyone.
+            Err(HubError::Rejected {
+                status: 400, code, ..
+            }) if code == "bad_body" && !look.saber_sounds.is_empty() => {
+                self.look_sounds_unsupported = true;
+                self.due_look = now;
             }
             // The claim lapsed at the hub: the next accepted claim sends the look again.
             Err(HubError::Rejected { code, .. }) if code == "not_on_server" => {
@@ -3435,7 +3467,14 @@ mod tests {
         fn look(&mut self, _: &Identity, server: &str, look: &Look) -> Result<u64, HubError> {
             Fake::record(
                 self,
-                format!("look {server} {:?} {}", look.saber, look.illuminate),
+                if look.saber_sounds.is_empty() {
+                    format!("look {server} {:?} {}", look.saber, look.illuminate)
+                } else {
+                    format!(
+                        "look {server} {:?} {} sounds {}",
+                        look.saber, look.illuminate, look.saber_sounds
+                    )
+                },
             )?;
             if let Some(refusal) = self.look_refusals.lock().unwrap().pop_front() {
                 return Err(refusal);
@@ -4417,6 +4456,7 @@ mod tests {
             illuminate: true,
             saber_off: Vec::new(),
             toys: Vec::new(),
+            saber_sounds: String::new(),
         }
     }
 
@@ -4597,6 +4637,85 @@ mod tests {
         worker.tick(at + LOOK_AGAIN);
         worker.tick(at + LOOK_AGAIN * 3);
         assert_eq!(fake.looks().len(), sent + 5);
+    }
+
+    /// A hub from before the sounds choice refuses `saber_sounds` as an unknown field:
+    /// the look goes again at once without it, and later looks leave it out, so the
+    /// blade still reaches everyone (who hear the sounds that follow it). A sound set the
+    /// key does not hold is left out the same way, the blade kept.
+    #[test]
+    fn sounds_an_older_hub_refuses_or_the_key_lacks_are_left_out_and_the_blade_goes() {
+        let fake = Fake::default();
+        fake.owned.lock().unwrap().push("saber_sun".to_owned());
+        let t0 = Instant::now();
+        let (mut worker, _) = worker(&fake, t0);
+        worker.handle(Command::Configure(on("https://hub")), t0);
+        worker.handle(Command::Enter(here(3, "Sol")), t0);
+        worker.tick(t0);
+        let sent = fake.looks().len();
+        fake.look_refusals
+            .lock()
+            .unwrap()
+            .push_back(refused(400, "bad_body"));
+        let at = t0 + LOOK_EVERY;
+        let sounds = Look {
+            saber_sounds: "stock".to_owned(),
+            ..lit("saber_sun")
+        };
+        worker.handle(Command::Look(sounds.clone()), at);
+        worker.tick(at);
+        worker.tick(at);
+        assert_eq!(
+            fake.looks()[sent..],
+            [
+                "look 1.2.3.4:29070 \"saber_sun\" true sounds stock",
+                "look 1.2.3.4:29070 \"saber_sun\" true",
+            ]
+        );
+        // Another choice still goes without it to this hub.
+        let at = at + LOOK_EVERY;
+        worker.handle(
+            Command::Look(Look {
+                illuminate: false,
+                ..sounds.clone()
+            }),
+            at,
+        );
+        worker.tick(at);
+        assert_eq!(
+            fake.looks().last().unwrap(),
+            "look 1.2.3.4:29070 \"saber_sun\" false"
+        );
+
+        // A newer hub: a sound set the key lacks is refused and left out, the blade kept.
+        let fake = Fake::default();
+        fake.owned.lock().unwrap().push("saber_sun".to_owned());
+        let (mut worker, _) = self::worker(&fake, t0);
+        worker.handle(Command::Configure(on("https://hub")), t0);
+        worker.handle(Command::Enter(here(3, "Sol")), t0);
+        worker.tick(t0);
+        let sent = fake.looks().len();
+        fake.look_refusals
+            .lock()
+            .unwrap()
+            .push_back(refused(403, "sounds_not_unlocked"));
+        let at = t0 + LOOK_EVERY;
+        worker.handle(
+            Command::Look(Look {
+                saber_sounds: "saber_void".to_owned(),
+                ..lit("saber_sun")
+            }),
+            at,
+        );
+        worker.tick(at);
+        worker.tick(at);
+        assert_eq!(
+            fake.looks()[sent..],
+            [
+                "look 1.2.3.4:29070 \"saber_sun\" true sounds saber_void",
+                "look 1.2.3.4:29070 \"saber_sun\" true",
+            ]
+        );
     }
 
     fn profile_reads(fake: &Fake) -> usize {

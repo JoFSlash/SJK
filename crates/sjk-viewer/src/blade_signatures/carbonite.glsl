@@ -189,7 +189,7 @@ vec3 base_vol(vec3 ro, vec3 rd, float px){
   if (uClash > 0.01){
     float a = 1.0 - uClash;
     vec3 h = rayAt(ro, rd, L*0.6);
-    if (h.z > 0.0) light += vec3(0.75, 0.95, 1.0)*halo(abs((length(h.xy) + 1e3*behindBlade(ro, rd, h.z)) - 0.8 - 6.0*a), 0.25)*1.4*uClash;
+    if (h.z > 0.0) light += vec3(0.75, 0.95, 1.0)*halo(hideD(abs(length(h.xy) - 0.8 - 6.0*a), behindBlade(ro, rd, h.z)), 0.25)*1.4*uClash;
     float dc = rayPtRaw(ro, rd, vec3(0.0, L*0.6, 0.0), ta);
     light += vec3(0.75, 0.95, 1.0)*halo(dc, 1.4)*pow(uClash, 2.0);
   }

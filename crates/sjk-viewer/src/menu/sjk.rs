@@ -427,6 +427,11 @@ pub(crate) mod color {
     pub(crate) const QUIET: Color = Color::new(0.53, 0.573, 0.675, 1.0);
     /// Only for leaving: Quit.
     pub(crate) const EMBER: Color = Color::new(1.0, 0.478, 0.239, 1.0);
+    /// The red team, muted: the SJK scoreboard's team rules and names, the CTF HUD's
+    /// team boxes.
+    pub(crate) const RED_TEAM: Color = Color::new(0.88, 0.38, 0.38, 1.0);
+    /// The blue team, muted as [`RED_TEAM`].
+    pub(crate) const BLUE_TEAM: Color = Color::new(0.44, 0.64, 0.98, 1.0);
 
     /// `color` at `alpha`.
     pub(crate) const fn alpha(color: Color, alpha: f32) -> Color {

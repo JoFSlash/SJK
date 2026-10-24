@@ -43,7 +43,9 @@ fn sig_glow(g: vec3<f32>, b: vec2<f32>, r: f32, px_in: f32) -> vec3<f32> {
     // ignition heat
     let w = ob_w(b.y);
     let ax = abs(b.x);
-    let inside = step(b.y, L + 0.05) * step(-0.3, b.y);
+    // round 23 (Creyon's game, 22/10/2026: an orange box ended at a straight line level with the
+    // tip): the edges' blooms fade out round the tip and into the hilt instead of stopping at once
+    let inside = (1.0 - smoothstep(L - 0.6, L + 1.6, b.y)) * smoothstep(-0.8, -0.1, b.y);
     // white-hot edges: thin bright lines on both sides, crackling, with a hot orange bloom
     let de = abs(ax - w);
     let cr = ob_crack(b.y + sign(b.x) * 7.0, uTime);
@@ -51,7 +53,7 @@ fn sig_glow(g: vec3<f32>, b: vec2<f32>, r: f32, px_in: f32) -> vec3<f32> {
     light += vec3<f32>(1.0, 0.5, 0.15) * halo(de, 0.35) * 0.5 * cr * inside + vec3<f32>(1.0, 0.35, 0.08) * halo(de, 1.4) * 0.12 * inside;
     // the tip: the two edges meet in a hot point
     let dt = length(vec2(b.x, max(b.y - L, 0.0)));
-    light += vec3<f32>(1.0, 0.8, 0.5) * halo(dt, 0.25) * 0.5 * step(L - 0.5, b.y);
+    light += vec3<f32>(1.0, 0.8, 0.5) * halo(dt, 0.25) * 0.5 * smoothstep(L - 1.2, L - 0.3, b.y);
     // sparks running along the edge
     for (var k = 0; k < 5; k++) {
         let fk = f32(k);

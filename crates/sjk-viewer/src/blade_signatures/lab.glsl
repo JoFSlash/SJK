@@ -61,9 +61,13 @@ vec2 helix(float y, float r, float turns, float phase){
 // Round 22 (Creyon: nothing may be seen through the blade when it is behind it): how hidden by
 // the blade's body a point t along the ray is, 0 (seen) to 1 (hidden): the ray passes through the
 // blade's body (its nearest approach to the axis within the blade) before reaching it.
+// Round 23 (players' reports after the 2026.1021.1 release: hard-edged boxes and lines round
+// the tip when a blade pointed at the camera): it fades in and out softly; it used to switch
+// off at once when looking nearly along the blade.
 float behindBlade(vec3 ro, vec3 rd, float t){
   float a = dot(rd.xz, rd.xz);
-  if (a < 0.02) return 0.0;
+  float along = smoothstep(0.01, 0.04, a);
+  if (along <= 0.0) return 0.0;
   float ta = -dot(ro.xz, rd.xz)/a;
   float y = ro.y + rd.y*ta;
   vec2 off = ro.xz + rd.xz*ta;
@@ -71,9 +75,21 @@ float behindBlade(vec3 ro, vec3 rd, float t){
   // what lies on the blade's own body (its axis, its glow) is never hidden by it
   vec3 p = ro + rd*t;
   float outside = smoothstep(0.5, 0.9, length(p.xz));
-  float onBlade = smoothstep(-0.8, -0.2, y)*(1.0 - smoothstep(uLength - 0.2, uLength + 0.4, y));
-  return (1.0 - smoothstep(0.35, 0.8, d))*onBlade*outside*smoothstep(ta + 0.15, ta + 0.7, t);
+  // round 23: the body hiding narrows with the blade's rounded tip (a quarter circle over its
+  // last 1.4 units) down to the point, so what passes behind the tip is hidden too (Sol's review:
+  // ending the hiding before the tip let Exegol Rift's flare and Quasar's jet show through),
+  // without the dark round end past the tip that a full-width hiding drew seen end on
+  float into = clamp((y - (uLength - 1.4))/1.4, 0.0, 1.0);
+  float w = sqrt(max(1.0 - into*into, 0.0));
+  float onBlade = smoothstep(-0.8, -0.2, y)*(1.0 - smoothstep(uLength - 0.15, uLength + 0.05, y));
+  return (1.0 - smoothstep(0.35*w, 0.8*w + 0.02, d))*onBlade*outside*smoothstep(ta + 0.15, ta + 0.7, t)*along;
 }
+// A distance d as seen when h (behindBlade) of it is hidden by the blade: unchanged at 0, out of
+// reach at 1, and in between the piece narrows and dims, so whatever passes behind the blade fades
+// out over the blade's soft edge. Round 23: adding 1e3*h hid a piece wherever h was more than a
+// thousandth, a hard cut along the blade's body that showed as a box round the tip when the blade
+// pointed at the camera.
+float hideD(float d, float h){ return d/max(1.0 - h, 1e-3) + h; }
 // The distance from the ray to point p, as seen (a point the blade hides is far off); t
 // returns how far along the ray that is.
 float rayPtRaw(vec3 ro, vec3 rd, vec3 p, out float t){
@@ -82,7 +98,7 @@ float rayPtRaw(vec3 ro, vec3 rd, vec3 p, out float t){
 }
 float rayPt(vec3 ro, vec3 rd, vec3 p, out float t){
   float d = rayPtRaw(ro, rd, p, t);
-  return d + 1e3*behindBlade(ro, rd, t);
+  return hideD(d, behindBlade(ro, rd, t));
 }
 // The distance from the ray to the segment a-b; s returns where on it (0 at a, 1 at b); the
 // raw one ignores the blade's body (for bounds and the blade's own axis).
@@ -100,7 +116,7 @@ float raySegRaw(vec3 ro, vec3 rd, vec3 a, vec3 b, out float s){
 float raySeg(vec3 ro, vec3 rd, vec3 a, vec3 b, out float s){
   float d = raySegRaw(ro, rd, a, b, s);
   vec3 q = a + (b - a)*s;
-  return d + 1e3*behindBlade(ro, rd, max(dot(q - ro, rd), 0.0));
+  return hideD(d, behindBlade(ro, rd, max(dot(q - ro, rd), 0.0)));
 }
 // Where the ray crosses the plane across the blade at height h: xz there, and t (negative:
 // never, or behind the camera).
@@ -180,14 +196,14 @@ float fxNear(vec3 ro, vec3 rd, float y0, float y1){
 float ringD(vec3 ro, vec3 rd, float y, float R){
   float best = 1e3;
   vec3 h = rayAt(ro, rd, y);
-  if (h.z > 0.0) best = abs(length(h.xy) - R) + 1e3*behindBlade(ro, rd, h.z);
+  if (h.z > 0.0) best = hideD(abs(length(h.xy) - R), behindBlade(ro, rd, h.z));
   float a = dot(rd.xz, rd.xz), b = dot(ro.xz, rd.xz), c = dot(ro.xz, ro.xz) - R*R;
   float dsc = b*b - a*c;
   if (dsc > 0.0 && a > 1e-6){
     float q = sqrt(dsc);
     float t0 = (-b - q)/a, t1 = (-b + q)/a;
-    if (t0 > 0.0) best = min(best, abs(ro.y + rd.y*t0 - y) + 1e3*behindBlade(ro, rd, t0));
-    if (t1 > 0.0) best = min(best, abs(ro.y + rd.y*t1 - y) + 1e3*behindBlade(ro, rd, t1));
+    if (t0 > 0.0) best = min(best, hideD(abs(ro.y + rd.y*t0 - y), behindBlade(ro, rd, t0)));
+    if (t1 > 0.0) best = min(best, hideD(abs(ro.y + rd.y*t1 - y), behindBlade(ro, rd, t1)));
   }
   return best;
 }
@@ -196,7 +212,10 @@ float ringD(vec3 ro, vec3 rd, float y, float R){
 vec3 fxFlare(vec3 ro, vec3 rd, vec3 p, float px, float size, float len, float n, float spin, vec3 col){
   float t;
   float d = rayPt(ro, rd, p, t);
-  if (d > len + size*4.0) return vec3(0.0);
+  // round 23: skipped only past its widest halo (size*8), which fades to nothing before the cut
+  // (at size*4 it was still a tenth as bright and ended at a hard ring round the flare; Sol's
+  // review: size*18 cost too much, size*12 with the taper below is as clean)
+  if (d > len + size*12.0) return vec3(0.0);
   vec3 q = ro + rd*t - p;
   vec3 u = normalize(cross(rd, abs(rd.y) < 0.9 ? vec3(0.0, 1.0, 0.0) : vec3(1.0, 0.0, 0.0)));
   vec3 v = cross(rd, u);
@@ -207,13 +226,15 @@ vec3 fxFlare(vec3 ro, vec3 rd, vec3 p, float px, float size, float len, float n,
   float across = abs(r*sin(aa)), along = r*cos(aa);
   float w = max(px, 0.03 + 0.012*along);
   float ray = exp(-pow(across/w, 2.0))*exp(-max(along, 0.0)/max(len, 0.01)*2.6)*step(0.0, along);
-  return (vec3(1.0)*(halo(d, max(size, px))*1.8 + ray*0.9) + col*(halo(d, size*3.0)*0.7 + ray*0.8 + halo(d, size*8.0)*0.15))*roomAt(p);
+  float wide = halo(d, size*8.0)*(1.0 - smoothstep(len + size*7.0, len + size*12.0, d));
+  return (vec3(1.0)*(halo(d, max(size, px))*1.8 + ray*0.9) + col*(halo(d, size*3.0)*0.7 + ray*0.8 + wide*0.15))*roomAt(p);
 }
 // Beams of light shooting out of the blade between heights y0 and y1: count of them (up to
 // 24), each up to len long, flaring out and fading rate times a second, seed chooses them.
 vec3 fxRays(vec3 ro, vec3 rd, float px, float y0, float y1, float count, float len, float rate, float seed, vec3 col){
   vec3 acc = vec3(0.0);
-  if (fxNear(ro, rd, y0, y1) > len*1.6 + 1.0) return acc;
+  // round 23: past the beams' widest glow (nine of their widths), which ended at a hard edge
+  if (fxNear(ro, rd, y0, y1) > len*1.6 + 5.0) return acc;
   float s;
   for (int i = 0; i < 24; i++){
     float fi = float(i);
@@ -233,12 +254,19 @@ vec3 fxRays(vec3 ro, vec3 rd, float px, float y0, float y1, float count, float l
   }
   return acc;
 }
+// A bolt's light (boltLight) faded to nothing 1.7 from it, so fxArcs can skip a bolt past that
+// without a seam: its widest glow is a fortieth as bright there.
+vec3 arcGlow(float dist, vec3 col, float px){
+  return boltLight(dist, col, px)*(1.0 - smoothstep(1.1, 1.7, dist));
+}
 // Lightning in three dimensions: count (up to 10) bolts that leave the blade between y0 and
 // y1, arc out up to reach units on every side and come back in, with a fork, struck anew
 // rate times a second (Sol's Storm, all round the blade).
 vec3 fxArcs(vec3 ro, vec3 rd, float px, float y0, float y1, float count, float reach, float rate, float seed, vec3 col){
   vec3 acc = vec3(0.0);
-  if (fxNear(ro, rd, y0, y1) > reach + 2.0) return acc;
+  // round 23: past the forks' reach (half again the bolt's, which the blade's room caps at 0.6 of
+  // it) and their glow, which ended at a hard edge
+  if (fxNear(ro, rd, y0, y1) > min(reach, 0.6*uReach)*1.6 + 3.0) return acc;
   float t;
   for (int i = 0; i < 10; i++){
     float fi = float(i);
@@ -250,13 +278,23 @@ vec3 fxArcs(vec3 ro, vec3 rd, float px, float y0, float y1, float count, float r
     float a = h11(k*4.1 + fi*2.0 + seed);
     float R = min(reach, 0.6*uReach)*(0.45 + 0.55*h11(k*7.7 + fi + seed));
     vec3 mid = around(R, a, mix(ya, yb, 0.5) + (h11(k*9.1 + fi) - 0.5)*2.0);
-    if (rayPtRaw(ro, rd, mid, t) > R + (yb - ya)*0.6 + 1.5) continue;
+    // round 23 (Sol's review: timed on Creyon's RTX 5070, the arc blades cost a fifth to a third
+    // more once their glow faded out instead of being cut): each of the arc's three bolts (its two
+    // halves and the fork) is drawn only near its own middle. A bolt's points lie within half its
+    // length of its middle (its zigzag reaches less aside than that), and its glow is made to end
+    // 1.7 past them (arcGlow), so a pixel further off would draw nothing from it.
+    if (rayPtRaw(ro, rd, mid, t) > R*1.25 + (yb - ya)*0.65 + 2.8) continue;
     float env = (1.0 - q)*(1.0 - q)*(0.6 + 0.4*step(0.5, fract(q*9.0 + fi)));
-    float d = min(bolt3(ro, rd, around(0.25, a, ya), mid, k + fi*1.37 + seed, 0.5),
-                  bolt3(ro, rd, mid, around(0.25, a, yb), k + fi*1.37 + seed + 0.5, 0.5));
+    vec3 ea = around(0.25, a, ya), eb = around(0.25, a, yb);
     vec3 fork = mid + around(R*0.55, a + 0.12*(h11(k + fi) - 0.5), (h11(k*3.3 + fi) - 0.5)*3.0);
-    float d2 = bolt3(ro, rd, mid, fork, k*2.1 + fi + seed, 0.6);
-    acc += (boltLight(d, col, px) + boltLight(d2, col, px)*0.55)*env;
+    float d = 1e3, d2 = 1e3;
+    if (rayPtRaw(ro, rd, (ea + mid)*0.5, t) < 0.55*length(mid - ea) + 1.8 + px)
+      d = bolt3(ro, rd, ea, mid, k + fi*1.37 + seed, 0.5);
+    if (rayPtRaw(ro, rd, (mid + eb)*0.5, t) < 0.55*length(eb - mid) + 1.8 + px)
+      d = min(d, bolt3(ro, rd, mid, eb, k + fi*1.37 + seed + 0.5, 0.5));
+    if (rayPtRaw(ro, rd, (mid + fork)*0.5, t) < 0.55*length(fork - mid) + 1.8 + px)
+      d2 = bolt3(ro, rd, mid, fork, k*2.1 + fi + seed, 0.6);
+    acc += (arcGlow(d, col, px) + arcGlow(d2, col, px)*0.55)*env;
   }
   return acc;
 }
@@ -287,7 +325,8 @@ vec3 fxSparks(vec3 ro, vec3 rd, float px, float y0, float y1, float count, float
 // travelling up at speed; knots of light run along them. count (up to 4) strands.
 vec3 fxCoils(vec3 ro, vec3 rd, float px, float y0, float y1, float R, float turns, float speed, float count, vec3 col){
   vec3 acc = vec3(0.0);
-  if (fxNear(ro, rd, y0, y1) > R + 1.5) return acc;
+  // round 23: past the coils' widest glow (it ended at a hard edge, R + 1.5)
+  if (fxNear(ro, rd, y0, y1) > R + 2.5) return acc;
   float s;
   for (int j = 0; j < 4; j++){
     float fj = float(j);
@@ -351,7 +390,10 @@ float bands(float y, float k, float v){ return 0.5 + 0.5*sin(y*k*6.2832 - uTime*
 // heights y0 and y1, reaching r across, falling at v, slanted by lean.
 vec3 fxFall(vec3 ro, vec3 rd, float px, float y0, float y1, float r, float count, float v, float len, float lean, float seed, vec3 col){
   vec3 acc = vec3(0.0);
-  if (fxNear(ro, rd, y0, y1) > r + 1.0) return acc;
+  // round 23: the streaks start up to 2 units past y0 and y1 and reach len further (leaning
+  // lean*len aside): skipped only outside all that (Lightspeed Ram's rising streaks were cut
+  // above the tip)
+  if (fxNear(ro, rd, y0 - 2.0 + min(len, 0.0), y1 + 2.0 + max(len, 0.0)) > r + abs(lean*len) + 1.0) return acc;
   float s;
   for (int i = 0; i < 32; i++){
     float fi = float(i);
@@ -375,6 +417,18 @@ float part(float k){ return 1.0 - mod(floor(uParts/exp2(k) + 0.001), 2.0); }
 // (Creyon: Reactor's shock ring was cut off where it left that room).
 float roomFade(float r){ return 1.0 - smoothstep(0.72*uReach, 0.97*uReach, r); }
 float roomAt(vec3 p){ return roomFade(length(p.xz)); }
+// ---- round 23: sharp patterns without stair steps (players' reports after 2026.1021.1) ----
+// A step from 0 to 1 at e, smoothed over w (a pixel, in x's units): a pattern's edge stays sharp
+// but no longer stair-steps or flickers as the blade moves.
+float aaStep(float e, float x, float w){ return smoothstep(e - 0.5*w, e + 0.5*w, x); }
+// How far a pixel is into the next cell of u (cells one long), over the cell's last w (a pixel in
+// u's units, and at least a twelfth of the cell, as px is the pixel across the blade and a pixel
+// along it is longer where the blade is seen end on): blending a cell's value into the next one's
+// by it keeps blocks and stripes sharp.
+float cellMix(float u, float w){ return smoothstep(1.0 - clamp(w, 0.08, 0.5), 1.0, fract(u)); }
+// A square wave of u, 0 for the first half of each one-long cell and 1 for the second, its two
+// edges smoothed over w (a pixel in u's units, at least a twelfth of the cell, as cellMix).
+float aaSquare(float u, float w){ float f = fract(u); w = clamp(w, 0.08, 0.25); return aaStep(0.5, f, w)*(1.0 - smoothstep(1.0 - w, 1.0, f)); }
 // ---- round 12: richer pieces for the lower tiers (each blade sets its own pattern) ----
 // Soft curling smoke round the blade between heights y0 and y1, w units to each side at its
 // thickest, rising at `rise` units a second (negative sinks): warped smooth noise with no hard
@@ -391,12 +445,19 @@ float fxSmokeAt(vec3 p, float w, float y0, float y1, float rise, float seed){
   float shape = exp(-pow(ax/w, 2.0))*smoothstep(y0 - 3.0, y0 + 2.0, p.y)*(1.0 - smoothstep(y1 - 7.0, y1 - 1.0, p.y));
   return smoothstep(0.35, 0.8, n)*shape;
 }
+// Round 23 (players' reports after 2026.1021.1: a hard-edged dome in the smoke seen along the
+// blade): a step at most about a third of the cloud's width, up to 12 of them (16 cost the smoke
+// blades up to a sixth more seen along them, Sol's review), so a long path through it (looking
+// along the blade) is not sampled six units apart; seen from the side the path is short and it
+// still takes six.
 vec3 fxSmoke(vec3 ro, vec3 rd, float y0, float y1, float w, float rise, float seed, vec3 col){
   vec2 span = raySpan(ro, rd, w*2.4, y0 - 3.0, y1);
   if (span.x >= span.y) return vec3(0.0);
-  float dt = (span.y - span.x)/6.0;
+  float n = clamp(ceil((span.y - span.x)/(0.8*w)), 6.0, 12.0);
+  float dt = (span.y - span.x)/n;
   float acc = 0.0;
-  for (int i = 0; i < 6; i++){
+  for (int i = 0; i < 12; i++){
+    if (float(i) >= n) break;
     float ts = span.x + (float(i) + 0.5)*dt;
     acc += fxSmokeAt(ro + rd*ts, w, y0, y1, rise, seed)*(1.0 - behindBlade(ro, rd, ts));
   }
@@ -438,7 +499,10 @@ vec3 fxStreams(vec3 ro, vec3 rd, float px, float y0, float y1, float count, floa
 // swaying `drift` units, spread up to `spread` units to each side.
 vec3 fxFlakes(vec3 ro, vec3 rd, float px, float y0, float y1, float spread, float count, float v, float size, float aspect, float spin, float drift, float seed, vec3 col){
   vec3 acc = vec3(0.0);
-  if (fxNear(ro, rd, y0 - 3.0, y1) > spread + 1.0) return acc;
+  // round 23: skipped only past where a flake's soft halo has faded (a flake sways `drift` past
+  // `spread`, and its halo reaches about six sizes): cut there, it drew a hard dome round the
+  // blade seen along it (Yavin Vines, players' reports after 2026.1021.1)
+  if (fxNear(ro, rd, y0 - 3.0, y1) > spread + abs(drift) + size*6.0 + 1.0) return acc;
   float ta;
   for (int i = 0; i < 24; i++){
     float fi = float(i);
@@ -450,7 +514,7 @@ vec3 fxFlakes(vec3 ro, vec3 rd, float px, float y0, float y1, float spread, floa
     float rr = min(0.6 + (spread - 0.6)*h11(fi*3.9 + seed) + drift*sin(uTime*0.9 + fi*2.0), 0.95*uReach);
     vec3 p = around(max(rr, 0.4), h11(fi*4.3 + seed) + 0.03*sin(uTime*0.5 + fi), y);
     float d = rayPt(ro, rd, p, ta);
-    if (d > size*4.0 + px) continue;
+    if (d > size*6.0 + px) continue;
     vec3 q = ro + rd*ta - p;
     vec3 fu = normalize(cross(rd, abs(rd.y) < 0.9 ? vec3(0.0, 1.0, 0.0) : vec3(1.0, 0.0, 0.0)));
     vec2 e = rot(uTime*spin + fi*1.7)*vec2(dot(q, fu), dot(q, cross(rd, fu)));
@@ -485,5 +549,6 @@ float bladeSeen(vec3 ro, vec3 rd, vec3 at){
   raySegRaw(ro, rd, vec3(0.0), vec3(0.0, L, 0.0), sAx);
   float dAx = rayPtRaw(ro, rd, vec3(0.0, sAx*L, 0.0), tAx);
   rayPt(ro, rd, at, tAt);
-  return 1.0 - (1.0 - smoothstep(0.35, 0.9, dAx))*step(tAx, tAt);
+  // round 23: fading in behind the axis over a little depth, not at a hard step
+  return 1.0 - (1.0 - smoothstep(0.35, 0.9, dAx))*smoothstep(tAx - 0.4, tAx + 0.4, tAt);
 }

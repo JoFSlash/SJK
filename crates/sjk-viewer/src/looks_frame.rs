@@ -68,25 +68,22 @@ impl GpuState {
         // The look the hub relays is what the player holds; `debug_collectibles` changes
         // only the blade drawn here (the hub refuses a skin the player lacks).
         let mut sent = None;
-        let (saber_skin, options_off) = if due {
+        let (saber_skin, options_off, sounds) = if due {
             let setting = text(crate::unlockables::SABER_SKIN_CVAR);
+            let sounds = text(crate::saber_sound_choice::CVAR);
             #[cfg(test)]
             let shot = self.looks.shot_owns_unlocks;
             #[cfg(not(test))]
             let shot = false;
-            let held = Worn::own(
-                &setting,
-                &options,
-                |id| shot || player_identity::owns_unlock(id),
-                lit,
-            );
+            let owned = |id: &str| shot || player_identity::owns_unlock(id);
+            let held = Worn::own(&setting, &options, owned, lit).with_sounds(&sounds, owned);
             let debug = self
                 .console
                 .as_ref()
                 .is_some_and(crate::debug_collectibles::wanted)
                 && player_identity::is_staff();
             let own = if debug {
-                Worn::own(&setting, &options, |_| true, lit)
+                Worn::own(&setting, &options, |_| true, lit).with_sounds(&sounds, |_| true)
             } else {
                 held
             };
@@ -96,15 +93,17 @@ impl GpuState {
                     .with_toy(crate::hax::TOY, self.hax.on())
                     .with_toy(crate::hax::AWAY_TOY, away_hackable),
             );
-            (own.saber_skin, own.options_off)
+            (own.saber_skin, own.options_off, own.sounds)
         } else {
-            (self.looks.own().saber_skin, self.looks.own().options_off)
+            let own = self.looks.own();
+            (own.saber_skin, own.options_off, own.sounds)
         };
         let own = Worn {
             saber_skin,
             illuminate: lit,
             options_off,
             toys: 0,
+            sounds,
         }
         .with_toy(crate::cardboard_box::TOY, self.cardboard_box.on())
         .with_toy(crate::order66::TOY, self.order66.on())

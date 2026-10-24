@@ -181,6 +181,14 @@ impl ViewerConsole {
         self.window_options.unfocused || self.window_options.minimized
     }
 
+    /// A private message arrived (a server's tell or an encrypted whisper, not from a
+    /// player muted here): flash the taskbar while the window is away, unless
+    /// `cl_privateChatFlash` is off (`chat_sounds.rs`). Coming back stops it.
+    pub(crate) fn note_private_message(&mut self) {
+        let setting = self.bool_cvar(crate::chat_sounds::FLASH_CVAR);
+        self.window_options.attention |= private_flash(self.window_away(), setting);
+    }
+
     /// Update modifier state from the same native event used by console shortcuts.
     pub(crate) fn window_alt(&mut self, alt: bool) {
         self.window_options.alt = alt;
@@ -282,6 +290,12 @@ fn contains_ascii(text: &str, word: &str) -> bool {
             .any(|part| part.eq_ignore_ascii_case(word.as_bytes()))
 }
 
+/// Whether a private message flashes the taskbar: the window away (unfocused or
+/// minimised) and the flash not switched off.
+fn private_flash(away: bool, setting: Option<bool>) -> bool {
+    away && setting != Some(false)
+}
+
 /// `CL_CmdButtons`' away test: unfocused with `cl_unfocusedChatbox`, or minimised
 /// with `cl_minimizedChatbox`, each enabled by any nonzero value.
 fn away_talk(
@@ -291,6 +305,34 @@ fn away_talk(
     minimized_chatbox: i64,
 ) -> bool {
     unfocused && unfocused_chatbox != 0 || minimized && minimized_chatbox != 0
+}
+
+#[cfg(test)]
+mod private_flash_tests {
+    use super::private_flash;
+    use crate::console::ViewerConsole;
+
+    #[test]
+    fn a_private_message_flashes_only_an_away_window_with_the_flash_on() {
+        assert!(private_flash(true, Some(true)));
+        assert!(private_flash(true, None));
+        assert!(!private_flash(true, Some(false)));
+        assert!(!private_flash(false, Some(true)));
+        let directory = tempfile::tempdir().unwrap();
+        let mut console = ViewerConsole::new(directory.path().join("config.cfg")).unwrap();
+        console.note_private_message();
+        assert!(!console.window_options.attention, "focused: no flash");
+        console.window_state(Some(false), None);
+        console.note_private_message();
+        assert!(console.window_options.attention, "on by default");
+        // Coming back clears it; with the flash off nothing asks again.
+        console.window_state(Some(true), None);
+        assert!(!console.window_options.attention);
+        console.window_state(Some(false), None);
+        assert!(console.set_cvar(crate::chat_sounds::FLASH_CVAR, "0"));
+        console.note_private_message();
+        assert!(!console.window_options.attention);
+    }
 }
 
 #[cfg(test)]

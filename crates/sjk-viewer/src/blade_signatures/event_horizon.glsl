@@ -46,7 +46,7 @@ vec3 eh_disk(vec3 ro, vec3 rd, float h, float k, float tmax, float g, float px){
   // the innermost stable orbit: a thin ring blazing round the hole
   vec3 hp = rayAt(ro, rd, h);
   if (hp.z > 0.0 && hp.z < tmax){
-    float rr = abs((length(hp.xy) + 1e3*behindBlade(ro, rd, hp.z)) - 0.85*g);
+    float rr = hideD(abs(length(hp.xy) - 0.85*g), behindBlade(ro, rd, hp.z));
     acc += white*(halo(rr, max(0.04, px))*1.3 + vio*halo(rr, 0.3)*0.4)*boost;
   }
   return acc;

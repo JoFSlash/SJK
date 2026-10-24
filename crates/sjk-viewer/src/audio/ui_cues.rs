@@ -134,6 +134,12 @@ pub(crate) fn take_posted() -> Vec<Cue> {
 
 /// Play every cue posted since the last call.
 pub(crate) fn play_pending(audio: &mut GameAudio) {
+    // A chat kind's preview (`chat_sounds.rs`): its chosen sound, on a channel of its
+    // own after the cues'.
+    for kind in crate::chat_sounds::take_previews() {
+        let key = audio.chat_sounds.preview(kind);
+        audio.play_local(key, 1.0, UI_SOURCE, ChannelId(CUE_SOUNDS.len() as u32 + 2));
+    }
     let pending = PENDING.swap(0, Ordering::Relaxed);
     if pending == 0 {
         return;

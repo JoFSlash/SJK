@@ -14,16 +14,36 @@
 //! seen while the flag stays taken. `scores` is the only source naming an enemy
 //! carrier out of sight; it comes with each scoreboard press, and rows from before
 //! the take could name an earlier carrier, so they are left out.
+//!
+//! With the team scores on, the scores stand in two team boxes under the clock, in
+//! the SJK UI's team colours, each with its flag and where the flag is ("At base",
+//! the carrier, "18 s" before a dropped one goes home); in capture games the boxes then replace the left
+//! icons. `cg_teamScoresBoxes 0` brings back the classic "RED 3" and "BLUE 5" plates
+//! beside the left icons; `cg_drawTeamScores 0` leaves the left icons alone.
 use super::icons::assets;
 use super::*;
+use crate::menu::sjk::color;
 use sjk_client::{ScoreEntry, TeamInfo};
 use sjk_ui::{Color, DrawCommand, FontWeight, Rect, TextAlign, TextOverflow};
 use std::fmt::Write;
 
-/// Text ids of the flag captions (two rows) and the two team score labels.
+/// Text ids of the flag captions (two rows), the two team scores, the two boxes'
+/// flag lines and the line under the boxes.
 pub(super) const TEXT_FIRST: u32 = 340;
 /// Last text id this module resolves.
-pub(super) const TEXT_LAST: u32 = 345;
+pub(super) const TEXT_LAST: u32 = 348;
+/// The team scores in their boxes.
+const TEXT_SCORES: u32 = 344;
+/// Where each team's flag is, in its box.
+const TEXT_STATUS: u32 = 346;
+/// The line under the boxes while the local player carries a flag.
+const TEXT_HINT: u32 = 348;
+/// How long a dropped flag lies before it goes home by itself: `LaunchItem` gives a
+/// dropped CTF flag `nextthink = level.time + 30000` and `Team_DroppedFlagThink`
+/// returns it (OpenJK `codemp/game/g_items.c`; JoF EJK and jaPRO keep it, but for
+/// jaPRO's Tribes weapons, 45 s, which the client cannot tell: its count reaches zero
+/// early and the box then just says "Dropped").
+const FLAG_RETURN_MS: i64 = 30_000;
 
 const CS_SCORES1: usize = 6;
 const CS_SCORES2: usize = 7;
@@ -41,8 +61,21 @@ const TEAM_BLUE: u8 = 2;
 const FLAG_POWERUPS: [usize; 3] = [4, 5, 6];
 /// `CS_PLAYERS`: one client-info config string per client from here.
 const CS_PLAYERS: usize = 1_131;
-/// `entityType_t::ET_PLAYER`.
+/// `entityType_t::ET_PLAYER` and `ET_EVENTS`.
 const ET_PLAYER: u8 = 1;
+const ET_EVENTS: u8 = 18;
+/// `EV_EVENT_BITS`: the sequence bits over an entity's `event`.
+const EV_EVENT_BITS: u16 = 0x300;
+/// `EV_CTFMESSAGE` and `CTFMESSAGE_PLAYER_GOT_FLAG` (`bg_public.h`, `ctfMessages_t`).
+const EV_CTFMESSAGE: u16 = 99;
+const CTFMESSAGE_PLAYER_GOT_FLAG: u32 = 4;
+/// `entityState_t::trickedentindex2`'s field: a CTF message's team.
+const ES_TRICKED2: usize = 74;
+/// `MAX_CLIENTS`.
+const MAX_CLIENTS: usize = 32;
+/// How long a CTF message naming who took a flag stays good for, in server time:
+/// the config string saying the flag is taken may come a little before or after it.
+const TAKER_MS: i64 = 3_000;
 
 /// Where a team's flag is (`flagStatus_t`, the states the server sends).
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
@@ -135,13 +168,46 @@ pub(crate) struct State {
     carried: bool,
     show_flags: bool,
     show_scores: bool,
+    /// The scores stand in SJK team boxes (`cg_teamScoresBoxes`), else on the classic
+    /// plates beside the left flag icons.
+    boxes: bool,
+    /// The boxes' size over the HUD's (`cg_teamScoresScale`, 0.5 to 2; 0 before the
+    /// first update reads as 1).
+    box_scale: f32,
     scores: Option<[i32; 2]>,
     labels: [String; 2],
     /// The red and blue flags' carriers by name ([`Carrier`]).
     carriers: [Carrier; 2],
+    /// Who the last CTF message said took each flag, and when ([`ctf_takers`]).
+    takers: [Option<(u16, i64)>; 2],
+    /// The snapshot's server time at the last update.
+    now: i64,
+    /// When each flag was seen dropping; `None` while it is not dropped, or when it was
+    /// already lying when this client first saw the game (its count is unknown).
+    dropped_at: [Option<i64>; 2],
+    /// The flags were read in a capture game at the last update, so a change since is a
+    /// change seen happening.
+    seen: bool,
+    /// Where each flag is, as its box says it, and how.
+    statuses: [String; 2],
+    tones: [Tone; 2],
+    /// The line under the boxes, empty when none.
+    hint: &'static str,
     /// A made-up CTF state for world shots.
     #[cfg(test)]
     staged: Option<Staged>,
+}
+
+/// How a box's flag line reads.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+enum Tone {
+    /// At base: quiet.
+    #[default]
+    Quiet,
+    /// Taken or dropped.
+    Plain,
+    /// Carried by the local player: gold.
+    Own,
 }
 
 /// Who carries one flag, and the name the caption shows. The name is formatted again
@@ -189,6 +255,37 @@ pub(crate) struct ScoreRows<'a> {
     pub(crate) revision: u32,
 }
 
+/// The players a snapshot's CTF messages say just took a flag, by side (red, blue):
+/// `PrintCTFMessage(player, flag team, CTFMESSAGE_PLAYER_GOT_FLAG)` from
+/// `Team_TouchEnemyFlag` (OpenJK `codemp/game/g_team.c`) raises a broadcast
+/// `EV_CTFMESSAGE` with the player in `trickedentindex` and the flag's team in
+/// `trickedentindex2`, so every client learns who took a flag, in sight or not.
+fn ctf_takers(snapshot: &sjk_protocol::Snapshot) -> [Option<u16>; 2] {
+    let mut takers = [None; 2];
+    for state in &snapshot.entities {
+        let event = if state.entity_type() >= ET_EVENTS {
+            u16::from(state.entity_type() - ET_EVENTS)
+        } else {
+            state.event() & !EV_EVENT_BITS
+        };
+        if event != EV_CTFMESSAGE
+            || u32::from(state.event_parameter()) != CTFMESSAGE_PLAYER_GOT_FLAG
+        {
+            continue;
+        }
+        let player = state.tracked_entity_num();
+        let side = match state.integer_field(ES_TRICKED2) {
+            Some(1) => 0,
+            Some(2) => 1,
+            _ => continue,
+        };
+        if usize::from(player) < MAX_CLIENTS {
+            takers[side] = Some(player);
+        }
+    }
+    takers
+}
+
 /// The client carrying flag powerup `power`, from the viewed player's state, a player
 /// entity in the snapshot or a teammate's `tinfo` row.
 fn find_carrier(power: usize, snapshot: &sjk_protocol::Snapshot, team: &[TeamInfo]) -> Option<u16> {
@@ -232,8 +329,14 @@ impl State {
         game: &GameState,
         console: Option<&ViewerConsole>,
     ) {
+        let previous = self.flags;
         self.show_flags = family::integer(console, "cg_drawFlagStatus", 1) != 0;
         self.show_scores = family::integer(console, "cg_drawTeamScores", 1) != 0;
+        self.boxes = family::integer(console, "cg_teamScoresBoxes", 1) != 0;
+        self.box_scale = console
+            .and_then(|console| console.float_cvar("cg_teamScoresScale"))
+            .map_or(1.0, |scale| scale as f32)
+            .clamp(0.5, 2.0);
         let gametype = game
             .config_string(0)
             .and_then(|s| sjk_client::LegacyClientInfo::new(s).integer("g_gametype"))
@@ -268,18 +371,103 @@ impl State {
             self.carried = staged.carried;
             self.scores = Some(staged.scores);
         }
+        self.track_drops(previous, i64::from(snapshot.server_time));
+        // A box shows the bare score, a classic plate its team's name before it.
         for (label, (name, score)) in self.labels.iter_mut().zip(
-            ["RED", "BLUE"]
+            ["RED ", "BLUE "]
                 .into_iter()
                 .zip(self.scores.unwrap_or([0; 2])),
         ) {
             label.clear();
+            if !self.boxes {
+                label.push_str(name);
+            }
             if score == SCORE_NOT_PRESENT {
-                let _ = write!(label, "{name} -");
+                label.push('-');
             } else {
-                let _ = write!(label, "{name} {score}");
+                let _ = write!(label, "{score}");
             }
         }
+        self.format_statuses();
+    }
+
+    /// Note when a flag is seen dropping at server time `now`, the flags having been
+    /// `previous` at the last update. A flag already lying when the client first reads
+    /// a capture game has no known count.
+    fn track_drops(&mut self, previous: [Flag; 2], now: i64) {
+        self.now = now;
+        for ((dropped_at, flag), before) in self.dropped_at.iter_mut().zip(self.flags).zip(previous)
+        {
+            *dropped_at = match flag {
+                Flag::Dropped if !self.ctf => None,
+                Flag::Dropped if self.seen && before != Flag::Dropped => Some(now),
+                Flag::Dropped => *dropped_at,
+                _ => None,
+            };
+        }
+        self.seen = self.ctf;
+    }
+
+    /// The milliseconds before flag `side` goes home by itself, when known.
+    fn return_left(&self, side: usize) -> Option<i64> {
+        let left = FLAG_RETURN_MS - (self.now - self.dropped_at[side]?);
+        (left > 0).then_some(left.min(FLAG_RETURN_MS))
+    }
+
+    /// The side of the flag the local player's team goes for, or `None` off a team.
+    fn enemy_side(&self) -> Option<usize> {
+        match self.team {
+            TEAM_RED => Some(1),
+            TEAM_BLUE => Some(0),
+            _ => None,
+        }
+    }
+
+    /// Word where each flag is for its box, and the line under the boxes, in their
+    /// kept storage.
+    fn format_statuses(&mut self) {
+        let enemy = self.enemy_side();
+        for side in 0..2 {
+            let own = self.carried && enemy == Some(side);
+            let left = self.return_left(side);
+            let status = &mut self.statuses[side];
+            status.clear();
+            self.tones[side] = if own {
+                status.push_str("You");
+                Tone::Own
+            } else {
+                match self.flags[side] {
+                    Flag::AtBase => {
+                        status.push_str("At base");
+                        Tone::Quiet
+                    }
+                    Flag::Taken => {
+                        let name = &self.carriers[side].name;
+                        status.push_str(if name.is_empty() { "Taken" } else { name });
+                        Tone::Plain
+                    }
+                    Flag::Dropped => {
+                        match left {
+                            Some(left) => {
+                                let _ = write!(status, "{} s", (left + 999) / 1_000);
+                            }
+                            None => status.push_str("Dropped"),
+                        }
+                        Tone::Plain
+                    }
+                }
+            };
+        }
+        self.hint = match enemy {
+            Some(enemy) if self.carried && self.ctf => {
+                if self.flags[1 - enemy] == Flag::AtBase {
+                    "Take it home"
+                } else {
+                    "Your flag is away"
+                }
+            }
+            _ => "",
+        };
     }
 
     /// Note who carries each taken flag, from `snapshot`, the teammates' `team` rows
@@ -293,6 +481,14 @@ impl State {
         scores: ScoreRows,
         colors: bool,
     ) {
+        let now = i64::from(snapshot.server_time);
+        for (taker, seen) in self.takers.iter_mut().zip(ctf_takers(snapshot)) {
+            if let Some(player) = seen {
+                *taker = Some((player, now));
+            } else if taker.is_some_and(|(_, at)| now - at > TAKER_MS) {
+                *taker = None;
+            }
+        }
         for (side, carrier) in self.carriers.iter_mut().enumerate() {
             if !(self.ctf && self.flags[side] == Flag::Taken) {
                 carrier.taken_at = None;
@@ -301,7 +497,9 @@ impl State {
             }
             let power = FLAG_POWERUPS[side];
             let since_take = *carrier.taken_at.get_or_insert(scores.revision) != scores.revision;
+            let taker = self.takers[side].map(|(player, _)| player);
             let client = find_carrier(power, snapshot, team)
+                .or(taker)
                 .or_else(|| {
                     let bit = 1_u32 << power;
                     since_take.then_some(scores.rows).and_then(|rows| {
@@ -313,6 +511,7 @@ impl State {
                 .or(carrier.client);
             carrier.set(client, game, colors);
         }
+        self.format_statuses();
     }
 
     /// Play a made-up CTF state over a recorded game, for world shots.
@@ -325,8 +524,11 @@ impl State {
     pub(super) fn text(&self, id: u32) -> &str {
         match id {
             TEXT_FIRST | 343 => self.caption(usize::from(id != TEXT_FIRST)),
-            344 => &self.labels[0],
+            TEXT_SCORES => &self.labels[0],
             345 => &self.labels[1],
+            TEXT_STATUS => &self.statuses[0],
+            347 => &self.statuses[1],
+            TEXT_HINT => self.hint,
             _ => "",
         }
     }
@@ -348,6 +550,17 @@ impl State {
         }
     }
 
+    /// Whether the team boxes show the flags this frame, so the other flag pictures
+    /// (the left icons, the carried flag's powerup pictures) stay out.
+    pub(super) fn flags_in_boxes(&self, visibility: HudVisibility) -> bool {
+        self.boxes
+            && self.show_flags
+            && self.ctf
+            && self.scores_shown()
+            && visibility.hud
+            && visibility.status
+    }
+
     /// Append the icons, their captions and the team score plates.
     pub(super) fn emit(
         &self,
@@ -357,7 +570,16 @@ impl State {
         visibility: HudVisibility,
     ) {
         let [w, h] = viewport;
-        if self.show_flags && self.ctf && visibility.status {
+        // Under the status gate, as JoF's team scores in `CG_DrawHUD`: an open classic
+        // board keeps the HUD but not these boxes over its header.
+        let scores = self.scores_shown() && visibility.hud && visibility.status;
+        let boxes = scores && self.boxes;
+        if boxes {
+            self.emit_boxes(list, w, h, icons);
+        } else if scores {
+            self.emit_plates(list, w, h);
+        }
+        if self.show_flags && self.ctf && visibility.status && !boxes {
             // CG_DrawFlagStatus: 32-unit icons at the left edge of the 640x480 screen,
             // the first at y 328 and the next one icon up.
             let unit = h / 480.0;
@@ -412,37 +634,195 @@ impl State {
                 });
             }
         }
-        // Under the status gate, as JoF's team scores in `CG_DrawHUD`: an open classic
-        // board keeps the HUD but not these plates over its header.
-        if self.scores_shown() && visibility.hud && visibility.status {
-            let s = crate::ui_scale::height_scale(h);
-            let (plate_w, plate_h, gap) = (130.0 * s, 30.0 * s, 8.0 * s);
-            let top = 76.0 * s;
-            for (index, tint) in [
-                Color::new(0.75, 0.12, 0.12, 0.55),
-                Color::new(0.14, 0.3, 0.85, 0.55),
-            ]
-            .into_iter()
-            .enumerate()
-            {
-                let x = if index == 0 {
-                    w * 0.5 - gap * 0.5 - plate_w
+    }
+
+    /// The classic team score plates under the clock: "RED 3" and "BLUE 5".
+    fn emit_plates(&self, list: &mut DrawList, w: f32, h: f32) {
+        let s = crate::ui_scale::height_scale(h);
+        let (plate_w, plate_h, gap) = (130.0 * s, 30.0 * s, 8.0 * s);
+        let top = 76.0 * s;
+        for (index, tint) in [
+            Color::new(0.75, 0.12, 0.12, 0.55),
+            Color::new(0.14, 0.3, 0.85, 0.55),
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            let x = if index == 0 {
+                w * 0.5 - gap * 0.5 - plate_w
+            } else {
+                w * 0.5 + gap * 0.5
+            };
+            let rect = Rect::new(x, top, plate_w, plate_h);
+            let _ = list.push(DrawCommand::SolidRect { rect, color: tint });
+            let _ = list.push(DrawCommand::Text {
+                rect,
+                text: TextId(TEXT_SCORES + index as u32),
+                size: 20.0 * s,
+                color: Color::new(1.0, 1.0, 1.0, 1.0),
+                align: TextAlign::Center,
+                overflow: TextOverflow::Clip,
+                weight: FontWeight::Semibold,
+                letter_spacing: 0.0,
+            });
+        }
+    }
+
+    /// The two team boxes under the clock, red left and blue right, in a `w` by `h`
+    /// viewport: the UI's navy under the team's colour, a rule of it along the bottom;
+    /// the score at the inner
+    /// edge and, in capture games with `cg_drawFlagStatus`, the flag at the outer edge
+    /// (its taken picture while away, a gold arc round it counting down a drop) and
+    /// where it is between them; then, while the local player carries a flag, one line
+    /// under the boxes.
+    fn emit_boxes(&self, list: &mut DrawList, w: f32, h: f32, icons: &icons::Icons) {
+        // The boxes stand where the plates did, under the clock, at any size.
+        let top = 76.0 * crate::ui_scale::height_scale(h);
+        let scale = if self.box_scale > 0.0 {
+            self.box_scale
+        } else {
+            1.0
+        };
+        let s = crate::ui_scale::height_scale(h) * scale;
+        let (box_w, box_h, gap, pad) = (168.0 * s, 42.0 * s, 6.0 * s, 9.0 * s);
+        let (icon, score_w, rule) = (22.0 * s, 48.0 * s, 2.0 * s);
+        // HUD text sets its line box from the rectangle's top: give each run a line
+        // about its size, centred on the box.
+        let line = |size: f32| (top + (box_h - size * 1.25) * 0.5, size * 1.25);
+        let flags = self.show_flags && self.ctf;
+        let own = self.enemy_side().map(|enemy| 1 - enemy);
+        for (side, team) in [color::RED_TEAM, color::BLUE_TEAM].into_iter().enumerate() {
+            let red = side == 0;
+            let x = if red {
+                w * 0.5 - gap * 0.5 - box_w
+            } else {
+                w * 0.5 + gap * 0.5
+            };
+            let rect = Rect::new(x, top, box_w, box_h);
+            for color in [color::alpha(color::SPACE, 0.72), color::alpha(team, 0.22)] {
+                let _ = list.push(DrawCommand::SolidRect { rect, color });
+            }
+            let _ = list.push(DrawCommand::SolidRect {
+                rect: Rect::new(x, top + box_h - rule, box_w, rule),
+                color: team,
+            });
+            let inner = Rect::new(
+                if red {
+                    x + box_w - pad - score_w
                 } else {
-                    w * 0.5 + gap * 0.5
+                    x + pad
+                },
+                line(36.0 * s).0,
+                score_w,
+                line(36.0 * s).1,
+            );
+            let _ = list.push(DrawCommand::Text {
+                rect: inner,
+                text: TextId(TEXT_SCORES + side as u32),
+                size: 36.0 * s,
+                color: color::TEXT,
+                align: if red {
+                    TextAlign::End
+                } else {
+                    TextAlign::Start
+                },
+                overflow: TextOverflow::Clip,
+                weight: FontWeight::Semibold,
+                letter_spacing: 0.0,
+            });
+            if !flags {
+                continue;
+            }
+            let icon_x = if red { x + pad } else { x + box_w - pad - icon };
+            let icon_y = top + (box_h - icon) * 0.5;
+            let away = self.flags[side] != Flag::AtBase || self.tones[side] == Tone::Own;
+            let slot = match (red, self.ysalamiri, away) {
+                (true, _, true) => assets::RED_FLAG_TAKEN,
+                (false, _, true) => assets::BLUE_FLAG_TAKEN,
+                (true, false, false) => assets::RED_FLAG,
+                (true, true, false) => assets::RED_FLAG_YSALAMIRI,
+                (false, false, false) => assets::BLUE_FLAG,
+                (false, true, false) => assets::BLUE_FLAG_YSALAMIRI,
+            };
+            // A pack without the taken pictures shows the flag faint while it is away.
+            let picture = icons.cell(slot).map(|texture| (texture, 1.0)).or_else(|| {
+                let home = if red {
+                    assets::RED_FLAG
+                } else {
+                    assets::BLUE_FLAG
                 };
-                let rect = Rect::new(x, top, plate_w, plate_h);
-                let _ = list.push(DrawCommand::SolidRect { rect, color: tint });
-                let _ = list.push(DrawCommand::Text {
-                    rect,
-                    text: TextId(344 + index as u32),
-                    size: 20.0 * s,
-                    color: Color::new(1.0, 1.0, 1.0, 1.0),
-                    align: TextAlign::Center,
-                    overflow: TextOverflow::Clip,
-                    weight: FontWeight::Semibold,
-                    letter_spacing: 0.0,
+                icons.cell(home).map(|texture| (texture, 0.45))
+            });
+            if let Some((texture, alpha)) = picture {
+                let _ = list.push(DrawCommand::TexturedQuad {
+                    rect: Rect::new(icon_x, icon_y, icon, icon),
+                    texture,
+                    color: Color::new(1.0, 1.0, 1.0, alpha),
                 });
             }
+            if let Some(left) = self.return_left(side) {
+                let _ = list.push(DrawCommand::Arc {
+                    center: [icon_x + icon * 0.5, icon_y + icon * 0.5],
+                    radius: icon * 0.5 + 3.0 * s,
+                    width: 2.0 * s,
+                    start: -std::f32::consts::FRAC_PI_2,
+                    sweep: std::f32::consts::TAU * left as f32 / FLAG_RETURN_MS as f32,
+                    color: color::GOLD,
+                    knockout: None,
+                });
+            }
+            let words_x = if red {
+                icon_x + icon + 7.0 * s
+            } else {
+                x + pad + score_w
+            };
+            let words_w = box_w - 2.0 * pad - icon - 7.0 * s - score_w;
+            let (words_y, words_h) = line(14.0 * s);
+            let _ = list.push(DrawCommand::Text {
+                rect: Rect::new(words_x, words_y, words_w, words_h),
+                text: TextId(TEXT_STATUS + side as u32),
+                size: 14.0 * s,
+                color: match self.tones[side] {
+                    Tone::Quiet => color::MUTED,
+                    Tone::Plain => color::TEXT,
+                    Tone::Own => color::GOLD_BRIGHT,
+                },
+                align: if red {
+                    TextAlign::Start
+                } else {
+                    TextAlign::End
+                },
+                overflow: TextOverflow::Ellipsis,
+                weight: FontWeight::Semibold,
+                letter_spacing: 0.0,
+            });
+        }
+        if flags && !self.hint.is_empty() {
+            let (hint_w, hint_h, size) = (150.0 * s, 20.0 * s, 13.0 * s);
+            let (hint_x, hint_y) = (w * 0.5 - hint_w * 0.5, top + box_h + gap);
+            let _ = list.push(DrawCommand::SolidRect {
+                rect: Rect::new(hint_x, hint_y, hint_w, hint_h),
+                color: color::alpha(color::SPACE, 0.78),
+            });
+            let _ = list.push(DrawCommand::Text {
+                rect: Rect::new(
+                    hint_x,
+                    hint_y + (hint_h - size * 1.25) * 0.5,
+                    hint_w,
+                    size * 1.25,
+                ),
+                text: TextId(TEXT_HINT),
+                size,
+                color: if self.flags[own.unwrap_or(0)] == Flag::AtBase {
+                    color::GOLD_BRIGHT
+                } else {
+                    color::TEXT
+                },
+                align: TextAlign::Center,
+                overflow: TextOverflow::Clip,
+                weight: FontWeight::Regular,
+                letter_spacing: 0.0,
+            });
         }
     }
 }
@@ -594,6 +974,40 @@ mod tests {
     }
 
     #[test]
+    fn a_ctf_message_names_who_took_a_flag_out_of_sight() {
+        let mut game = GameState::empty_local(0);
+        game.replace_config_string(CS_PLAYERS + 7, b"\\n\\Torren\\t\\1".to_vec())
+            .unwrap();
+        let mut event = sjk_protocol::EntityState::zero(40, &sjk_protocol::LEGACY_ENTITY_FIELDS);
+        event.set_raw_field(8, u32::from(ET_EVENTS) + u32::from(EV_CTFMESSAGE));
+        event.set_raw_field(42, CTFMESSAGE_PLAYER_GOT_FLAG);
+        event.set_raw_field(58, 7);
+        event.set_raw_field(ES_TRICKED2, 2);
+        let mut snapshot = sjk_protocol::Snapshot {
+            message_sequence: 1,
+            reliable_acknowledge: 0,
+            server_commands: vec![],
+            server_time: 1_000,
+            delta_from: None,
+            flags: 0,
+            area_mask: vec![],
+            player: sjk_protocol::PlayerState::zero(),
+            vehicle_player: None,
+            entities: vec![event],
+            consumed_bits: 0,
+        };
+        assert_eq!(ctf_takers(&snapshot), [None, Some(7)]);
+        // The message comes a moment before the status says taken: still good.
+        let mut state = ctf_state(TEAM_BLUE, [Flag::AtBase; 2]);
+        state.update_carriers(&snapshot, &game, &[], ScoreRows::default(), false);
+        snapshot.entities.clear();
+        snapshot.server_time = 1_200;
+        state.flags[1] = Flag::Taken;
+        state.update_carriers(&snapshot, &game, &[], ScoreRows::default(), false);
+        assert_eq!(state.text(347), "Torren");
+    }
+
+    #[test]
     fn the_own_flag_alone_keeps_its_caption() {
         let state = State {
             team: TEAM_BLUE,
@@ -603,6 +1017,129 @@ mod tests {
         };
         assert_eq!(state.caption(0), "DROPPED");
         assert_eq!(state.caption(1), "");
+    }
+
+    fn ctf_state(team: u8, flags: [Flag; 2]) -> State {
+        State {
+            team,
+            ctf: true,
+            flags,
+            ..State::default()
+        }
+    }
+
+    #[test]
+    fn the_boxes_say_where_each_flag_is() {
+        let mut state = ctf_state(TEAM_BLUE, [Flag::AtBase, Flag::Taken]);
+        state.format_statuses();
+        assert_eq!(state.text(TEXT_STATUS), "At base");
+        assert_eq!(state.tones[0], Tone::Quiet);
+        // No carrier known yet: just taken.
+        assert_eq!(state.text(347), "Taken");
+        state.carriers[1].name.push_str("Torren");
+        state.format_statuses();
+        assert_eq!(state.text(347), "Torren");
+        assert_eq!(state.tones[1], Tone::Plain);
+        assert_eq!(state.text(TEXT_HINT), "");
+    }
+
+    #[test]
+    fn a_carrier_reads_you_and_a_line_on_what_to_do() {
+        // Blue carries red's flag; the status may not have caught up yet.
+        let mut state = ctf_state(TEAM_BLUE, [Flag::AtBase, Flag::AtBase]);
+        state.carried = true;
+        state.format_statuses();
+        assert_eq!(state.text(TEXT_STATUS), "You");
+        assert_eq!(state.tones[0], Tone::Own);
+        assert_eq!(state.text(TEXT_HINT), "Take it home");
+        // Blue's own flag away: no capture until it is back.
+        state.flags = [Flag::Taken, Flag::Dropped];
+        state.format_statuses();
+        assert_eq!(state.text(TEXT_HINT), "Your flag is away");
+    }
+
+    #[test]
+    fn a_drop_seen_happening_counts_down_to_its_return() {
+        let mut state = ctf_state(TEAM_RED, [Flag::AtBase; 2]);
+        state.track_drops([Flag::AtBase; 2], 1_000);
+        state.flags = [Flag::AtBase, Flag::Dropped];
+        state.track_drops([Flag::AtBase; 2], 2_000);
+        state.format_statuses();
+        assert_eq!(state.text(347), "30 s");
+        state.track_drops(state.flags, 14_500);
+        state.format_statuses();
+        assert_eq!(state.text(347), "18 s");
+        assert_eq!(state.return_left(1), Some(17_500));
+        // Past the stock return time (a mod that waits longer): just dropped.
+        state.track_drops(state.flags, 32_000);
+        state.format_statuses();
+        assert_eq!(state.text(347), "Dropped");
+        // Home again, then dropped again: a new count.
+        state.flags = [Flag::AtBase; 2];
+        state.track_drops([Flag::AtBase, Flag::Dropped], 33_000);
+        assert_eq!(state.dropped_at, [None, None]);
+    }
+
+    #[test]
+    fn a_flag_already_lying_when_first_seen_has_no_count() {
+        let mut state = ctf_state(TEAM_RED, [Flag::Dropped, Flag::AtBase]);
+        state.track_drops([Flag::AtBase; 2], 5_000);
+        state.format_statuses();
+        assert_eq!(state.text(TEXT_STATUS), "Dropped");
+        state.track_drops(state.flags, 6_000);
+        assert_eq!(state.return_left(0), None);
+    }
+
+    #[test]
+    fn the_boxes_replace_the_left_icons_and_draw_the_count() {
+        let mut state = ctf_state(TEAM_RED, [Flag::AtBase; 2]);
+        state.show_flags = true;
+        state.show_scores = true;
+        state.boxes = true;
+        state.scores = Some([3, 5]);
+        state.track_drops([Flag::AtBase; 2], 0);
+        state.flags = [Flag::Dropped, Flag::Taken];
+        state.track_drops([Flag::AtBase; 2], 1_000);
+        state.format_statuses();
+        let visibility = HudVisibility::from_console(None);
+        let icons = icons::Icons::default();
+        let mut list = DrawList::new(64);
+        state.emit(&mut list, [1920.0, 1080.0], &icons, visibility);
+        let texts: Vec<u32> = list
+            .commands()
+            .iter()
+            .filter_map(|command| match command {
+                DrawCommand::Text { text, .. } => Some(text.0),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(texts, [344, TEXT_STATUS, 345, 347]);
+        assert!(
+            list.commands()
+                .iter()
+                .any(|command| matches!(command, DrawCommand::Arc { .. }))
+        );
+        // The classic look: the plates and the left icons with their captions.
+        state.boxes = false;
+        let mut list = DrawList::new(64);
+        state.emit(&mut list, [1920.0, 1080.0], &icons, visibility);
+        let texts: Vec<u32> = list
+            .commands()
+            .iter()
+            .filter_map(|command| match command {
+                DrawCommand::Text { text, .. } => Some(text.0),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(texts, [344, 345, TEXT_FIRST, 343]);
+        // Team scores off: only the left icons.
+        state.show_scores = false;
+        let mut list = DrawList::new(64);
+        state.emit(&mut list, [1920.0, 1080.0], &icons, visibility);
+        assert!(list.commands().iter().all(|command| match command {
+            DrawCommand::Text { text, .. } => [TEXT_FIRST, 343].contains(&text.0),
+            _ => true,
+        }));
     }
 
     #[test]

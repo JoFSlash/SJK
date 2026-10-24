@@ -22,6 +22,11 @@ pub(crate) fn register(cvars: &mut CvarRegistry) -> Result<(), sjk_shell::CvarEr
             1,
             "Team games: the red and blue scores at the top centre",
         ),
+        (
+            "cg_teamScoresBoxes",
+            1,
+            "Team scores as SJK team boxes with each flag's state; 0 the classic plates and flag icons",
+        ),
         ("cg_drawSnapshot", 0, "Snapshot time and message number"),
         ("cg_drawUpperRight", 1, "Show upper-right match information"),
         ("cg_drawVote", 1, "Show vote information"),
@@ -48,6 +53,11 @@ pub(crate) fn register(cvars: &mut CvarRegistry) -> Result<(), sjk_shell::CvarEr
         ("cg_gunX", 0.0, "View weapon forward offset"),
         ("cg_gunY", 0.0, "View weapon left offset"),
         ("cg_gunZ", 0.0, "View weapon upward offset"),
+        (
+            "cg_teamScoresScale",
+            1.0,
+            "Size of the SJK team score boxes, 0.5 to 2",
+        ),
     ] {
         cvars.register(CvarDefinition::new(name, value, CvarFlags::ARCHIVE, help))?;
     }

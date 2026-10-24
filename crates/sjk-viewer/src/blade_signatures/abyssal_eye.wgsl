@@ -308,7 +308,7 @@ fn r8_vol(ro: vec3<f32>, rd: vec3<f32>, px: f32) -> vec3<f32> {
         if cl > 0.01 {
             let h = rayAt(ro, rd, L * 0.55);
             if h.z > 0.0 {
-                fx += red * halo(abs((length(h.xy) + 1.0e3 * behindBlade(ro, rd, h.z)) - 1.0 - 6.0 * (1.0 - cl)), 0.18 + 0.2 * (1.0 - cl)) * cl * 1.6;
+                fx += red * halo(hideD(abs(length(h.xy) - 1.0 - 6.0 * (1.0 - cl)), behindBlade(ro, rd, h.z)), 0.18 + 0.2 * (1.0 - cl)) * cl * 1.6;
             }
             var tq: f32;
             fx += red * halo(rayPtRaw(ro, rd, vec3(0.0, L * 0.55, 0.0), &tq), 1.2) * pow(cl, 3.0);

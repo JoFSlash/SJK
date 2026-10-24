@@ -18,7 +18,7 @@ fn dp_ring(ro: vec3<f32>, rd: vec3<f32>, y: f32, R: f32) -> f32 {
     var best: f32 = 1.0e3;
     let h = rayAt(ro, rd, y);
     if h.z > 0.0 {
-        best = abs(length(h.xy) - R) + 1.0e3 * behindBlade(ro, rd, h.z);
+        best = hideD(abs(length(h.xy) - R), behindBlade(ro, rd, h.z));
     }
     let a = dot(rd.xz, rd.xz);
     let b = dot(ro.xz, rd.xz);
@@ -29,10 +29,10 @@ fn dp_ring(ro: vec3<f32>, rd: vec3<f32>, y: f32, R: f32) -> f32 {
         let t0 = (-b - q) / a;
         let t1 = (-b + q) / a;
         if t0 > 0.0 {
-            best = min(best, abs(ro.y + rd.y * t0 - y) + 1.0e3 * behindBlade(ro, rd, t0));
+            best = min(best, hideD(abs(ro.y + rd.y * t0 - y), behindBlade(ro, rd, t0)));
         }
         if t1 > 0.0 {
-            best = min(best, abs(ro.y + rd.y * t1 - y) + 1.0e3 * behindBlade(ro, rd, t1));
+            best = min(best, hideD(abs(ro.y + rd.y * t1 - y), behindBlade(ro, rd, t1)));
         }
     }
     return best;
@@ -99,7 +99,8 @@ fn base_vol(ro: vec3<f32>, rd: vec3<f32>, px: f32) -> vec3<f32> {
 // the blade: Sol's glow and core from the file, a bright scan line racing up it
 fn sig_glow(g: vec3<f32>, b: vec2<f32>, r: f32, px: f32) -> vec3<f32> {
     let ys = 0.8 + glsl_mod(uTime * 12.0, uLength + 2.0);
-    let ln = 0.85 + 0.15 * step(0.5, fract(b.y * 2.0 - uTime * 3.0));
+    // round 23: the dashes' edges smoothed over a pixel (they stair-stepped)
+    let ln = 0.85 + 0.15 * aaSquare(b.y * 2.0 - uTime * 3.0, px * 2.0);
     // nothing of it inside the hilt: from the emitter up only (round 16)
     let above = smoothstep(0.0, 0.8, b.y);
     return g * mix(1.0, ln, above) + vec3<f32>(0.8, 0.93, 1.0) * halo(b.y - ys, 0.25) * smoothstep(1.5, 0.0, abs(b.x)) * 1.4 * above;

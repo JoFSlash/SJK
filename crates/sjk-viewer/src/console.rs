@@ -241,6 +241,10 @@ pub(crate) struct ViewerConsole {
     hax_on: bool,
     /// The Toys tab asked to turn the Hax on (`true`) or off, not yet taken.
     pending_hax: Option<bool>,
+    /// The player is limp (the Ragdoll), mirrored as [`Self::order66_on`] is.
+    ragdoll_on: bool,
+    /// The Toys tab asked to go limp (`true`) or get up, not yet taken.
+    pending_ragdoll: Option<bool>,
     /// A chip naming a setting was clicked (`console_changelog.rs`): the cvar to search
     /// Settings for, not yet taken.
     pending_settings_search: Option<String>,

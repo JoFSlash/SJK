@@ -334,7 +334,7 @@ on the 16:9 frame, dark behind the form on the left and clear over the model.
   under a sub-heading (Hilt, or Staff), in two columns, six lines on show,
   scrolled by the wheel or its bar, the chosen one gold with a dot and kept in
   view (in the middle when the list first shows); for Dual two lists side by
-  side, Right hand and Left hand, four lines each. The hilts come in the game's
+  side, Right hand and Left hand, three lines each (four until 23/10/2026). The hilts come in the game's
   load order, as JoF EJK lists them (`legacy_saber_load_order`), the retail game's
   first under a "Jedi Academy" line with their count and the community's after them
   under "Community" (`HiltLines`; the rule in [AGENTS.md](../AGENTS.md)). The hilt search
@@ -354,12 +354,17 @@ on the 16:9 frame, dark behind the form on the left and clear over the model.
   the one worn ringed gold, and under the row's name the name of the one under
   the pointer or worn; six show at a time (10/10/2026), scrolled so the worn one
   stands third where it can, with a gold chevron at a side that has more; with no skin owned, or the identity off, only the stock
-  blade and a line saying why. Then the blade's colour as seven chips (the six
+  blade and a line saying why. Under it the Sounds row (23/10/2026, after Nib's idea): a
+  Preview button, then a ‹ › control with the saber sounds chosen apart from the blade,
+  "Follow shader (<the blade worn>)", "Stock sounds" or an owned shader's name
+  (`cg_saberSounds`, [unlockables.md](unlockables.md#saber-sounds)); Preview, or Enter on
+  the row (the keys line then says "Enter preview"), plays the choice's ignition and hum.
+  Then the blade's colour as seven chips (the six
   stock colours and the custom one, ringed gold when chosen), its red, green
   and blue sliders (a digit types the number), and the second blade's for Dual.
   The camera cuts to the saber shot, where the model throws the saber to float
   and turn before it. World shot: `world_shot::saber_skins::duel6_sjk_saber_page`
-  (the search typed, a search finding nothing with no skin owned, Dual; at 1080p,
+  (the search typed, a search finding nothing with no skin owned, the Sounds row, Dual; at 1080p,
   with `ui_textScale` 1.2, and at 4K with it).
 - **Force:** the **Force templates** panel at the right offers separate
   **Jedi Academy** and **Community** selectors, retail first. Left/Right or
@@ -527,7 +532,7 @@ on the 16:9 frame, dark behind the form on the left and clear over the model.
 
 The keys are the player screen's shared ones: Up and Down choose a row (on the Saber and
 Force pages in the order they show them: the hilt search, both hilt lists, the
-Blade row and the blades' colours,
+Blade row, the Sounds row and the blades' colours,
 the Force groups' powers in their order, the other side's skipped), Left and
 Right change it (a hilt list's choice moves one hilt, the Blade row's one
 blade; the wheel over the Blade row and its ‹ › arrows browse it six blades at a time
@@ -540,7 +545,7 @@ it, a slider follows, a style button, a hilt, a blade, a level, the search
 field types), a click elsewhere on a
 row (a Force power's holocron or name too) only chooses it, a click on a tile
 picks that model. The SJK view's own targets (levels, the Blade row's
-blades, style buttons, hilts and the lists' wheel areas, tokens from 1000) go to
+blades, the Sounds row's Preview, style buttons, hilts and the lists' wheel areas, tokens from 1000) go to
 `PlayerMenu::sjk_pointer` before the screen's shared pointer handling.
 
 It is the player screen's shared state and controller with a view of its own:
@@ -676,7 +681,13 @@ overlay routes their text to the UI's families (`console_sjk_pages.rs`).
   verified tick alone, "SJK player" (gold, with "SJK staff")
   or "Not known to the SJK hub", the hub name when it differs, the key, where they are
   on the server being played, their medals' medallions, Block or Unblock (gold edged) and
-  what that does. It sits right of the name, or left of it at the screen's edge.
+  what that does. It sits right of the name, or left of it at the screen's edge. In the
+  game's chat a click on the name pins it (23/10/2026, after Bishop's and Sanjisan's
+  ideas): it stays until the name is clicked again, a click lands off it, Escape or the
+  composer closes; for a player on the server other than the player themselves it then
+  heads its buttons with Whisper, the whole row in holo blue, above Block
+  ([client.md](client.md), [chat/card.rs](../crates/sjk-viewer/src/chat/card.rs)). World
+  shot: `chat::card::shots::chat_name_actions_shot` (1080p and 4K).
 - **Test list** ([debug_panel_view.rs](../crates/sjk-viewer/src/debug_panel_view.rs),
   10/10/2026, Sol asked for every trace of the old hero look to go): the `debug_panel`
   command's personal test list ([sjk.md](sjk.md#debug-panel)), drawn in this look in
@@ -815,8 +826,11 @@ that mode for the visit and leaves the player's choice as it was.
     gathers the renderer's four tabs (image, lighting, shadows, weather) under
     their names; Display is Video's other rows under Screen, Frame rate and
     View; Sound holds every sound, the game's under Game, then the unlock
-    sound, the SJK chat sound and the quick wheel's sounds under
-    Notifications; Gameplay is Game options without the packs and mods, with
+    sound, the world ping's and the quick wheel's sounds under
+    Notifications, and Chat sounds last (since 23/10/2026: the master switch, then
+    for public chat, team chat, private messages and the SJK chat a switch, a sound
+    list and a Play button, then the private message flash;
+    [client.md](client.md#chat-sounds)); Gameplay is Game options without the packs and mods, with
     JoF EJK's camera framing and damping rows under Camera and prediction;
     Interface the menus and the console (the quick wheel's rows are its
     category's and Sound's); HUD its classic rows without the chat box, the FPS
@@ -850,7 +864,8 @@ that mode for the visit and leaves the player's choice as it was.
     Off after it); a slider (a gold-filled track and its number, which a click
     or a typed digit opens for typing); segments for a choice of up to three; a
     field with a caret for a longer list, the display mode, the resolution and
-    the HUD (the last two open their pickers); a field for text.
+    the HUD (the last two open their pickers); a field for text; a Play button (a chat
+    sound's preview: Enter or a click plays it).
   - A choice whose values are numbers or codes shows names on its segments, list,
     field and detail (`settings::help::CHOICE_NAMES`): Shader remaps Never, Not
     players, Always; Dynamic glow Off, On, Sabers; Light shafts Off to High;
@@ -1572,16 +1587,17 @@ for the run.
   a click or the number keys 1 to 6 switch one (`cg_saberSkinOptions`), the model's
   blade following at once and, worn, every SJK player's view of it
   ([unlockables.md](unlockables.md#options)).
-- **Toys:** "4 toys", things to use in a match. Illuminate's holocron, the
-  cardboard box (since 16/10/2026), Order 66 (since 17/10/2026) and the Hax (since
-  21/10/2026), each its icon in its niche, "Everyone's"; the chosen one ringed gold on a full glow, the others dimmed; a
+- **Toys:** "5 toys", things to use in a match. Illuminate's holocron, the
+  cardboard box (since 16/10/2026), Order 66 (since 17/10/2026), the Hax (since
+  21/10/2026) and the Ragdoll (since 23/10/2026), each its icon in its niche (200 units,
+  220 apart, so five stand left of the stage's text), "Everyone's"; the chosen one ringed gold on a full glow, the others dimmed; a
   dotted line for the toys to come. The arrows and Tab choose; a click on a niche chooses it, a click on the
   chosen one runs it. With Illuminate chosen the holocron floats lit by the model on
   the stage (`illuminate::submit_stage_holocron`); the box has no 3D stand-in on the
-  stage, nor have Order 66 and the Hax. Beside the model the chosen toy's name, what it
-  is, how to use it and its switch, "Holocron lit", "In the box", "In the order" or
-  "Hacker": on while the toy is on, and Enter or a click runs it (the `toy_illuminate`,
-  `toy_box`, `toy_order66` or `toy_hax` toggle, set to the state wanted; the viewer owns the state, the console
+  stage, nor have Order 66, the Hax and the Ragdoll. Beside the model the chosen toy's
+  name, what it is, how to use it and its switch, "Holocron lit", "In the box", "In the
+  order", "Hacker" or "Limp": on while the toy is on, and Enter or a click runs it (the
+  `toy_illuminate`, `toy_box`, `toy_order66`, `toy_hax` or `toy_ragdoll` toggle, set to the state wanted; the viewer owns the state, the console
   mirrors it each frame). The keys line says "Enter: light" or "Enter: put out",
   "Enter: hide" or "Enter: come out", "Enter: turn on" or "Enter: turn off". Hovering
   Order 66's niche shows how to turn it on and that `order66` executes it; the Hax's,
@@ -2072,7 +2088,8 @@ player has left is dropped. The same look in every menu style, on the 16:9 frame
   right-aligned along the foot; focus starts on Don't send. Keys bottom right: Enter
   send unencrypted, Esc don't send; Space does nothing.
 - **Safety code:** "Encrypted whispers", then "Safety code with <name>" (or "<name>'s
-  key changed"), the code in Rajdhani 48 (gold once verified), and the words: compare it
+  key changed"), the code's twelve groups of five digits in three rows of four (Rajdhani
+  40, rows 46 apart; gold once verified), and the words: compare it
   outside the game, then mark them verified; once verified, that SJK warns if their key
   changes; for a changed key, that whispers to them wait for a new check. Buttons Close
   and Mark verified (gold, Enter); once verified, Close is gold (Enter and Esc) and

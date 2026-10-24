@@ -37,7 +37,7 @@ fn sf_ring(ro: vec3<f32>, rd: vec3<f32>, y: f32, R: f32) -> f32 {
     var best: f32 = 1.0e3;
     let h = rayAt(ro, rd, y);
     if h.z > 0.0 {
-        best = abs(length(h.xy) - R) + 1.0e3 * behindBlade(ro, rd, h.z);
+        best = hideD(abs(length(h.xy) - R), behindBlade(ro, rd, h.z));
     }
     let a = dot(rd.xz, rd.xz);
     let b = dot(ro.xz, rd.xz);
@@ -48,10 +48,10 @@ fn sf_ring(ro: vec3<f32>, rd: vec3<f32>, y: f32, R: f32) -> f32 {
         let t0 = (-b - q) / a;
         let t1 = (-b + q) / a;
         if t0 > 0.0 {
-            best = min(best, abs(ro.y + rd.y * t0 - y) + 1.0e3 * behindBlade(ro, rd, t0));
+            best = min(best, hideD(abs(ro.y + rd.y * t0 - y), behindBlade(ro, rd, t0)));
         }
         if t1 > 0.0 {
-            best = min(best, abs(ro.y + rd.y * t1 - y) + 1.0e3 * behindBlade(ro, rd, t1));
+            best = min(best, hideD(abs(ro.y + rd.y * t1 - y), behindBlade(ro, rd, t1)));
         }
     }
     return best;

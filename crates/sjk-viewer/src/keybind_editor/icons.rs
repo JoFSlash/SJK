@@ -38,6 +38,8 @@ const ICONS: &[(&str, &str)] = &[
     ),
     // SJK's Hax, which the client bundles (`crate::hax`).
     (crate::hax::COMMAND, crate::hax::ICON),
+    // SJK's Ragdoll, which the client bundles (`crate::ragdoll`).
+    (crate::ragdoll::COMMAND, crate::ragdoll::ICON),
     // WEAPONS
     ("weapon 1", "gfx/hud/w_icon_lightsaber.tga"),
     ("weapmelee", "gfx/hud/w_icon_melee.tga"),

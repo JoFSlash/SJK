@@ -64,6 +64,8 @@ impl ChatOverlay {
             input.dead.other_key(text);
         }
         match key {
+            // A pinned sender card goes first, the composer with the next Escape.
+            KeyCode::Escape if self.unpin_card() => {}
             KeyCode::Escape => {
                 self.input = None;
                 self.scroll = 0;
@@ -163,14 +165,33 @@ impl ChatOverlay {
             // Match the canvas's reverse paint order: the card covers the
             // composer, which covers the feed. Otherwise release activates a
             // different widget than the one recorded here and is discarded.
-            self.pressed_action = [card::CARD_BAN, card::CARD_MUTE, card::CARD]
-                .into_iter()
-                .chain([LATEST, SJK, TEAM, GLOBAL])
-                .find(|token| {
-                    self.ui
-                        .rect_for(*token)
-                        .is_some_and(|rect| rect.contains(position))
-                });
+            self.pressed_action = [
+                card::CARD_WHISPER,
+                card::CARD_SAFETY,
+                card::CARD_BAN,
+                card::CARD_MUTE,
+                card::CARD,
+            ]
+            .into_iter()
+            .chain([LATEST, SJK, TEAM, GLOBAL])
+            .chain(0..MAX_VISIBLE as u16)
+            .find(|token| {
+                self.ui
+                    .rect_for(*token)
+                    .is_some_and(|rect| rect.contains(position))
+            });
+            // A sender's name: whose it is, so a release on another never pins theirs.
+            self.pressed_who = self
+                .pressed_action
+                .and_then(|token| self.visible_people.get(usize::from(token)).copied())
+                .flatten();
+            // A press off a pinned card and off every name lets the card go.
+            if !self
+                .pressed_action
+                .is_some_and(|token| usize::from(token) < MAX_VISIBLE || token >= card::CARD)
+            {
+                self.unpin_card();
+            }
         }
         if let InputEvent::PointerWheel { delta, .. } = event {
             if delta.y != 0.0 {
@@ -224,6 +245,11 @@ impl ChatOverlay {
             card::CARD_MUTE => self.toggle_card_mute(),
             card::CARD_BAN => self.press_card_ban(),
             card::CARD_SAFETY => self.press_card_safety(),
+            card::CARD_WHISPER => self.press_card_whisper(),
+            token if usize::from(token) < MAX_VISIBLE => {
+                let pressed = self.pressed_who.take();
+                self.click_name(usize::from(token), pressed);
+            }
             _ => {}
         }
     }

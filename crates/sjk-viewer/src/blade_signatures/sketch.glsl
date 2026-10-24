@@ -12,14 +12,14 @@ float dp_top(){ return uLength*clamp(uAge/0.45, 0.0, 1.0); }
 float dp_ring(vec3 ro, vec3 rd, float y, float R){
   float best = 1e3;
   vec3 h = rayAt(ro, rd, y);
-  if (h.z > 0.0) best = abs(length(h.xy) - R) + 1e3*behindBlade(ro, rd, h.z);
+  if (h.z > 0.0) best = hideD(abs(length(h.xy) - R), behindBlade(ro, rd, h.z));
   float a = dot(rd.xz, rd.xz), b = dot(ro.xz, rd.xz), c = dot(ro.xz, ro.xz) - R*R;
   float dsc = b*b - a*c;
   if (dsc > 0.0 && a > 1e-6){
     float q = sqrt(dsc);
     float t0 = (-b - q)/a, t1 = (-b + q)/a;
-    if (t0 > 0.0) best = min(best, abs(ro.y + rd.y*t0 - y) + 1e3*behindBlade(ro, rd, t0));
-    if (t1 > 0.0) best = min(best, abs(ro.y + rd.y*t1 - y) + 1e3*behindBlade(ro, rd, t1));
+    if (t0 > 0.0) best = min(best, hideD(abs(ro.y + rd.y*t0 - y), behindBlade(ro, rd, t0)));
+    if (t1 > 0.0) best = min(best, hideD(abs(ro.y + rd.y*t1 - y), behindBlade(ro, rd, t1)));
   }
   return best;
 }
@@ -72,7 +72,8 @@ vec3 base_vol(vec3 ro, vec3 rd, float px){
 // the blade: Sol's glow and core from the file, a bright scan line racing up it
 vec3 sig_glow(vec3 g, vec2 b, float r, float px){
   float ys = 0.8 + mod(uTime*12.0, uLength + 2.0);
-  float ln = 0.85 + 0.15*step(0.5, fract(b.y*2.0 - uTime*3.0));
+  // round 23: the dashes' edges smoothed over a pixel (they stair-stepped)
+  float ln = 0.85 + 0.15*aaSquare(b.y*2.0 - uTime*3.0, px*2.0);
   // nothing of it inside the hilt: from the emitter up only (round 16)
   float above = smoothstep(0.0, 0.8, b.y);
   return g*mix(1.0, ln, above) + vec3(0.8, 0.93, 1.0)*halo(b.y - ys, 0.25)*smoothstep(1.5, 0.0, abs(b.x))*1.4*above;

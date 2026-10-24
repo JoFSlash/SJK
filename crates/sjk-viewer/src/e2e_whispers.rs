@@ -418,7 +418,10 @@ impl GpuState {
                         now,
                     );
                     // Sent: its sound, as the SJK chat plays one for the player's own.
-                    if crate::cgame_options::chat_sounds(self.console.as_ref()) {
+                    if crate::chat_sounds::enabled(
+                        self.console.as_ref(),
+                        crate::chat_sounds::Kind::Private,
+                    ) {
                         crate::audio::ui_cues::post(crate::audio::ui_cues::Cue::EncryptedWhisper);
                     }
                     if let Some(console) = self.console.as_mut() {
@@ -470,7 +473,7 @@ impl GpuState {
             return;
         };
         let directory = console.config_directory().to_owned();
-        let sound = crate::cgame_options::chat_sounds(Some(console));
+        let sound = crate::chat_sounds::enabled(Some(console), crate::chat_sounds::Kind::Private);
         let text = match whisper.text {
             Ok(text) => shown_text(&text),
             Err(failure) => {
@@ -514,6 +517,7 @@ impl GpuState {
             }
             let line = format!("^6{shown}^6 (encrypted): {text}");
             console.push_chat_line(line.clone(), &line, None);
+            console.note_private_message();
         }
         if sound {
             crate::audio::ui_cues::post(crate::audio::ui_cues::Cue::EncryptedWhisper);

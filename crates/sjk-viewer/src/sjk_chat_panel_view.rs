@@ -1447,7 +1447,7 @@ impl Panel {
             .is_some_and(|key| inputs.muted.contains(key));
         self.shown.card_muted = muted;
         let s = frame.s;
-        let size = crate::sender_card::size(&card.person, s);
+        let size = crate::sender_card::size(&card.person, false, s);
         // A player of the who-is-online window has their card left of the window, over
         // the chat's quiet top, rather than over the window's other faces (text draws
         // over every shape, so a card over them would show their initials through it).
@@ -1480,8 +1480,9 @@ impl Panel {
                 card: CARD_TOKEN,
                 mute: CARD_MUTE_TOKEN,
                 ban: CARD_BAN_TOKEN,
-                // The safety code is only offered in the game's chat.
+                // The safety code and Whisper are only offered in the game's chat.
                 safety: CARD_TOKEN,
+                whisper: None,
             },
         );
     }

@@ -729,6 +729,11 @@ pub struct Look {
     /// 16/10/2026; absent, and empty, from older hubs and from players with none out).
     #[serde(default)]
     pub toys: Vec<String>,
+    /// The saber sounds the player chose apart from their blade (since 23/10/2026):
+    /// empty to follow the blade skin (absent from older hubs and clients), `stock` for
+    /// the retail sounds, or a blade-skin unlock id whose sounds they hear.
+    #[serde(default)]
+    pub saber_sounds: String,
 }
 
 /// A look worn on a game server, as the feed relays it when it changes: the slot and
@@ -757,6 +762,9 @@ pub struct LookEvent {
     /// The toys the wearer has out; empty when absent.
     #[serde(default)]
     pub toys: Vec<String>,
+    /// The saber sounds the wearer chose; empty (follow the blade) when absent.
+    #[serde(default)]
+    pub saber_sounds: String,
 }
 
 impl LookEvent {
@@ -767,6 +775,7 @@ impl LookEvent {
             illuminate: self.illuminate,
             saber_off: self.saber_off.clone(),
             toys: self.toys.clone(),
+            saber_sounds: self.saber_sounds.clone(),
         }
     }
 }
@@ -1461,6 +1470,7 @@ mod tests {
                 illuminate: true,
                 saber_off: Vec::new(),
                 toys: Vec::new(),
+                saber_sounds: String::new(),
             })
         );
         let options: Presence = serde_json::from_str(
@@ -1493,6 +1503,7 @@ mod tests {
                 illuminate: true,
                 saber_off: Vec::new(),
                 toys: Vec::new(),
+                saber_sounds: String::new(),
             }
         );
         let options: Feed = serde_json::from_str(
@@ -1501,6 +1512,13 @@ mod tests {
         )
         .unwrap();
         assert_eq!(options.looks[0].look().saber_off, ["wisps"]);
+        // The sounds chosen apart from the blade (23/10/2026); absent above: follow it.
+        let sounds: Feed = serde_json::from_str(
+            r#"{"next":17,"looks":[{"id":17,"at":9,"slot":3,"claimed_name":"^2Sol",
+                "key_id":"aa","saber":"saber_sun","illuminate":false,"saber_sounds":"stock"}]}"#,
+        )
+        .unwrap();
+        assert_eq!(sounds.looks[0].look().saber_sounds, "stock");
         let quiet: Feed = serde_json::from_str(r#"{"next":3,"emotes":[]}"#).unwrap();
         assert!(quiet.looks.is_empty(), "an older hub sends no looks");
     }

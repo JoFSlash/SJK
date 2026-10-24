@@ -71,6 +71,7 @@ const SHORT_LABELS: &[(&str, &str)] = &[
     ("cg_thirdPersonHorzOffset", "Camera side"),
     ("cg_thirdPersonCameraDamp", "Camera damping"),
     ("cg_thirdPersonTargetDamp", "Target damping"),
+    ("cg_wallGrabLock", "Lock wall-grab camera"),
     ("cg_errorDecay", "Error smoothing"),
     (crate::ghost_replay::SHOWCASE_CVAR, "Showcase tools"),
     (crate::frame_target::aa::exposure::MIN_EV, "Max darken, EV"),
@@ -97,6 +98,9 @@ pub(super) fn classic_label<'a>(cvar: &str, label: &'a str) -> (&'a str, Timing)
 /// a code: each `(cvar, value, name)`. A value not listed is shown as it is
 /// written ([`super::classic_view::choice_label`]).
 const CHOICE_NAMES: &[(&str, &str, &str)] = &[
+    (crate::chat_sounds::MASTER_CVAR, "0", "Off"),
+    (crate::chat_sounds::MASTER_CVAR, "1", "On"),
+    (crate::chat_sounds::MASTER_CVAR, "2", "Distinct (EJK)"),
     (crate::holocron_popup::NOTIFICATIONS_CVAR, "0", "Off"),
     (
         crate::holocron_popup::NOTIFICATIONS_CVAR,
@@ -193,6 +197,7 @@ pub(super) fn choice_name(cvar: &str, value: &str) -> Option<&'static str> {
         })
         .map(|(_, _, shown)| *shown)
         .or_else(|| crate::away_emote::choice_name(cvar, value))
+        .or_else(|| crate::chat_sounds::choice_name(cvar, value))
 }
 
 /// What the detail column says, in gold, while the SJK renderer is on and a
@@ -394,7 +399,7 @@ const HELP: &[(&str, &str)] = &[
     ),
     (
         crate::away_emote::ALT_TAB_CVAR,
-        "On: alt-tabbing out or minimising the game counts as away, for the away emote and quiet emotes.",
+        "On: alt-tabbing out or minimising counts as away and starts the away emote. Your emote goes quiet either way.",
     ),
     (
         crate::away_emote::IDLE_CVAR,
@@ -403,6 +408,10 @@ const HELP: &[(&str, &str)] = &[
     (
         crate::emotes::ATTACK_STOP_CVAR,
         "On: attacking or alt attacking ends your emote, for everyone, so your real swing shows. Off: you keep dancing.",
+    ),
+    (
+        crate::emotes::TYPING_KEEP_CVAR,
+        "On: while a player types (chat, console or menu open), their emote stays, even if pushed; moving after ends it.",
     ),
     (
         crate::unlock_toast::SOUND_CVAR,
@@ -516,6 +525,14 @@ const HELP: &[(&str, &str)] = &[
     (
         "cg_drawTeamScores",
         "Team games: the red and blue scores at the top centre of the HUD, in every HUD style.",
+    ),
+    (
+        "cg_teamScoresScale",
+        "Size of the SJK team score boxes: 1 is the default, 2 twice as large.",
+    ),
+    (
+        "cg_teamScoresBoxes",
+        "Team scores in SJK boxes, in CTF with each flag's carrier or return time. Off: the classic plates and flag icons.",
     ),
     (
         "cg_drawFlagStatus",
@@ -763,6 +780,10 @@ const HELP: &[(&str, &str)] = &[
         "How loosely the third-person camera turns where you aim: lower is smoother, 1 is instant.",
     ),
     (
+        "cg_wallGrabLock",
+        "Off: stock locks; JA+ lets you look and aim the kick-off. On locks JA+ too, preventing aim during the hold.",
+    ),
+    (
         "cg_errorDecay",
         "Smooths the view over this many milliseconds when the server corrects you; 0 snaps.",
     ),
@@ -877,8 +898,57 @@ const HELP: &[(&str, &str)] = &[
         "Keeps live SJK chat messages in console scrollback. Off does not hide SJK chat anywhere else.",
     ),
     (
+        crate::chat_sounds::MASTER_CVAR,
+        "Every chat sound. Distinct (EJK) gives team chat and private messages EJK's own sounds when theirs is Default.",
+    ),
+    (
+        "cg_chatBeep",
+        "A sound for public chat on game servers. Private messages have their own switch below.",
+    ),
+    (
+        "cl_chatSoundPublic",
+        "The sound public chat plays; Default is JKA's chat sound. Choosing one plays it.",
+    ),
+    (
+        "chatsoundpreview public",
+        "Plays the sound public chat plays now, even with its switch off.",
+    ),
+    ("cg_teamChatBeep", "A sound for team chat on game servers."),
+    (
+        "cl_chatSoundTeam",
+        "The sound team chat plays; Default is JKA's chat sound (EJK's team beep with Distinct).",
+    ),
+    (
+        "chatsoundpreview team",
+        "Plays the sound team chat plays now, even with its switch off.",
+    ),
+    (
+        crate::chat_sounds::Kind::Private.switch_cvar(),
+        "A sound for private messages: a server's tells (JA+, JoF and others) and encrypted whispers.",
+    ),
+    (
+        "cl_chatSoundPrivate",
+        "The sound private messages play; Default is JKA's chat sound for a tell, the SJK whisper sound for an encrypted whisper.",
+    ),
+    (
+        "chatsoundpreview private",
+        "Plays the sound private messages play now, even with their switch off.",
+    ),
+    (
         crate::sjk_chat_frame::SOUND_CVAR,
-        "A sound for each new SJK chat message, yours included, in menus and games. Chat sounds off (cg_chatSounds 0) silences it too.",
+        "A sound for each new SJK chat message, yours included, in menus and games.",
+    ),
+    (
+        "cl_chatSoundSjk",
+        "The sound SJK chat messages play; Default is SJK's own variant of JKA's chat sound.",
+    ),
+    (
+        "chatsoundpreview sjk",
+        "Plays the sound SJK chat messages play now, even with their switch off.",
+    ),
+    (
+        crate::chat_sounds::FLASH_CVAR,
+        "Flashes the game's taskbar button when a private message arrives while you are away from the window.",
     ),
     (
         crate::holocron_popup::NOTIFICATIONS_CVAR,

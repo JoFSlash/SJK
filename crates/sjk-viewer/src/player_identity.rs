@@ -1471,6 +1471,7 @@ mod tests {
             illuminate: true,
             saber_off: Vec::new(),
             toys: Vec::new(),
+            saber_sounds: String::new(),
         };
         let mut sent = None;
         assert!(newly(&mut sent, &lit));

@@ -83,6 +83,12 @@ pub(crate) const DEFAULT_VOLUME: f64 = 2.0;
 pub(crate) const ATTACK_STOP_CVAR: &str = "cg_emoteAttackStop";
 /// [`ATTACK_STOP_CVAR`]'s default.
 pub(crate) const DEFAULT_ATTACK_STOP: bool = false;
+/// Whether a player typing (the chat, the console or a menu open: their talk balloon,
+/// `EF_TALK`) keeps their emote whatever happens meanwhile: it ends when they move or
+/// attack after closing it ([`ActiveEmotes::hold`]; Settings > Sound > Emotes).
+pub(crate) const TYPING_KEEP_CVAR: &str = "cg_emoteTypingKeep";
+/// [`TYPING_KEEP_CVAR`]'s default (since 23/10/2026, Rollembones' idea).
+pub(crate) const DEFAULT_TYPING_KEEP: bool = true;
 /// How long an emote the catalogue does not know lasts.
 const UNKNOWN_LENGTH: Duration = Duration::from_secs(3);
 /// How far a player may move (game units) before their emote stops.
@@ -305,6 +311,9 @@ pub(crate) struct ActiveEmote {
     /// Silenced while its player is away ([`ActiveEmotes::set_quiet`]): its music
     /// keeps time without playing.
     pub(crate) quiet: bool,
+    /// Its player is typing ([`ActiveEmotes::hold`]): moving or attacking does not
+    /// end it until they stop.
+    pub(crate) held: bool,
 }
 
 /// An emote's music: its first sound, then the one that repeats after it (its loop,
@@ -447,6 +456,7 @@ impl ActiveEmotes {
             next_sound,
             leader: None,
             quiet: false,
+            held: false,
         });
     }
 
@@ -503,6 +513,7 @@ impl ActiveEmotes {
             next_sound,
             leader: Some(leader),
             quiet: false,
+            held: false,
         });
         true
     }
@@ -585,11 +596,31 @@ impl ActiveEmotes {
     /// the server attacks whatever the emote shows. True when one ended, so the
     /// caller tells the others (as `sjkemote stop`).
     pub(crate) fn end_on_attack(&mut self, slot: u8, buttons: u16, enabled: bool) -> bool {
-        if !enabled || buttons & ATTACK_BUTTONS == 0 || self.get(slot).is_none() {
+        if !enabled
+            || buttons & ATTACK_BUTTONS == 0
+            || self.get(slot).is_none_or(|active| active.held)
+        {
             return false;
         }
         self.stop(slot);
         true
+    }
+
+    /// Which players are typing now (bit `slot` of `typing`; zero with
+    /// [`TYPING_KEEP_CVAR`] off): while one is, their emote does not end when they move
+    /// or attack. Once they stop, the place where they are then is the one they may
+    /// not leave, so being pushed while typing does not end it either; the next move
+    /// or attack does. Call it each frame before [`Self::update`].
+    pub(crate) fn hold(&mut self, typing: u64) {
+        for (slot, entry) in self.slots.iter_mut().enumerate() {
+            let Some(active) = entry else { continue };
+            let held = typing & (1 << slot) != 0;
+            if active.held && !held {
+                // Taken again by `update`, where the player is now.
+                active.origin = None;
+            }
+            active.held = held;
+        }
     }
 
     /// The sounds to start and stop since the last call.
@@ -637,7 +668,7 @@ impl ActiveEmotes {
                 Some(at) => {
                     active.missing_since = None;
                     match active.origin {
-                        _ if active.moving => false,
+                        _ if active.moving || active.held => false,
                         None => {
                             active.origin = Some(at);
                             false
@@ -658,6 +689,35 @@ impl ActiveEmotes {
             }
         }
     }
+}
+
+/// The players typing now, for [`ActiveEmotes::hold`]: bit `slot` set for the own
+/// player (`own`: their slot and whether a chat, console or menu of theirs is open)
+/// and for every other player whose entity (`others`: number and `eFlags`) wears the
+/// talk balloon (`EF_TALK`, which their client's `BUTTON_TALK` sets on the server, so
+/// every SJK client sees the same typists without the hub). None while `enabled`
+/// ([`TYPING_KEEP_CVAR`]) is off.
+pub(crate) fn typing_slots(
+    enabled: bool,
+    own: Option<(u8, bool)>,
+    others: impl IntoIterator<Item = (u16, u32)>,
+) -> u64 {
+    if !enabled {
+        return 0;
+    }
+    let mut typing = match own {
+        Some((slot, true)) if usize::from(slot) < SLOTS => 1u64 << slot,
+        _ => 0,
+    };
+    for (number, flags) in others {
+        if usize::from(number) < SLOTS
+            && flags & sjk_game_jka::pmove_talk::EF_TALK != 0
+            && own.is_none_or(|(slot, _)| u16::from(slot) != number)
+        {
+            typing |= 1 << number;
+        }
+    }
+    typing
 }
 
 /// The catalogue (once a game's files are mounted) and the emotes playing now.
@@ -881,6 +941,77 @@ mod tests {
         active.start(2, "dance", Some(&dance), Some([0.0; 3]), t0);
         assert!(active.end_on_attack(2, 128, true), "alt attack");
         assert!(active.get(2).is_none());
+    }
+
+    /// Rollembones' idea (23/10/2026): a player typing stays in their emote until they
+    /// move or attack after closing the chat, whatever happens while they type.
+    #[test]
+    fn typing_keeps_the_emote_until_the_player_moves_after() {
+        let t0 = Instant::now();
+        let sit = parse(
+            "sit",
+            r#"{"name": "Sit", "loop": true, "sound": "sound/emotes/sit.wav"}"#,
+        )
+        .unwrap();
+        let mut active = ActiveEmotes::default();
+        active.start(2, "sit", Some(&sit), Some([0.0; 3]), t0);
+        active.start(3, "sit", Some(&sit), Some([0.0; 3]), t0);
+        active.take_cues();
+        // Slot 2 types; both are pushed 40 units away.
+        active.hold(1 << 2);
+        let pushed = [40.0, 0.0, 0.0];
+        active.update(t0 + Duration::from_millis(100), |_| Some(pushed));
+        assert!(active.get(2).is_some(), "typing: pushed, still sitting");
+        assert!(active.get(3).is_none(), "not typing: moved, ended");
+        assert!(
+            !active.end_on_attack(2, 1, true),
+            "a click while typing is not an attack"
+        );
+        assert!(active.get(2).is_some());
+        // The chat closes: where they are now is the new place to stay.
+        active.hold(0);
+        active.update(t0 + Duration::from_millis(200), |_| Some(pushed));
+        assert!(
+            active.get(2).is_some(),
+            "closing the chat alone ends nothing"
+        );
+        active.update(t0 + Duration::from_millis(300), |_| Some([52.0, 0.0, 0.0]));
+        assert!(active.get(2).is_some(), "12 units: still there");
+        active.update(t0 + Duration::from_millis(400), |_| Some([70.0, 0.0, 0.0]));
+        assert!(active.get(2).is_none(), "walking off after typing ends it");
+        // And an attack after typing does too.
+        active.start(2, "sit", Some(&sit), Some([0.0; 3]), t0);
+        active.hold(1 << 2);
+        active.hold(0);
+        assert!(active.end_on_attack(2, 1, true));
+    }
+
+    #[test]
+    fn with_the_setting_off_typing_holds_nothing() {
+        let t0 = Instant::now();
+        let sit = parse("sit", r#"{"name": "Sit", "loop": true}"#).unwrap();
+        let mut active = ActiveEmotes::default();
+        active.start(2, "sit", Some(&sit), Some([0.0; 3]), t0);
+        // The frame hook passes no typists while `cg_emoteTypingKeep` is off.
+        active.hold(typing_slots(false, Some((2, true)), std::iter::empty()));
+        active.update(t0 + Duration::from_millis(100), |_| Some([40.0, 0.0, 0.0]));
+        assert!(active.get(2).is_none());
+    }
+
+    #[test]
+    fn typists_are_the_talk_balloons_and_the_own_open_chat() {
+        const EF_TALK: u32 = sjk_game_jka::pmove_talk::EF_TALK;
+        let others = [(4u16, EF_TALK), (5, 0), (70, EF_TALK), (6, EF_TALK | 2)];
+        assert_eq!(
+            typing_slots(true, Some((1, true)), others.iter().copied()),
+            1 << 1 | 1 << 4 | 1 << 6,
+            "a number past the slots is no player"
+        );
+        assert_eq!(typing_slots(true, Some((1, false)), std::iter::empty()), 0);
+        assert_eq!(
+            typing_slots(false, Some((1, true)), others.iter().copied()),
+            0
+        );
     }
 
     /// Hub report #107: a dancer out of the snapshot for a moment keeps dancing and

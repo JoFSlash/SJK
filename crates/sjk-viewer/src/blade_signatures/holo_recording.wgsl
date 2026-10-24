@@ -29,7 +29,8 @@ fn sig_vol(ro: vec3<f32>, rd: vec3<f32>, px: f32) -> vec3<f32> {
     var fx: vec3<f32> = vec3<f32>(0.0);
     let c: vec3<f32> = vec3<f32>(0.7, 0.9, 1.0);
     var ta: f32;
-    if fxNear(ro, rd, y0, y1) < 3.0 {
+    // round 23: out to where the dashes' glow has faded (cut at 3 units, they ended at a hard edge)
+    if fxNear(ro, rd, y0, y1) < 4.0 {
         for (var i = 0; i < 14; i++) {
             let fi = f32(i);
             let k = floor(t * 12.0 + fi * 0.37);

@@ -973,6 +973,15 @@ impl LoadedSkins {
             .map(|index| self.skins[index].color(index as u8, off))
     }
 
+    /// The number of the loaded skin of unlock `id` (its sound set's in the audio
+    /// adapter's table), if its pack is loaded.
+    pub(crate) fn index_of(&self, id: &str) -> Option<u8> {
+        self.skins
+            .iter()
+            .position(|skin| skin.id == id)
+            .map(|index| index as u8)
+    }
+
     /// The loaded skins with their numbers.
     pub(crate) fn iter(&self) -> impl Iterator<Item = (u8, &LoadedSkin)> {
         self.skins
@@ -1052,6 +1061,14 @@ pub(crate) struct SaberSkins {
     local: Option<SkinColor>,
     /// The local player's client slot, in a session.
     local_client: Option<usize>,
+    /// Which skin's sound set each slot is heard with (its number): `sound_others`, with
+    /// the local player's own in its slot. The blade's unless the player chose other
+    /// saber sounds (`crate::saber_sound_choice`).
+    sounds: [Option<u8>; MAX_CLIENTS],
+    /// What the hub's looks say each slot is heard with.
+    sound_others: [Option<u8>; MAX_CLIENTS],
+    /// The local player's own sound set.
+    sound_local: Option<u8>,
     /// Who sits in each slot (team, name), for the skins drawn from that.
     personas: [crate::saber_persona::Persona; MAX_CLIENTS],
     /// The local player's own, also with no session (its `name`).
@@ -1095,6 +1112,7 @@ impl SaberSkins {
     pub(crate) fn set(&mut self, client: usize, skin: Option<SkinColor>) {
         if let Some(slot) = self.others.get_mut(client) {
             *slot = skin;
+            self.sound_others[client] = skin.map(|skin| skin.index);
             self.merge();
         }
     }
@@ -1102,30 +1120,51 @@ impl SaberSkins {
     /// Take every other slot's skin from the looks (`skin_of` a client slot) when their
     /// `revision` or the loaded skins' `generation` is not the one last taken; no
     /// allocation, 32 lookups when it changed.
+    /// Each slot is heard with its blade's sound set.
+    #[cfg(test)]
     pub(crate) fn follow_looks(
         &mut self,
         revision: u64,
         generation: u64,
         skin_of: impl Fn(usize) -> Option<SkinColor>,
     ) {
+        self.follow_looks_and_sounds(revision, generation, |client| {
+            let skin = skin_of(client);
+            (skin, skin.map(|skin| skin.index))
+        });
+    }
+
+    /// [`Self::follow_looks`], with each slot's sound set (a loaded skin's number, `None`
+    /// the stock sounds) taken apart from its blade: `of` a client slot gives both.
+    pub(crate) fn follow_looks_and_sounds(
+        &mut self,
+        revision: u64,
+        generation: u64,
+        of: impl Fn(usize) -> (Option<SkinColor>, Option<u8>),
+    ) {
         if self.taken_at == Some((revision, generation)) {
             return;
         }
         self.taken_at = Some((revision, generation));
-        for (client, skin) in self.others.iter_mut().enumerate() {
-            *skin = skin_of(client);
+        for (client, (skin, sound)) in self
+            .others
+            .iter_mut()
+            .zip(self.sound_others.iter_mut())
+            .enumerate()
+        {
+            (*skin, *sound) = of(client);
         }
         self.merge();
     }
 
-    /// Draw `others`, with the local player's own skin in its slot.
+    /// Draw `others`, with the local player's own skin in its slot, and hear
+    /// `sound_others` so.
     fn merge(&mut self) {
         self.clients = self.others;
-        if let Some(slot) = self
-            .local_client
-            .and_then(|client| self.clients.get_mut(client))
-        {
-            *slot = self.local;
+        self.sounds = self.sound_others;
+        if let Some(client) = self.local_client.filter(|client| *client < MAX_CLIENTS) {
+            self.clients[client] = self.local;
+            self.sounds[client] = self.sound_local;
         }
     }
 
@@ -1181,22 +1220,47 @@ impl SaberSkins {
         })
     }
 
-    /// The local player wears `skin` and, in a session, sits in slot `client`.
+    /// The local player wears `skin`, heard with its own sound set, and, in a session,
+    /// sits in slot `client`.
+    #[cfg(test)]
     pub(crate) fn set_local(&mut self, client: Option<usize>, skin: Option<SkinColor>) {
-        if (client, skin) == (self.local_client, self.local) {
+        self.set_local_with_sound(client, skin, skin.map(|skin| skin.index));
+    }
+
+    /// [`Self::set_local`], heard with sound set `sound` (a loaded skin's number, `None`
+    /// the stock sounds) whatever the blade.
+    pub(crate) fn set_local_with_sound(
+        &mut self,
+        client: Option<usize>,
+        skin: Option<SkinColor>,
+        sound: Option<u8>,
+    ) {
+        if (client, skin, sound) == (self.local_client, self.local, self.sound_local) {
             return;
         }
         self.local = skin;
+        self.sound_local = sound;
         self.local_client = client;
         self.merge();
     }
 
-    /// Each client slot's sound set (its skin's number) for the audio adapter.
+    /// Each client slot's sound set (a loaded skin's number) for the audio adapter:
+    /// the blade's, or the one the player chose apart from it.
     pub(crate) fn sound_sets(&self) -> [Option<u8>; MAX_CLIENTS] {
         if self.plain {
             return [None; MAX_CLIENTS];
         }
-        self.clients.map(|skin| skin.map(|skin| skin.index))
+        self.sounds
+    }
+
+    /// The sound set the player whose body is entity `entity_id` (client + 1) is heard
+    /// with, for the animation's swing cues.
+    pub(crate) fn sound_of(&self, entity_id: u64) -> Option<u8> {
+        let client = usize::try_from(entity_id.checked_sub(1)?).ok()?;
+        if self.plain {
+            return None;
+        }
+        self.sounds.get(client).copied().flatten()
     }
 }
 
@@ -1257,13 +1321,25 @@ impl GpuState {
         ));
         let (looks, skins) = (&self.looks, &self.blade_skins);
         self.saber_skins
-            .follow_looks(looks.revision(), skins.generation(), |client| {
-                looks
+            .follow_looks_and_sounds(looks.revision(), skins.generation(), |client| {
+                let skin = looks
                     .saber_skin_id(client)
-                    .and_then(|id| skins.color_with(id, looks.options_off(client)))
+                    .and_then(|id| skins.color_with(id, looks.options_off(client)));
+                let sound = looks
+                    .sound_skin_id(client)
+                    .and_then(|id| skins.index_of(id));
+                (skin, sound)
             });
         let skin = self.local_saber_skin();
-        self.saber_skins.set_local(client, skin);
+        let sound = self
+            .looks
+            .own()
+            .sound_skin()
+            .and_then(|id| self.blade_skins.index_of(id));
+        self.saber_skins.set_local_with_sound(client, skin, sound);
+        if let Some(preview) = crate::saber_sound_choice::take_preview() {
+            self.play_sound_preview(game_audio, preview);
+        }
         if let Some(audio) = game_audio {
             audio.follow_blade_skins(&self.blade_skins);
             audio.set_saber_sound_overrides(&self.saber_skins.sound_sets());

@@ -137,7 +137,7 @@ fn held_on_the_stage() {
 /// the hilt search being typed ("ka") with its matches, and the blade choice offering
 /// the stock blade and every blade skin (made-up grants; the Storm worn, the model
 /// holding it); then a kept search that finds nothing with no skin owned; then Dual
-/// with every skin. At 1080p, with the menu text at its largest (`ui_textScale` 1.4),
+/// with every skin; the Sounds row under the blade, the Void's sounds chosen. At 1080p, with the menu text at its largest (`ui_textScale` 1.4),
 /// and at 4K with it, as Sol plays. No canvas runs out of room.
 #[test]
 #[ignore = "renders with the GPU and the installed game data named by JKA_GAME_DATA"]
@@ -165,6 +165,7 @@ fn duel6_sjk_saber_page() {
                 ("ui_menuStyle", "sjk"),
                 (crate::settings::quick::HIDE_CVAR, "1"),
                 (crate::unlockables::SABER_SKIN_CVAR, "saber_storm"),
+                (crate::saber_sound_choice::CVAR, "saber_void"),
                 ("name", "^1Sol^7Vulpes"),
             ];
             if let Some(scale) = scale {
@@ -181,11 +182,13 @@ fn duel6_sjk_saber_page() {
             if let (Some(menu), Some(console)) = (gpu.client_menu.as_mut(), gpu.console.as_ref()) {
                 menu.open_player_hub(console, crate::player_menu::ReturnTarget::MainMenu);
             }
-            // Search typed, then (the same rows: Style, Search, Hilt, Blade) the
-            // search kept finding nothing and no skin, then Dual on its blade row.
-            let steps: [(&str, bool, bool, usize, &str); 3] = [
+            // Search typed, then (the same rows: Style, Search, Hilt, Blade, Sounds) the
+            // search kept finding nothing and no skin, then the Sounds row chosen (the
+            // Void's sounds under the Storm blade), then Dual on its blade row.
+            let steps: [(&str, bool, bool, usize, &str); 4] = [
                 ("ka", true, true, 1, "search"),
                 ("zzz", false, false, 3, "none"),
+                ("", false, true, 4, "sounds"),
                 ("", false, true, 3, "dual"),
             ];
             for (search, typing, owned, row, part) in steps {

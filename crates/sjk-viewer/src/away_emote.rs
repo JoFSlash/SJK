@@ -186,6 +186,15 @@ pub(crate) fn is_away(
             && since_input.is_some_and(|since| since >= idle))
 }
 
+/// Whether an alt-tabbed out or minimised window (`unfocused`) silences the emote the
+/// player plays (`emoting`), for everyone and here: always, whatever [`ALT_TAB_CVAR`]
+/// says (Sol's rule, 23/10/2026: nobody hears music a player left running behind
+/// another window). [`ALT_TAB_CVAR`] only decides whether alt-tabbing out with no emote
+/// playing starts the away emote.
+pub(crate) fn alt_tab_quiets(unfocused: bool, emoting: bool) -> bool {
+    unfocused && emoting
+}
+
 /// The SJK emotes [`SJK_CVAR`] may name: [`NONE`] then the catalogue's looping ones
 /// sent to the hub, made once for each catalogue (the settings list wants them for
 /// the program's life).
@@ -306,19 +315,19 @@ impl crate::GpuState {
             .and_then(|own| state.active.get(own))
             .and_then(|active| def_of(&state, &active.emote))
             .is_some_and(|def| def.looping);
+        let current = own
+            .and_then(|own| state.active.get(own))
+            .map(|active| active.emote.clone());
         let away = playing
-            && is_away(
+            && (is_away(
                 unfocused,
                 console.bool_cvar(ALT_TAB_CVAR) != Some(false),
                 crate::holocrons::activity::since_input(now),
                 idle,
                 dancing,
                 away_state.away,
-            );
+            ) || alt_tab_quiets(unfocused, current.is_some()));
         let sjk = pick(SJK_CVAR).filter(|id| def_of(&state, id).is_some_and(|def| fits(&def)));
-        let current = own
-            .and_then(|own| state.active.get(own))
-            .map(|active| active.emote.clone());
         let step = away_state.turn(away, current.as_deref(), japlus.as_deref(), sjk.as_deref());
         if let (Some(step), Some(own)) = (step, own) {
             let def = current.as_deref().and_then(|id| def_of(&state, id));
@@ -454,6 +463,33 @@ mod tests {
             !is_away(false, true, None, idle, false, false),
             "no input yet"
         );
+    }
+
+    /// Sol's rule (23/10/2026): alt-tabbing out always silences the emote playing, even
+    /// with `cg_awayAltTab` off, which then starts no away emote; coming back plays it
+    /// again.
+    #[test]
+    fn alt_tabbing_out_always_quiets_the_emote_playing() {
+        let idle = Duration::from_secs(180);
+        let alt_tab_off = |unfocused: bool, emoting: bool| {
+            is_away(unfocused, false, None, idle, emoting, false)
+                || alt_tab_quiets(unfocused, emoting)
+        };
+        let mut away = Away::default();
+        assert!(alt_tab_off(true, true));
+        assert_eq!(
+            away.turn(alt_tab_off(true, true), Some("dance"), None, Some("sit")),
+            Some(Step::Quiet)
+        );
+        assert_eq!(
+            away.turn(alt_tab_off(false, true), Some("dance"), None, Some("sit")),
+            Some(Step::Loud)
+        );
+        assert!(
+            !alt_tab_off(true, false),
+            "no emote and alt-tab off: no away emote starts"
+        );
+        assert!(!alt_tab_quiets(false, true), "in focus");
     }
 
     /// Hub report #107: a dance left running is not idle, an alt-tab still counts, and

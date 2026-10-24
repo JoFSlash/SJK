@@ -121,6 +121,35 @@ const NOTE_MAX: usize = 200;
 /// How long Clear all and Unlink wait for their second press.
 const CONFIRM_FOR: Duration = Duration::from_secs(3);
 
+/// Whether `token` is one of the buttons only SJK's creator may use (the hub's
+/// `PROTOCOL.md`, "Creator", since 23/10/2026): what gives, takes back, clears or merges.
+/// Other staff see them dimmed; Tab skips them and a press does nothing.
+fn owner_only(token: u16) -> bool {
+    let within = |base: u16, count: usize| (base..base + count as u16).contains(&token);
+    matches!(
+        token,
+        PICTURE_DOWN_TOKEN
+            | CLEAR_ALL_TOKEN
+            | HOLOCRON_GIVE_TOKEN
+            | AMOUNT_TOKEN
+            | CREDITS_GIVE_TOKEN
+            | CREDITS_TAKE_TOKEN
+            | SHARDS_GIVE_TOKEN
+            | SHARDS_TAKE_TOKEN
+            | MERGE_FIELD_TOKEN
+            | MERGE_PICK_TOKEN
+            | MERGE_TOKEN
+            | MERGE_CONFIRM_TOKEN
+    ) || within(GIVE_BASE, crate::medals::Medal::COUNT)
+        || within(TAKE_BASE, crate::medals::Medal::COUNT)
+        || within(UNLOCK_BASE, crate::unlockables::ALL.len())
+        || within(RELOCK_BASE, crate::unlockables::ALL.len())
+        || within(HOLOCRON_TIER_BASE, crate::holocrons::COUNT)
+        || within(HOLOCRON_REMOVE_BASE, HOLOCRONS_SHOWN)
+        || within(CLEAR_BASE, crate::achievements::ALL.len())
+        || within(UNLINK_BASE, LINKED_SHOWN)
+}
+
 /// What the console does after the page handled an event.
 #[derive(Debug, Eq, PartialEq)]
 pub(crate) enum PanelAction {
@@ -229,7 +258,8 @@ struct Shown {
     verified: bool,
     /// The chosen player is staff.
     staff: bool,
-    /// The player's own is SJK's creator, who alone makes staff.
+    /// The player's own is SJK's creator, who alone makes staff and uses the
+    /// [`owner_only`] buttons.
     creator: bool,
     /// The chosen player's linked keys listed with Unlink.
     linked: Vec<String>,
@@ -425,6 +455,9 @@ impl Panel {
 
     /// What Enter (or a click) on `token` does.
     fn activate(&mut self, token: u16) -> PanelAction {
+        if owner_only(token) && !self.shown.creator {
+            return PanelAction::None;
+        }
         self.focus = token;
         if self.confirm.is_some_and(|(pressed, _)| pressed != token) {
             self.confirm = None;
@@ -995,9 +1028,11 @@ mod tests {
         }
     }
 
+    /// The player's own: SJK's creator, who may use every button.
     fn me() -> Profile {
         Profile {
             staff: true,
+            creator: true,
             medals: vec![Medal {
                 id: "early_tester".into(),
                 count: 1,
@@ -1293,6 +1328,7 @@ mod tests {
         assert!(!panel.order.contains(&HOLOCRON_REMOVE_BASE));
         let held = Profile {
             staff: true,
+            creator: true,
             holocrons: vec![
                 wire_holocron(41, "legendary"),
                 wire_holocron(40, "from_the_future"),
@@ -1400,6 +1436,10 @@ mod tests {
     fn only_the_creator_makes_staff_on_a_second_press_and_never_unstaffs_themselves() {
         let other = profile("bbbbbbbbbbbbbbbb", "Fox");
         let (mut panel, me, _) = drawn(vec![other.clone()]);
+        let me = Profile {
+            creator: false,
+            ..me
+        };
         let _ = panel.activate(PLAYER_BASE);
         redraw(&mut panel, &me, vec![other.clone()]);
         assert!(
@@ -1440,6 +1480,48 @@ mod tests {
         let _ = panel.activate(ME_TOKEN);
         redraw(&mut panel, &creator, Vec::new());
         assert!(!panel.order.contains(&SET_STAFF_TOKEN));
+    }
+
+    #[test]
+    fn staff_read_what_only_the_creator_gives_takes_back_or_merges() {
+        let other = profile("bbbbbbbbbbbbbbbb", "Fox");
+        let (mut panel, me, _) = drawn(vec![other.clone()]);
+        let me = Profile {
+            creator: false,
+            ..me
+        };
+        let _ = panel.activate(PLAYER_BASE);
+        panel.amount = "50".to_owned();
+        let _ = panel.activate(ECONOMY_TAB_TOKEN);
+        redraw(&mut panel, &me, vec![other.clone()]);
+        assert!(!panel.order.iter().any(|token| owner_only(*token)));
+        assert_eq!(panel.activate(CREDITS_GIVE_TOKEN), PanelAction::None);
+        assert_eq!(panel.activate(HOLOCRON_GIVE_TOKEN), PanelAction::None);
+        assert_eq!(panel.activate(GIVE_BASE), PanelAction::None);
+        // The day-to-day moderation stays theirs.
+        assert_eq!(
+            panel.activate(HUB_MUTE_TOKEN),
+            PanelAction::Request(StaffRequest::ChatMute {
+                key_id: other.key_id.clone(),
+                muted: true
+            })
+        );
+        let creator = Profile {
+            staff: true,
+            creator: true,
+            ..me
+        };
+        let _ = panel.activate(ECONOMY_TAB_TOKEN);
+        redraw(&mut panel, &creator, vec![other.clone()]);
+        assert!(panel.order.contains(&CREDITS_GIVE_TOKEN));
+        assert_eq!(
+            panel.activate(CREDITS_GIVE_TOKEN),
+            PanelAction::Request(StaffRequest::Credits {
+                key_id: other.key_id,
+                delta: 50,
+                note: String::new()
+            })
+        );
     }
 
     #[test]

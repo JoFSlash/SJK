@@ -75,6 +75,9 @@ pub(crate) struct Icons {
     seconds: [i32; 16],
     cty: bool,
     warned_model: bool,
+    /// The team boxes show the flags this frame (`flag_status`), so the carried
+    /// flag's pictures at the bottom left and in the upper-right column stay out.
+    pub(super) flags_in_boxes: bool,
 }
 
 impl Icons {
@@ -162,6 +165,7 @@ impl Default for Icons {
             seconds: [-1; 16],
             cty: false,
             warned_model: false,
+            flags_in_boxes: false,
         }
     }
 }
@@ -250,7 +254,7 @@ impl Icons {
                 );
             }
         }
-        if self.enabled && visibility.status && self.alive && !self.models {
+        if self.enabled && visibility.status && self.alive && !self.models && !self.flags_in_boxes {
             for power in 4..=6 {
                 if self.seconds[power] >= 0 {
                     self.quad(
@@ -268,7 +272,10 @@ impl Icons {
         let mut bottom = 0.0;
         let mut y = 200.0 * s;
         for (power, seconds) in self.seconds.iter().copied().enumerate() {
-            if seconds < 0 || assets::POWERS[power] == 0 {
+            if seconds < 0
+                || assets::POWERS[power] == 0
+                || (self.flags_in_boxes && matches!(power, 4..=6))
+            {
                 continue;
             }
             let index = if self.cty && matches!(power, 4 | 5) {

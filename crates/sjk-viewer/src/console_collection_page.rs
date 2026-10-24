@@ -148,6 +148,10 @@ impl ViewerConsole {
                 self.pending_hax = Some(on);
                 self.hax_on = on;
             }
+            PanelAction::Ragdoll(on) => {
+                self.pending_ragdoll = Some(on);
+                self.ragdoll_on = on;
+            }
             PanelAction::Hub(tab) => {
                 // A tab of another page: the Holocrons page.
                 let back = self.collection_panel.back();
@@ -205,6 +209,16 @@ impl ViewerConsole {
     /// The Toys tab asked to turn the Hax on (`true`) or off, once.
     pub(crate) fn take_hax_request(&mut self) -> Option<bool> {
         self.pending_hax.take()
+    }
+
+    /// The viewer says whether the player is limp (the Ragdoll), once a frame.
+    pub(crate) fn set_ragdoll_on(&mut self, on: bool) {
+        self.ragdoll_on = on;
+    }
+
+    /// The Toys tab asked to go limp (`true`) or get up, once.
+    pub(crate) fn take_ragdoll_request(&mut self) -> Option<bool> {
+        self.pending_ragdoll.take()
     }
 
     /// Give a pressed key to the open page; false when the page is closed.
@@ -275,6 +289,7 @@ impl ViewerConsole {
         let cardboard_box = self.cardboard_box_on;
         let order66 = self.order66_on;
         let hax = self.hax_on;
+        let ragdoll = self.ragdoll_on;
         let stock = self.stock_blade();
         let grid = self.integer_cvar(super::collection_panel::SHADER_VIEW_CVAR) == Some(1);
         let options = self
@@ -306,6 +321,7 @@ impl ViewerConsole {
                 cardboard_box,
                 order66,
                 hax,
+                ragdoll,
                 name: &name,
                 stock,
                 grid,
@@ -327,6 +343,7 @@ impl ViewerConsole {
             cardboard_box,
             order66,
             hax,
+            ragdoll,
             name: &name,
             stock,
             grid,

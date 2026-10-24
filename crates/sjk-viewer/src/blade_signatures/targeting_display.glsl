@@ -6,9 +6,15 @@
 // @palette {"corona.rim_cool":[0.05,0.3,0.85],"corona.rim_hot":[0.2,0.8,1.0],"corona.inner":[0.75,1.0,1.0],"core.white":[1.0,1.0,1.0],"core.fringe_cool":[0.2,0.75,1.0],"core.fringe_hot":[0.7,1.0,1.0],"light.color":[0.2,0.8,1.0],"trail":[0.2,0.8,1.0]}
 
 vec3 targeting_display_glow0(vec3 g, vec2 b, float r, float px){
-  vec2 q = floor(vec2(b.x*4.0, b.y*1.6));
-  float blink = step(0.85, h21(q + floor(uTime*4.0)))*part(0.0);
-  float step_ = floor(lvl(g)*5.0 + 0.5)/5.0;
+  // round 23: the lit squares' and the levels' edges smoothed (they stair-stepped into a jagged
+  // outline); the blade keeps its blocky levels
+  vec2 u = vec2(b.x*4.0, b.y*1.6), q = floor(u);
+  float tk = floor(uTime*4.0);
+  float mx = cellMix(u.x, px*4.0), my = cellMix(u.y, px*1.6);
+  float blink = mix(mix(step(0.85, h21(q + tk)), step(0.85, h21(q + vec2(1.0, 0.0) + tk)), mx),
+                    mix(step(0.85, h21(q + vec2(0.0, 1.0) + tk)), step(0.85, h21(q + vec2(1.0, 1.0) + tk)), mx), my)*part(0.0);
+  float lv = lvl(g)*5.0 + 0.5;
+  float step_ = (floor(lv) + smoothstep(0.85, 1.0, fract(lv)))/5.0;
   return g/max(lvl(g), 0.001)*step_*(1.0 + 0.5*blink);
 }
 vec3 sig_glow(vec3 g, vec2 b, float r, float px){

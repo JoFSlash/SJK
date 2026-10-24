@@ -6,8 +6,9 @@
 // @palette {"corona.rim_cool":[0.6,0.62,0.66],"corona.rim_hot":[0.95,0.95,0.98],"corona.inner":[1.0,1.0,1.0],"core.white":[1.0,1.0,1.0],"core.fringe_cool":[0.85,0.85,0.9],"core.fringe_hot":[1.0,1.0,1.0],"light.color":[0.9,0.9,0.95],"trail":[0.9,0.9,0.95]}
 
 vec3 code_cylinder_glow0(vec3 g, vec2 b, float r, float px){
-  float k = floor(b.y*1.2 - uTime*0.8);
-  float s = step(0.45, h11(k*3.7));
+  // round 23: each stripe's edge smoothed over a pixel (it stair-stepped)
+  float u = b.y*1.2 - uTime*0.8, k = floor(u);
+  float s = mix(step(0.45, h11(k*3.7)), step(0.45, h11((k + 1.0)*3.7)), cellMix(u, px*1.2));
   return g*(0.8 + 0.3*s*part(0.0));
 }
 vec3 sig_glow(vec3 g, vec2 b, float r, float px){

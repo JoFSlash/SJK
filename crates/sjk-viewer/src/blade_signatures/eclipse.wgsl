@@ -107,9 +107,11 @@ fn r8_vol(ro: vec3<f32>, rd: vec3<f32>, px: f32) -> vec3<f32> {
         let ey = yb + (f32(k) * 2.0 - 1.0) * hw * 0.62;
         let hp = rayAt(ro, rd, ey);
         if hp.z > 0.0 {
-            let rr = (length(hp.xy) + 1.0e3 * behindBlade(ro, rd, hp.z));
+            // round 23: hidden behind the blade softly (see hideD in lab.glsl)
+            let rr = length(hp.xy);
+            let seen = 1.0 - behindBlade(ro, rd, hp.z);
             let rim = halo(abs(rr - 0.42), max(0.05, px)) * 1.1;
-            fx += white * rim * vis * (1.0 - smoothstep(0.6, 1.2, rr));
+            fx += white * rim * vis * (1.0 - smoothstep(0.6, 1.2, rr)) * seen;
         }
     }
     // ---- diamond ring and Baily's beads: flashes on the band's edge as the moon slides
@@ -125,8 +127,9 @@ fn r8_vol(ro: vec3<f32>, rd: vec3<f32>, px: f32) -> vec3<f32> {
     // a soft horizontal flash streak through the diamond, round the band
     let hp2 = rayAt(ro, rd, dp.y);
     if hp2.z > 0.0 {
-        let rr = (length(hp2.xy) + 1.0e3 * behindBlade(ro, rd, hp2.z));
-        fx += white * halo(abs(rr - 0.42), 0.25) * exp(-rr / 2.5) * fl * 0.6 * vis;
+        let rr = length(hp2.xy);
+        let seen = 1.0 - behindBlade(ro, rd, hp2.z);
+        fx += white * halo(abs(rr - 0.42), 0.25) * exp(-rr / 2.5) * fl * 0.6 * vis * seen;
     }
     for (var j = 0; j < 5; j++) {
         let fj = f32(j);

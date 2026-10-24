@@ -84,6 +84,12 @@ impl Templates {
         self.rescan(vfs);
     }
 
+    /// Forget lists derived from the previous world's file system.
+    pub(super) fn detach_vfs(&mut self) {
+        self.listed = None;
+        self.sides = Default::default();
+    }
+
     /// List both sides again.
     fn rescan(&mut self, vfs: &Arc<VirtualFileSystem>) {
         let user = user_root();
@@ -319,6 +325,17 @@ pub(super) fn append_name(name: &mut String, text: &str) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn detaching_releases_the_listed_vfs() {
+        let vfs = Arc::new(VirtualFileSystem::new());
+        let weak = Arc::downgrade(&vfs);
+        let mut templates = Templates::from_test_vfs(Arc::clone(&vfs));
+        drop(vfs);
+        assert!(weak.upgrade().is_some());
+        templates.detach_vfs();
+        assert!(weak.upgrade().is_none());
+    }
 
     #[test]
     fn bundled_jof_presets_load_by_side_after_retail_and_allow_overrides() {

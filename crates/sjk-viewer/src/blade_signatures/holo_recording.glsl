@@ -19,7 +19,8 @@ vec3 sig_vol(vec3 ro, vec3 rd, float px){
   vec3 fx = vec3(0.0);
   vec3 c = vec3(0.7, 0.9, 1.0);
   float ta;
-  if (fxNear(ro, rd, y0, y1) < 3.0){
+  // round 23: out to where the dashes' glow has faded (cut at 3 units, they ended at a hard edge)
+  if (fxNear(ro, rd, y0, y1) < 4.0){
     for (int i = 0; i < 14; i++){
       float fi = float(i);
       float k = floor(t*12.0 + fi*0.37);

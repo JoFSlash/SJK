@@ -62,7 +62,7 @@ vec3 r8_vol(vec3 ro, vec3 rd, float px){
   if (cl > 0.01){
     float yc = uLength*0.6;
     vec3 h = rayAt(ro, rd, yc);
-    if (h.z > 0.0) col += green*halo(abs((length(h.xy) + 1e3*behindBlade(ro, rd, h.z)) - 0.6 - 5.0*(1.0 - cl)), 0.25 + 0.4*(1.0 - cl))*cl*1.8;
+    if (h.z > 0.0) col += green*halo(hideD(abs(length(h.xy) - 0.6 - 5.0*(1.0 - cl)), behindBlade(ro, rd, h.z)), 0.25 + 0.4*(1.0 - cl))*cl*1.8;
     float dc = rayPtRaw(ro, rd, vec3(0.0, yc, 0.0), ta);
     col += pale*halo(dc, 1.5)*cl*cl*1.5;
   }

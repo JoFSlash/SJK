@@ -201,6 +201,8 @@ impl SettingsMenu {
                         return SettingsResult::OpenImport;
                     } else if matches!(setting.kind(), ValueKind::GameplayFps) {
                         return SettingsResult::OpenGameplayFps;
+                    } else if matches!(setting.kind(), ValueKind::SoundPreview) {
+                        super::preview_sound(setting.cvar);
                     } else if self.classic.is_some() && self.open_dropdown(console, row) {
                         // Classic+: a choice opens its list; nothing changes yet.
                     } else if let Some(position) = event.position {

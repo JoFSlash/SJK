@@ -1087,7 +1087,7 @@ pub(crate) fn sender_card(
     let Some(card) = dock.sender_card.as_ref() else {
         return;
     };
-    let size = crate::sender_card::size(&card.person, frame.s);
+    let size = crate::sender_card::size(&card.person, false, frame.s);
     let gap = 12.0 * frame.s;
     // Left of the field, which reaches a little past the dock's text.
     let [left, floor] = frame.point(place.x - FIELD_OVERHANG, place.card_floor);
@@ -1108,8 +1108,9 @@ pub(crate) fn sender_card(
             card: tokens.card,
             mute: tokens.mute,
             ban: tokens.ban,
-            // The safety code is only offered in the game's chat.
+            // The safety code and Whisper are only offered in the game's chat.
             safety: tokens.card,
+            whisper: None,
         },
     );
 }

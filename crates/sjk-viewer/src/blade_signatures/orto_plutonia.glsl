@@ -21,7 +21,9 @@ vec3 sig_vol(vec3 ro, vec3 rd, float px){
   vec3 fx = vec3(0.0);
   vec3 snow = vec3(0.92, 0.97, 1.0);
   float ta;
-  if (fxNear(ro, rd, y0, y1) < 3.0){
+  // round 23: out to where the swirling snow's glow has faded (it swings out to 2.9 units and
+  // was cut at 3)
+  if (fxNear(ro, rd, y0, y1) < 4.5){
     for (int i = 0; i < 18; i++){
       float fi = float(i);
       float a = t*(0.25 + 0.2*h11(fi*2.1)) + h11(fi*5.3)*6.2832;

@@ -25,16 +25,17 @@ vec3 sig_vol(vec3 ro, vec3 rd, float px){
     float dir = k == 1 ? -1.0 : 1.0;
     vec3 h = rayAt(ro, rd, yd);
     if (h.z > 0.0){
-      float r = (length(h.xy) + 1e3*behindBlade(ro, rd, h.z));
+      // round 23: hidden behind the blade softly (see hideD in lab.glsl)
+      float r = length(h.xy), seen = 1.0 - behindBlade(ro, rd, h.z);
       float ang = atan(h.y, h.x);
       float on = smoothstep(0.75, 0.95, r)*(1.0 - smoothstep(R - 0.25, R, r));
       float gr = 0.5 + 0.5*cos(r*25.0 + fk);
       // sectors of written data, some bright, turning with the disc
       float sec = step(0.45, h11(floor((ang - t*1.5*dir)*6.0/3.1416) + fk*7.0));
       float sweep = pow(0.5 + 0.5*cos(ang - t*1.5*dir + fk*2.0), 10.0);
-      disc += c*on*(0.12 + 0.14*gr + 0.12*sec + 0.9*sweep*gr);
+      disc += c*on*(0.12 + 0.14*gr + 0.12*sec + 0.9*sweep*gr)*seen;
       // the hub
-      disc += vec3(1.0, 0.85, 0.6)*halo(r - 0.75, 0.08)*0.8;
+      disc += vec3(1.0, 0.85, 0.6)*halo(r - 0.75, 0.08)*0.8*seen;
     }
     disc += c*halo(ringD(ro, rd, yd, R), max(0.04, px))*0.6;
   }

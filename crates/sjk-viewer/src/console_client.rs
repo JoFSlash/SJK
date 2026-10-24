@@ -74,6 +74,10 @@ pub(super) const COMMANDS: &[(&str, &str)] = &[
     ),
     (crate::am_color::COMMAND, crate::am_color::HELP),
     (
+        crate::chat_sounds::PREVIEW_COMMAND,
+        "Play the sound chosen for a kind of chat message: chatsoundpreview <public|team|private|sjk>",
+    ),
+    (
         "reply",
         "Whisper to the last player who whispered to you: reply <message>, or bare to open the chat on it",
     ),
@@ -953,6 +957,7 @@ impl crate::GpuState {
                 let console = self.console.as_mut().ok_or("Console unavailable")?;
                 return crate::am_color::run(console, args);
             }
+            crate::chat_sounds::PREVIEW_COMMAND => return crate::chat_sounds::command(args),
             "pmonly" => {
                 return crate::chat::pm_only::command(
                     self.console.as_mut().ok_or("Console unavailable")?,

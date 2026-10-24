@@ -89,7 +89,9 @@ fn sig_orbit(ro: vec3<f32>, rd: vec3<f32>, px: f32) -> vec3<f32> {
     let L = uLength;
     var ta: f32;
     var fx: vec3<f32> = vec3<f32>(0.0);
-    if fxNear(ro, rd, L * 0.2, L * 0.9) > 5.0 {
+    // round 23: past the sun's and the orb's widest glow (2.6 out, glow 2 wide), which ended at a
+    // hard edge
+    if fxNear(ro, rd, L * 0.2, L * 0.9) > 8.0 {
         return fx;
     }
     let ds = rayPt(ro, rd, ba_sun(), &ta);

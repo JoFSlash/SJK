@@ -2067,6 +2067,12 @@ fn skin_core(input: VertexOutput, texel: vec4<f32>, uv: vec2<f32>, footprint: f3
         sig_take(input);
         core = max(sig_core(core, vec2(x, along), footprint), vec3(0.0))
             * (1.0 - smoothstep(input.length - 0.2, input.length + 0.4, along));
+        // Round 23 (players' reports after the 2026.1021.1 release): the line fades out before
+        // its quad's sides. The core image's fringe is still a tenth as bright at its border,
+        // and a signature's softer glow no longer hid the straight edge that left along both
+        // sides of the line up close, nor the faint box past the narrowed tip, where the line's
+        // coordinates run out of the image and it repeats its border.
+        core *= 1.0 - smoothstep(0.36, 0.5, abs(uv.x - 0.5));
         return sig_coloured(input, core);
     }
     if input.chroma != 0.0 {
@@ -2079,37 +2085,43 @@ fn skin_core(input: VertexOutput, texel: vec4<f32>, uv: vec2<f32>, footprint: f3
 // its rounded tip and moves with a glitch or the hologram's jitter (in core half-widths,
 // the glow's radius about three of them).
 fn core_coordinates(input: VertexOutput) -> vec2<f32> {
-    var across = input.blade.x / (2.0 * input.radius) * core_stretch(input);
-    if input.kind >= KIND_SKIN {
-        let along = mix(-1.0, input.length, input.blade.y);
-        let skin = skin_at(input);
-        let moved = skin_glitch(skin, along, input.animation.x, input.animation.y).x
-            + skin_jitter(skin, input.animation.x, input.animation.y);
-        across -= 1.5 * moved;
-    }
+    let line = core_line(input);
+    return core_coordinates_at(input, line, line.stretch);
+}
+
+// The core line's texture coordinates stretched across by `stretch` and moved as `line` says.
+fn core_coordinates_at(input: VertexOutput, line: CoreLine, stretch: f32) -> vec2<f32> {
+    let across = input.blade.x / (2.0 * input.radius) * stretch - line.moved;
     return vec2(0.5 + across, 1.0 - input.blade.y);
 }
 
-// How much a skin's core line is stretched across here: its breathing, and its rounded tip,
-// where the width left goes to nothing (1 for a stock line).
-fn core_stretch(input: VertexOutput) -> f32 {
-    if input.kind < KIND_SKIN {
-        return 1.0;
-    }
-    let along = mix(-1.0, input.length, input.blade.y);
-    let skin = skin_at(input);
-    return (1.0 + skin_wave(skin.core_breathe, input.animation.x, along, input.animation.y))
-        / skin_tip_taper(along, input.length, skin.core_fringe.w * input.radius);
+// What a skin does to its core line at this fragment, worked out once (one skin lookup):
+// `fragment_main` takes both stretches, the glitch's move and its colour split from it.
+struct CoreLine {
+    // The breathing across, without the rounded tip's narrowing (1 for a stock line).
+    breath: f32,
+    // The breathing with the rounded tip, where the width left goes to nothing.
+    stretch: f32,
+    // How far a glitch or the hologram's jitter moves the line across (texture units).
+    moved: f32,
+    // The colour split a glitch gives the core (texture units across).
+    split: f32,
 }
 
-// The colour split a glitch gives the core at this fragment, in texture units across.
-fn core_split(input: VertexOutput) -> f32 {
+fn core_line(input: VertexOutput) -> CoreLine {
     if input.kind < KIND_SKIN {
-        return 0.0;
+        return CoreLine(1.0, 1.0, 0.0, 0.0);
     }
-    let skin = skin_at(input);
     let along = mix(-1.0, input.length, input.blade.y);
-    return 1.5 * skin_glitch(skin, along, input.animation.x, input.animation.y).y;
+    let skin = skin_at(input);
+    let time = input.animation.x;
+    let seed = input.animation.y;
+    let breath = 1.0 + skin_wave(skin.core_breathe, time, along, seed);
+    let stretch = breath
+        / skin_tip_taper(along, input.length, skin.core_fringe.w * input.radius);
+    let glitch = skin_glitch(skin, along, time, seed);
+    let moved = 1.5 * (glitch.x + skin_jitter(skin, time, seed));
+    return CoreLine(breath, stretch, moved, 1.5 * glitch.y);
 }
 
 // Glint n's size: every other one of an orbit is smaller, a companion to the first.
@@ -2187,10 +2199,18 @@ const SIG_BLOOM: f32 = 0.55;
 fn fragment_main(input: VertexOutput) -> @location(0) vec4<f32> {
     // v runs from the tip (0) to behind the hilt (1), as DoLine's texture coordinates do.
     // Derivatives are taken before any branch (uniform control flow); the glow ignores the
-    // core's and a skin's glow takes the pixel's size.
-    let core_uv = core_coordinates(input);
-    let core_dx = dpdx(core_uv);
-    let core_dy = dpdy(core_uv);
+    // core's and a skin's glow takes the pixel's size. The core is sampled with the
+    // derivatives of its coordinates before the rounded tip narrows them (the shaft's, where
+    // the two are the same): in the tip the narrowing runs to a hundred times within a pixel,
+    // and those derivatives picked the texture's smallest mip, a flat bright average of the
+    // whole line, which drew a bright rim of pixels round the tip's end (players' reports
+    // after the 2026.1021.1 release, every signature blade).
+    // One skin lookup for both: the filter's coordinates are the line's without the tip.
+    let line = core_line(input);
+    let core_uv = core_coordinates_at(input, line, line.stretch);
+    let filter_uv = core_coordinates_at(input, line, line.breath);
+    let core_dx = dpdx(filter_uv);
+    let core_dy = dpdy(filter_uv);
     let pixel = fwidth(input.blade.x);
     if input.kind == KIND_BLACK { discard; }
     if input.hilt <= STAR {
@@ -2208,9 +2228,9 @@ fn fragment_main(input: VertexOutput) -> @location(0) vec4<f32> {
     // the stretch runs to a hundred within one pixel, and the rounded tip's cut then left
     // half the line's width lit there, a bar across the tip.
     if design != 0u { discard; }
-    let footprint = pixel / (2.0 * input.radius) * core_stretch(input);
+    let footprint = pixel / (2.0 * input.radius) * line.stretch;
     var texel = textureSampleGrad(core_texture, core_sampler, core_uv, core_dx, core_dy);
-    let split = core_split(input);
+    let split = line.split;
     if split > 0.0 {
         // A glitch parts the core's colours: red one way, blue the other.
         let offset = vec2(split, 0.0);
@@ -4229,9 +4249,12 @@ fn sig_from_mouth(skin: Skin, along: f32) -> f32 {
 
 // How hidden by the blade's body a point `t` along `ray` is (0 seen, 1 hidden), the blade `len`
 // units long (round 22, Creyon: nothing may be seen through the blade behind it).
+// Round 23 (players' reports after the 2026.1021.1 release): it fades in and out softly instead
+// of switching off when looking nearly along the blade, as `behindBlade` in the lab.
 fn ray_behind_blade(ray: SigRay, t: f32, len: f32) -> f32 {
     let a = dot(ray.d.xz, ray.d.xz);
-    if a < 0.02 {
+    let along_view = smoothstep(0.01, 0.04, a);
+    if along_view <= 0.0 {
         return 0.0;
     }
     let ta = -dot(ray.o.xz, ray.d.xz) / a;
@@ -4239,8 +4262,21 @@ fn ray_behind_blade(ray: SigRay, t: f32, len: f32) -> f32 {
     let d = length(ray.o.xz + ray.d.xz * ta);
     let p = ray.o + ray.d * t;
     let outside = smoothstep(0.5, 0.9, length(p.xz));
-    let on_blade = smoothstep(-0.8, -0.2, y) * (1.0 - smoothstep(len - 0.2, len + 0.4, y));
-    return (1.0 - smoothstep(0.35, 0.8, d)) * on_blade * outside * smoothstep(ta + 0.15, ta + 0.7, t);
+    // Round 23: the body hiding narrows with the blade's rounded tip to its point, as
+    // `behindBlade` in the lab: what passes behind the tip stays hidden, with no dark round end
+    // past the tip seen end on.
+    let into = clamp((y - (len - 1.4)) / 1.4, 0.0, 1.0);
+    let w = sqrt(max(1.0 - into * into, 0.0));
+    let on_blade = smoothstep(-0.8, -0.2, y) * (1.0 - smoothstep(len - 0.15, len + 0.05, y));
+    return (1.0 - smoothstep(0.35 * w, 0.8 * w + 0.02, d)) * on_blade * outside
+        * smoothstep(ta + 0.15, ta + 0.7, t) * along_view;
+}
+
+// A distance `d` as seen when `h` (`ray_behind_blade`) of it is hidden by the blade: the piece
+// narrows and dims as it passes behind, as `hideD` in the lab (round 23: adding a thousand times
+// `h` cut it at a hard edge along the blade's body, a box round the tip seen end on).
+fn hide_d(d: f32, h: f32) -> f32 {
+    return d / max(1.0 - h, 0.001) + h;
 }
 
 // The ray's distance to a ring of radius `radius` round the blade at `height` (the hilt's
@@ -4251,7 +4287,7 @@ fn sig_ring_d(ray: SigRay, height: f32, radius: f32) -> f32 {
         let t = (height - ray.o.y) / ray.d.y;
         if t > 0.0 {
             let h = ray.o + ray.d * t;
-            best = abs(length(h.xz) - radius) + 1000.0 * ray_behind_blade(ray, t, uLength);
+            best = hide_d(abs(length(h.xz) - radius), ray_behind_blade(ray, t, uLength));
         }
     }
     let a = dot(ray.d.xz, ray.d.xz);
@@ -4263,10 +4299,10 @@ fn sig_ring_d(ray: SigRay, height: f32, radius: f32) -> f32 {
         let t0 = (-b - q) / a;
         let t1 = (-b + q) / a;
         if t0 > 0.0 {
-            best = min(best, abs(ray.o.y + ray.d.y * t0 - height) + 1000.0 * ray_behind_blade(ray, t0, uLength));
+            best = min(best, hide_d(abs(ray.o.y + ray.d.y * t0 - height), ray_behind_blade(ray, t0, uLength)));
         }
         if t1 > 0.0 {
-            best = min(best, abs(ray.o.y + ray.d.y * t1 - height) + 1000.0 * ray_behind_blade(ray, t1, uLength));
+            best = min(best, hide_d(abs(ray.o.y + ray.d.y * t1 - height), ray_behind_blade(ray, t1, uLength)));
         }
     }
     return best;

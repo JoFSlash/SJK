@@ -32,7 +32,9 @@ fn sig_vol(ro: vec3<f32>, rd: vec3<f32>, px: f32) -> vec3<f32> {
     var fx: vec3<f32> = vec3<f32>(0.0);
     let snow: vec3<f32> = vec3<f32>(0.92, 0.97, 1.0);
     var ta: f32;
-    if fxNear(ro, rd, y0, y1) < 3.0 {
+    // round 23: out to where the swirling snow's glow has faded (it swings out to 2.9 units and
+    // was cut at 3)
+    if fxNear(ro, rd, y0, y1) < 4.5 {
         for (var i = 0; i < 18; i++) {
             let fi = f32(i);
             let a = t * (0.25 + 0.2 * h11(fi * 2.1)) + h11(fi * 5.3) * 6.2832;

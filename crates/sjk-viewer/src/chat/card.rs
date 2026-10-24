@@ -5,6 +5,14 @@
 //! pointer is on it, and for [`GRACE_MS`] after the pointer leaves both, so the way
 //! from the name to the card's buttons never loses it. A muted player's lines are
 //! hidden as ignored ones are.
+//!
+//! A click on the name pins the card (Bishop's and Sanjisan's idea, Sol's go 23/10/2026):
+//! it stays, whatever the pointer does, until the name is clicked again, a click lands
+//! off the card, Escape is pressed or the composer closes. For a player on the server
+//! (not the player themselves) the card then heads its buttons with Whisper, which
+//! turns the composer to a whisper to them ([`ChatOverlay::whisper_target`]): it goes
+//! encrypted through the SJK hub when they take encrypted whispers, else as the
+//! server's `tell`, as any whisper from the composer.
 
 use super::*;
 use crate::sender_card::{self, Person, Place};
@@ -15,6 +23,7 @@ pub(super) const CARD: u16 = 120;
 pub(super) const CARD_MUTE: u16 = 121;
 pub(super) const CARD_BAN: u16 = 122;
 pub(super) const CARD_SAFETY: u16 = 123;
+pub(super) const CARD_WHISPER: u16 = 124;
 /// How long the card stays once the pointer is off the name and the card.
 pub(super) const GRACE_MS: u64 = 400;
 
@@ -36,6 +45,8 @@ pub(super) struct Card {
     pub(super) anchor: Rect,
     /// When the pointer left the name and the card, while it is off both.
     pub(super) left_ms: Option<u64>,
+    /// A click on the name pinned it: it stays until dismissed.
+    pub(super) pinned: bool,
 }
 
 /// Mute or unmute asked from a card, which the frame carries out
@@ -62,6 +73,33 @@ impl ChatOverlay {
                 .token_hovered(token as u16)
                 .then(|| (who, self.ui.rect_for(token as u16)))
         });
+        // A pinned card stays, following its name while the name is in view.
+        if let Some(card) = self.card.as_mut().filter(|card| card.pinned) {
+            if let Some((_, anchor)) = hovered.filter(|(who, _)| *who == card.who) {
+                card.anchor = anchor.unwrap_or(card.anchor);
+            } else if let Some(token) =
+                (0..MAX_VISIBLE).find(|token| self.visible_people[*token] == Some(card.who))
+                && let Some(anchor) = self.ui.rect_for(token as u16)
+            {
+                card.anchor = anchor;
+            }
+            card.left_ms = None;
+        } else {
+            self.hover_card(hovered, ms);
+        }
+        // Their picture's version, until the hub's players or their profile say it.
+        if let Some(card) = self
+            .card
+            .as_mut()
+            .filter(|card| card.person.avatar.is_none())
+            && let Some(key_id) = &card.person.key_id
+        {
+            card.person.avatar = crate::player_identity::avatar_version(key_id);
+        }
+    }
+
+    /// The card follows the pointer: the name under it, or the card itself.
+    fn hover_card(&mut self, hovered: Option<(Who, Option<Rect>)>, ms: u64) {
         match hovered {
             Some((who, anchor)) => {
                 let anchor = anchor.unwrap_or_default();
@@ -77,11 +115,12 @@ impl ChatOverlay {
                             muted,
                             anchor,
                             left_ms: None,
+                            pinned: false,
                         });
                     }
                 }
             }
-            None if [CARD, CARD_MUTE, CARD_BAN, CARD_SAFETY]
+            None if [CARD, CARD_MUTE, CARD_BAN, CARD_SAFETY, CARD_WHISPER]
                 .into_iter()
                 .any(|token| self.ui.token_hovered(token)) =>
             {
@@ -99,15 +138,65 @@ impl ChatOverlay {
                 }
             }
         }
-        // Their picture's version, until the hub's players or their profile say it.
-        if let Some(card) = self
+    }
+
+    /// A click on the name in feed token `token`, whose sender the press began on
+    /// (`pressed`): pin their card, or unpin it when it is pinned already.
+    pub(super) fn click_name(&mut self, token: usize, pressed: Option<Who>) {
+        let Some(who) = self.visible_people.get(token).copied().flatten() else {
+            return;
+        };
+        // A new line can move the names between press and release: never pin another.
+        if pressed != Some(who) {
+            return;
+        }
+        let shown = self
             .card
             .as_mut()
-            .filter(|card| card.person.avatar.is_none())
-            && let Some(key_id) = &card.person.key_id
-        {
-            card.person.avatar = crate::player_identity::avatar_version(key_id);
+            .filter(|card| card.who == who)
+            .map(|card| std::mem::replace(&mut card.pinned, true));
+        match shown {
+            // Pinned already: the click unpins it.
+            Some(true) => self.card = None,
+            Some(false) => {}
+            None => {
+                let anchor = self.ui.rect_for(token as u16).unwrap_or_default();
+                self.card = self.person(who).map(|(person, muted)| Card {
+                    who,
+                    person,
+                    muted,
+                    anchor,
+                    left_ms: None,
+                    pinned: true,
+                });
+            }
         }
+    }
+
+    /// Drop a pinned card (Escape, a click elsewhere). False when none is pinned.
+    pub(super) fn unpin_card(&mut self) -> bool {
+        if self.card.as_ref().is_some_and(|card| card.pinned) {
+            self.card = None;
+            return true;
+        }
+        false
+    }
+
+    /// Who Whisper on a card goes to: the player in the slot, still the one the line
+    /// named (an SJK chat sender by the slot their key is matched to here), and never
+    /// the player themselves. `None` when they left, renamed or are not on the server.
+    pub(super) fn whisper_target(&self, who: Who, place: Place) -> Option<ChatTarget> {
+        let target = match who {
+            Who::Player(target) => target,
+            Who::Hub(_) => match place {
+                Place::Slot(slot) | Place::SlotByName(slot) => {
+                    self.roster.target(Some(u16::from(slot)))?
+                }
+                Place::Unknown | Place::Away => return None,
+            },
+        };
+        (self.roster.name(target).is_some() && Some(target.slot()) != self.own_slot)
+            .then_some(target)
     }
 
     /// Who `who` is, from the line or the server and what the hub and the mute list
@@ -188,7 +277,10 @@ impl ChatOverlay {
         };
         let measure = crate::sjk_chat_look::Measure::new(font, crate::text::TextStyle::NEUTRAL);
         let u = g.scale * self.options.card;
-        let size = sender_card::size(&card.person, u);
+        let whisper = self
+            .whisper_target(card.who, card.person.place)
+            .map(|_| CARD_WHISPER);
+        let size = sender_card::size(&card.person, whisper.is_some(), u);
         let origin = sender_card::beside(card.anchor, size, viewport, 4.0 * u);
         // Text draws over every shape: the feed's text under the card is left out, or
         // the messages showed through it (Sol, 18/10/2026).
@@ -208,8 +300,30 @@ impl ChatOverlay {
                 mute: CARD_MUTE,
                 ban: CARD_BAN,
                 safety: CARD_SAFETY,
+                whisper,
             },
         );
+    }
+
+    /// Whisper on the card: the composer turns to a whisper to them (encrypted when
+    /// they take it, `chat/interaction.rs`'s send), the draft kept, the card closed.
+    pub(super) fn press_card_whisper(&mut self) {
+        let Some(card) = &self.card else {
+            return;
+        };
+        let target = self.whisper_target(card.who, card.person.place);
+        self.card = None;
+        let Some(input) = &mut self.input else {
+            return;
+        };
+        match target {
+            Some(target) => {
+                input.channel = Channel::Whisper;
+                input.recipient = Some(target);
+                self.notice = "";
+            }
+            None => self.notice = "Player left or changed identity. Choose a name again.",
+        }
     }
 
     /// Mute or Unmute on the card: ask the frame to change the list.
@@ -403,5 +517,274 @@ mod tests {
         assert!(chat.lines[3].muted, "new lines too");
         chat.set_muted_slots(0);
         assert!(chat.lines.iter().all(|line| !line.muted));
+    }
+
+    /// The composer open over game lines, with "Fox" in slot 3 and us in slot 0.
+    fn game_chat(players: &[(usize, &str)]) -> ChatOverlay {
+        let mut chat = ChatOverlay::new();
+        let mut game = sjk_protocol::GameState::empty_local(0);
+        for (slot, name) in players {
+            game.replace_config_string(1_131 + slot, format!("n\\{name}\\t\\0").into_bytes())
+                .expect("a player");
+        }
+        chat.update_roster(&game);
+        chat
+    }
+
+    fn click(chat: &mut ChatOverlay, at: Vec2) {
+        let button = PointerButton::Primary;
+        chat.pointer(InputEvent::PointerMove(at));
+        chat.pointer(InputEvent::PointerPress {
+            position: at,
+            button,
+        });
+        chat.pointer(InputEvent::PointerRelease {
+            position: at,
+            button,
+        });
+    }
+
+    /// The feed token of the one name the feed shows.
+    fn only_name(chat: &ChatOverlay) -> (Who, Rect) {
+        let names: Vec<_> = (0..MAX_VISIBLE)
+            .filter_map(|token| chat.visible_people[token].zip(Some(token)))
+            .collect();
+        assert_eq!(names.len(), 1, "{names:?}");
+        let (who, token) = names[0];
+        (
+            who,
+            chat.ui.rect_for(token as u16).expect("the name's target"),
+        )
+    }
+
+    #[test]
+    fn a_click_pins_the_card_and_whisper_turns_the_composer_to_them() {
+        let mut chat = game_chat(&[(0, "Me"), (3, "^1Fox")]);
+        chat.receive(
+            ServerEventKind::Chat,
+            "^1Fox^7: hi".to_owned(),
+            Some(3),
+            Instant::now(),
+        );
+        chat.open(false);
+        build(&mut chat);
+        let (who, name) = only_name(&chat);
+        let Who::Player(target) = who else {
+            panic!("{who:?}")
+        };
+        assert_eq!(target.slot(), 3);
+        click(&mut chat, centre(name));
+        build(&mut chat);
+        assert!(chat.card.as_ref().is_some_and(|card| card.pinned));
+        // Pinned, it stays with the pointer away, past the grace.
+        chat.pointer(InputEvent::PointerMove(Vec2::new(1_900.0, 10.0)));
+        chat.build(
+            true,
+            &crate::text::test_font(),
+            VIEWPORT,
+            1_000 + 2 * GRACE_MS,
+        );
+        assert!(chat.card.is_some(), "pinned");
+        assert!(texts(&chat).iter().any(|text| text == "Whisper"));
+        let whisper = chat.ui.rect_for(CARD_WHISPER).expect("Whisper");
+        let block = chat.ui.rect_for(CARD_MUTE).expect("Block");
+        assert!(whisper.bottom() <= block.y, "Whisper heads the buttons");
+        click(&mut chat, centre(whisper));
+        assert!(chat.card.is_none());
+        let input = chat.input.as_ref().expect("the composer stays");
+        assert_eq!(input.channel, Channel::Whisper);
+        assert_eq!(input.recipient, Some(target));
+        // The draft goes as the server's whisper (no encrypted slots here).
+        chat.input.as_mut().unwrap().insert("hello");
+        let sent = chat.edit_key(
+            winit::keyboard::KeyCode::Enter,
+            &winit::keyboard::Key::Named(winit::keyboard::NamedKey::Enter),
+            None,
+        );
+        assert!(matches!(sent, ChatInputResult::Submit(command) if command == "tell 3 \"hello\""));
+    }
+
+    #[test]
+    fn escape_and_a_click_elsewhere_let_a_pinned_card_go() {
+        let mut chat = game_chat(&[(0, "Me"), (3, "Fox")]);
+        chat.receive(
+            ServerEventKind::Chat,
+            "Fox: hi".to_owned(),
+            Some(3),
+            Instant::now(),
+        );
+        chat.open(false);
+        build(&mut chat);
+        let (_, name) = only_name(&chat);
+        click(&mut chat, centre(name));
+        build(&mut chat);
+        assert!(chat.card.is_some());
+        // Escape: the card first, the composer stays.
+        chat.edit_key(
+            winit::keyboard::KeyCode::Escape,
+            &winit::keyboard::Key::Named(winit::keyboard::NamedKey::Escape),
+            None,
+        );
+        assert!(chat.card.is_none() && chat.is_typing());
+        // A second click on the name unpins it; a click on empty feed does too.
+        click(&mut chat, centre(name));
+        build(&mut chat);
+        assert!(chat.card.as_ref().is_some_and(|card| card.pinned));
+        click(&mut chat, centre(name));
+        assert!(chat.card.is_none(), "clicked again");
+        click(&mut chat, centre(name));
+        build(&mut chat);
+        click(&mut chat, Vec2::new(1_900.0, 10.0));
+        assert!(chat.card.is_none(), "clicked elsewhere");
+    }
+
+    /// Safety code is a button of its own: a click on it is its, not the card's
+    /// (before 23/10/2026 the press was taken for the card's and the click was lost).
+    #[test]
+    fn a_click_on_safety_code_asks_for_it() {
+        let mut chat = game_chat(&[(0, "Me"), (3, "Fox")]);
+        let fox = chat.roster.target(Some(3)).expect("Fox");
+        chat.open(false);
+        chat.card = Some(Card {
+            who: Who::Player(fox),
+            person: Person {
+                name: "Fox".to_owned(),
+                safety: true,
+                ..Person::default()
+            },
+            muted: false,
+            anchor: Rect::new(10.0, 300.0, 40.0, 10.0),
+            left_ms: None,
+            pinned: true,
+        });
+        build(&mut chat);
+        let safety = chat.ui.rect_for(CARD_SAFETY).expect("Safety code");
+        click(&mut chat, centre(safety));
+        assert_eq!(chat.take_safety_request(), Some(3));
+    }
+
+    #[test]
+    fn whisper_needs_the_same_player_still_here_and_not_ourselves() {
+        let mut chat = game_chat(&[(0, "Me"), (3, "Fox")]);
+        let fox = chat.roster.target(Some(3)).expect("Fox");
+        let me = chat.roster.target(Some(0)).expect("us");
+        assert_eq!(
+            chat.whisper_target(Who::Player(fox), Place::Slot(3)),
+            Some(fox)
+        );
+        assert_eq!(chat.whisper_target(Who::Player(me), Place::Slot(0)), None);
+        // An SJK chat sender, by the slot their key is matched to here.
+        assert_eq!(
+            chat.whisper_target(Who::Hub(7), Place::SlotByName(3)),
+            Some(fox)
+        );
+        assert_eq!(chat.whisper_target(Who::Hub(7), Place::Away), None);
+        assert_eq!(chat.whisper_target(Who::Hub(7), Place::Unknown), None);
+        assert_eq!(
+            chat.whisper_target(Who::Hub(7), Place::Slot(9)),
+            None,
+            "nobody there"
+        );
+        // Fox renames (or leaves and another takes the slot): the old line's Fox is gone.
+        let mut game = sjk_protocol::GameState::empty_local(0);
+        game.replace_config_string(1_131, b"n\\Me\\t\\0".to_vec())
+            .expect("us");
+        game.replace_config_string(1_131 + 3, b"n\\Wolf\\t\\0".to_vec())
+            .expect("another");
+        chat.update_roster(&game);
+        assert_eq!(chat.whisper_target(Who::Player(fox), Place::Slot(3)), None);
+        // A card pinned before offers no Whisper, and a press says why.
+        chat.open(false);
+        chat.card = Some(Card {
+            who: Who::Player(fox),
+            person: Person::default(),
+            muted: false,
+            anchor: Rect::new(10.0, 10.0, 40.0, 10.0),
+            left_ms: None,
+            pinned: true,
+        });
+        build(&mut chat);
+        assert!(chat.card.is_some() && chat.ui.rect_for(CARD_WHISPER).is_none());
+        chat.press_card_whisper();
+        assert_eq!(chat.input.as_ref().unwrap().channel, Channel::Global);
+        assert!(!chat.notice.is_empty());
+    }
+
+    /// Two players wearing one name: a line the server did not attribute names nobody,
+    /// so it has no card and no actions; one it attributed keeps its slot.
+    #[test]
+    fn a_shared_name_is_only_clickable_on_lines_the_server_attributed() {
+        let mut chat = game_chat(&[(0, "Me"), (3, "^1Fox"), (4, "^2Fox")]);
+        let now = Instant::now();
+        chat.receive(ServerEventKind::Chat, "Fox^7: one".to_owned(), None, now);
+        chat.open(false);
+        build(&mut chat);
+        assert!(chat.visible_people.iter().all(Option::is_none));
+        chat.receive(
+            ServerEventKind::Chat,
+            "^2Fox^7: two".to_owned(),
+            Some(4),
+            now,
+        );
+        build(&mut chat);
+        let (who, _) = only_name(&chat);
+        assert!(matches!(who, Who::Player(target) if target.slot() == 4));
+    }
+}
+
+#[cfg(test)]
+mod shots {
+    use super::*;
+
+    /// A click on a chat name over a duel6 view: the pinned sender card with Whisper,
+    /// Block and the rest, rendered off screen at 1080p and 4K.
+    #[test]
+    #[ignore = "renders with the GPU and the installed game data named by JKA_GAME_DATA"]
+    fn chat_name_actions_shot() {
+        for (size, suffix) in [([1920, 1080], "1080p"), ([3840, 2160], "4k")] {
+            crate::world_shot::on_big_stack(move || {
+                let Some((mut gpu, _profile)) = crate::world_shot::open(
+                    "maps/mp/duel6.bsp",
+                    size,
+                    None,
+                    &[("cg_chatbox", "60000"), ("cg_chatboxlines", "8")],
+                ) else {
+                    return;
+                };
+                gpu.chat.for_shot = true;
+                let mut game = sjk_protocol::GameState::empty_local(0);
+                for (slot, name) in [(0, "^1Sol^7Vulpes"), (3, "^1Fox"), (5, "dart_mario")] {
+                    game.replace_config_string(
+                        1131 + slot,
+                        format!("n\\{name}\\t\\0").into_bytes(),
+                    )
+                    .unwrap();
+                }
+                gpu.chat.update_roster(&game);
+                let now = Instant::now();
+                for (line, slot) in [
+                    ("dart_mario^7: ^2gg", 5),
+                    ("^1Fox^7: ^2anyone up for a duel on ffa3?", 3),
+                    ("dart_mario^7: ^2in 5 min", 5),
+                ] {
+                    gpu.chat
+                        .receive(ServerEventKind::Chat, line.to_owned(), Some(slot), now);
+                }
+                gpu.chat.open(false);
+                let _ = crate::world_shot::frame(&mut gpu, 4);
+                let token = (0..MAX_VISIBLE)
+                    .find(|token| {
+                        matches!(gpu.chat.visible_people[*token],
+                            Some(Who::Player(target)) if target.slot() == 3)
+                    })
+                    .expect("Fox's name in the feed");
+                let who = gpu.chat.visible_people[token];
+                gpu.chat.click_name(token, who);
+                assert!(gpu.chat.card.as_ref().is_some_and(|card| card.pinned));
+                let path =
+                    crate::world_shot::shoot(&mut gpu, 6, &format!("chat-name-actions-{suffix}"));
+                println!("{}", path.display());
+            });
+        }
     }
 }

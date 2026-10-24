@@ -35,16 +35,18 @@ fn sig_vol(ro: vec3<f32>, rd: vec3<f32>, px: f32) -> vec3<f32> {
         let dir = select(1.0, -1.0, k == 1);
         let h = rayAt(ro, rd, yd);
         if h.z > 0.0 {
-            let r = (length(h.xy) + 1.0e3 * behindBlade(ro, rd, h.z));
+            // round 23: hidden behind the blade softly (see hideD in lab.glsl)
+            let r = length(h.xy);
+            let seen = 1.0 - behindBlade(ro, rd, h.z);
             let ang = atan2(h.y, h.x);
             let on = smoothstep(0.75, 0.95, r) * (1.0 - smoothstep(R - 0.25, R, r));
             let gr = 0.5 + 0.5 * cos(r * 25.0 + fk);
             // sectors of written data, some bright, turning with the disc
             let sec = step(0.45, h11(floor((ang - t * 1.5 * dir) * 6.0 / 3.1416) + fk * 7.0));
             let sweep = pow(0.5 + 0.5 * cos(ang - t * 1.5 * dir + fk * 2.0), 10.0);
-            disc += c * on * (0.12 + 0.14 * gr + 0.12 * sec + 0.9 * sweep * gr);
+            disc += c * on * (0.12 + 0.14 * gr + 0.12 * sec + 0.9 * sweep * gr) * seen;
             // the hub
-            disc += vec3<f32>(1.0, 0.85, 0.6) * halo(r - 0.75, 0.08) * 0.8;
+            disc += vec3<f32>(1.0, 0.85, 0.6) * halo(r - 0.75, 0.08) * 0.8 * seen;
         }
         disc += c * halo(ringD(ro, rd, yd, R), max(0.04, px)) * 0.6;
     }

@@ -90,7 +90,7 @@ vec3 r8_vol(vec3 ro, vec3 rd, float px){
       float shellL = halo(R - dc, 0.25 + 0.4*(1.0 - cl))*smoothstep(R + 0.3, R - 0.2, dc);
       fxl += white*shellL*cl*1.1 + ice*halo(dc, 3.0)*pow(cl, 3.0)*1.4;
       vec3 h = rayAt(ro, rd, o.y);
-      if (h.z > 0.0) fxl += white*halo(abs((length(h.xy) + 1e3*behindBlade(ro, rd, h.z)) - R*1.1), 0.15 + 0.3*(1.0 - cl))*cl*1.4;
+      if (h.z > 0.0) fxl += white*halo(hideD(abs(length(h.xy) - R*1.1), behindBlade(ro, rd, h.z)), 0.15 + 0.3*(1.0 - cl))*cl*1.4;
     }
     light += fxl*fx;
   }

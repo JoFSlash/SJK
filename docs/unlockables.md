@@ -42,7 +42,7 @@ fifteen choices no longer fit. Seen in off-screen GPU renders on duel6 (world sh
 | Illuminate | Free for everyone, a toy (`toy_illuminate`); its lit state is part of the look so others see the holocron. |
 | Toys in the look | Since 16/10/2026 a look lists the toys out that others draw (`toys`, ids; the [cardboard box](client.md#cardboard-box)'s is `cardboard_box`, [Order 66](client.md#order-66)'s `order66`, the [Hax](client.md#hax)'s `hax`, and `hax_away` when its trap holds while away), sent only when one is out, so older hubs see the look they know. A client draws the toys it knows (`looks::TOYS`) and ignores the rest. Free for everyone, like Illuminate. |
 | Feed with chat off | The feed reads while the player is on a game server whatever `cl_sjkChat` says (chat stays hidden); in the menus it reads only with chat on. |
-| Choosing | The Collection's Shaders tab (SJK UI look; the Unlockables page until 10/10/2026) lists every blade skin, owned or locked, previews the chosen one on the player's own saber and equips owned ones; the Profile screen's Saber tab offers the owned blade skins too (10/10/2026); `cg_saberSkin` holds the choice. |
+| Choosing | The Collection's Shaders tab (SJK UI look; the Unlockables page until 10/10/2026) lists every blade skin, owned or locked, previews the chosen one on the player's own saber and equips owned ones; the Profile screen's Saber tab offers the owned blade skins too (10/10/2026); `cg_saberSkin` holds the choice. Since 23/10/2026 the Saber tab's Sounds row chooses the saber sounds apart from the blade (`cg_saberSounds`: follow it, stock, or an owned shader's; [Saber sounds](#saber-sounds)). |
 | Art (looks, sounds) | SJK's own, all rights reserved, not under the code's GPLv2: kept in the hub's private repository and served by the hub to registered SJK keys as packs. The code that draws it stays open and generic: no skin's values, sounds or pictures are in this repository or its history to come. |
 | Delivery | The identity service downloads the hub's packs into `assets/` beside `identity.key` (at start once registered, then every 6 hours, only when a pack's SHA-256 changed); the viewer mounts every cached pack at start and a new one at once, below the game data, so a PK3 with the same paths replaces their files. A cached pack mounts with the identity off too. |
 | Tiers | Every saber shader has a tier: Common (white, 14/10/2026: filler that holocrons of any tier may drop; there is no Common holocron) and the holocrons' four (Uncommon, Rare, Legendary, Mythical), their names and colours (10/10/2026, Sol's tiers; [Tiers](#tiers)). |
@@ -439,6 +439,12 @@ A look is what a player wears that others draw:
 
     {"saber":"saber_sun","illuminate":true}
 
+Since 23/10/2026 the client may send `"saber_sounds":".."`, the saber sounds its
+wearer chose apart from the blade ([Saber sounds](#saber-sounds)): absent or `""` to follow
+the blade, `"stock"`, or a blade-skin unlock id. The hub takes it since 24/10/2026; a
+hub from before refuses the field with `bad_body`, and the client then sends the look
+again without it.
+
 Since 11/10/2026 a look may also carry `"saber_off":["glint","haze"]`, the blade skin's
 options its wearer switched off ([Options](#options)): optional in a request (at most 8
 distinct ids of 1 to 24 of `a`-`z`, `0`-`9`, `_`, else 400 `bad_look`; an older hub
@@ -678,7 +684,8 @@ from the looks.
   keep their own hub look, blades, thrown saber and sounds alike (`looks::ViewSlots`).
 - Sounds, per player wearing it: ignition and switching off, the hum loop and three
   swings play over the stock ones, which keep playing below (each on a channel of its
-  own, so the skin's does not cut them), at the paths the file names in its pack. With
+  own, so the skin's does not cut them), at the paths the file names in its pack, unless
+  the wearer chose other saber sounds ([Saber sounds](#saber-sounds)). With
   `s_saberSkinSounds 2` (Settings > Sound > Blade skin sounds: Only skin) they play in
   the stock ones' place, and with `0` (Off) they are not played: the stock ones alone. A sound
   the file names that is not in the game data (no pack carries it yet) is left out: the
@@ -1194,6 +1201,64 @@ choice kept, the hint without skins or identity, a click on a swatch wearing it,
 page with every skin carrying every effect within the screen's canvas, Dual too) and
 the world shot `duel6_sjk_saber_page` with the hub's pack (`SJK_TEST_PACKS`); not
 tried in the game.
+
+### Saber sounds
+
+Built 23/10/2026, branch `personal/saber-sound-pick` (Nib's idea of 18/10/2026 and hub
+report #109, approved by Sol on 23/10/2026): a player chooses the saber sounds they are
+heard with apart from the shader they wear, and every SJK player hears that choice.
+
+- `cg_saberSounds` (archived, default empty;
+  [saber_sound_choice.rs](../crates/sjk-viewer/src/saber_sound_choice.rs)): empty follows
+  the shader (the sounds come with the blade, as before), `stock` the stock saber sounds
+  whatever the blade, or a blade skin's unlock id (`saber_void`) for that shader's ignition,
+  switching off, hum and swings whatever the blade, the stock one included. A shader's
+  sounds hold only while the own hub profile lists it, as for wearing it
+  (`SoundChoice::own`); one not owned (or taken back) follows the blade, the setting kept.
+- Chosen on the Profile screen's Saber tab, the Sounds row under the Blade row
+  ([player_menu/saber_sounds.rs](../crates/sjk-viewer/src/player_menu/saber_sounds.rs),
+  [sjk-ui.md](sjk-ui.md#character)): "Follow shader (<the blade worn>)", "Stock sounds",
+  then the owned shaders, the rarest tier first as the Blade row lists them (the same
+  holdings). Left and Right (or a click on the control's halves) write the setting;
+  Preview, or Enter on the row, plays the choice's ignition and hum once, as the worn
+  blade would be heard with it (a shader whose pack is not loaded plays the stock
+  ones). An SJK UI page, drawn in its look in every menu style; the classic menus set the
+  cvar from the console.
+- Sent with the look as `saber_sounds`, only when not following (`Worn::to_look`), and
+  read back from presence and feed looks (`Worn::of`; an unknown id, a newer client's
+  shader, follows the blade). A look without the field, from an older client or hub,
+  follows the blade: those players are heard as before.
+- Heard: each slot's sound set is the blade skin `SoundChoice::sound_skin` gives for
+  their blade and choice (`Looks::sound_skin_id`; the local player's own from its gated
+  look), looked up among the loaded skins and kept beside the blades in `SaberSkins`
+  (`follow_looks_and_sounds`, `set_local_with_sound`), which hands the audio adapter its
+  per-client table (`sound_sets`) and the animation swings their set (`sound_of`). The
+  rest is the existing path: `s_saberSkinSounds` (With normal, Only skin, Off) applies to
+  the chosen set as to the blade's; a duel's stock blades (`cg_duelStockBlades`) and a
+  player muted here are heard stock; a set whose pack is not loaded plays the stock
+  sounds.
+- Hub (deployed 24/10/2026): a hub from before refuses `saber_sounds` with 400
+  `bad_body`; the client then sends the look again at once without it and leaves it out
+  (`look_sounds_unsupported` in the identity service), so the blade, its parts and the
+  toys still reach everyone, who hear the blade's sounds. The hub takes an optional
+  `saber_sounds` string in `POST /v1/look` (`""`, `"stock"` or a blade-skin id of the
+  Unlocks table, else 400 `bad_look`; an id the key does not hold is 403
+  `sounds_not_unlocked`, which the client answers by sending the look without it until
+  the profile's unlocks change), keeps it with the look, gives it back in presence and
+  look events only when not empty (so older clients see the same JSON), and clears it
+  from the live look, with an event, when the skin it names is taken back from the key.
+  Older clients never send it.
+
+Verified by unit tests: the resolution (follow, stock, another shader on a skinned or
+the stock blade, an unknown id and a look without the field following the blade, a
+muted slot stock), the own choice gated by ownership and sent and read back, the
+per-slot table and the swings' set apart from the blade and stock in a duel, the Sounds
+row (stepping and clicking write the setting, Preview and Enter ask for the right set,
+Single and Dual within the canvas), the look's body, the feed's field, and the service
+dropping the field for a hub that refuses it or a set the key lacks while still sending
+the blade. World shot `duel6_sjk_saber_page` (the Sounds row with the Void's sounds under
+the Storm blade). Not verified: heard in a game, the preview by ear, another player's
+choice through a hub (the hub's side is tested in the hub's own suite).
 
 ## Medal shaders
 

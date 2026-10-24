@@ -127,7 +127,44 @@ impl Authority {
 #[cfg(test)]
 mod wall_tests {
     use super::*;
-    use sjk_game_jka::pmove::MovementState;
+    use sjk_game_jka::pmove::{MovementState, PMF_STUCK_TO_WALL, Predictor};
+
+    #[test]
+    fn snapshot_acknowledgement_does_not_reopen_wall_mouse_look() {
+        for step in [8, 7, 4, 3] {
+            let state = MovementState {
+                health: 100,
+                command_time: step,
+                movement_flags: PMF_STUCK_TO_WALL,
+                view_angles: [12.0, 90.0, 0.0],
+                wall_view_locked: true,
+                ..MovementState::default()
+            };
+            let predicted = Predictor::from_state(state, Default::default());
+            let mut authority = Authority::default();
+            let (mut pitch, mut yaw) = (0.0, 0.0);
+            authority.observe_prediction(predicted.state(), &mut pitch, &mut yaw);
+            let mut snapshot = sjk_protocol::PlayerState::default();
+            predicted.state().write_player_state(&mut snapshot);
+            let acknowledged = predicted.reseed_player_state(&snapshot, Default::default());
+            // Snapshot reception acknowledges every command. No newer slice runs;
+            // the delta is unchanged, but this frame still has fresh mouse motion.
+            for _ in 0..3 {
+                pitch += 0.3;
+                yaw -= 0.5;
+                authority.observe_prediction(acknowledged.state(), &mut pitch, &mut yaw);
+                assert_eq!(pitch, -12.0_f32.to_radians());
+                assert_eq!(yaw, 90.0_f32.to_radians());
+            }
+            snapshot.set_movement_flags(0);
+            let released = acknowledged.reseed_player_state(&snapshot, Default::default());
+            pitch += 0.1;
+            yaw += 0.2;
+            let expected = (pitch, yaw);
+            authority.observe_prediction(released.state(), &mut pitch, &mut yaw);
+            assert_eq!((pitch, yaw), expected);
+        }
+    }
 
     #[test]
     fn repeated_wall_view_cancels_mouse_motion_without_a_delta_change() {

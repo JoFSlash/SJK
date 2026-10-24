@@ -47,7 +47,7 @@ const CHAN_MENU1: u32 = 11;
 const CHAN_LOCAL: u32 = 1;
 pub(crate) const CHAN_ANNOUNCER: u32 = 9;
 const CS_AMBIENT_SET: usize = 37;
-const EVENT_KIND_COUNT: usize = 61;
+const EVENT_KIND_COUNT: usize = 62;
 // Every `LegacySoundEvent` has a ledger slot; `CustomVoice` is the last variant.
 const _: () = assert!(LegacySoundEvent::CustomVoice as usize + 1 == EVENT_KIND_COUNT);
 const EV_PLAYDOORLOOPSOUND: u16 = 72;
@@ -231,6 +231,10 @@ pub enum LegacySoundEvent {
     ForceDrained,
     /// `chat`/`lchat` server command beep (`CG_ServerCommand`).
     ChatBeep,
+    /// The beep of a `chat`/`lchat` that carries the stock private-message marker
+    /// (`chat::private_chat_command`): a tell, which the viewer's chat sound settings
+    /// switch and voice apart from public chat (`docs/client.md`, "Chat sounds").
+    PrivateChatBeep,
     /// `tchat`/`ltchat` server command beep.
     TeamChatBeep,
     /// `CG_CheckLocalSounds` timelimit warnings.
@@ -329,6 +333,7 @@ impl LegacySoundEvent {
             Self::Taunt => "EV_TAUNT",
             Self::ForceDrained => "EV_FORCE_DRAINED",
             Self::ChatBeep => "CG_CHAT_BEEP",
+            Self::PrivateChatBeep => "CG_PRIVATE_CHAT_BEEP",
             Self::TeamChatBeep => "CG_TEAM_CHAT_BEEP",
             Self::OneMinuteWarning => "CG_ONE_MINUTE_WARNING",
             Self::FiveMinuteWarning => "CG_FIVE_MINUTE_WARNING",

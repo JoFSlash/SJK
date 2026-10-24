@@ -127,10 +127,32 @@ const MODS_ROWS: &[&str] = &[
 
 /// The sounds Sound gathers from Network and Interface after the Sound tab's.
 const NOTIFICATION_SOUNDS: &[&str] = &[
-    crate::sjk_chat_frame::SOUND_CVAR,
     crate::world_ping::SOUND_CVAR,
     crate::quick_wheel::SOUNDS_CVAR,
 ];
+
+/// The chat sounds' rows (`chat_sounds.rs`), which Sound shows last under their
+/// heading: the master switch, then each kind's switch, sound and preview, then the
+/// private messages' taskbar flash.
+const CHAT_SOUND_ROWS: &[&str] = {
+    use crate::chat_sounds::Kind;
+    &[
+        crate::chat_sounds::MASTER_CVAR,
+        Kind::Public.switch_cvar(),
+        Kind::Public.sound_cvar(),
+        Kind::Public.preview_row(),
+        Kind::Team.switch_cvar(),
+        Kind::Team.sound_cvar(),
+        Kind::Team.preview_row(),
+        Kind::Private.switch_cvar(),
+        Kind::Private.sound_cvar(),
+        Kind::Private.preview_row(),
+        Kind::Sjk.switch_cvar(),
+        Kind::Sjk.sound_cvar(),
+        Kind::Sjk.preview_row(),
+        crate::chat_sounds::FLASH_CVAR,
+    ]
+};
 
 /// The quick wheel's rows of the classic Interface, which Advanced's Quick
 /// wheel category and Sound hold.
@@ -267,8 +289,13 @@ impl Group {
                 cvars
             }
             Self::Advanced(Advanced::Sound) => {
-                let mut cvars: Vec<&str> = AUDIO.iter().map(|setting| setting.cvar).collect();
+                let mut cvars: Vec<&str> = AUDIO
+                    .iter()
+                    .map(|setting| setting.cvar)
+                    .filter(|cvar| !CHAT_SOUND_ROWS.contains(cvar))
+                    .collect();
                 cvars.extend_from_slice(NOTIFICATION_SOUNDS);
+                cvars.extend_from_slice(CHAT_SOUND_ROWS);
                 cvars
             }
             _ => self.cvars().to_vec(),
@@ -331,6 +358,7 @@ impl Group {
                 "cg_thirdPersonHorzOffset",
                 "cg_thirdPersonCameraDamp",
                 "cg_thirdPersonTargetDamp",
+                "cg_wallGrabLock",
                 "cg_errorDecay",
                 "mod_japlus",
                 "mod_japro",
@@ -405,6 +433,8 @@ impl Group {
                 "cg_drawTimer",
                 "cg_drawTimerUpperRight",
                 "cg_drawTeamScores",
+                "cg_teamScoresBoxes",
+                "cg_teamScoresScale",
                 "cg_drawFlagStatus",
                 crate::version_overlay::CVAR,
                 "cg_speedometer",
@@ -561,6 +591,7 @@ impl Group {
                 ("s_volume", "Game"),
                 (crate::emotes::VOLUME_CVAR, "Emotes"),
                 (crate::unlock_toast::SOUND_CVAR, "Notifications"),
+                (crate::chat_sounds::MASTER_CVAR, "Chat sounds"),
             ],
             Self::Advanced(Advanced::Gameplay) => &[
                 ("cg_simpleItems", "Items and models"),
@@ -876,6 +907,7 @@ mod tests {
             "cg_thirdPersonHorzOffset",
             "cg_thirdPersonCameraDamp",
             "cg_thirdPersonTargetDamp",
+            "cg_wallGrabLock",
             "cg_errorDecay",
         ];
         for group in [Group::GameOptions, Group::Advanced(Advanced::Gameplay)] {

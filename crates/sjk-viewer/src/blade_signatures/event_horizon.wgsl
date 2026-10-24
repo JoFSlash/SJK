@@ -59,7 +59,7 @@ fn eh_disk(ro: vec3<f32>, rd: vec3<f32>, h: f32, k: f32, tmax: f32, g: f32, px: 
     // the innermost stable orbit: a thin ring blazing round the hole
     let hp = rayAt(ro, rd, h);
     if hp.z > 0.0 && hp.z < tmax {
-        let rr = abs((length(hp.xy) + 1.0e3 * behindBlade(ro, rd, hp.z)) - 0.85 * g);
+        let rr = hideD(abs(length(hp.xy) - 0.85 * g), behindBlade(ro, rd, hp.z));
         acc += white * (halo(rr, max(0.04, px)) * 1.3 + vio * halo(rr, 0.3) * 0.4) * boost;
     }
     return acc;
