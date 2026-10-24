@@ -59,6 +59,8 @@ $images = @{}   # "path/without/ext" -> @{ tga = entry; png = entry; ... }
 $bsps = @{}     # "mp/ffa3" -> entry
 $shaderTexts = New-Object System.Collections.Generic.List[object]
 
+# Run with -File, PowerShell passes "a,b" as one string: split it here.
+$Path = @($Path | ForEach-Object { $_ -split '[,;]' } | ForEach-Object { $_.Trim().Trim('"') } | Where-Object { $_ })
 $pk3s = foreach ($folder in $Path) {
     if (-not (Test-Path -LiteralPath $folder)) { throw "Folder not found: $folder" }
     Get-ChildItem -LiteralPath $folder -Filter *.pk3 -File | Sort-Object Name
