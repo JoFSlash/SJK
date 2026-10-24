@@ -4271,9 +4271,15 @@ python scripts/arena_map.py --no-compile --preview plan.png
 - **Checks.** Before writing, the script stops if a spawn point's player box
   or a light touches a brush. `--preview` draws a plan of the brushes (shaded
   by height), lights and spawn points, to check a layout without compiling it.
-- **Not verified** (24/10/2026, Linux, no q3map2 or game data): the compile,
-  the lighting and the map in game. Only the `.map`, the textures and the
-  preview were generated and looked at.
+- **Stairs.** Each step is its own box beside the next; stacked, overlapping
+  step boxes made q3map2's `-meta` warn of duplicate or flipped triangles.
+- **Checked** (24/10/2026, Linux): q3map2 from NetRadiant-custom `8216133`
+  (built with GCC 14; GCC 13 and clang 18 reject its C++20) compiles it with no
+  warning or leak, 3 lightmaps (mean 40 of 255), with an empty `GameData/base`.
+  `sjk-bsp` parses the BSP; player-box traces land each spawn point (raised 9
+  as `SelectSpawnPoint` does) on its floor, stop at the walls and ceiling, and
+  climb the stairs onto a balcony 18 units at a time.
+- **Not checked:** the map in a game, on a server and in EternalJK.
 
 ## Default visual profile
 

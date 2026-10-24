@@ -152,9 +152,11 @@ def balconies():
     ]
     steps = BALCONY_Z // STEP_H
     for i in range(steps - 1):  # the balcony itself is the last step
+        # one box per step, side by side: overlapping boxes leave slivers in -meta
         top = (i + 1) * STEP_H
         y = y0 - (steps - 1 - i) * STEP_D
-        stair = Brush((-HALF, y, 0), (-HALF + STAIR_W, y0, top), {"*": "trim", "+z": "floor"})
+        stair = Brush((-HALF, y, 0), (-HALF + STAIR_W, y + STEP_D, top),
+                      {"*": "trim", "+z": "floor"})
         north += [stair, mirror_x(stair)]
     return north + [mirror_y(b) for b in north]
 
