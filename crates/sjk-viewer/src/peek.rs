@@ -171,6 +171,9 @@ impl GpuState {
         if client == snapshot.player.client_num() {
             return Err("peek: select another player".into());
         }
+        if self.muted_players.contains(client) {
+            return Err("peek: you blocked this player; /unblock them first".into());
+        }
         if !snapshot
             .entities
             .iter()
