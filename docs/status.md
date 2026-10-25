@@ -14,7 +14,8 @@ the viewer's card and renderer tests on Linux. Played by Slash on the built-in R
 `vram` command, compression, 3D resolution and the hitch changes): `vram` read 553 MiB
 in the menu and 710 to 805 MiB on Academy6 and mp/ffa5, against 2819 MiB on Academy6
 before. Not verified: the Cards tab, an opening or the card up close in game (pictures
-appearing a few frames later than before).
+appearing a few frames later than before): Slash's account showed no cards (the tab
+said "Contacting the hub..." in the release build too), so nothing drew a picture.
 
 ## Announcements and contributor reward rounds
 
