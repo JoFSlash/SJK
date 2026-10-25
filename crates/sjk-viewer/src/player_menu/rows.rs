@@ -64,6 +64,8 @@ pub(super) enum SaberRow {
     Hilt,
     /// SJK UI: the stock blade or a blade skin the player owns (`cg_saberSkin`).
     Skin,
+    /// SJK UI: the saber sounds apart from the blade (`cg_saberSounds`).
+    Sounds,
     Blade,
     Red,
     Green,
@@ -82,6 +84,7 @@ impl SaberRow {
             Self::Search => "Search",
             Self::Hilt => "Hilt",
             Self::Skin => "Blade",
+            Self::Sounds => "Sounds",
             Self::Blade => "Blade colour",
             Self::Red | Self::SecondRed => "Red",
             Self::Green | Self::SecondGreen => "Green",
@@ -118,7 +121,7 @@ impl SaberRow {
     }
 }
 
-const SABER_ROW_CAPACITY: usize = 13;
+const SABER_ROW_CAPACITY: usize = 14;
 
 /// The saber page's rows for the current draft, built without allocating.
 #[derive(Clone, Copy, Debug)]
@@ -182,6 +185,7 @@ impl PlayerMenu {
         rows.push(SaberRow::Hilt);
         if self.is_sjk() {
             rows.push(SaberRow::Skin);
+            rows.push(SaberRow::Sounds);
         }
         rows.push(SaberRow::Blade);
         rows.extend([SaberRow::Red, SaberRow::Green, SaberRow::Blue]);

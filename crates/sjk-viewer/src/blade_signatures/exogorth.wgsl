@@ -290,7 +290,7 @@ fn r8_vol(ro: vec3<f32>, rd: vec3<f32>, px: f32) -> vec3<f32> {
         let yb = 1.2 + 3.0 * f;
         let h = rayAt(ro, rd, yb);
         if h.z > 0.0 {
-            fx += amb * halo(abs((length(h.xy) + 1.0e3 * behindBlade(ro, rd, h.z)) - R), 0.15 + 0.5 * f) * (1.0 - f) * 0.35 * ex_gape();
+            fx += amb * halo(hideD(abs(length(h.xy) - R), behindBlade(ro, rd, h.z)), 0.15 + 0.5 * f) * (1.0 - f) * 0.35 * ex_gape();
         }
     }
     // acid: glowing drops sliding down the outside of the gullet and falling
@@ -324,7 +324,7 @@ fn r8_vol(ro: vec3<f32>, rd: vec3<f32>, px: f32) -> vec3<f32> {
         let a = 1.0 - uClash;
         let h = rayAt(ro, rd, L * 0.6);
         if h.z > 0.0 {
-            fx += amb * halo(abs((length(h.xy) + 1.0e3 * behindBlade(ro, rd, h.z)) - 1.0 - 7.0 * a), 0.22 + 0.3 * a) * 1.6 * uClash;
+            fx += amb * halo(hideD(abs(length(h.xy) - 1.0 - 7.0 * a), behindBlade(ro, rd, h.z)), 0.22 + 0.3 * a) * 1.6 * uClash;
         }
         let dc = rayPtRaw(ro, rd, vec3(0.0, L * 0.6, 0.0), &tq);
         fx += amb * halo(abs(dc - 1.0 - 5.0 * a), 0.3 + 0.4 * a) * 0.7 * uClash + amb * halo(dc, 1.5) * pow(uClash, 2.0) * 1.2;

@@ -507,6 +507,14 @@ fn submit_actor(
     if let Some((percent, npc_class)) = model_scale::source(state, local_player) {
         model_scale::apply(transform, percent, npc_class);
     }
+    // A limp player (the Ragdoll toy) is drawn where the ragdoll lies, posed in its
+    // model space (`actor_pose_steps`).
+    if entity.kind != EntityKind::Corpse
+        && mesh.is_some_and(|index| sinks.actor_meshes[index].ragdoll.posed)
+        && let Some(points) = crate::ragdoll::shown_entity(entity.id)
+    {
+        crate::ragdoll::place(transform, &points);
+    }
     // `EV_VEH_FIRE`: this vehicle's volleys, at its muzzles as posed now.
     if let Some(index) = mesh
         && sinks.actor_meshes[index].preview.vehicle.is_some()

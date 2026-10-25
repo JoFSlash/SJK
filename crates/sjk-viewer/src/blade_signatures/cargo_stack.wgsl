@@ -12,8 +12,9 @@
 fn cargo_stack_glow0(g: vec3<f32>, b: vec2<f32>, r: f32, px: f32) -> vec3<f32> {
     let cyc = fract(uTime / 8.0);
     let n = cyc * (uLength / 2.5 + 2.0);
+    // round 23: the top of the stack smoothed over a pixel (it stair-stepped)
     let k = floor(b.y / 2.5);
-    let lit = step(k + 1.0, n) * part(0.0);
+    let lit = mix(step(k + 1.0, n), step(k + 2.0, n), cellMix(b.y / 2.5, px / 2.5)) * part(0.0);
     let edge = halo((0.5 - abs(fract(b.y / 2.5) - 0.5)) * 2.5, 0.05);
     let clear = smoothstep(0.92, 1.0, cyc) * part(0.0);
     return g * (0.6 + 0.45 * lit + 0.8 * clear + 0.4 * (1.0 - part(0.0))) + lvl(g) * vec3<f32>(1.0) * edge * 0.3 * lit;

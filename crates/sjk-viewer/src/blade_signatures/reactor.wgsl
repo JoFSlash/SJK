@@ -100,7 +100,12 @@ fn base_vol(ro: vec3<f32>, rd: vec3<f32>, px: f32) -> vec3<f32> {
     let y1 = L * 0.97;
     // ---- venting plasma and lightning as it heats ----
     col += fxSparks(ro, rd, px, y0, y1, 6.0 + 22.0 * max(h.x, sw), 6.0, 1.2, 2.2, pc) * (0.3 + h.x + sw);
-    col += fxArcs(ro, rd, px, y0, y1, 1.0 + 6.0 * h.x + 2.0 * sw, 4.5, 2.0 + 2.0 * h.y, 5.3, pc) * max(h.x, 0.25 * sw);
+    // round 23 (Sol's review, timed on Creyon's RTX 5070): the lightning is worked out only while
+    // it shows (cold and still, more than half of its 30-second cycle, it is weighted to nothing)
+    let arcs = max(h.x, 0.25 * sw);
+    if arcs > 0.0 {
+        col += fxArcs(ro, rd, px, y0, y1, 1.0 + 6.0 * h.x + 2.0 * sw, 4.5, 2.0 + 2.0 * h.y, 5.3, pc) * arcs;
+    }
     // ---- reactor dust and a glowing haze round it ----
     col += fxMotes(ro, rd, px, y0, y1, 1.0, 5.5, 30.0, 0.06, 3.3, mix(pc, vec3<f32>(1.0), 0.3));
     col += fxAura(ro, rd, y0, y1, 3.0, pc) * (0.8 + 0.6 * h.x + strobe);
@@ -109,7 +114,9 @@ fn base_vol(ro: vec3<f32>, rd: vec3<f32>, px: f32) -> vec3<f32> {
     // round 19 (Creyon: the ring was cut off where it left the blade's room): it races out to
     // well inside that room and fades there
     col += fxShock(ro, rd, px, L * 0.5, fq / 1.6, 6.5, vec3<f32>(1.0, 0.9, 0.8)) * 2.0;
-    col += fxSparks(ro, rd, px, y0, y1, 24.0, 7.0, 1.5, 9.1, pc) * h.z * 2.0;
+    if h.z > 0.0 {
+        col += fxSparks(ro, rd, px, y0, y1, 24.0, 7.0, 1.5, 9.1, pc) * h.z * 2.0;
+    }
     return col * uFx;
 }
 

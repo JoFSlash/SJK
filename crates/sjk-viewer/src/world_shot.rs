@@ -282,12 +282,16 @@ mod cardboard_box;
 #[path = "world_shot_map_edits.rs"]
 mod map_edit_shots;
 
+#[path = "world_shot_drone.rs"]
+mod drone_shots;
 #[path = "world_shot_hax.rs"]
 mod hax_shots;
 #[path = "world_shot_order66.rs"]
 mod order66_shots;
 #[path = "world_shot_petals.rs"]
 mod petals;
+#[path = "world_shot_ragdoll.rs"]
+mod ragdoll_shots;
 
 #[path = "world_shot_blade_cards.rs"]
 mod blade_cards;
@@ -339,6 +343,9 @@ mod emote_picker_shots;
 #[path = "world_shot_alpha_notice.rs"]
 mod alpha_notice_shots;
 
+#[path = "world_shot_official.rs"]
+mod official_shots;
+
 #[path = "world_shot_chat_gifs.rs"]
 mod chat_gifs_shots;
 
@@ -366,6 +373,8 @@ mod log_requests;
 #[path = "world_shot_whats_new.rs"]
 mod whats_new;
 
+#[path = "world_shot_chat_sounds.rs"]
+mod chat_sounds_shots;
 #[cfg(test)]
 #[path = "world_shot_footprints.rs"]
 mod footprints_shots;
@@ -1270,6 +1279,12 @@ Found the fog bug, ask me about it!"
             kyber: None,
             shop: None,
             trade: None,
+            announcements: Vec::new(),
+            announcements_revision: 0,
+            rewards: None,
+            rewards_revision: 0,
+            claim: None,
+            announce: None,
             public_key: String::new(),
         };
         let standings = crate::achievements::ALL
@@ -3428,6 +3443,7 @@ like this one.",
                     client: String::new(),
                     text: (*text).to_owned(),
                     holocron: None,
+                    official: None,
                 },
             )
             .collect();

@@ -78,6 +78,7 @@ fn duel6_sjk_chat_gifs_page() {
                 client: String::new(),
                 text: (*text).to_owned(),
                 holocron: None,
+                official: None,
             },
         )
         .collect();
@@ -234,6 +235,7 @@ fn duel6_sjk_chat_gifs_feed() {
                     client: String::new(),
                     text: text.to_owned(),
                     holocron: None,
+                    official: None,
                 };
             let state = |messages: Vec<sjk_identity::ChatMessage>| sjk_identity::ChatState {
                 messages: messages.into_iter().collect(),
@@ -314,6 +316,7 @@ fn duel6_sjk_chat_gif_picker() {
             client: String::new(),
             text: format!("look https://giphy.com/gifs/ShotPick{:02}X", n),
             holocron: None,
+            official: None,
         })
         .collect();
     let state = sjk_identity::ChatState {

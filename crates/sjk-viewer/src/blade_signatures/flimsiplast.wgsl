@@ -12,9 +12,10 @@
 fn flimsiplast_glow0(g: vec3<f32>, b: vec2<f32>, r: f32, px: f32) -> vec3<f32> {
     let k = floor(uTime / 4.0);
     let q = smoothstep(0.0, 0.3, fract(uTime / 4.0));
-    let f0 = fract(b.y / 3.0 + b.x * (0.8 + 0.4 * h11(k)));
-    let f1 = fract(b.y / 3.0 + b.x * (0.8 + 0.4 * h11(k + 1.0)));
-    let s = mix(step(0.5, f0), step(0.5, f1), q);
+    // round 23: the creases' edges smoothed over a pixel (they stair-stepped)
+    let m0 = 0.8 + 0.4 * h11(k);
+    let m1 = 0.8 + 0.4 * h11(k + 1.0);
+    let s = mix(aaSquare(b.y / 3.0 + b.x * m0, px * (0.34 + m0)), aaSquare(b.y / 3.0 + b.x * m1, px * (0.34 + m1)), q);
     return g * (1.0 - 0.3 * s * part(0.0));
 }
 

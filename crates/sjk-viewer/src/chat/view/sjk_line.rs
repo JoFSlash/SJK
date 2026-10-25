@@ -39,6 +39,8 @@ pub(in crate::chat) struct Marks<'a> {
     /// The sender's name emoji (`sjk_identity::name_emoji`), right after the name;
     /// empty for none.
     pub(in crate::chat) emoji: &'a str,
+    /// The SJK team's line: the name in the SJK UI's accent gold.
+    pub(in crate::chat) accent: bool,
 }
 
 /// What a line's first row holds before its message, measured in the feed's font.
@@ -65,6 +67,8 @@ pub(in crate::chat) struct Prefix<'a> {
     colon_width: f32,
     /// The line is a holocron drop: its mark is the tier's gem, not the verified tick.
     tier: Option<&'static Tier>,
+    /// The name in the SJK UI's accent gold ([`Marks::accent`]).
+    accent: bool,
 }
 
 impl<'a> Prefix<'a> {
@@ -83,6 +87,7 @@ impl<'a> Prefix<'a> {
             emoji: marks.emoji,
             emoji_width: sjk_chat_look::emoji_room(font, marks.emoji, size),
             tier: marks.tier,
+            accent: marks.accent,
             jof: crate::jof_tag::clan(name),
             label: marks.label,
             label_width: if marks.label.is_empty() {
@@ -211,11 +216,16 @@ pub(in crate::chat) fn draw(
         ui.accent_bar(name_rect, Color::new(0.70, 0.88, 0.98, 0.16));
     }
     if !name.is_empty() {
+        let gold = crate::menu::sjk::color::GOLD;
         ui.text(
             name,
             Rect::new(name_x, y, prefix.name_width + 1.0, row_box(g)),
             size,
-            ink,
+            if prefix.accent {
+                Color::new(gold.r, gold.g, gold.b, alpha)
+            } else {
+                ink
+            },
             FontWeight::Semibold,
             0.0,
         );
@@ -330,6 +340,7 @@ mod tests {
             client: String::new(),
             text: text.to_owned(),
             holocron: None,
+            official: None,
         }
     }
 

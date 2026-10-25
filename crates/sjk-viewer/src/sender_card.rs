@@ -7,7 +7,9 @@
 //! where they are on this server and how they were matched), and Mute or Unmute, which
 //! hides their chat, draws them as Kyle with the default saber and silences them on this
 //! PC only. For a player the hub vouches for, a sender it does not vouch for also gets
-//! Ban 24 h beside it ([`crate::chat_ban`]).
+//! Ban 24 h beside it ([`crate::chat_ban`]). In the game's chat, where a click pins the
+//! card, a player on the server also gets Whisper at the head of the buttons
+//! ([`Tokens::whisper`], `chat/card.rs`).
 //!
 //! The card is built when the name under the pointer changes and drawn every frame
 //! without allocating; each place that shows it keeps it up while the pointer moves
@@ -110,6 +112,9 @@ pub(crate) struct Tokens {
     pub(crate) ban: u16,
     /// Safety code, when [`Person::safety`].
     pub(crate) safety: u16,
+    /// Whisper, at the head of the card's buttons: only where the card can open a
+    /// whisper to them (the game's chat, for a player on the server), else `None`.
+    pub(crate) whisper: Option<u16>,
 }
 
 /// The card's width in 1080p pixels: compact, so it sits beside the chat without
@@ -132,9 +137,13 @@ const BUTTON: f32 = 28.0;
 const QUIET_GAP: f32 = 5.0;
 const QUIET_ROW: f32 = 14.0;
 
-/// The card's size for `person`, at the scale `u` (1 at 1080 lines).
-pub(crate) fn size(person: &Person, u: f32) -> [f32; 2] {
+/// The card's size for `person`, at the scale `u` (1 at 1080 lines); `whisper` when it
+/// offers Whisper ([`Tokens::whisper`]).
+pub(crate) fn size(person: &Person, whisper: bool, u: f32) -> [f32; 2] {
     let mut height = PAD + HEAD + RULE;
+    if whisper {
+        height += BUTTON + 6.0;
+    }
     let lines = [
         person.hub_name.is_some(),
         person.printed_key().is_some(),
@@ -183,7 +192,7 @@ pub(crate) fn draw(
         muted,
         measure,
     } = *card;
-    let [width, height] = size(person, u);
+    let [width, height] = size(person, tokens.whisper.is_some(), u);
     let card = Rect::new(origin[0], origin[1], width, height);
     let list = canvas.draw_list_mut();
     // A soft shadow, the panel, its hairline edge and a thin accent along the top.
@@ -359,6 +368,12 @@ pub(crate) fn draw(
         y += MEDAL_ROW * u;
     }
     y += 6.0 * u;
+    // Whisper first, the whole row: what a click on a name is most often for.
+    let whisper_button = Rect::new(x, y, inner, BUTTON * u);
+    if let Some(token) = tokens.whisper {
+        card_button(canvas, whisper_button, u, token, "Whisper", color::HOLO);
+        y += (BUTTON + 6.0) * u;
+    }
     let half = (inner - 8.0 * u) * 0.5;
     let button = Rect::new(x, y, half, BUTTON * u);
     card_button(
@@ -447,6 +462,9 @@ pub(crate) fn draw(
         );
     }
     canvas.hit_region(tokens.card, card);
+    if let Some(token) = tokens.whisper {
+        canvas.hit_region(token, whisper_button);
+    }
     canvas.hit_region(tokens.mute, button);
     if ban_key.is_some() {
         canvas.hit_region(tokens.ban, ban_button);
@@ -510,6 +528,7 @@ mod tests {
         mute: 8,
         ban: 9,
         safety: 10,
+        whisper: None,
     };
 
     #[test]
@@ -650,8 +669,11 @@ mod tests {
             texts.contains(&"Seen 3 minutes ago".to_owned()),
             "{texts:?}"
         );
-        assert_eq!(size(&noted, 1.0)[1], size(&plain, 1.0)[1] + LINE);
-        assert_eq!(rect.height, size(&noted, 1.0)[1]);
+        assert_eq!(
+            size(&noted, false, 1.0)[1],
+            size(&plain, false, 1.0)[1] + LINE
+        );
+        assert_eq!(rect.height, size(&noted, false, 1.0)[1]);
         let (_, _, texts, _) = drawn(&plain, false);
         assert!(!texts.iter().any(|text| text.starts_with("Seen")));
     }
@@ -725,7 +747,7 @@ mod tests {
     #[test]
     fn the_card_goes_beside_the_name_and_stays_on_screen() {
         let viewport = [1920.0, 1080.0];
-        let size = size(&sol(), 1.0);
+        let size = size(&sol(), false, 1.0);
         let left_name = Rect::new(100.0, 500.0, 80.0, 20.0);
         assert_eq!(beside(left_name, size, viewport, 10.0), [190.0, 500.0]);
         // At the right edge it goes to the name's left.

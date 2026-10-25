@@ -60,6 +60,8 @@ impl GpuState {
         self.local_prediction
             .set_predict_items(console.bool_cvar("cg_predictItems").unwrap_or(true));
         self.local_prediction
+            .set_wall_grab_lock(console.bool_cvar("cg_wallGrabLock").unwrap_or(false));
+        self.local_prediction
             .set_show_miss(console.bool_cvar("cg_showMiss").unwrap_or(false));
         if let Some(adapter) = &mut self.legacy_world_adapter {
             adapter.set_smooth_clients(console.smooth_clients());

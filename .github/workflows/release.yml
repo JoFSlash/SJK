@@ -2,7 +2,7 @@ name: SJK release
 
 # SJK only. Pushing a tag named sjk-v<version> (for example sjk-v2026.1005.1, a
 # date version, docs/sjk.md "Version") builds the
-# Windows x64 and Linux x64 drop-in ZIPs exactly as the GameData packages workflow
+# Windows x64, Linux x64 and macOS Apple Silicon drop-in ZIPs exactly as the GameData packages workflow
 # does (scripts/package_client.py, with its smoke check), names them
 # SJK-<version>-<platform>.zip and publishes them as a GitHub Release with the
 # checksums and the matching source snapshot. Rerun on an existing tag with
@@ -57,10 +57,11 @@ jobs:
           cat > notes.md <<EOF
           <p align="center"><img src="https://raw.githubusercontent.com/${{ github.repository }}/refs/tags/$TAG/assets/branding/sjk-logo-512.png" alt="Sol JK emblem" width="200"></p>
 
-          Sol JK $VERSION for Windows 10/11 x64 and Linux x64.
+          Sol JK $VERSION for Windows 10/11 x64 and Linux x64, plus an experimental,
+          unsigned build for Macs with Apple Silicon (its README says how to allow it).
 
           **Install:** extract the whole ZIP for your platform into Jedi Academy's
-          \`GameData\` folder, beside \`base\`, then launch \`sjk\`. Your settings
+          \`GameData\` folder, beside \`base\`, then launch \`sjk\` (\`sjk-client\` on a Mac). Your settings
           live in \`GameData/SJK/\` and are kept when you update. A legally owned copy
           of Jedi Academy is required; no game assets are included.
 
@@ -85,10 +86,17 @@ jobs:
             platform: windows-x64
             target: x86_64-pc-windows-msvc
             rustflags: '-C target-feature=+crt-static'
+          # Apple Silicon only; unsigned (docs/packages.md#macos).
+          - os: macos-latest
+            platform: macos-arm64
+            target: aarch64-apple-darwin
+            rustflags: ''
     runs-on: ${{ matrix.os }}
     env:
       CARGO_INCREMENTAL: 0
       RUSTFLAGS: ${{ matrix.rustflags }}
+      # The oldest macOS the Mac build starts on; ignored by the other targets.
+      MACOSX_DEPLOYMENT_TARGET: '11.0'
       VERSION: ${{ needs.draft.outputs.version }}
       # The programs' build scripts name the build after the tag's version
       # (scripts/build_version.rs); a build without it says <version>-dev.
@@ -128,7 +136,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          # Both platforms produce the same source snapshot; Linux uploads it.
+          # Every platform produces the same source snapshot; Linux uploads it.
           if [ "${{ matrix.platform }}" != linux-x64 ]; then
             rm -f dist/*-source.zip
           fi

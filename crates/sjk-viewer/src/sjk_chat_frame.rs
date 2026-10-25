@@ -135,9 +135,9 @@ impl GpuState {
 }
 
 /// Whether the SJK chat's sound plays: `cl_sjkChatSound`, under the master chat sound
-/// switch `cg_chatSounds` (`cgame_options.rs`), which silences every chat sound.
+/// switch `cg_chatSounds`, which silences every chat sound (`chat_sounds.rs`).
 fn sound_on(console: &console::ViewerConsole) -> bool {
-    console.bool_cvar(SOUND_CVAR) != Some(false) && cgame_options::chat_sounds(Some(console))
+    crate::chat_sounds::enabled(Some(console), crate::chat_sounds::Kind::Sjk)
 }
 
 /// `cl_sjkChatSound`: whether a new SJK chat message plays a sound.

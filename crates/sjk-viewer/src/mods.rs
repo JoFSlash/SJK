@@ -136,6 +136,9 @@ impl Mods {
                     setting.help,
                 ))?;
             }
+            for &(old, current) in module.old_setting_names() {
+                shell.cvars.register_alias(old, current)?;
+            }
         }
         if shell.cvars.get(DEFAULT_VERSION).is_none() {
             shell.cvars.register(CvarDefinition::new(
@@ -558,6 +561,17 @@ mod tests {
         let (shell, _) = shell();
         assert!(shell.cvars.get("japlus.loginServer1").is_some());
         assert!(shell.cvars.get("mod_jof").is_some());
+    }
+
+    /// A config made for JoF EternalJK still sets anti-kiss under its old name.
+    #[cfg(feature = "mod-japlus")]
+    #[test]
+    fn old_setting_names_set_the_current_one() {
+        let (mut shell, _) = shell();
+        shell.execute_line("seta cg_antiAmKiss 1").unwrap();
+        let current = shell.cvars.get(sjk_mod_japlus::anti_kiss::CVAR).unwrap();
+        assert_eq!(current.value.as_text(), "1");
+        assert_eq!(current.name, sjk_mod_japlus::anti_kiss::CVAR);
     }
 
     #[cfg(all(feature = "mod-jof", feature = "mod-japlus"))]

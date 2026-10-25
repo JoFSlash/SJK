@@ -288,11 +288,17 @@ impl LegacyLocalSounds {
                 // announces the message (`docs/hub-chat.md`, "Said on the game server too").
                 b"chat" if crate::chat::sjk_copy_command(&command.command) => continue,
                 b"chat" | b"lchat" if !CG_TEAM_CHATS_ONLY && CG_CHAT_BEEP => {
-                    let private =
-                        self.chat_mode == 2 && crate::chat::private_chat_command(&command.command);
+                    // A tell is told apart at every mode, so the viewer can switch and
+                    // voice it on its own; its default sound is EJK's private one only
+                    // under cg_chatSounds 2 (JoF EJK `cg_servercmds.c:1814`).
+                    let private = crate::chat::private_chat_command(&command.command);
                     if self.push(
-                        LegacySoundEvent::ChatBeep,
                         if private {
+                            LegacySoundEvent::PrivateChatBeep
+                        } else {
+                            LegacySoundEvent::ChatBeep
+                        },
+                        if private && self.chat_mode == 2 {
                             self.media.private_chat
                         } else {
                             self.media.talk
@@ -584,7 +590,9 @@ mod pm_only_tests {
             .filter(|sound| {
                 matches!(
                     sound.event,
-                    LegacySoundEvent::ChatBeep | LegacySoundEvent::TeamChatBeep
+                    LegacySoundEvent::ChatBeep
+                        | LegacySoundEvent::TeamChatBeep
+                        | LegacySoundEvent::PrivateChatBeep
                 )
             })
             .collect();
@@ -606,6 +614,75 @@ mod pm_only_tests {
                 .filter(|sound| sound.event == LegacySoundEvent::ChatBeep)
                 .count(),
             1
+        );
+    }
+}
+
+#[cfg(test)]
+mod chat_beep_tests {
+    use super::*;
+    use sjk_protocol::ReliableServerCommand;
+
+    /// The chat beeps `commands` make at `mode`: each one's event and sound (talk 1,
+    /// EJK team 2, EJK private 3).
+    fn beeps(mode: i64, commands: &[&[u8]]) -> Vec<(LegacySoundEvent, Option<u16>)> {
+        let media = LocalSoundMedia::register(|path| match path {
+            "sound/player/talk.wav" => 1,
+            "sound/movers/switches/button_11.mp3" => 2,
+            "sound/movers/switches/button_15.mp3" => 3,
+            _ => 9,
+        });
+        let mut local = LegacyLocalSounds::new(&GameState::empty_local(0), media);
+        local.chat_mode = mode;
+        let mut snapshot = test_snapshot(1000);
+        snapshot.server_commands = commands
+            .iter()
+            .enumerate()
+            .map(|(sequence, command)| ReliableServerCommand {
+                sequence: sequence as i32 + 1,
+                command: command.to_vec(),
+            })
+            .collect();
+        local.observe_snapshot(&snapshot);
+        local
+            .pending()
+            .iter()
+            .map(|sound| (sound.event, sound.sound))
+            .collect()
+    }
+
+    const COMMANDS: [&[u8]; 5] = [
+        b"chat \"Fox: public\" 2",
+        b"tchat \"(Fox): team\" 2",
+        b"chat \"[Fox^7]: ^6a tell\" 2",
+        // A tell to a teammate, with a location (G_Say's SAY_TELL in team games).
+        b"lchat \"[Fox^7]: \" \"@Base\" \"6\" \"hello\" 2",
+        // Typed to look like a tell: public chat.
+        b"chat \"Fox: [Fake^7]: ^6fake\" 2",
+    ];
+
+    #[test]
+    fn a_tell_is_its_own_event_at_every_mode_with_ejk_sounds_at_mode_2() {
+        use LegacySoundEvent::{ChatBeep, PrivateChatBeep, TeamChatBeep};
+        assert_eq!(
+            beeps(1, &COMMANDS),
+            [
+                (ChatBeep, Some(1)),
+                (TeamChatBeep, Some(1)),
+                (PrivateChatBeep, Some(1)),
+                (PrivateChatBeep, Some(1)),
+                (ChatBeep, Some(1)),
+            ]
+        );
+        assert_eq!(
+            beeps(2, &COMMANDS),
+            [
+                (ChatBeep, Some(1)),
+                (TeamChatBeep, Some(2)),
+                (PrivateChatBeep, Some(3)),
+                (PrivateChatBeep, Some(3)),
+                (ChatBeep, Some(1)),
+            ]
         );
     }
 }

@@ -52,10 +52,6 @@ const COMMANDS: &[Command] = &[
         "japlus.plugin",
         "List or toggle JA+ plugin features (cp_pluginDisable): japlus.plugin [id]",
     ),
-    command(
-        "japlus.color",
-        "Set your model's tint: japlus.color <red> <green> <blue> (0-255)",
-    ),
 ];
 
 const SETTINGS: &[Setting] = &[
@@ -96,6 +92,9 @@ const SETTINGS: &[Setting] = &[
     },
 ];
 
+/// Settings renamed into `japlus.`, under the names configs may still use.
+const OLD_SETTING_NAMES: &[(&str, &str)] = &[(anti_kiss::EJK_CVAR, anti_kiss::CVAR)];
+
 /// The JA+ tools mod.
 #[derive(Default)]
 pub struct JaPlus {
@@ -111,30 +110,6 @@ impl JaPlus {
 /// The local player, for the commands that need one.
 fn me(host: &dyn Host) -> Result<sjk_mod::Me, String> {
     host.me().ok_or_else(|| "not in a game".to_owned())
-}
-
-/// `japlus.color <red> <green> <blue>`: EternalJK's `amColor`
-/// (`cg_consolecmds.c:1245`), checked to 0-255.
-fn color(args: &[String], host: &mut dyn Host) -> Result<Vec<String>, String> {
-    let [red, green, blue] = args else {
-        return Err(
-            "usage: japlus.color <red> <green> <blue>, such as japlus.color 255 255 0".into(),
-        );
-    };
-    let mut values = [0_u8; 3];
-    for (value, text) in values.iter_mut().zip([red, green, blue]) {
-        *value = text
-            .trim()
-            .parse()
-            .map_err(|_| format!("japlus.color: {text} is not 0 to 255"))?;
-    }
-    for (name, value) in ["char_color_red", "char_color_green", "char_color_blue"]
-        .iter()
-        .zip(values)
-    {
-        host.set_cvar(name, &value.to_string())?;
-    }
-    Ok(Vec::new())
 }
 
 impl ClientMod for JaPlus {
@@ -165,6 +140,10 @@ impl ClientMod for JaPlus {
 
     fn settings(&self) -> &'static [Setting] {
         SETTINGS
+    }
+
+    fn old_setting_names(&self) -> &'static [(&'static str, &'static str)] {
+        OLD_SETTING_NAMES
     }
 
     /// `amlogin`, the JA+ family's account and clan passwords and
@@ -205,7 +184,6 @@ impl ClientMod for JaPlus {
             "japlus.autologin" => return login::auto_login(host),
             "japlus.serverconfig" => return options::server_config(host),
             "japlus.plugin" => return options::plugin(args, host),
-            "japlus.color" => return color(args, host),
             _ => return Err(format!("Unknown JA+ tools command {name}")),
         };
         host.send(&command)?;
@@ -217,10 +195,6 @@ impl ClientMod for JaPlus {
 mod tests {
     use super::*;
 
-    /// Settings that keep JoF EternalJK's name instead of the `japlus.` prefix, so a
-    /// config made for EternalJK keeps working.
-    const EJK_NAMES: &[&str] = &[anti_kiss::CVAR];
-
     #[test]
     fn every_name_carries_the_prefix() {
         let mod_ = JaPlus::new();
@@ -229,7 +203,6 @@ mod tests {
             .iter()
             .map(|command| command.name)
             .chain(mod_.settings().iter().map(|setting| setting.name))
-            .filter(|name| !EJK_NAMES.contains(name))
         {
             assert!(name.starts_with("japlus."), "{name}");
         }
@@ -237,6 +210,10 @@ mod tests {
             let (server, password) = login::names(slot);
             assert!(SETTINGS.iter().any(|setting| setting.name == server));
             assert!(SETTINGS.iter().any(|setting| setting.name == password));
+        }
+        for &(old, current) in mod_.old_setting_names() {
+            assert!(!old.starts_with("japlus."), "{old}");
+            assert!(SETTINGS.iter().any(|setting| setting.name == current));
         }
     }
 }

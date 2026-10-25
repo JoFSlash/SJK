@@ -797,6 +797,32 @@ impl Runtime {
         (self.any_haze || self.any_holes) && skinned(&self.ranges)
     }
 
+    /// How far this frame's haze or lenses may bend the picture they sample, as a share of
+    /// the target's longer side (`effect_bounds`): the lens's reach when a drawn blade's skin
+    /// has black holes, the haze's when one has heat haze, else none. At most one look per
+    /// loaded skin, nothing allocated.
+    pub(crate) fn bent_reach(&self) -> f32 {
+        use crate::frame_target::aa::effects::bounds::{HAZE_REACH, LENS_REACH};
+        if !self.has_haze() {
+            return 0.0;
+        }
+        let first = crate::saber_rgb::SKIN_MATERIAL as usize;
+        let mut reach = 0.0_f32;
+        for (index, skin) in self.loaded.iter() {
+            if self.ranges[first + usize::from(index)].is_empty() {
+                continue;
+            }
+            let shown = skin.shown();
+            if shown.holes.is_some() {
+                return LENS_REACH;
+            }
+            if shown.haze.is_some() {
+                reach = HAZE_REACH;
+            }
+        }
+        reach
+    }
+
     /// The black holes' horizons and the skins' solid parts (ink, chrome) over the blades
     /// just drawn from `buffer`.
     fn draw_horizons<'pass>(

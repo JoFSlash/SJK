@@ -85,6 +85,7 @@ pub(super) fn register_daily_cvars(cvars: &mut CvarRegistry) -> Result<(), sjk_s
     crate::text::style::register(cvars)?;
     crate::text::charset::register(cvars)?;
     crate::menu_hud::register(cvars)?;
+    crate::chat_sounds::register(cvars)?;
     let archive = CvarFlags::ARCHIVE;
     let definitions = [
         CvarDefinition::new(
@@ -306,6 +307,12 @@ pub(super) fn register_daily_cvars(cvars: &mut CvarRegistry) -> Result<(), sjk_s
             archive,
             "Hide pickups only while you are in a private duel",
         ),
+        CvarDefinition::new(
+            "cg_wallGrabLock",
+            false,
+            archive,
+            "Lock wall-grab look even when the server allows free look; off follows the server profile",
+        ),
         // EternalJK's: write prediction misses to the log (`cg_predict.c:1534`).
         CvarDefinition::new(
             "cg_showMiss",
@@ -511,6 +518,12 @@ pub(super) fn register_daily_cvars(cvars: &mut CvarRegistry) -> Result<(), sjk_s
             crate::emotes::DEFAULT_ATTACK_STOP,
             archive,
             "An attack or alt attack ends your own emote (SJK)",
+        ),
+        CvarDefinition::new(
+            crate::emotes::TYPING_KEEP_CVAR,
+            crate::emotes::DEFAULT_TYPING_KEEP,
+            archive,
+            "A player typing keeps their emote until they move or attack after (SJK)",
         ),
         CvarDefinition::new(
             crate::away_emote::SJK_CVAR,
@@ -725,6 +738,12 @@ pub(super) fn register_daily_cvars(cvars: &mut CvarRegistry) -> Result<(), sjk_s
             "The Hax toy is on (toy_hax switches it; it stays on until turned off)",
         ),
         CvarDefinition::new(
+            crate::toy_saved::DRONE_CVAR,
+            false,
+            archive,
+            "The Drone toy is on: other players may peek at you, their drone following you (toy_drone switches it)",
+        ),
+        CvarDefinition::new(
             crate::duel_blades::CVAR,
             false,
             archive,
@@ -827,6 +846,12 @@ pub(super) fn register_daily_cvars(cvars: &mut CvarRegistry) -> Result<(), sjk_s
             "",
             archive,
             "The blade skin your sabers wear, by unlock id (saber_sun: the Sun blade), shown once your SJK profile holds it; empty for the stock blade",
+        ),
+        CvarDefinition::new(
+            crate::saber_sound_choice::CVAR,
+            "",
+            archive,
+            "The saber sounds you hear and other SJK players hear for your sabers: empty follows your saber shader, stock the stock sounds, or a shader you own by unlock id (saber_sun: the Sun blade's)",
         ),
         CvarDefinition::new(
             crate::saber_skin_options::CVAR,
@@ -1278,12 +1303,28 @@ pub(super) fn register_daily_cvars(cvars: &mut CvarRegistry) -> Result<(), sjk_s
         cvars.register(definition)?;
     }
     cvars.register_alias("r_vsync", "r_swapInterval")?;
+    cvars.register_alias(
+        crate::away_emote::JAPLUS_OLD_CVAR,
+        crate::away_emote::JAPLUS_CVAR,
+    )?;
     crate::cgame_options::register(cvars)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_old_away_emote_name_sets_the_japlus_one() {
+        let mut cvars = CvarRegistry::new();
+        register_daily_cvars(&mut cvars).unwrap();
+        cvars
+            .set_text(crate::away_emote::JAPLUS_OLD_CVAR, "amsit")
+            .unwrap();
+        let current = cvars.get(crate::away_emote::JAPLUS_CVAR).unwrap();
+        assert_eq!(current.value.as_text(), "amsit");
+        assert_eq!(current.name, crate::away_emote::JAPLUS_CVAR);
+    }
 
     #[test]
     fn an_integer_setting_follows_an_on_off_cvar() {

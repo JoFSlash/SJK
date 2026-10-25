@@ -41,6 +41,11 @@ impl CosmeticsMenu {
         }
     }
 
+    /// Forget content derived from the previous world's file system.
+    pub(super) fn detach_vfs(&mut self) {
+        self.catalog = None;
+    }
+
     /// Read what is worn; list the installed pieces of `vfs` if not yet.
     pub(super) fn open(&mut self, console: &ViewerConsole, vfs: Option<&Arc<VirtualFileSystem>>) {
         if let Some(vfs) = vfs
@@ -207,5 +212,22 @@ impl CosmeticsMenu {
         let worn = &mut self.worn[slot.index()];
         worn.clear();
         worn.push_str(name.unwrap_or_default());
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn detaching_releases_the_catalogue_vfs() {
+        let vfs = Arc::new(VirtualFileSystem::new());
+        let weak = Arc::downgrade(&vfs);
+        let mut menu = CosmeticsMenu::new();
+        menu.catalog = Some((Arc::clone(&vfs), Catalog::scan(&vfs)));
+        drop(vfs);
+        assert!(weak.upgrade().is_some());
+        menu.detach_vfs();
+        assert!(weak.upgrade().is_none());
     }
 }

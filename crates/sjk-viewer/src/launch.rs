@@ -139,6 +139,21 @@ fn find_game_data_in(
         candidates.push(home.join(".local/share/Steam/steamapps/common/Jedi Academy/GameData"));
         candidates.push(home.join(".steam/steam/steamapps/common/Jedi Academy/GameData"));
         candidates.push(home.join("Games/Jedi Academy/GameData"));
+        // Steam on macOS: a GameData copied from a Windows install, or the Mac
+        // edition, whose base folder sits inside its app bundle.
+        let mac_steam =
+            home.join("Library/Application Support/Steam/steamapps/common/Jedi Academy");
+        candidates.push(mac_steam.join("GameData"));
+        if let Ok(entries) = std::fs::read_dir(&mac_steam) {
+            let mut bundles: Vec<PathBuf> = entries
+                .flatten()
+                .map(|entry| entry.path())
+                .filter(|path| path.extension().is_some_and(|extension| extension == "app"))
+                .map(|path| path.join("Contents"))
+                .collect();
+            bundles.sort();
+            candidates.extend(bundles);
+        }
     }
     candidates
         .into_iter()

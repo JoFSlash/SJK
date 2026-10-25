@@ -56,17 +56,27 @@ pub(crate) const TOY_CHANNEL: ChannelId = ChannelId(14);
 /// skin's over the stock ones (the default), 2 the skin's alone.
 pub(crate) const SKIN_SOUNDS_CVAR: &str = "s_saberSkinSounds";
 
-/// Apply independent notification and footstep switches without muting combat.
-pub(super) fn allows_event(
+/// The sound `event` plays, `handle` being the adapter's choice: footsteps under
+/// `cg_footsteps`, and a chat beep after the chat sound settings (`chat_sounds.rs`),
+/// which mute its kind or play its chosen sound instead; `None` plays nothing. Combat
+/// is never muted here. A chosen sound that is not loaded (missing from the game data)
+/// leaves the adapter's.
+pub(super) fn event_handle(
     event: sjk_client::LegacySoundEvent,
+    handle: SoundHandle,
     footsteps: bool,
-    chat: [bool; 2],
-) -> bool {
-    match event {
-        sjk_client::LegacySoundEvent::ChatBeep => chat[0],
-        sjk_client::LegacySoundEvent::TeamChatBeep => chat[1],
-        _ => footsteps || !event.is_footstep(),
+    chat: &crate::chat_sounds::Options,
+    handles: &HashMap<String, SoundHandle>,
+) -> Option<SoundHandle> {
+    use crate::chat_sounds::{Kind, Route};
+    if let Some(kind) = Kind::of_event(event) {
+        return match chat.route(kind) {
+            Route::Muted => None,
+            Route::Default => Some(handle),
+            Route::Sound(key) => Some(handles.get(key).copied().unwrap_or(handle)),
+        };
     }
+    (footsteps || !event.is_footstep()).then_some(handle)
 }
 
 impl GameAudio {
@@ -118,10 +128,7 @@ impl GameAudio {
                     != 0,
             );
         }
-        self.chat_beeps = ["cg_chatBeep", "cg_teamChatBeep"].map(|name| {
-            crate::cgame_options::chat_sounds(console)
-                && console.and_then(|c| c.bool_cvar(name)).unwrap_or(true)
-        });
+        self.chat_sounds = crate::chat_sounds::Options::read(console);
         self.duel_enabled = console
             .and_then(|c| c.bool_cvar("cg_duelMusic"))
             .unwrap_or(true);
@@ -474,5 +481,57 @@ mod listener_tests {
                 "{left} {right}"
             );
         }
+    }
+}
+
+#[cfg(test)]
+mod chat_handle_tests {
+    use super::*;
+    use crate::chat_sounds::Options;
+    use sjk_client::LegacySoundEvent;
+
+    #[test]
+    fn a_chat_beep_plays_its_kind_s_chosen_sound_or_nothing() {
+        let directory = tempfile::tempdir().unwrap();
+        let mut console = ViewerConsole::new(directory.path().join("config.cfg")).unwrap();
+        let mut handles = HashMap::new();
+        handles.insert("sound/interface/update.mp3".to_owned(), SoundHandle(7));
+        let beep = SoundHandle(1);
+        let handle = |event, options: &Options, handles: &HashMap<String, SoundHandle>| {
+            event_handle(event, beep, true, options, handles)
+        };
+        // Defaults: the adapter's beep for every kind.
+        let options = Options::read(Some(&console));
+        for event in [
+            LegacySoundEvent::ChatBeep,
+            LegacySoundEvent::TeamChatBeep,
+            LegacySoundEvent::PrivateChatBeep,
+        ] {
+            assert_eq!(handle(event, &options, &handles), Some(beep));
+        }
+        // Public chat off, private messages on a chosen sound (Turin's case).
+        assert!(console.set_cvar("cg_chatBeep", "0"));
+        assert!(console.set_cvar("cl_chatSoundPrivate", "blip"));
+        let options = Options::read(Some(&console));
+        assert_eq!(handle(LegacySoundEvent::ChatBeep, &options, &handles), None);
+        assert_eq!(
+            handle(LegacySoundEvent::PrivateChatBeep, &options, &handles),
+            Some(SoundHandle(7))
+        );
+        // A chosen sound not loaded leaves the adapter's beep.
+        assert_eq!(
+            handle(LegacySoundEvent::PrivateChatBeep, &options, &HashMap::new()),
+            Some(beep)
+        );
+        // Combat and footsteps are not chat.
+        assert_eq!(
+            handle(LegacySoundEvent::Taunt, &options, &handles),
+            Some(beep)
+        );
+        let footstep = LegacySoundEvent::Footstep;
+        assert_eq!(
+            event_handle(footstep, beep, false, &options, &handles),
+            None
+        );
     }
 }

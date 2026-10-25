@@ -1112,6 +1112,54 @@ mod tests {
     }
 
     #[test]
+    fn acknowledged_wall_grab_keeps_its_view_hold_without_another_slice() {
+        for step in [8, 7, 4, 3] {
+            for free_wall_look in [false, true] {
+                let config = super::super::MovementConfig {
+                    debug_melee: crate::pmove_debug_melee::DebugMelee {
+                        free_wall_look,
+                        ..Default::default()
+                    },
+                    ..Default::default()
+                };
+                let mut predictor = Predictor::from_state(
+                    MovementState {
+                        health: 100,
+                        ground_entity_number: ENTITY_NUMBER_NONE,
+                        legs_anim: BOTH_FORCEWALLREBOUND_FORWARD,
+                        torso_anim: BOTH_FORCEWALLREBOUND_FORWARD,
+                        legs_timer: 150,
+                        torso_timer: 150,
+                        movement_flags: PMF_STUCK_TO_WALL,
+                        view_angles: [12.0, 0.0, 0.0],
+                        ..MovementState::default()
+                    },
+                    config,
+                );
+                let command = UserCommand {
+                    server_time: step,
+                    angles: [0, 4096, 0],
+                    ..Default::default()
+                };
+                predictor.predict_command(command, &EAST);
+                let mut player = sjk_protocol::PlayerState::default();
+                predictor.state.write_player_state(&mut player);
+                // A fully acknowledged queue has nothing to replay. OpenJK renders
+                // this snapshot's viewangles until a new command can run.
+                let mut seed = predictor.reseed_player_state(&player, config);
+                seed.predict_command(command, &EAST);
+                assert_eq!(seed.state.wall_view_locked, !free_wall_look, "{step} ms");
+                assert_eq!(seed.state.view_angles, player.view_angles());
+
+                // The server releasing the wall must not inherit the old lock.
+                player.set_movement_flags(0);
+                let released = seed.reseed_player_state(&player, config);
+                assert!(!released.state.wall_view_locked);
+            }
+        }
+    }
+
+    #[test]
     fn wall_rebound_locks_the_view_until_release_but_japlus_leaves_it_free() {
         for step in [8, 7, 4, 3] {
             for free_wall_look in [false, true] {

@@ -13,6 +13,16 @@ use winit::keyboard::{KeyCode, PhysicalKey};
 
 impl PlayerMenu {
     pub(crate) fn attach_catalogue(&mut self, vfs: Arc<VirtualFileSystem>) {
+        // The menu moves between worlds. Every catalogue worker and derived list
+        // must move with it: retaining one old VFS keeps every mounted PK3 open.
+        self.icons = model_icons::ModelIcons::new();
+        self.force_icons = icons::IconLoader::new();
+        self.part_icons = part_icons::PartIcons::new();
+        self.force_templates.list.detach_vfs();
+        self.cosmetics.detach_vfs();
+        self.choice = None;
+        self.resolved_catalogue = false;
+        self.tiles.clear();
         self.loader = Some(LegacyAssetCatalogLoader::new(Arc::clone(&vfs)));
         self.icon_vfs = Some(vfs);
     }
@@ -38,6 +48,7 @@ impl PlayerMenu {
         self.search.clear();
         self.saber.set_search("");
         self.blade_choice.read(console);
+        self.sound_choice.read(console, &self.blade_choice);
         self.page = ProfilePage::Character;
         self.selected = 0;
         self.creator.reset();
@@ -382,6 +393,7 @@ impl PlayerMenu {
                 match row {
                     SaberRow::Search => return,
                     SaberRow::Skin => return self.blade_choice.step(console, direction),
+                    SaberRow::Sounds => return self.sound_choice.step(console, direction),
                     _ => {}
                 }
                 let catalog = catalog_of(&self.loader);
@@ -436,6 +448,10 @@ impl PlayerMenu {
                 self.name_editing = true;
             }
             _ if search_row => self.begin_search(),
+            // Enter on the Sounds row plays them.
+            (ProfilePage::Saber, row) if self.saber_rows().get(row) == Some(&SaberRow::Sounds) => {
+                self.preview_sounds();
+            }
             (ProfilePage::Character, row) if self.is_sjk() => {
                 if self.character_rows().get(row) == Some(&CharacterRow::Apply) {
                     self.apply_look(console);
@@ -622,5 +638,59 @@ pub(super) fn append_legacy_name(name: &mut String, text: &str) {
             break;
         }
         name.push(character);
+    }
+}
+
+#[cfg(test)]
+mod vfs_lifetime_tests {
+    use super::*;
+    use sjk_client::LegacyAssetCatalog;
+    use std::time::{Duration, Instant};
+
+    fn empty_catalogue() -> Arc<LegacyAssetCatalog> {
+        Arc::new(LegacyAssetCatalog {
+            characters: Vec::new(),
+            retail_characters: 0,
+            species: Vec::new(),
+            retail_species: 0,
+            saber_hilts: Vec::new(),
+            retail_saber_hilts: 0,
+            excluded_saber_hilts: 0,
+            saber_colors: sjk_client::LEGACY_SABER_COLORS,
+        })
+    }
+
+    #[test]
+    fn a_new_catalogue_releases_the_old_icon_worker_vfs() {
+        let mut menu = PlayerMenu::new();
+        let old = Arc::new(VirtualFileSystem::new());
+        let old_weak = Arc::downgrade(&old);
+        menu.attach_catalogue(Arc::clone(&old));
+        // A model-icon worker waits for jobs for as long as its cache is attached.
+        menu.icons.attach(&old, &empty_catalogue());
+        drop(old);
+        assert!(old_weak.upgrade().is_some());
+
+        menu.attach_catalogue(Arc::new(VirtualFileSystem::new()));
+        let deadline = Instant::now() + Duration::from_secs(5);
+        while old_weak.upgrade().is_some() && Instant::now() < deadline {
+            std::thread::sleep(Duration::from_millis(1));
+        }
+        assert!(
+            old_weak.upgrade().is_none(),
+            "the old world's VFS stayed alive after attaching the new one"
+        );
+    }
+
+    #[test]
+    fn reattaching_the_same_vfs_restarts_the_catalogue_loader() {
+        let mut menu = PlayerMenu::new();
+        let vfs = Arc::new(VirtualFileSystem::new());
+        menu.attach_catalogue(Arc::clone(&vfs));
+        menu.loader.as_mut().unwrap().request();
+        assert_eq!(menu.status(), LegacyCatalogStatus::Loading);
+
+        menu.attach_catalogue(vfs);
+        assert_eq!(menu.status(), LegacyCatalogStatus::Idle);
     }
 }

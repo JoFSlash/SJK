@@ -10,8 +10,10 @@
 // shifting runs, a bright point bounces up and down inside it like a ball on a table, and gold
 // glitter hangs round it.
 fn canto_bight_glow0(g: vec3<f32>, b: vec2<f32>, r: f32, px: f32) -> vec3<f32> {
+    // round 23: each run's edge smoothed over a pixel (it stair-stepped)
     let k = floor(b.y / 4.0);
-    let lights = step(0.55, h11(k * 3.1 + floor(uTime * 3.0)));
+    let tk = floor(uTime * 3.0);
+    let lights = mix(step(0.55, h11(k * 3.1 + tk)), step(0.55, h11((k + 1.0) * 3.1 + tk)), cellMix(b.y / 4.0, px / 4.0));
     let by = uLength * (0.15 + 0.8 * abs(fract(uTime * 0.4) * 2.0 - 1.0));
     let spot = halo(length(vec2(b.x, b.y - by)), 0.7);
     return g * (0.8 + 0.4 * lights * part(0.0)) + lvl(g) * vec3<f32>(1.0, 0.95, 0.8) * spot * part(0.0);

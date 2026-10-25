@@ -99,7 +99,7 @@ fn sig_vol(ro: vec3<f32>, rd: vec3<f32>, px: f32) -> vec3<f32> {
         let h = rayAt(ro, rd, L * (select(0.24, 0.78, fk < 0.5)) + sin(t * 0.4 + fk * 2.0));
         if h.z > 0.0 {
             let R = select(2.6, 3.2, fk < 0.5);
-            let d = abs((length(h.xy) + 1.0e3 * behindBlade(ro, rd, h.z)) - R);
+            let d = hideD(abs(length(h.xy) - R), behindBlade(ro, rd, h.z));
             let side = 0.5 + 0.5 * sin(atan2(h.x, h.y) - t * 0.2 * (select(-1.0, 1.0, fk < 0.5)) + fk * 3.1);
             col += (vec3<f32>(1.0) * halo(d, max(0.05, px)) * 0.8 + mix(MO_NIGHT, MO_DAY, side) * halo(d, 0.3) * 0.5) * part(3.0);
         }

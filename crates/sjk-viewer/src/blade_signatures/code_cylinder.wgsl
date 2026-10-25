@@ -8,8 +8,10 @@
 // Code Cylinder: an Imperial officer's code cylinder, as a blade. Data stripes of different widths
 // scroll slowly up the blade, brighter and dimmer.
 fn code_cylinder_glow0(g: vec3<f32>, b: vec2<f32>, r: f32, px: f32) -> vec3<f32> {
-    let k = floor(b.y * 1.2 - uTime * 0.8);
-    let s = step(0.45, h11(k * 3.7));
+    // round 23: each stripe's edge smoothed over a pixel (it stair-stepped)
+    let u = b.y * 1.2 - uTime * 0.8;
+    let k = floor(u);
+    let s = mix(step(0.45, h11(k * 3.7)), step(0.45, h11((k + 1.0) * 3.7)), cellMix(u, px * 1.2));
     return g * (0.8 + 0.3 * s * part(0.0));
 }
 

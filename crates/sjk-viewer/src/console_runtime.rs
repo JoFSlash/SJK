@@ -26,6 +26,12 @@ impl GpuState {
         if let Some(on) = console.take_hax_request() {
             self.hax.set_on(on);
         }
+        if let Some(on) = console.take_ragdoll_request() {
+            self.ragdoll.set_on(on);
+        }
+        if let Some(on) = console.take_drone_request() {
+            self.drone.set_on(on);
+        }
         let mut actions = [None; MAX_ACTIONS_PER_FRAME];
         console.advance_command_frame();
         console.pump_console_socket();
@@ -58,18 +64,22 @@ impl GpuState {
         for action in actions[..action_count].iter().copied().flatten() {
             self.apply_input_action(Some(action));
         }
-        // `toy_illuminate` may have flipped it: tell the Toys tab. Order 66 and the Hax
-        // stay as last switched, across maps, servers and restarts (`toy_saved`).
+        // `toy_illuminate` may have flipped it: tell the Toys tab. Order 66, the Hax and the
+        // Drone stay as last switched, across maps, servers and restarts (`toy_saved`).
         if let Some(console) = self.console.as_mut() {
-            let [order66, hax] = &mut self.toys_saved;
+            let [order66, hax, drone] = &mut self.toys_saved;
             let on = order66.sync(console, crate::toy_saved::ORDER66_CVAR, self.order66.on());
             self.order66.set_on(on);
             let on = hax.sync(console, crate::toy_saved::HAX_CVAR, self.hax.on());
             self.hax.set_on(on);
+            let on = drone.sync(console, crate::toy_saved::DRONE_CVAR, self.drone.on());
+            self.drone.set_on(on);
             console.set_illuminate_lit(self.illuminate.lit());
             console.set_cardboard_box_on(self.cardboard_box.on());
             console.set_order66_on(self.order66.on());
             console.set_hax_on(self.hax.on());
+            console.set_ragdoll_on(self.ragdoll.on());
+            console.set_drone_on(self.drone.on());
         }
         let connection = self
             .console

@@ -583,6 +583,39 @@ Windows that memory also shows in the process's RAM in Task Manager.
   out in the main menu). The rest of that menu: the game font atlases (128 MiB, RGBA),
   the UI icon atlas (56 MiB) and the world's shadow, GI and froxel targets (about
   200 MiB) a picture menu does not draw.
+- Texture compression (`r_textureCompression`, on by default,
+  [texture_compression.rs](../crates/sjk-viewer/src/texture_compression.rs)) uploads map
+  and model textures as BC1 blocks when every texel is opaque (an eighth of RGBA8) and
+  BC3 otherwise (a quarter), sRGB like the RGBA8 path, on devices with
+  `TEXTURE_COMPRESSION_BC`. The loading workers compress each mip chain after building it
+  (`mips::prepare`), only the levels `r_picmip` uploads, with
+  [block_compression](https://crates.io/crates/block_compression)'s CPU encoders (a Rust
+  port of Intel's ISPC kernels): BC1 about 0.15 s and BC3 0.22 s for 2048x2048 on one
+  core of the cloud runner, close to libsquish's cluster fit (texpresso's range fit was as
+  fast and a third worse; BC7 took 2 to 20 s and is not used). Levels below 4x4 or of odd
+  sizes repeat their edge texels into whole blocks. Uncompressed: textures under 64
+  pixels or not whole 4x4 blocks at the uploaded size, the non-mipmapped path, fonts, UI,
+  effects and lightmaps. The blocks are kept in `cache/textures` beside the configuration
+  ([texture_compression_store.rs](../crates/sjk-viewer/src/texture_compression_store.rs)),
+  one file per array named by the MD4 of each source image file
+  (`decoded_image_cache::content_digest`), the array's size, the levels left off and a
+  version: a map or pack updated with other images names other files and is compressed
+  again, and each start, and each 256 MiB written since, deletes the files used longest
+  ago beyond 2 GiB. The store is read before the mip chain is built (`mips::prepare`):
+  a stored texture is read and uploaded without one. Textures no worker prepared (a
+  material compiled during play, uploaded on the thread that needs it) stay RGBA8, never
+  encoding there, and so does a context without a console (GPU tests). The shared map
+  textures' key includes whether compression is on, so a change takes from the next map
+  even for textures the last one held. A file that does
+  not match the asked size or layout is ignored and written again. The load logs
+  `texture compression: N arrays (M from the store), X MiB as RGBA8, Y MiB as blocks`.
+  `scripts/vram-estimate.ps1` estimated 1332 MiB of RGBA8 textures for `amjh3te` and
+  182 MiB as blocks, 99 and 14 MiB for mp/siege_desert. In game on Slash's built-in
+  Radeon (24/10/2026): the menu 156 to 20 MiB, JoF's FFA3 Night 163 to 20 MiB, FFA3 at
+  1920x1080 after a graphics reload 452 to 64 MiB (147 of 288 arrays from the store),
+  texture preparation 1.1 to 4.3 s instead of 0.4 to 0.5 s; the textures looked right.
+  The ignored `map_changes_vram` takes `SJK_TEST_COMPRESSION=0` for an off-screen
+  comparison.
 - Work on the render thread after a world is built runs inside wgpu error scopes
   ([gpu_guard.rs](../crates/sjk-viewer/src/gpu_guard.rs)) where it can fail alone: the
   menu stage's model (the creator's head, torso and legs), which then is not shown and
@@ -686,6 +719,39 @@ second build: about 3 s in release, 1.4 s of it hidden behind the file read, abo
 | ffa3 alone | ffa3 + siege_desert | Empty world | Empty world + siege_desert |
 | --- | --- | --- | --- |
 | 2208 MiB | 3719 MiB | 1436 MiB | 3045 MiB |
+
+[scripts/vram-estimate.ps1](../scripts/vram-estimate.ps1) estimates each map's
+texture memory from the pk3 files alone, with no game, build or graphics card: run
+`powershell -ExecutionPolicy Bypass -File vram-estimate.ps1 -Path <GameData\base>,<mod folder>`.
+It reads each map's shader list from its BSP, the shader scripts and the image headers,
+and prints RGBA8 with mips at `r_picmip` 0 to 2, the size with block compression (BC1
+opaque, BC3 with alpha, as `r_textureCompression` uploads them), the material maps beside them,
+and the largest textures of all the pk3 files. Map textures only: not models placed on
+the map, skins, effects, lightmaps or screen targets, and texture arrays fitted to a
+common layer size can take more. Written 24/10/2026 without a Windows PowerShell to try
+it on.
+
+The world shots above build their client from a fresh profile, whose renderer cvars are
+their defaults: the Experimental preset, not the SJK (recommended) one players start on.
+`low_end_vram_audit` (`world_shot_vram.rs`) builds each map at each preset
+(`graphics_quality::preset_cvars`) and texture detail and prints every label, the
+allocator's reserved bytes and what DXGI says the process uses (`VideoMemory::usage`);
+`card_faces_vram_audit` mounts the SJK packs of `JKA_GAME_DATA/SJK/assets`, which the
+other shots never do. Measured 25/10/2026 at 1920x1080 (MiB in use):
+
+| Map, r_picmip 0 / 2 | Vanilla style | SJK (recommended) | Experimental |
+| --- | --- | --- | --- |
+| mp/ffa3 | 1769 / 626 | 1814 / 670 | 2213 / 1065 |
+| mp/siege_desert | 1915 / 618 | 1952 / 654 | 2572 / 1275 |
+| Menu on pictures | 1140 / 512 | 1168 / 539 | 1425 / 797 |
+
+The presets that leave the real-time lighting off differ by about 45 MiB; Experimental
+adds its lamp light cache (up to 360 MiB on ffa5), fixture visibility, GI, froxels and
+sun shadow maps. DXGI's count is the allocator's reserved bytes plus about 200 MiB, and
+stays level over 12 map changes. With the hub's 333 card faces mounted, the menu on
+pictures at r_picmip 2 went from 539 to 2316 MiB in use (3235 MiB reserved): every face
+was uploaded at 1024 pixels in every world (see [cards.md](cards.md)), which the hub's
+crash reports named (`label = 'SJK menu emblem'`, a GTX 1060 3GB in the main menu).
 
 ## Eye adaptation
 
@@ -2343,6 +2409,65 @@ at that point and returning the blade's own: `sig_glow(g, b, r, px)` the glow's 
   what lies on the blade itself is never hidden, and bounds and the blade's own axis use the raw
   distances (`rayPtRaw`, `raySegRaw`). Liquid Beskar's rings no longer show through the blade, and
   the Clone Wars halftone no longer reaches below the hilt.
+- **Round 23 (players' reports after the 2026.1021.1 release: pixels at the tip, hard lines).**
+  A skin's core is sampled with the derivatives of its coordinates before the rounded tip narrows
+  them (`core_coordinates_at` with `core_breath`; the shaft's, where the two are the same): in the
+  tip the narrowing runs to a hundred times within a pixel and picked the core image's smallest
+  mip, which drew a bright rim of pixels round the end of every signature's core, in the game, the
+  Collection and the holocron cards. A signature's core fades out before its quad's sides
+  (`skin_core`): the core image's fringe is still a tenth as bright at its border, which drew a
+  straight edge along both sides of the line up close and a faint box past the narrowed tip. Round
+  22's hiding behind the blade is soft: `behindBlade` (and `ray_behind_blade`) fades in as the view
+  turns from along the blade instead of switching off at once, and ends before the tip where the
+  blade narrows; a hidden piece's distance goes through `hideD` (`hide_d`), which narrows and dims
+  it over the blade's soft edge, instead of adding a thousand times the hidden share, which cut it
+  at a hard edge and drew a box round the tip whenever a blade pointed at the camera; the
+  signatures' own ring code and `bladeSeen` do the same. `fxFlare` is skipped only where its widest
+  halo has faded (it ended at a hard ring), and Hypermatter's and the Uneti Tree's pulses fall off
+  over their fronts instead of ending at a line across the blade, as does the Starfighter
+  Canopy's. The other early-outs that cut glow at a line wait until it has faded: `fxFlakes`
+  (a dome seen along Yavin Vines), `fxCoils`, `fxRays`, `fxArcs` and `fxFall` in the lab, and
+  Balance's, Holo-Recording's and Orto Plutonia's own; `fxSmoke` takes a step at most about a
+  third of the cloud's width, up to 12 (a long path along the blade was sampled six units
+  apart). The blocky designs keep their look with edges smoothed over about a pixel (`aaStep`,
+  `cellMix` and `aaSquare` in `lab.glsl`): Code Cylinder, Canto Bight, Flimsiplast, Death Star
+  Plans, Cargo Stack, Holonet Feed and Targeting Display. Code Cylinder's and Flimsiplast's
+  stripes still alias seen right along the blade.
+  Sol's review (22/10/2026): the softened pulses are scaled back to their old peak (Hypermatter's
+  and the Starfighter Canopy's by 2.22, the Uneti Tree's second pulse 0.96 for 0.6), as their
+  fronts' fall-off had dimmed them to 45 and 63 percent. The hiding behind the blade no longer
+  ends 1.4 units before the tip (Exegol Rift's tip flare and Quasar's jet showed through it): its
+  width narrows with the rounded tip (a quarter circle over the last 1.4 units) to the point, so
+  nothing behind the tip shows and no dark round end is drawn past it. The tip fix needs the
+  core's coordinates without the tip's narrowing as well (`filter_uv`), on every skinned blade,
+  not only the signatures. Both come from one skin lookup per pixel (`core_line`, which also
+  gives the glitch's colour split): the first version ran `skin_at`, `skin_wave`, `skin_glitch`
+  and `skin_jitter` a second time for them, which the timing below counts. In
+  Creyon's game (third person and free camera, in front of a wall) Obsidian Edge still drew a box
+  round its tip: its edges' orange bloom stopped at once level with the tip (`inside` was a step;
+  it fades round the tip and into the hilt now), and its heat haze showed a stale strip cut at
+  straight edges, as the haze (and a black hole's lens) bends the effect layer's `original` image
+  up to 2 (6) percent of the screen outside the effects' rectangle, where that image keeps an
+  older frame: the rectangle (`effect_bounds`) now has that much more room on every side on a
+  frame that draws a haze or a lens (`HAZE_REACH`, `LENS_REACH`, `Bounds::bend`); other frames
+  keep the tight rectangle. Hypermatter's pulses come out of the hilt softly too.
+  The timing (Creyon's RTX 5070, Windows 11, `signature_gpu_cost_against_stock` with the 12
+  heaviest signatures, 33 blades a frame, `main` and this branch timed in turns, twice each, the
+  lower kept): the first version cost the 12 together 12 to 19 percent more than `main`, most of
+  it in the four arc blades (Sith Holocron, Quantum, Carbonite, Reactor, a fifth to a third more),
+  as `fxArcs` drew every bolt wherever its arc's glow could reach. Each of an arc's three bolts is
+  now drawn only near its own middle, its glow made to end 1.7 past it (`arcGlow`); `fxFlare` is
+  cut at 12 sizes (18 cost too much) and `fxSmoke` at 12 steps (16 cost the smoke blades a sixth
+  more seen along them). After that the 12 cost 2.0 (game), 1.8 (close) and 2.8 (along) percent
+  more than `main`, with the stock blade's own time (the stand-in) 3 to 4 percent more, so about
+  the same: Sith Holocron, Quantum and Carbonite 7 to 19 percent less, the others within a tenth.
+  Reactor still cost 13 to 17 percent more: its lightning was worked out while weighted to
+  nothing (cold and still, over half its cycle), and the arcs' outer bound used the arcs' asked
+  reach, not the reach the blade's room caps them at (`min(reach, 0.6*uReach)`). With both
+  fixed, timed again the same way: Reactor costs 3 percent less to 1 percent more than `main`,
+  Sith Holocron, Quantum and Carbonite 7 to 19 percent less; the stock blade's own time is 3 to 4
+  percent more in every run (the tip's second skin lookup and the softer hiding). The second
+  lookup was removed after this timing (`core_line`, Sol's review of 24/10/2026); not timed again.
 - **The big effects (round 9).** `lab.glsl` holds shared pieces every mythical draws its
   own way (flat since round 10): `fxRays` (beams shooting out of the blade and fading),
   `fxArcs` (Storm-like lightning leaving the blade, arcing out on any side and coming

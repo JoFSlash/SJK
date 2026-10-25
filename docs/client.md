@@ -1054,22 +1054,34 @@ Live appearance with installed animations remains unverified; see
 
 A player grabbing a wall to jump off it (Force jump 3, pushing into a wall in the
 air: `BOTH_FORCEWALLREBOUND_*`, then `BOTH_FORCEWALLHOLD_*` while the hold lasts)
-is drawn facing the wall the way the animation needs, whatever their view does
-([wall_hold_pose.rs](../crates/sjk-viewer/src/wall_hold_pose.rs)). `CG_G2PlayerAngles`
-turns the body with the view yaw. A stock server turns that yaw to the wall during
-the hold (`PM_AdjustAngleForWallJump`), so the camera locks too, but a JA+ server
-leaves the view free there ([networking](networking.md#server-dialect-movement-rules)),
-and looking around turned the body off the wall, as if it floated. While the
-legs play a rebound the model's yaw is the stock server's facing instead
-(`vectoyaw(wall normal) + yawAdjust`, from the same 128-unit check along the
-view, [`wall_hold_yaw`](../crates/sjk-game-jka/src/pmove_wall_moves.rs)); a frame
-whose check misses keeps the rebound's last facing, and the kick off returns the
-body to the view. It applies to the local player (from the predicted state) and to
-other players alike. Only the model changes: the camera stays free on JA+ and
-locked on a stock server, as each server computes it, and the kick off still goes
-straight back from the side the view picks (`checkDir`), so on JA+ it follows
-where the player looks, not the wall. The check sees the world's brushes only: a
-wall on a mover keeps the body on the view.
+is drawn facing the wall as its animation needs
+([wall_hold_pose.rs](../crates/sjk-viewer/src/wall_hold_pose.rs)). The model takes
+`vectoyaw(wall normal) + yawAdjust` from OpenJK's `PM_AdjustAngleForWallJump`:
+forward grabs face the wall; side and backward grabs keep their animation's side
+offset. A missed model-facing check keeps the rebound's last facing, and leaving
+the rebound returns the model to the view. This applies to local and remote models;
+the model check uses world brushes.
+
+The camera follows the server profile by default (`cg_wallGrabLock 0`): stock
+locks the view during the grab, while JA+ leaves mouse and keyboard look free.
+On JA+ (including JoF servers using that profile), looking around while holding
+jump aims the kick-off; this is an intentional server feature.
+
+**Lock wall-grab camera** is in SJK Settings > Advanced > Gameplay and classic
+Setup > Game options. `cg_wallGrabLock 1` opts into locking on JA+ too. With it
+on, the camera uses the shared 128-unit upright-wall check against world and mover
+collision to face the wall with the rebound side's offset, including frames with
+only a snapshot seed. With it off nothing is re-aimed: a stock grab's view is the
+one its movement slice or snapshot already turned to the wall.
+Look input is consumed during a lock so it cannot build up or spill out after
+release; movement and jump buttons still reach the command. Turning the option
+off restores the profile's policy. Stock remains locked with either value.
+
+The optional lock changes the local view used to build subsequent commands, so
+JA+ players who enable it give up free mouse aiming during the hold. It does not
+change the server's movement rules, replay state, delta angles or velocity.
+Missing the wall keeps the current held view; releasing the grab ends the
+optional hold. Model facing remains independent of the camera option.
 
 ## Dismemberment and disintegration
 
@@ -2354,6 +2366,9 @@ overlays still use the local player aim. Monitoring only received entities
 respects server PVS, but may show surroundings outside your line of sight.
 `/peek` alone uses the crosshair player; `/peek off` or a duration of 0 cancels.
 Local flight (`fakenoclip` or `freecam`) ends a peek; stop flight before peeking.
+Since 24/10/2026 Peek is the [Drone](#drone)'s: on a server it watches only a player
+whose Drone switch is on (in a local game, anyone), stops when they turn it off, and
+other SJK players see the drone behind the watched player.
 The local body stays at its player position and the view gun is suppressed.
 The camera cancels when the timer ends, the target slot/name changes, or the
 map changes. Missing snapshot data pauses the view; it resumes if data returns
@@ -2386,6 +2401,50 @@ A whisper to another SJK player goes through the SJK hub end-to-end encrypted wh
 `cl_e2eWhispers` is on (default; Settings > Network > Encrypted whispers): in its own
 pink, marked ENCRYPTED, with its own sound, and a card asks before sending one the hub
 could not take through the game server. See [hub-chat.md](hub-chat.md#encrypted-whispers).
+
+### Chat sounds
+
+Each kind of chat message has its own sound switch and sound (Sol, after Turin's and
+Nib's ideas, 23/10/2026; [chat_sounds.rs](../crates/sjk-viewer/src/chat_sounds.rs)),
+in Settings > Sound > Chat sounds (Advanced), every row in the settings search:
+
+| Kind | Switch (default on) | Sound (default `default`) | Default sound |
+| --- | --- | --- | --- |
+| Public chat (`chat`, `lchat`) | `cg_chatBeep` | `cl_chatSoundPublic` | JKA's `sound/player/talk` |
+| Team chat (`tchat`, `ltchat`) | `cg_teamChatBeep` | `cl_chatSoundTeam` | talk; EJK's `button_11` under `cg_chatSounds 2` |
+| Private messages | `cg_privateChatBeep` | `cl_chatSoundPrivate` | talk for a tell (EJK's `button_15` under `cg_chatSounds 2`), the SJK whisper sound for an encrypted whisper |
+| SJK chat | `cl_sjkChatSound` | `cl_chatSoundSjk` | SJK's variant of talk ([hub-chat.md](hub-chat.md#a-sound-for-a-new-message)) |
+
+- **The master switch** is EternalJK's `cg_chatSounds` (Chat sounds: Off, On, Distinct
+  (EJK)): 0 silences every kind; 2 makes team chat and tells play JoF EternalJK's own
+  sounds (`cg_main.c` registers `button_11` and, without JoF's `commlink_off`,
+  `button_15`; `cg_servercmds.c` plays them) while their sound is Default.
+- **Private messages** are a server's tells and SJK's encrypted whispers. A tell arrives
+  as public chat (`chat`, or `lchat` to a teammate with a location) whose text starts
+  with the stock private marker `[` (`G_Say`'s `SAY_TELL`); a player cannot type
+  that byte, so a line made to look like a tell stays public. JA+, JoF and the other
+  servers SJK knows send tells that way, so one test serves them all
+  (`chat::private_chat_command`, which `cg_pmOnlyChat` uses too); the sound adapter
+  gives a tell its own beep event (`PrivateChatBeep`). Before, `cg_chatBeep 0` muted
+  tells with public chat; now `cg_chatBeep 0` with `cg_privateChatBeep 1` keeps only
+  the private messages heard (Turin's case).
+- **The sounds:** Default, JKA chat (`talk`), SJK chat and SJK whisper (SJK's two
+  variants of talk), EJK team beep (`button_11`), EJK private beep (`button_15`), Blip
+  (`interface/update`), Select (`interface/sub_select`), Button (`interface/button1`),
+  Tick (`interface/menuroam`): the retail game's short sounds of `assets0.pk3`, read from
+  the player's game data (SJK ships none). Choosing one in Settings plays it; each kind
+  has a Play row, and `chatsoundpreview <public|team|private|sjk>` plays the same, its
+  chosen sound even while its switch is off. An unknown value is the default.
+- **How they play:** a game server's beep as the game's does (beside the listener on
+  `CHAN_LOCAL_SOUND`, a muted player's never), the chosen sound in place of the
+  adapter's; the SJK chat's and an encrypted whisper's through the interface cues.
+- **Taskbar flash:** `cl_privateChatFlash` (archived, default 1; Private message flash)
+  flashes the game's taskbar button when a private message arrives while the window is
+  unfocused or minimised (winit's `request_user_attention`, Informational: Windows
+  flashes it until the window comes back; a no-op where the system has none): a tell
+  from a player not muted here, never the server's echo of the player's own, or an
+  encrypted whisper. Name mentions in public chat already flash with EternalJK's
+  `con_notifywords`.
 
 ### Chat player actions
 
@@ -2476,10 +2535,29 @@ the visible username glyph bounds. There is no standing player-options hint or s
 notice. Opening the composer exposes history even when passive chat is hidden with
 `cg_chatbox 0`.
 
-Clicking a name does nothing since 18/10/2026 (Sol's decision): the dropdown it opened
-(whisper, a per-map ignore, a local friend star kept in `chat-friends.txt`, copy name)
-was removed, the sender card and `block` having replaced it. Whisper with the `tell`
-command or `reply`; an existing `chat-friends.txt` is no longer read.
+Clicking a name pins its sender card (23/10/2026, Bishop's and Sanjisan's requests, Sol's
+go; [chat/card.rs](../crates/sjk-viewer/src/chat/card.rs)): the card stays whatever the
+pointer does, until the name is clicked again, a click lands off the card and off every
+name, Escape is pressed (the first Escape closes the card, the next the composer) or the
+composer closes. For a player on the server other than yourself it heads its buttons with
+**Whisper**, above Block: the composer turns to a whisper to them, the draft kept, sent as
+any whisper from the composer (encrypted through the SJK hub when they take encrypted
+whispers, else the server's `tell <slot>`). Whisper names the roster observation the
+line was matched to: a player who left, renamed or whose slot another took has no
+Whisper, and a press made before the roster changed says "Player left or changed
+identity". An SJK chat line's sender is whispered in the slot their key (or name) is
+matched to here ("On this server, slot N"); one not on the server has none. Lines are
+matched to players as before: the server's sender slot, else the one connected player
+whose name, as the game shows it, starts the line; two players wearing one name leave
+such a line unclickable. The card's Safety code button also answers clicks now (before,
+the press was taken for the card's and the click was lost).
+
+There is no Add friend: SJK has no friends list (the hub keeps none, and the local friend
+star of the old name dropdown, `chat-friends.txt`, went with it on 18/10/2026, Sol's
+decision), and there is no View profile either: the card is the profile view (picture,
+hub name, key, medals, where they are), while the player card (`inspect`) needs the
+player in sight. The old dropdown (whisper, a per-map ignore, the friend star, copy
+name) stays gone; an existing `chat-friends.txt` is not read.
 
 The draft shares the console's UTF-8 caret and selection rules: arrows/Home/End,
 Ctrl+arrows and Ctrl+Backspace/Delete, Shift-selection, Ctrl+A/C/X/V,
@@ -4139,8 +4217,9 @@ the archived `cl_toyHax`, as Order 66 in `cl_toyOrder66`).
   [toy relay](hub-chat.md#toy-relay), not the toy events, which wait for the feed's next
   poll: the hacker's client sends a frame (keys, buttons, view) when they change and
   every 50 ms at least, at most one per 30 ms; a frame still waiting to be sent is
-  replaced by the next. Each holder of the toy keeps a long poll open for the events
-  meant for them. The hack's start and end, the seize and the answers travel the same
+  replaced by the next. Every SJK client on a game server keeps a long poll open for
+  the events meant for it (since 23/10/2026, for the [Ragdoll](#ragdoll); before, only
+  holders of the toy). The hack's start and end, the seize and the answers travel the same
   way. The steering lags by the hacker's way to the hub, the hub's to the hacked
   player and their ping, and the hacker sees the result after their own ping too. Without
   the hub (`cl_identity 0`), or with a hub from before the relay, nothing is hacked.
@@ -4152,6 +4231,126 @@ The icon (a terminal with a green ">_") and the rain's glyphs are drawn by
 Noto Sans JP;
 the sounds and the hack bar's icon are the retail game's. See
 [hax.rs](../crates/sjk-viewer/src/hax.rs).
+
+## Ragdoll
+
+The Ragdoll is a meme toy, SJK's own and free for every player (Sol's idea,
+23/10/2026): the player's body goes limp and falls where physics takes it, as in the
+sandbox games, though the player is not dead. `toy_ragdoll` is a toggle: once to go
+limp, again to get up, from a bind (Settings > Key bindings > Interaction > Toy:
+Ragdoll, unbound until a key is picked), from the quick wheel's [Toys page](#toys-page)
+or from the Collection's Toys tab ([SJK UI](sjk-ui.md#collection)). Nothing is saved:
+every fall ends with the map or the server.
+
+- **The body:** a limp humanoid of 15 points (pelvis, chest, head, shoulders, elbows,
+  hands, hips, knees, feet) held by sticks, the trunk braced as one block, knees bending
+  forward and elbows back (Verlet integration, [body.rs](../crates/sjk-viewer/src/ragdoll/body.rs)).
+  It starts standing where the player stood, turned their way, with their speed, and
+  pushed off balance (back, to a side, the knees buckling), so a running or jumping
+  player tumbles on. It falls at `g_gravity`'s 800, slides and bounces a little on the
+  world's brushes, and sleeps once it has lain still for a second (or after 40 seconds
+  whatever it does), until a mover stirs it.
+- **Movers:** since 25/10/2026 lifts, doors, trains and the map's other brush movers are
+  in its way too ([scene.rs](../crates/sjk-viewer/src/ragdoll/scene.rs)). Each stands
+  where its trajectory puts it at the step's own moment, read from the first snapshot
+  at or after that moment, so every client places it alike. A point lying on a mover
+  goes with it (a lift takes the body up, a train along, a turning platform round) and
+  keeps the mover's speed when it leaves it; a mover that moves into a point pushes it
+  along (a closing door shoves the body). A sleeping body wakes when a mover it lies on
+  starts, or one comes into it.
+- **The model:** the player's own model is drawn posed by it
+  ([skin.rs](../crates/sjk-viewer/src/ragdoll/skin.rs)): the `_humanoid` skeleton is cut
+  into eleven rigid parts (pelvis, chest, head, upper arms, forearms, thighs, shins),
+  each turned as the points it spans, each hung from its parent at the model's own
+  joint, so a model of any proportions stays in one piece. The saber, the hat and cape
+  and the other bolts follow the posed bones. A model without the stock skeleton is
+  drawn as animated.
+- **The camera:** behind the body's pelvis, turned by the mouse (as the Hax's hacker's).
+  Getting up gives the view back as it was.
+- **The real body:** the game server knows nothing of it, so the player's player stays
+  there: while limp, the client walks it to where the ragdoll lies (its own user
+  commands, running far off, walking near, stopping within 12 units), so that the
+  player gets up there. A limp player sends no button and cannot attack. Players on
+  stock clients see a player walking about.
+- **Getting up:** `toy_ragdoll` again; or at once when the player is hurt ("Ouch! You
+  got up"), dies, spectates, is in a duel or carries a flag. Nobody goes limp in a duel
+  ("No ragdoll in a duel"), with the flag, while spectating or dead, or in a [Hax](#hax)
+  hack.
+- **Everyone sees the same fall:** no pose is ever sent. The faller's client relays
+  one start event to each SJK player on the server through the hub's
+  [toy relay](hub-chat.md#toy-relay), one every 35 ms: `fall_<moment>_<x>_<y>_<z>_<vx>_<vy>_<vz>_<yaw>`,
+  the game server time it began, the origin, speed (whole units) and yaw (degrees).
+  Every client runs the same simulation from it, in fixed 16 ms steps of the game
+  server's clock (the turn from a table of whole degrees, plain arithmetic, so every
+  client gets the same numbers), and a client that hears it late runs the steps it
+  missed at once: the body is where the faller sees it. A player who comes onto the
+  server during a fall (as the hub's looks tell) is told too. Getting up relays
+  `up_<moment>`; a client that missed it lets the ragdoll go when the faller dies,
+  respawns, leaves, or their real body stays more than 320 units from it for 3
+  seconds. On a game server, every SJK client keeps its relay poll open for this. A
+  sender counts only when the game shows the name they claimed, and never one blocked
+  here. Without the hub (`cl_identity 0`) nobody else sees the fall.
+- **The sounds:** going limp plays a flatline (`sound/sjk/ragdoll/flatline.wav`, two
+  monitor beeps then the long tone, SJK's own, made by
+  [ragdoll_assets.py](../scripts/ragdoll_assets.py)), to the player and at the body for
+  the others; a PK3 that has the same path replaces it. Since 25/10/2026 every part of
+  the body is heard on its own, as in the sandbox games
+  ([sounds.rs](../crates/sjk-viewer/src/ragdoll/sounds.rs)): the trunk, the head and
+  each arm and leg knock when they hit the world (110 units a second into it, 150 for a
+  limb), each at most every 120 ms and at most three parts of a body in a frame, louder
+  the harder (a limb a quarter quieter). A knock is two sounds at once: the flesh (the
+  trunk the game's body falls, `sound/player/bodyfall_human1.mp3` to `3`, or slams from
+  420 units a second, `sound/effects/body_slam1.mp3`, `2`; a limb or the head the melee
+  punches, `sound/weapons/melee/punch1.mp3` to `4`, a limb's hard one the kicks,
+  `kick1.mp3` to `5`, the head's `sound/effects/thud.mp3`) and what it hit: the
+  footstep of its material (stone, metal, wood, grass, sand, snow, mud, gravel,
+  carpet..., the footsteps' own families and name guess, a hard knock the run's). A part
+  dragged along a surface faster than 120 units a second scrapes on it (its footsteps,
+  quiet, at most every 220 ms a body).
+
+The icon (a limp figure slumped against a wall) is drawn by the same script. World shots:
+`world_shot::ragdoll_shots::ragdoll_on_a_demo` (with `SJK_TEST_DEMO`). See
+[ragdoll.rs](../crates/sjk-viewer/src/ragdoll.rs).
+
+## Drone
+
+The Drone (Sol's idea, 24/10/2026, grown from Slash's Peek work in #199) makes the free
+camera and Peek a toy: a little training remote, Jedi Academy's own seeker ball
+(`models/items/remote.md3`, drawn 2.2 times its size), that every other SJK player on
+the server sees fly, the pilot's name over it (white, shadowed, within 2,400 units and
+not behind a wall), coming out with the game's remote hiss.
+
+- `freecam` (the detached free camera, [status.md](status.md#detached-free-camera)) flies the drone: it is where
+  the camera is, turned the way it looks.
+- `peek` ([timed player peek](#timed-player-peek)) sends it to a player: it hovers
+  where the peeking camera stands, behind them and above (`peek::behind`).
+
+Both commands, their binds and their quick wheel choice are unchanged; they fly the
+drone whatever the switch. The switch, `toy_drone` (a bind, the quick wheel's Toys page,
+Collection > Toys, "Peek me"), is the consent to be peeked: on a server `peek` refuses a
+player whose look does not show the toy ("has not let drones follow them"), and a peek
+under way ends as soon as the watched player turns it off ("Name sent your drone away":
+their client relays `away` to the pilot at once, and again at each repeat of a drone
+watching them while it is off; failing that, the pilot's client ends it when their look
+shows it off, "Your drone was sent away").
+The watched player, switch on, reads who watches as each drone comes ("Name's drone is
+watching you"). It stays as last switched, across maps, servers and restarts
+(`cl_toyDrone`, archived). In a local game no look is shared, so anyone may be peeked
+and nobody sees a drone.
+
+No game server knows of it. The pilot's client tells every other SJK player where the
+drone is through the toy relay (`PROTOCOL.md`, "Toy relay";
+[hub-chat.md](hub-chat.md#toy-relay)): `fly_<x>_<y>_<z>_<yaw>` (whole units, degrees)
+while the camera flies, `peek_<slot>` while it watches a player, `land` when it is put
+away. One event goes every 50 ms, to the players in turn: a player hears the drone's
+place again once it moved 2 units or turned 3 degrees, or every second while it holds
+still; so with two players each hears of it twenty times a second at most, with ten
+twice. A drone not heard of for 3 seconds goes. Each client glides the drones it shows to
+the latest place (and, for a peek, finds the place behind the watched player itself from
+what it shows of them), so they move smoothly between events. The pilot's own drone is
+not drawn on their screen (it is their camera). Players on stock clients see nothing.
+The icon (a training remote hovering) is drawn by `scripts/drone_assets.py`. See
+[drone.rs](../crates/sjk-viewer/src/drone.rs).
 
 ## Holstered saber hilts
 
@@ -4226,7 +4425,10 @@ tab (also the Profile page's See the collection), where owned skins are equipped
 unequipped and any is previewed on the player's own saber
 ([sjk-ui.md](sjk-ui.md#collection)).
 
-A skin brings its own sounds, heard for each player wearing it, over the stock ones,
+A player may choose other saber sounds than their skin's (`cg_saberSounds`, Profile >
+Saber > Sounds: follow the shader, the stock sounds, or any owned shader's; every SJK
+player hears the choice, [unlockables.md](unlockables.md#saber-sounds)); what follows
+holds for the set they are heard with. A skin brings its own sounds, heard for each player wearing it, over the stock ones,
 which keep playing (the skin's sound goes on a channel of its own, so that it does not
 cut the stock one), or, with `s_saberSkinSounds 2` (Settings > Sound > Blade skin
 sounds: Only skin; 1, With normal, is the default), in their place, or, with
@@ -4355,9 +4557,10 @@ Illuminate holocron's picture. Its gold dot marks a lit holocron (the client's o
 state; no cvar holds it). Since 16/10/2026 the default page also has the
 [Cardboard box](#cardboard-box) (`toy_box`, marked while the player is in it), and
 since 17/10/2026 [Order 66](#order-66) (`toy_order66`, marked while it is on, then
-Execute Order 66, `order66`), and since 21/10/2026 the [Hax](#hax) (`toy_hax`, marked
-while it is on); a wheel saved before keeps its Toys page as it was, and gains them from
-Add a choice, Toys.
+Execute Order 66, `order66`), since 21/10/2026 the [Hax](#hax) (`toy_hax`, marked
+while it is on), and since 23/10/2026 the [Ragdoll](#ragdoll) (`toy_ragdoll`, marked
+while the player is limp); a wheel saved before keeps its Toys page as it was, and gains
+them from Add a choice, Toys.
 
 ### GIF wheel
 

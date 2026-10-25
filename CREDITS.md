@@ -60,6 +60,16 @@ includes:
   executes the order and blows apart into flying pieces, or confetti;
 - the Hax, a meme toy: hold Use on another player who has it on to hack them
   with the siege hack bar, then steer them for a few seconds;
+- the Ragdoll, a meme toy: the body goes limp and falls where physics takes it,
+  every SJK player seeing the same fall from one relayed start (23/10/2026), carried
+  by lifts and pushed by doors, each part heard as flesh and as what it hits
+  (25/10/2026);
+- the Drone toy: the free camera and Peek fly a training remote other SJK players see,
+  peeking only players who switched it on (24/10/2026, after Slash's #199);
+- a macOS build for Apple Silicon Macs, drawn through Metal and built by GitHub with
+  every release, unsigned and experimental (24/10/2026);
+- announcements from the SJK team in SJK chat, and contributor reward rounds: who was
+  rewarded and why, and a window to Claim one's own (25/10/2026);
 - end-to-end encrypted whispers: whispers between SJK players sealed to the
   recipient's key and carried by the SJK hub, which cannot read them
   (22/10/2026);
@@ -101,6 +111,9 @@ includes:
   at the shop's price, a Holo or Solar one at half, the card kept, and a button under a
   held blade card on the Cards tab that leads to its shader (to the Forge's Craft while
   the player lacks it);
+- saber sounds of your choice (23/10/2026, after Nib's idea): the Saber tab's Sounds row
+  picks the sounds apart from the saber shader (follow it, stock, or an owned shader's),
+  with a preview, sent with the look so every SJK player hears them;
 - perk marks on cards (21/10/2026, Sol's request): a badge on the tile for each perk
   (a lightsaber, the Solar sun, a smith's hammer), the marks up close and before each
   perk's line on the hover card;
@@ -277,6 +290,15 @@ includes:
 - Discord status (`cl_discordPresence`): the player's Discord profile showing the menu
   screen, or the server, map, mode, team and players, through the Discord app's
   local pipe;
+- chat sounds by kind (23/10/2026, after Turin's and Nib's ideas): public chat, team chat,
+  private messages and the SJK chat each with a switch, a sound picked from the game's
+  and SJK's, and a Play button, and a taskbar flash for a private message while the
+  window is away;
+- emotes while typing (23/10/2026, after Rollembones' idea): a player typing keeps their
+  emote until they move or attack (`cg_emoteTypingKeep`), and alt-tabbing out always
+  silences your emote's music;
+- chat name actions (23/10/2026, after Bishop's and Sanjisan's ideas): a click on a
+  player's name in the chat pins their card, to Whisper or Block them;
 - SJK Alpha (19/10/2026), the first collection of cards: the Mythical rarity, the
   Credits and Meme kinds, and card 1, "Bishop", honouring the author of JKR (art by
   Sol, AI-assisted: a rusted helmet portrait).
@@ -286,7 +308,7 @@ includes:
 Creyon and Lumaya wear the SJK team's Early Contributor medal, shown on their
 cards of the in-game credits page.
 
-Creyon ([Creyon94](https://github.com/Creyon94)), contributor and tester, has 54
+Creyon ([Creyon94](https://github.com/Creyon94)), contributor and tester, has 55
 pull requests merged into SJK, most of them bringing SJK in line with EternalJK
 ([all of them](https://github.com/Sol-Vulpes/SJK/pulls?q=is%3Apr+author%3ACreyon94)):
 
@@ -348,6 +370,9 @@ pull requests merged into SJK, most of them bringing SJK in line with EternalJK
   his review rounds 15 to 22 after it (every effect in 3D, richer mythicals, faster
   loading);
 - #192 normal blades in duels (`cg_duelStockBlades`), each in its owner's colour;
+- #191 signature blades without the bright rim at the tip or hard straight edges round their
+  effects, with their GPU cost measured and trimmed; at the merge the bent-picture margin is
+  added only on frames with a haze or lens, and skinned blades look their skin up once a pixel;
 - #102 a formatting fix that unblocked every pull request's checks.
 - the Saber ideas page, whose concepts became the Tidal, Circuit, Aurora, Echo, Nebula,
   Cinder, Venom, Sakura and Firefly blades, and the twelve that followed (Slate, Amber,
@@ -358,7 +383,7 @@ pull requests merged into SJK, most of them bringing SJK in line with EternalJK
   its next seven the Sketch, Hourglass, Fiber Optic, Serpent, Monarch, Phoenix and Quantum
   blades, and its last three the Comic, Quicksilver and Obsidian Edge blades.
 
-Lumaya ([lumayaa](https://github.com/lumayaa)), contributor, has 51 pull requests
+Lumaya ([lumayaa](https://github.com/lumayaa)), contributor, has 52 pull requests
 merged into SJK
 ([all of them](https://github.com/Sol-Vulpes/SJK/pulls?q=is%3Apr+author%3Alumayaa)):
 
@@ -465,8 +490,11 @@ merged into SJK
   opt-in MP4 through Windows Media Foundation (`cl_sjkChatVideo`, off) instead of OpenH264.
 - #166 Shift plus the console key opens to `con_height` and Shift+Escape a quarter screen;
   made an option at the merge (`con_shiftHeight`, off, EternalJK's heights by default).
+- #195 (with #196) the wall-grab camera no longer comes loose on stock servers when a snapshot
+  catches up, JA+'s free look kept; `cg_wallGrabLock` (off) locks it there too and faces the
+  wall. At the merge the facing runs only with the option on.
 
-Lukas ([LukasMoudry](https://github.com/LukasMoudry)), contributor, has 17 pull requests
+Lukas ([LukasMoudry](https://github.com/LukasMoudry)), contributor, has 18 pull requests
 merged into SJK
 ([all of them](https://github.com/Sol-Vulpes/SJK/pulls?q=is%3Apr+author%3ALukasMoudry)):
 
@@ -504,8 +532,10 @@ merged into SJK
 - #179 `cl_holocronNotifications`: the card a holocron found in play gives is off, shown after
   a private duel or always, duels included; the holocron still waits for the game menu. At the
   merge a card that comes during a duel waits for the duel's end instead of being dropped.
+- #198 "Too many open files" after a long session: the Profile menu's model icons, cosmetics and
+  Force templates let go of the previous map's game files (its PK3 reopening part held back).
 
-Slash ([JoFSlash](https://github.com/JoFSlash)), contributor, has 24 pull requests merged
+Slash ([JoFSlash](https://github.com/JoFSlash)), contributor, has 26 pull requests merged
 into SJK ([all of them](https://github.com/Sol-Vulpes/SJK/pulls?q=is%3Apr+author%3AJoFSlash)):
 
 - #114 Tab completes the cfg file argument of `exec`, `execq`, `writeconfig` and `write`
@@ -554,6 +584,11 @@ into SJK ([all of them](https://github.com/Sol-Vulpes/SJK/pulls?q=is%3Apr+author
 - #187 an emplaced gun turns to where its gunner looks, stand and handles with it, barrels held
   to 40 degrees down, and keeps its aim after the gunner leaves.
 - #189 a smaller chat sender card that waits for the pointer, sized by `cg_chatCardScale`.
+- #200 encrypted whispers' safety code made from each key's own fingerprint (60 digits, as
+  Signal's safety numbers), after Slash found that the hub could make the 12-digit code match.
+
+His Peek work in #199 (closed 24/10/2026, not merged) shaped the Drone toy: a player is
+asked before being peeked, told who watches, and can end it.
 
 Milamber ([Milamber0](https://github.com/Milamber0)), contributor, has 3 pull requests merged
 into SJK ([all of them](https://github.com/Sol-Vulpes/SJK/pulls?q=is%3Apr+author%3AMilamber0)):
@@ -583,6 +618,18 @@ palette with pink as its main colour, light purple and white mist, afterimages m
 falling blossoms like the Spectral's, and a branch with a flower where the blade starts
 (and one day a wooden hilt). Sol built it as the Varykino Blossom, a Mythical saber shader
 (blade 166, 21/10/2026), with all of it but the hilt, which waits for custom hilts.
+
+Turin, a player, asked for private messages to be heard with the public chat sounds off:
+Sol built chat sounds by kind, each with its own sound (23/10/2026).
+
+Rollembones, a player, asked for emotes to stay on while typing: Sol built it as
+Typing keeps emote in Settings > Sound > Emotes (23/10/2026).
+
+Sanjisan, a player, asked to whisper a player by clicking their name in the chat: Sol
+built it as the pinned chat card's Whisper button (23/10/2026).
+
+Nib, a player, asked to choose the saber sounds apart from the saber shader (18/10/2026,
+and hub report #109): Sol built it as the Saber tab's Sounds row (23/10/2026).
 
 ## Tools
 

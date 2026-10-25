@@ -232,7 +232,7 @@ vec3 r8_vol(vec3 ro, vec3 rd, float px){
     float R = 1.0 + 2.8*f;
     float yb = 1.2 + 3.0*f;
     vec3 h = rayAt(ro, rd, yb);
-    if (h.z > 0.0) fx += amb*halo(abs((length(h.xy) + 1e3*behindBlade(ro, rd, h.z)) - R), 0.15 + 0.5*f)*(1.0 - f)*0.35*ex_gape();
+    if (h.z > 0.0) fx += amb*halo(hideD(abs(length(h.xy) - R), behindBlade(ro, rd, h.z)), 0.15 + 0.5*f)*(1.0 - f)*0.35*ex_gape();
   }
   // acid: glowing drops sliding down the outside of the gullet and falling
   for (int i = 0; i < 8; i++){
@@ -264,7 +264,7 @@ vec3 r8_vol(vec3 ro, vec3 rd, float px){
   if (uClash > 0.01){
     float a = 1.0 - uClash;
     vec3 h = rayAt(ro, rd, L*0.6);
-    if (h.z > 0.0) fx += amb*halo(abs((length(h.xy) + 1e3*behindBlade(ro, rd, h.z)) - 1.0 - 7.0*a), 0.22 + 0.3*a)*1.6*uClash;
+    if (h.z > 0.0) fx += amb*halo(hideD(abs(length(h.xy) - 1.0 - 7.0*a), behindBlade(ro, rd, h.z)), 0.22 + 0.3*a)*1.6*uClash;
     float dc = rayPtRaw(ro, rd, vec3(0.0, L*0.6, 0.0), tq);
     fx += amb*halo(abs(dc - 1.0 - 5.0*a), 0.3 + 0.4*a)*0.7*uClash + amb*halo(dc, 1.5)*pow(uClash, 2.0)*1.2;
     fx += amb*halo(max(d - ex_w(ys), 0.0), 1.2)*uClash*0.6;

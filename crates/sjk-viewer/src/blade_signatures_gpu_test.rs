@@ -5,7 +5,8 @@
 //! edge). With `SJK_SIGNATURE_PREVIEW` set to a folder, each sheet is saved there as
 //! `<id>.png`; `SJK_SIGNATURES` (ids, comma-separated) renders only those, and
 //! `SJK_SIGNATURE_ORBIT` set renders five views from a camera moving round it instead (to check
-//! that its effects stay with the blade as the view changes); `SJK_SIGNATURE_MORE` set adds
+//! that its effects stay with the blade as the view changes; `tip` looks down the blade's length
+//! instead, at its tip); `SJK_SIGNATURE_MORE` set adds
 //! three moments: just after it is out, half a second after a clash and while it goes out.
 use super::*;
 use wgpu::util::DeviceExt;
@@ -277,14 +278,27 @@ fn every_signature_draws_its_blade_and_nothing_at_the_edge() {
                 let yaw = [0.0f32, 0.6, 1.2, 1.8, 0.3][index];
                 let lift = [0.0f32, 12.0, 0.0, 45.0, 85.0][index];
                 let reach = [52.0f32, 52.0, 52.0, 52.0, 28.0][index];
-                let eye = glam::Vec3::new(reach * yaw.sin(), -reach * yaw.cos(), lift);
-                let m =
-                    glam::camera::rh::proj::directx::perspective(
-                        0.75,
-                        WIDTH as f32 / HEIGHT as f32,
-                        1.0,
-                        400.0,
-                    ) * glam::camera::rh::view::look_at_mat4(eye, glam::Vec3::ZERO, glam::Vec3::Z);
+                let mut eye = glam::Vec3::new(reach * yaw.sin(), -reach * yaw.cos(), lift);
+                let mut at = glam::Vec3::ZERO;
+                // Round 23 review (`SJK_SIGNATURE_ORBIT=tip`): down the blade's length, where
+                // players saw a box round the tip (Obsidian Edge): the first three from just
+                // beyond the tip looking back at it, the last two from behind the hilt.
+                if orbit.as_deref() == Some("tip") {
+                    let aside = [3.0f32, 1.5, 0.6, 4.0, 1.0][index];
+                    let (height, look) = if index < 3 {
+                        (18.0 + [26.0, 10.0, 5.0][index], 18.0)
+                    } else {
+                        (-22.0 - 14.0, 18.0)
+                    };
+                    eye = glam::Vec3::new(aside, -aside * 0.5, height);
+                    at = glam::Vec3::new(0.0, 0.0, look);
+                }
+                let m = glam::camera::rh::proj::directx::perspective(
+                    0.75,
+                    WIDTH as f32 / HEIGHT as f32,
+                    1.0,
+                    400.0,
+                ) * glam::camera::rh::view::look_at_mat4(eye, at, glam::Vec3::Z);
                 let mut cam = m.to_cols_array().to_vec();
                 cam.extend_from_slice(&[eye.x, eye.y, eye.z, 0.0]);
                 let buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {

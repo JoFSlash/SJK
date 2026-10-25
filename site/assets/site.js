@@ -107,7 +107,7 @@ function latestRelease(releases) {
   return published.find((r) => !r.prerelease) || published[0] || null;
 }
 
-/** Download asset for a platform ("windows-x64" or "linux-x64"). */
+/** Download asset for a platform ("windows-x64", "linux-x64" or "macos-arm64"). */
 function assetFor(release, platform) {
   return (release.assets || []).find((a) => a.name.endsWith(`-${platform}.zip`)) || null;
 }
@@ -142,10 +142,11 @@ function enhanceDownload(release) {
   const corner = document.getElementById("version");
   if (corner) corner.textContent = `Sol JK ${version}`;
   if (files) {
-    const links = ["windows-x64", "linux-x64"]
+    const labels = { "windows-x64": "Windows x64", "linux-x64": "Linux x64", "macos-arm64": "macOS Apple Silicon (experimental)" };
+    const links = Object.keys(labels)
       .map((p) => [p, assetFor(release, p)])
       .filter(([, a]) => a)
-      .map(([p, a]) => `<a href="${escapeHtml(a.browser_download_url)}">${p === "linux-x64" ? "Linux x64" : "Windows x64"}</a>`);
+      .map(([p, a]) => `<a href="${escapeHtml(a.browser_download_url)}">${labels[p]}</a>`);
     links.push(`<a href="${escapeHtml(release.html_url)}">all files &amp; checksums</a>`);
     files.innerHTML = links.join(" · ");
     files.hidden = false;

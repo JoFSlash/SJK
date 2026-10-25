@@ -588,6 +588,11 @@ impl Hax {
         }
     }
 
+    /// Whether the player is in a hack, as hacker or hacked (the Ragdoll waits).
+    pub(crate) fn busy(&self) -> bool {
+        !matches!(self.role, Role::Idle)
+    }
+
     /// The slot the player steers, while steering.
     fn steering(&self) -> Option<u8> {
         match self.role {
@@ -736,13 +741,16 @@ impl GpuState {
 
     /// The frame's toy logic: the relay's events, the hack under way, the steering's end,
     /// the hack bar and the hacking sound.
-    pub(crate) fn update_hax(&mut self, toy_events: &[sjk_identity::ToyEvent]) {
+    pub(crate) fn update_hax(
+        &mut self,
+        toy_events: &[sjk_identity::ToyEvent],
+        events: &[sjk_identity::ToyEvent],
+    ) {
         let Some(session) = self
             .live_session
             .as_ref()
             .filter(|session| !session.is_local())
         else {
-            crate::player_identity::set_relay_listen(false);
             self.end_hax_role();
             self.hax.leave();
             self.hud.set_toy_hack(None);
@@ -754,8 +762,6 @@ impl GpuState {
             self.hax.leave();
             self.hax.server = Some(server);
         }
-        crate::player_identity::set_relay_listen(self.hax.on);
-        let events = crate::player_identity::take_relay_events(Some(server));
         let Some(session) = self.live_session.as_ref() else {
             return;
         };

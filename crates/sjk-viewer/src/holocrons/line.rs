@@ -100,6 +100,7 @@ mod tests {
                 own,
                 find: None,
             }),
+            official: None,
         }
     }
 

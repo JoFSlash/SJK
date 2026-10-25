@@ -49,6 +49,9 @@ CANONICAL_TEXTS = {
     "Apache-2.0/MIT": "Apache-2.0",
     "MIT/Apache-2.0": "Apache-2.0",
     "MPL-2.0": "MPL-2.0",
+    # The macOS bindings (objc2, block2, dispatch...) ship no license file.
+    "MIT": "MIT",
+    "Zlib OR Apache-2.0 OR MIT": "Apache-2.0",
     "BSL-1.0": "BSL-1.0",
 }
 
@@ -103,10 +106,23 @@ def license_text(entries, name="SJK"):
 def instructions(platform, revision, name="SJK", repository=DEFAULT_REPOSITORY, version=None,
                  profile="SJK", client="sjk", server="sjk-server"):
     suffix = ".exe" if platform == "windows-x64" else ""
-    requirements = ("Windows 10/11 x64 and a working graphics driver. The MSVC runtime is statically linked."
-                    if suffix else
-                    "Linux x64 with glibc 2.35+, ALSA, Wayland/X11 libraries and a Vulkan or OpenGL driver.\n"
-                    f"If your archive extractor drops permissions: chmod +x {client} {server}")
+    requirements = {
+        "windows-x64": "Windows 10/11 x64 and a working graphics driver. The MSVC runtime is statically linked.",
+        "linux-x64": "Linux x64 with glibc 2.35+, ALSA, Wayland/X11 libraries and a Vulkan or OpenGL driver.\n"
+                     f"If your archive extractor drops permissions: chmod +x {client} {server}",
+        # Not signed with an Apple Developer ID: Gatekeeper blocks the programs until
+        # the player allows them once.
+        "macos-arm64": "macOS 11+ on Apple Silicon (M1 or later); the game draws through Metal.\n"
+                       "The programs are not signed by Apple, so macOS blocks them at first. In Terminal,\n"
+                       "in the folder you extracted them to, run once:\n"
+                       f"  xattr -d com.apple.quarantine {client} {server}\n"
+                       f"  chmod +x {client} {server}\n"
+                       "(or open System Settings > Privacy & Security and choose Open Anyway).\n"
+                       "SJK also looks inside the Mac edition's app bundle in Steam's library. If it is\n"
+                       "not found, extract into a GameData folder holding base/ copied from a Windows\n"
+                       "installation (assets0.pk3 through assets3.pk3).\n"
+                       "macOS builds are experimental: they have not been played on a Mac yet.",
+    }[platform]
     label = f"{name} {version}" if version else f"{name} playtest build"
     return f"""{label} - {platform}
 Source revision: {revision}
@@ -184,7 +200,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--source", type=Path, required=True)
     parser.add_argument("--target", required=True)
-    parser.add_argument("--platform", choices=("linux-x64", "windows-x64"), required=True)
+    parser.add_argument("--platform", choices=("linux-x64", "macos-arm64", "windows-x64"), required=True)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--smoke-check", action="store_true")
     # Release builds name their files after the product and version and point the
@@ -211,12 +227,17 @@ def main():
     suffix = ".exe" if args.platform == "windows-x64" else ""
     binaries = [source / "target" / args.target / "release" / (name + suffix)
                 for name in (args.client_bin, args.server_bin)]
+    # macOS disks ignore case by default: a program named `sjk` beside the `SJK`
+    # client folder takes its name, and the client falls back to per-user storage.
+    client = args.client_bin
+    if args.platform == "macos-arm64" and client.lower() == args.profile_dir.lower():
+        client += "-client"
     with zipfile.ZipFile(package, "w", zipfile.ZIP_DEFLATED, compresslevel=9) as archive:
-        for binary in binaries:
-            add_file(archive, binary, binary.name, executable=True)
+        for binary, packaged in zip(binaries, (client, args.server_bin)):
+            add_file(archive, binary, packaged + suffix, executable=True)
         archive.writestr(text_name("README", args.name),
                          instructions(args.platform, revision, args.name, args.repository, args.version,
-                                      args.profile_dir, args.client_bin, args.server_bin))
+                                      args.profile_dir, client, args.server_bin))
         fonts = source / "crates/sjk-viewer/assets/fonts"
         # The copyright notice leads the file.
         notices = [(f"{args.name}/NOTICE", (source / "NOTICE").read_bytes()),
@@ -237,7 +258,7 @@ def main():
         "binaries": {p.name: hashlib.sha256(p.read_bytes()).hexdigest() for p in binaries},
     }, indent=2) + "\n", encoding="utf-8")
     if args.smoke_check:
-        smoke_check(package, args.platform, source, args.profile_dir, args.client_bin, args.server_bin,
+        smoke_check(package, args.platform, source, args.profile_dir, client, args.server_bin,
                     args.name)
     source_zip = output / f"{stem}-source.zip"
     subprocess.run(["git", "-c", "core.autocrlf=false", "archive", "--format=zip", f"--prefix={stem}/",

@@ -41,6 +41,14 @@ pub(super) fn register(shell: &mut sjk_shell::Shell) -> Result<(), sjk_shell::Co
             crate::hax::COMMAND,
             "Toy: Hax on or off (hold +use on a player who has it on to hack them and steer them)",
         ),
+        (
+            crate::ragdoll::COMMAND,
+            "Toy: go limp as a ragdoll, or get up (other SJK players see the same fall)",
+        ),
+        (
+            crate::drone::COMMAND,
+            "Toy: Drone on or off (on, players may peek at you; freecam and peek fly a drone others see)",
+        ),
     ] {
         shell.commands.register(name, help, |_| {
             Err(sjk_shell::CommandError::Handler(

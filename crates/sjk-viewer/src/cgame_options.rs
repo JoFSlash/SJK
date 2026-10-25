@@ -41,7 +41,11 @@ pub(crate) fn register(cvars: &mut CvarRegistry) -> Result<(), sjk_shell::CvarEr
             0,
             "Clean body colours and suppress repeated messages",
         ),
-        ("cg_chatSounds", 1, "Master chat notification switch"),
+        (
+            "cg_chatSounds",
+            1,
+            "Master chat notification switch: 0 silences every chat sound, 2 gives team chat and private messages distinct default sounds (EJK)",
+        ),
         (
             crate::chat::reply::REMEMBER_CVAR,
             0,
@@ -153,14 +157,6 @@ pub(crate) fn scope_style(console: Option<&ViewerConsole>) -> i64 {
 /// Mask and rotating-insert visibility used directly by the GPU quad builder.
 pub(crate) fn scope_layers(style: i64) -> [bool; 2] {
     [style != 1, style == 0]
-}
-
-/// Master chat-sound switch, composed with the existing independent beep controls.
-pub(crate) fn chat_sounds(console: Option<&ViewerConsole>) -> bool {
-    console
-        .and_then(|c| c.integer_cvar("cg_chatsounds"))
-        .unwrap_or(1)
-        != 0
 }
 
 /// Finite scalar lookup using canonical lowercase names, without temporary strings.

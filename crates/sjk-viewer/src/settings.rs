@@ -695,6 +695,8 @@ impl SettingsMenu {
                         return SettingsResult::OpenImport;
                     } else if matches!(setting.kind(), ValueKind::GameplayFps) {
                         return SettingsResult::OpenGameplayFps;
+                    } else if matches!(setting.kind(), ValueKind::SoundPreview) {
+                        preview_sound(setting.cvar);
                     } else if classic && self.open_dropdown(console, self.selected) {
                         // Classic+: a choice opens its list; nothing changes yet.
                     } else if !self.begin_numeric(console, self.selected) {
@@ -875,6 +877,7 @@ impl SettingsMenu {
                 ValueKind::GameplayFps => crate::gameplay_fps::row_text(console),
                 ValueKind::AssetBrowser => "Browse packs".to_owned(),
                 ValueKind::JofContent => "Choose and download".to_owned(),
+                ValueKind::SoundPreview => PREVIEW_TEXT.to_owned(),
                 ValueKind::Quality => crate::graphics_quality::shown(console).to_owned(),
                 ValueKind::Bool if derived_switch(setting.cvar).is_some() => {
                     let on =
@@ -1037,9 +1040,21 @@ fn choice_value(console: &ViewerConsole, cvar: &str) -> Option<String> {
     console.cvar(cvar).map(CvarValue::as_text)
 }
 
-/// Make choice `value` of row `cvar`: set its cvar.
+/// Make choice `value` of row `cvar`: set its cvar. A chat kind's sound plays as it
+/// is chosen (`chat_sounds.rs`).
 fn set_choice(console: &mut ViewerConsole, cvar: &str, value: &str) {
     console.set_cvar(cvar, value);
+    crate::chat_sounds::choice_made(cvar);
+}
+
+/// What a chat kind's preview row shows.
+const PREVIEW_TEXT: &str = "Play";
+
+/// Play the sound of preview row `row` (`chat_sounds.rs`).
+fn preview_sound(row: &str) {
+    if let Some(kind) = crate::chat_sounds::preview_row_kind(row) {
+        crate::chat_sounds::preview(kind);
+    }
 }
 
 /// Whether `cvar` is one of the renderer's settings: the graphics preset and
@@ -1257,10 +1272,12 @@ mod tests {
             console.bool_cvar(crate::sjk_chat_frame::CONSOLE_CVAR),
             Some(true)
         );
-        // Its sound right under it, on by default.
-        assert_eq!(
-            network.get(hub + 4),
-            Some(&crate::sjk_chat_frame::SOUND_CVAR)
+        // Its sound is with the other chat sounds on Audio (`chat_sounds.rs`), on by
+        // default.
+        assert!(
+            AUDIO
+                .iter()
+                .any(|setting| setting.cvar == crate::sjk_chat_frame::SOUND_CVAR)
         );
         assert_eq!(
             console.bool_cvar(crate::sjk_chat_frame::SOUND_CVAR),
@@ -1269,15 +1286,15 @@ mod tests {
         // Holocron cards default to outside private duels; the ESC-menu pop-up is
         // independent in every mode.
         let holocron_notifications = crate::holocron_popup::NOTIFICATIONS_CVAR;
-        assert_eq!(network.get(hub + 5), Some(&holocron_notifications));
+        assert_eq!(network.get(hub + 4), Some(&holocron_notifications));
         assert_eq!(console.integer_cvar(holocron_notifications), Some(1));
         assert!(rows().any(|setting| setting.cvar == holocron_notifications));
-        // Its GIFs under the sound, on by default.
-        assert_eq!(network.get(hub + 6), Some(&crate::chat_gifs::CVAR));
+        // Its GIFs under the holocron cards, on by default.
+        assert_eq!(network.get(hub + 5), Some(&crate::chat_gifs::CVAR));
         assert_eq!(console.bool_cvar(crate::chat_gifs::CVAR), Some(true));
         // Video clips under the GIFs, off by default (Sol's condition), and only
         // switchable where Windows' decoder exists.
-        assert_eq!(network.get(hub + 7), Some(&crate::chat_gifs::VIDEO_CVAR));
+        assert_eq!(network.get(hub + 6), Some(&crate::chat_gifs::VIDEO_CVAR));
         assert_eq!(console.bool_cvar(crate::chat_gifs::VIDEO_CVAR), Some(false));
         assert_eq!(available_here(crate::chat_gifs::VIDEO_CVAR), cfg!(windows));
         assert!(available_here("cl_sjkChat"));
@@ -1302,6 +1319,7 @@ mod tests {
                     | ValueKind::ImportPage
                     | ValueKind::AssetBrowser
                     | ValueKind::JofContent
+                    | ValueKind::SoundPreview
                     | ValueKind::Quality
             ) {
                 continue;

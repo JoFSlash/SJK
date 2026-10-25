@@ -22,6 +22,7 @@ mod part_icons;
 mod pointer;
 mod rows;
 mod saber;
+mod saber_sounds;
 mod sjk_creator;
 mod sjk_force_templates;
 mod sjk_outfit;
@@ -216,6 +217,8 @@ pub(crate) struct PlayerMenu {
     sjk_hilts: [sjk_view::HiltList; 2],
     /// The SJK UI Saber page's blade: the stock one or a blade skin owned.
     blade_choice: blade_skins::BladeChoice,
+    /// SJK UI Saber page: the saber sounds apart from the shader (`cg_saberSounds`).
+    sound_choice: saber_sounds::SoundsChoice,
     /// The first blade choice the Saber page's row showed last frame (its arrows and
     /// wheel browse from it).
     blade_first: usize,
@@ -281,6 +284,7 @@ impl PlayerMenu {
             sjk: false,
             sjk_hilts: Default::default(),
             blade_choice: blade_skins::BladeChoice::new(),
+            sound_choice: saber_sounds::SoundsChoice::new(),
             blade_first: 0,
             turn: sjk_outfit::Turn::default(),
             creator: sjk_creator::Creator::default(),
@@ -348,6 +352,7 @@ impl PlayerMenu {
     pub(crate) fn follow_blade_skins(&mut self, console: &ViewerConsole) {
         if self.is_sjk() && self.page == ProfilePage::Saber {
             self.blade_choice.follow(console);
+            self.sound_choice.read(console, &self.blade_choice);
         }
     }
 
@@ -512,6 +517,7 @@ impl PlayerMenu {
         self.search_editing = typing;
         self.blade_choice.preview = Some(unlocks);
         self.blade_choice.read(console);
+        self.sound_choice.read(console, &self.blade_choice);
     }
 
     /// Make the draft Dual (not written to the profile), for the world shots.

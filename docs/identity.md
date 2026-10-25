@@ -951,6 +951,14 @@ call): on the Staff page's Overview, beside Verify, their own **Make staff** or
 /v1/staff/staff`, logged and undoable by the owner). It never shows on the creator's
 own player, and admin panel access stays the operator's.
 
+Since 23/10/2026 (Sol's call) what gives, takes back, clears or merges is the creator's
+alone too: medals, unlockables, holocrons, credits and shards, clearing achievements,
+taking a picture down, unlinking and merging keys. The hub refuses those requests from
+other staff (an error `creator_only`); on their Staff page those buttons show dimmed,
+Tab skips them and a press does nothing (`owner_only` in `staff_panel.rs`), and the
+status line says the tab is to read. Other staff keep search, verify, chat moderation,
+picture blocks, log requests and the Logs, Crashes and Chat bans tabs.
+
 The JKR creator (since 22/10/2026) is the creator of JKR, the client SJK is built on
 (Bishop): a flag only the hub operator sets (`sjk-hub jkr-creator KEY_ID`), carried by
 Profiles as `jkr_creator` (absent as false). It is a mark and nothing else: no staff

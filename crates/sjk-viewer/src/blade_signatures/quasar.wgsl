@@ -62,9 +62,11 @@ fn r8_vol(ro: vec3<f32>, rd: vec3<f32>, px: f32) -> vec3<f32> {
         light += white * (exp(-pow(dk / 0.55, 2.0)) * 1.4 + halo(dk, 1.3) * 0.3) * fade;
         let hr = rayAt(ro, rd, ky - 0.9);
         if hr.z > 0.0 {
-            let rr = (length(hr.xy) + 1.0e3 * behindBlade(ro, rd, hr.z));
+            // round 23: hidden behind the blade softly (see hideD in lab.glsl)
+            let rr = length(hr.xy);
+            let seen = 1.0 - behindBlade(ro, rd, hr.z);
             let ring = halo(abs(rr - 1.0), max(0.05, px * 1.2)) * 1.3 + halo(abs(rr - 1.0), 0.35) * 0.25;
-            fx += mix(white, vio, 0.4) * ring * fade * (1.0 - smoothstep(1.0, 2.2, rr)) * 0.9;
+            fx += mix(white, vio, 0.4) * ring * fade * (1.0 - smoothstep(1.0, 2.2, rr)) * 0.9 * seen;
         }
     }
     // ---- the tip jet: blasting on up from the tip, widening, with shock diamonds and knots

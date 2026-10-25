@@ -8,11 +8,18 @@ they are written against is the [sjk-mod](../crates/sjk-mod/src/lib.rs) crate.
 ## Rules
 
 - **Names.** Everything a mod adds starts with its id and a dot: `japlus.guntele`,
-  `japlus.loginServer1`, `jof.commands` (Sol's choice, 11/10/2026). Typing the id
-  and a dot, then Tab, lists the mod's commands. Server commands keep their real
-  names (`amtele`, `amkick`, emotes), so binds made for other clients still work;
-  a mod only completes and describes them. A setting JoF EternalJK already has keeps
-  its name (`cg_antiAmKiss`), so a config made for it still works.
+  `japlus.loginServer1`, `jof.commands` (Sol's choice, 11/10/2026). So does every
+  setting the core keeps for one server family alone (`japlus.awayEmote`, Sol,
+  24/10/2026): the prefix names the subject, not who owns the code. Typing the id
+  and a dot, then Tab, lists the mod's commands. Three kinds of names stay as they
+  are: server commands (`amtele`, `amkick`, emotes), which the server parses, so
+  binds made for other clients still work and a mod only completes and describes
+  them; userinfo and serverinfo keys (`cjp_client`, `cp_pluginDisable`, `jp_cinfo`),
+  which the server reads; and settings shared by every server, even when one
+  family is their only table entry today (`cg_flameThrower`, `amcolor`). A
+  setting's earlier name, or the one JoF EternalJK gives it, stays accepted as an
+  alias (`cg_antiAmKiss` sets `japlus.antiAmKiss`): a config made for it still works
+  and the value is saved under the new name (`ClientMod::old_setting_names`).
 - **Loading.** A mod's commands exist only on the servers it is made for: JA+
   tools on every JA+ server, JoF tools on JoF servers (a JoF server is a JA+ one, so
   both load there). Joining one loads the mod and leaving it unloads it, and Tab
@@ -85,11 +92,43 @@ decimals, as EternalJK's `%f` does.
 | `japlus.autologin` | `autoLogin` | Sends `amlogin <password>` with the password saved for the current server in `japlus.loginServer1-3` / `japlus.loginPass1-3`. A server without a port is `:29070`, and a host name is looked up when the command runs. Like EJK it runs only when asked, not during the intermission, and the passwords are saved as plain text |
 | `japlus.serverconfig` | `serverconfig` | Lists a JA+ server's `jp_cinfo` options (flip kick, roll fix mode, DFA variants, kata, ledge grab, alternate dimension); on jaPRO/TaystJK asks the server |
 | `japlus.plugin [id]` | `pluginDisable` | Lists the fifteen JA+ plugin features as Allowed/Disallowed, or toggles one bit of `cp_pluginDisable` |
-| `japlus.color <r> <g> <b>` | `amColor` | Sets `char_color_red/green/blue`, each 0 to 255; the core `amcolor` does the same on any server ([client.md](client.md)) |
 
 A player is named by client number, by name (colours and case ignored) or by a
 fragment of exactly one name. On a JA+ server the mod also completes JA+'s server
 commands: the admin set, clan commands, duels and emotes, from EternalJK's `gcmds[]`.
+
+| Setting | What it does |
+| --- | --- |
+| `japlus.loginServer1-3`, `japlus.loginPass1-3` | `japlus.autologin`'s servers and passwords |
+| `japlus.antiAmKiss` | [Anti-kiss](#anti-kiss); `cg_antiAmKiss` is its alias |
+
+EternalJK's `amColor` is the core's `amcolor`: the tint is stock JKA userinfo, so it
+works on every server and is not a JA+ tool (an earlier `japlus.color` duplicate was
+removed on 24/10/2026).
+
+### JA+ in SJK
+
+Where each JA+ part lives, so a change to JA+ support starts in one place. The mod
+holds what a player types; the core holds what a JA+ server needs to be played and
+works with `mod_japlus 0` ([What stays in the core](#rules)).
+
+| Part | Where | Name |
+| --- | --- | --- |
+| Admin teleports, auto login, server options, plugin bits | [sjk-mod-japlus](../crates/sjk-mod-japlus/src/lib.rs) | `japlus.*` commands |
+| Anti-kiss | [anti_kiss.rs](../crates/sjk-mod-japlus/src/anti_kiss.rs), bridged by [anti_emote.rs](../crates/sjk-viewer/src/anti_emote.rs) | `japlus.antiAmKiss` |
+| Passwords the console masks | [secrets.rs](../crates/sjk-mod-japlus/src/secrets.rs) | |
+| Server command completion | [server_commands.rs](../crates/sjk-mod-japlus/src/server_commands.rs) | |
+| Away emote on JA+ servers | [away_emote.rs](../crates/sjk-viewer/src/away_emote.rs) (core) | `japlus.awayEmote` |
+| Plugin identity and userinfo (`cjp_client`, `cp_pluginDisable`, `cp_clanPwd`) | [compat_profile.rs](../crates/sjk-client/src/compat_profile.rs) (core) | server keys |
+| Movement and saber prediction | [networking.md](networking.md) (core) | |
+| Flamethrower presentation | [japlus_flame.rs](../crates/sjk-viewer/src/japlus_flame.rs) (core, contract table) | `cg_flameThrower` |
+| Holstered sabers' JA+ contract | [holstered_sabers.rs](../crates/sjk-viewer/src/holstered_sabers.rs) (core, contract table) | `cg_holsteredSaberSupport` |
+| Plugin bit for black blades | [actor_world_submission.rs](../crates/sjk-viewer/src/actor_world_submission.rs) (core) | `cp_pluginDisable` |
+
+The core parts are entries in tables shared by several server families (AGENTS.md,
+no hardcoded special cases), which is why they are not moved into the mod. Settings
+shows the mod's switch and its settings together under Mods > Server mods (Game
+options in classic); the away emote stays beside the SJK one under Gameplay.
 
 Before the mod, `serverconfig` and `pluginDisable` were core commands. A bare
 `serverconfig` is now sent to the server like any unknown command, which
@@ -98,8 +137,9 @@ jaPRO/TaystJK servers answer. TaystJK's completion lists it.
 ### Anti-kiss
 
 [anti_kiss.rs](../crates/sjk-mod-japlus/src/anti_kiss.rs) is JoF EternalJK's
-`cg_antiAmKiss` (`CG_DrawActiveFrame`, `cg_view.c:2635-2640`; SJK #190, Lukas). Archived
-and off by default, under Settings > Gameplay > JA+ protection in every menu style.
+`cg_antiAmKiss` (`CG_DrawActiveFrame`, `cg_view.c:2635-2640`; SJK #190, Lukas), as
+`japlus.antiAmKiss` (EternalJK's name is an alias). Archived and off by default, under
+Settings > Mods > Server mods, after the JA+ tools switch (Game options in classic).
 When another player's `amkiss` puts you in the kiss-victim animation (`BOTH_KISSEE`, in
 the server's player state or the predicted one), it uses Force Push once: one push per
 interaction, so the initiator's animation is not disturbed over and over. Spectators and

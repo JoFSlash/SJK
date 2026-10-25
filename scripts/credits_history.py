@@ -108,6 +108,7 @@ def date(iso):
 PR_PATTERNS = [
     (re.compile(r"^Merge pull request #(?P<n>\d+) from "), "JKR"),
     (re.compile(r"^Merge SJK pull request #(?P<n>\d+) "), "SJK"),
+    (re.compile(r"^Merge pull request #(?P<n>\d+) \("), "SJK"),
     (re.compile(r"^Merge \S+'s PR #(?P<n>\d+) \("), "SJK"),
     (re.compile(r"^Merge JKR #(?P<n>\d+) \("), "JKR"),
     (re.compile(r"^Merge \S+(?: round \d+)? \(PR #(?P<n>\d+)"), "JKR"),

@@ -57,6 +57,12 @@ impl GpuState {
             .as_ref()
             .is_some_and(console::ViewerConsole::is_open);
         let typed = matches!(event.physical_key, PhysicalKey::Code(_));
+        // The SJK team's window takes every key while it shows, over the console too (an
+        // announcement read from the chat page or a command).
+        if self.official.window.is_open() {
+            self.official_key(&event);
+            return;
+        }
         if !console_open && self.text_dialog.is_open() {
             let action = self.text_dialog.handle_key(&event);
             self.apply_dialog_action(action);

@@ -6,6 +6,10 @@
 //! signature with solid parts). The glow pass draws every blade with the shared pipeline, so
 //! it is left out. Prints each signature's median milliseconds per frame, its ratio to stock
 //! and its pipelines' build time. `SJK_SIGNATURES` (ids, comma-separated) measures only those.
+//! `SJK_COST_SCENE` picks the scene: `game` (the default, as above), `close` (only the near
+//! blade, across the view) or `along` (only a near blade seen along its length, its tip
+//! pointing away, as Sol asked for the round 23 review: the views where an effect's ray
+//! march is longest).
 use super::*;
 use wgpu::util::DeviceExt;
 
@@ -158,7 +162,31 @@ fn signature_gpu_cost_against_stock() {
     });
 
     // The scene's blades: 16 players two blades each, then the close one.
-    let blades: Vec<(saber::Blade, [f32; 4])> = {
+    let scene = std::env::var("SJK_COST_SCENE").unwrap_or_else(|_| "game".to_owned());
+    println!("scene {scene}");
+    let blades: Vec<(saber::Blade, [f32; 4])> = if scene == "along" {
+        // The eye just behind and above the hilt, looking down the blade.
+        let forward = (glam::Vec3::new(0.0, 400.0, 40.0) - eye).normalize();
+        vec![(
+            saber::Blade {
+                base: (eye + forward * 18.0 - glam::Vec3::Z * 4.0).to_array(),
+                direction: (forward + glam::Vec3::Z * 0.08).normalize().to_array(),
+                length: 40.0,
+                radius: 3.0,
+            },
+            crate::saber_motion::STILL,
+        )]
+    } else if scene == "close" {
+        vec![(
+            saber::Blade {
+                base: [-14.0, -40.0, 50.0],
+                direction: glam::Vec3::new(0.7, 0.15, 0.7).normalize().to_array(),
+                length: 40.0,
+                radius: 3.0,
+            },
+            crate::saber_motion::STILL,
+        )]
+    } else {
         let swing = [0.9, 1_000.0, 1_000.0, 0.25];
         let clash = [0.0, 0.1, 1_000.0, 1_000.0];
         let mut blades = Vec::new();

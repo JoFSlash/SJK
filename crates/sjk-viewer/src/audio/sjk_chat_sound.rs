@@ -254,14 +254,39 @@ impl GameAudio {
     }
 
     /// Play the SJK chat sound as the game's chat beep plays: beside the listener, at
-    /// full volume under `s_volume`, on its own interface channel (`channel`).
+    /// full volume under `s_volume`, on its own interface channel (`channel`). The
+    /// sound chosen for SJK chat messages plays instead of the made one, and none while
+    /// they are switched off (`chat_sounds.rs`).
     pub(super) fn play_sjk_chat(&mut self, source: SourceId, channel: ChannelId) {
-        self.play_local(HANDLE_KEY, 1.0, source, channel);
+        self.play_chat_kind(crate::chat_sounds::Kind::Sjk, HANDLE_KEY, source, channel);
     }
 
-    /// Play the encrypted whisper's sound, as [`GameAudio::play_sjk_chat`].
+    /// Play the encrypted whisper's sound, as [`GameAudio::play_sjk_chat`]: a private
+    /// message, so the private messages' switch and sound decide.
     pub(super) fn play_encrypted_whisper(&mut self, source: SourceId, channel: ChannelId) {
-        self.play_local(WHISPER_KEY, 1.0, source, channel);
+        self.play_chat_kind(
+            crate::chat_sounds::Kind::Private,
+            crate::chat_sounds::Kind::whisper_default(),
+            source,
+            channel,
+        );
+    }
+
+    /// Play a `kind` message's sound, `default` when its choice is the default.
+    fn play_chat_kind(
+        &mut self,
+        kind: crate::chat_sounds::Kind,
+        default: &str,
+        source: SourceId,
+        channel: ChannelId,
+    ) {
+        use crate::chat_sounds::Route;
+        let key = match self.chat_sounds.route(kind) {
+            Route::Muted => return,
+            Route::Default => default,
+            Route::Sound(key) => key,
+        };
+        self.play_local(key, 1.0, source, channel);
     }
 }
 

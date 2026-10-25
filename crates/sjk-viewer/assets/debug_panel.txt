@@ -24,6 +24,135 @@
 
 # ---- Console & chat ----
 
+[announcements]
+area: Console & chat
+title: SJK team announcements and contributor reward rounds (Claim)
+change: Announcements show in SJK chat (SJK logo, title, Read more card); releases offer update.
+change: Reward rounds list who was rewarded and why; your own reward opens a window with Claim.
+test: debug_announce: a line in the game chat and the card opens. Try debug_announce release / long.
+test: announcement reopens the newest; in the dock and chat page a click on the line opens it.
+test: debug_reward, then back to the main menu: the claim window shows; Claim and Later close it.
+test: In a match, debug_reward: the "Contributor reward waiting" card, the window on game menu.
+test: debug_reward list (and rewards): the round list scrolls with Up, Down and the wheel.
+note: The live hub does not have it yet (hub branch announcements): real rounds need a deploy.
+
+[japlus-names]
+area: Console & chat
+title: JA+ settings renamed to japlus.* (old names still work)
+change: cg_antiAmKiss is japlus.antiAmKiss, cg_awayEmoteJaplus is japlus.awayEmote.
+change: Anti-kiss moved to Settings > Mods, under the JA+ tools switch. japlus.color is gone.
+test: Type japlus. then Tab: antiAmKiss and awayEmote show with the japlus commands.
+test: Type cg_antiAmKiss 1, then japlus.antiAmKiss: it says 1. Restart: it is still 1.
+test: Settings > Mods (SJK) and Game options (classic): Push away kiss attempts under JA+ tools.
+test: Settings > Gameplay: the JA+ away emote row still works and keeps its saved pick.
+test: amcolor 255 0 0 still tints you; japlus.color answers Unknown command.
+
+[safety-code-v2]
+area: Console & chat
+title: Safety code v2: 60 digits, one half per key (Slash, PR #200)
+change: whisper_verify shows 12 groups of five digits in 3 rows: your key's half and theirs.
+change: The hub can no longer make two keys of its own show matching codes on both screens.
+test: Two SJK clients, whisper_verify <name> on both: the same 60 digits, 3 rows of 4 groups.
+test: The rows fit inside the card; Mark verified turns them gold.
+test: A player verified before this version still shows VERIFIED.
+note: A client older than this shows 12 digits, which never match the new code.
+
+[drone-toy]
+area: Gameplay
+title: Drone toy: freecam and peek fly a remote others see
+change: freecam/peek unchanged (binds too) but fly the seeker ball, name over it, for SJK players.
+change: Peek needs consent: the target's Drone switch (toy_drone, wheel Toys, Collection > Toys).
+change: Target reads who watches; switching off sends the drone away (relayed "away").
+test: Two SJK clients on a server. A: freecam and fly: B sees the remote glide, A's name over it.
+test: A: peek B with B's Drone off: "has not let drones follow them". B turns it on: peek works.
+test: While A peeks, B reads "A's drone is watching you" and sees the remote behind them.
+test: B turns toy_drone off: A's view returns, "B sent your drone away"; the remote fades.
+test: Collection > Toys shows six niches, Drone's switch "Peek me" stays on after a restart.
+
+[ragdoll-physics]
+area: Gameplay
+title: Ragdoll: movers carry the body, every part heard on what it hits
+change: Lifts, trains and turning platforms carry the limp body; closing doors push it.
+change: Each part (trunk, head, arms, legs) knocks on its own: flesh + the surface's footstep.
+change: Sliding along the ground scrapes; harder hits are louder.
+test: Go limp on a lift, ride it: the body stays on and rises with it, the camera too.
+test: Go limp standing on a lift that is still, then call it: the body wakes and rides.
+test: Fall down stairs or off a ledge: several knocks, limbs lighter than the trunk.
+test: Fall on metal, then grass or snow: the knocks sound of the floor.
+test: Run and go limp: the body slides and scrapes.
+test: A second SJK client near you sees the body ride the lift the same way.
+
+[ragdoll-toy]
+area: Gameplay
+title: Ragdoll toy: go limp and fall, sandbox style
+change: toy_ragdoll (bind, quick wheel Toys, Collection > Toys) toggles a limp body.
+change: Flatline + game body-fall sounds; camera behind the body; others see the same fall.
+change: Your real body walks to the ragdoll; getting hurt, a duel or the flag gets you up.
+test: Bind a key to toy_ragdoll, press it standing: you crumple, flatline, mouse turns camera.
+test: Run and jump, press it: the body tumbles on; off a ledge it falls down.
+test: Press again: you stand where the body lay, your view as before.
+test: A second SJK client sees the same fall in the same place; a JKA client sees you walk.
+test: Get hit while limp: "Ouch! You got up". In a duel: "No ragdoll in a duel".
+
+[staff-owner-actions]
+area: Menus & settings
+title: Staff page: giving, taking back and merging are the owner's
+change: Non-creator staff see medal/unlock/holocron/credit/clear/merge/unlink dimmed.
+change: Tab skips them, a press does nothing; the hub refuses them too (creator_only).
+test: As Sol: every Staff page button works as before.
+test: As other staff: those buttons dimmed, the tab says it is to read; mute still works.
+
+[emote-typing-keep]
+area: Gameplay
+title: Emotes: typing keeps your emote until you move after
+change: Settings > Sound > Emotes: Typing keeps emote (cg_emoteTypingKeep, default 1).
+change: A player with chat, console or a menu open keeps the emote even if pushed.
+test: Dance, open the chat, get pushed (force push, a mover): still dancing.
+test: Close the chat without moving: still dancing. Walk a step: it ends.
+test: A second SJK client sees the same; with cg_emoteTypingKeep 0 a push ends it.
+
+[emote-alttab-quiet]
+area: Audio
+title: Alt-tab always silences your emote's music
+change: Alt-tabbed or minimised, your emote goes quiet for everyone, even with cg_awayAltTab 0.
+change: cg_awayAltTab now only decides whether the away emote starts.
+test: cg_awayAltTab 0, dance with music, alt-tab: a second SJK client hears it stop.
+test: Come back: the music plays again from where it is. No emote + alt-tab: nothing starts.
+
+[chat-name-actions]
+area: Console & chat
+title: Click a chat name: pinned card with Whisper and Block (Bishop, Sanjisan)
+change: With the chat open, a click on a name pins the sender card; Whisper heads its buttons.
+change: Whisper turns the composer to that player (encrypted when they take it, else tell).
+test: Open chat, click a player's name: the card stays when the pointer leaves it.
+test: Whisper: the composer says To <name>; send: they get it (pink ENCRYPTED if SJK).
+test: Escape closes the card first, then the chat; a click elsewhere closes the card.
+test: Your own name and a player who left show no Whisper.
+
+[saber-sound-pick]
+area: Audio
+title: Saber sounds chosen apart from the shader (Nib's idea, hub #109)
+change: Profile > Saber > Sounds: Follow shader, Stock, or an owned shader's sounds.
+change: cg_saberSounds; sent in the look (saber_sounds) once the hub takes the field.
+test: Profile > Saber: Sounds row under Blade. Step it, Preview plays ignition + hum.
+test: Wear the Storm, pick Void sounds: ignite and swing in game, the Void is heard.
+test: Pick Stock: a skinned blade sounds stock. Follow shader: back to the blade's sounds.
+note: Other players hear it only after the hub change (old hub: they hear the blade's).
+
+[chat-sounds]
+area: Audio
+title: Chat sounds by kind: public, team, private messages, SJK chat (Turin, Nib)
+change: Settings > Sound > Chat sounds: a switch, a sound and a Play button for each kind.
+change: cg_chatBeep 0 no longer mutes tells; cg_privateChatBeep switches them (and encrypted).
+change: cl_privateChatFlash (default 1): a private message flashes the taskbar when away.
+test: Public chat off, Private messages on: public chat silent, a /tell to you still plays.
+test: Pick each sound in a list: it plays as you pick it; Play plays the chosen one.
+test: Private message sound SJK whisper: a tell and an encrypted whisper both play it.
+test: cg_chatSounds 2 with Default sounds: team chat and tells play EJK's switch beeps.
+test: cg_chatSounds 0: no chat sound of any kind; Play still plays (you are choosing).
+test: Alt-tab, get a tell (or encrypted whisper): taskbar flashes; off: no flash.
+note: Unit tests and a Settings world shot only; not heard or flashed in a game window.
+
 [saber-throw-parts]
 area: Rendering & effects
 title: Thrown saber keeps its skin's afterimages and swing parts (Kushina #127)
@@ -146,7 +275,7 @@ test: Send: "To <name>" with their tick and emoji, ENCRYPTED, and the sound on b
 test: reply on their side answers encrypted; tell <name> from the console too.
 test: Stop the hub, whisper: the card asks; Esc sends nothing, Enter sends it through the server.
 test: cl_e2eWhispers 0: whispers go through the server as before, a red "Not private" note under.
-test: whisper_verify <name> on both PCs: same 12 digits. Mark verified: lines say VERIFIED.
+test: whisper_verify <name> on both PCs: same 60 digits. Mark verified: lines say VERIFIED.
 test: Then a new identity on the other PC: your whisper asks first, theirs warns in red.
 
 [sjk-chat-caret]
@@ -907,6 +1036,14 @@ test: With cl_idrive 2: hold C, then SPACE: you jump; let go of SPACE: you crouc
 note: A roll on landing while crouched (PM_CrashLand) is not prevented, in EJK either.
 
 # ---- Menus & settings ----
+
+[profile-vfs-release]
+area: Menus & settings
+title: No 'Too many open files' after many maps (Lukas, PR #198)
+change: Profile's model icons, cosmetics and Force templates drop the old map's game files.
+test: Play a long session: change maps 10+ times, reconnect: the map loads, no mount error.
+test: After a map change, Profile: model icons, cosmetics, Force templates still listed.
+note: Only part 1 merged; the PK3 close-between-reads part is held (asked Lukas why).
 
 [open-all-confirm]
 area: Menus & settings
@@ -1922,6 +2059,17 @@ note: Alt+Tab while holding Tab leaves the board and the hidden HUD up until Tab
 
 # ---- Rendering & effects ----
 
+[blade-tip-edges]
+area: Rendering & effects
+title: Signature blades: no bright tip rim, no hard edges (Creyon, PR #191)
+change: The tip's core is filtered as its shaft; effects fade instead of ending at a line.
+change: Effects area grows only with a haze/lens; skinned blades do one skin lookup a pixel.
+test: Collection, a signature blade close: no bright pixels round the tip, no box past it.
+test: Point a smoke or arc blade (Mortis, Reactor) at the camera: no straight cut edges.
+test: Obsidian Edge in front of a wall, third person: no box round the tip.
+test: Watch the frame rate with several signature blades: no drop vs before.
+note: Not timed on a low-VRAM card.
+
 [demp2-flash]
 area: Rendering & effects
 title: DEMP2 shock flash fades with distance (Slash #125)
@@ -2552,6 +2700,16 @@ test: Turn round with a sound running: it moves to the other ear.
 test: Fire at a wall on your left: the impact plays mostly in the left ear.
 
 # ---- Gameplay ----
+
+[wall-grab-lock]
+area: Gameplay
+title: Wall grabs: stock camera holds, cg_wallGrabLock option (Lumaya, PR #195)
+change: Stock: the wall-grab camera no longer comes loose when a snapshot catches up.
+change: JA+ keeps free look on a wall; cg_wallGrabLock 1 locks it and faces the wall.
+test: Stock server, g_debugMelee 2: hang on a wall, mouse: the view stays held.
+test: JA+/JoF, option off: hang, look left, let go: you kick off where you aimed.
+test: Settings > Advanced > Gameplay: Lock wall-grab camera on: JA+ hang faces the wall.
+note: Untested live: grabs on moving walls.
 
 [atst-camera]
 area: Gameplay

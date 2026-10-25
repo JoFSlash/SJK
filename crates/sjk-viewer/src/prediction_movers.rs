@@ -174,6 +174,21 @@ impl Collider {
         self.rotated = angles != [0.0; 3];
         self.axes = rotation_axes(angles);
     }
+
+    /// The same solid where its trajectories put it at `time`, moved and turned alike
+    /// (the Ragdoll's movers, placed at each step's moment).
+    pub(crate) fn placed_at(&self, time: i32) -> Self {
+        let mut placed = *self;
+        placed.origin = placed.position.position(time);
+        placed.set_angle_time(time);
+        placed
+    }
+
+    /// Whether either trajectory moves it at all (`TR_LINEAR` and on); one that does
+    /// not stands where it was read, whatever the time.
+    pub(crate) fn moves(&self) -> bool {
+        self.position.kind >= TR_LINEAR || self.angular.kind >= TR_LINEAR
+    }
 }
 
 /// Reused solid list plus O(1) ground-entity lookup. A prediction snapshot

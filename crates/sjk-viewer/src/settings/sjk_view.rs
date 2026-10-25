@@ -65,6 +65,8 @@ const NAME_COLUMN: f32 = CONTROL_LEFT - LABEL_X - 30.0;
 const RESET_X: f32 = ROWS_X + ROWS_WIDTH - 22.0;
 /// A field's width, a slider's track and its number.
 const FIELD_WIDTH: f32 = 230.0;
+/// A chat kind's preview button (`chat_sounds.rs`): under half a field, a word wide.
+const PREVIEW_WIDTH: f32 = 120.0;
 const TRACK_WIDTH: f32 = 230.0;
 const NUMBER_WIDTH: f32 = 46.0;
 const TRACK_X: f32 = CONTROL_RIGHT - NUMBER_WIDTH - 18.0 - TRACK_WIDTH;
@@ -382,6 +384,22 @@ impl SettingsMenu {
                     RowControl::Segment { row, index: 0 }.token(),
                 );
             }
+            // A chat kind's preview: a button that plays its chosen sound.
+            ValueKind::SoundPreview => kit::button(
+                &mut self.ui,
+                frame,
+                [
+                    CONTROL_RIGHT - PREVIEW_WIDTH,
+                    middle - kit::CONTROL_HEIGHT * 0.5,
+                    PREVIEW_WIDTH,
+                    kit::CONTROL_HEIGHT,
+                ],
+                &value,
+                false,
+                true,
+                focused,
+                row as u16,
+            ),
             // It opens a page: no list drops from it.
             ValueKind::IdentityPage
             | ValueKind::ImportPage
@@ -822,6 +840,7 @@ impl SettingsMenu {
                     ValueKind::ImportPage => (&["Enter"][..], "choose"),
                     ValueKind::GameplayFps => (&["Enter"][..], "explain"),
                     ValueKind::AssetBrowser | ValueKind::JofContent => (&["Enter"][..], "browse"),
+                    ValueKind::SoundPreview => (&["Enter"][..], "play"),
                     ValueKind::Text => (&["Enter"][..], "type"),
                     _ => (&["Left", "Right"][..], "change"),
                 });

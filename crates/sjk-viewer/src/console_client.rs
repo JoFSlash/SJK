@@ -74,6 +74,10 @@ pub(super) const COMMANDS: &[(&str, &str)] = &[
     ),
     (crate::am_color::COMMAND, crate::am_color::HELP),
     (
+        crate::chat_sounds::PREVIEW_COMMAND,
+        "Play the sound chosen for a kind of chat message: chatsoundpreview <public|team|private|sjk>",
+    ),
+    (
         "reply",
         "Whisper to the last player who whispered to you: reply <message>, or bare to open the chat on it",
     ),
@@ -116,6 +120,26 @@ pub(super) const COMMANDS: &[(&str, &str)] = &[
     (
         crate::unlock_toast::UPDATE_COMMAND,
         crate::unlock_toast::UPDATE_HELP,
+    ),
+    (
+        crate::official::ANNOUNCEMENT_COMMAND,
+        crate::official::ANNOUNCEMENT_HELP,
+    ),
+    (
+        crate::official::REWARDS_COMMAND,
+        crate::official::REWARDS_HELP,
+    ),
+    (
+        crate::official::ANNOUNCE_COMMAND,
+        crate::official::ANNOUNCE_HELP,
+    ),
+    (
+        crate::official::DEBUG_ANNOUNCE_COMMAND,
+        crate::official::DEBUG_ANNOUNCE_HELP,
+    ),
+    (
+        crate::official::DEBUG_REWARD_COMMAND,
+        crate::official::DEBUG_REWARD_HELP,
     ),
     (
         crate::quick_wheel::OPEN_COMMAND,
@@ -953,6 +977,7 @@ impl crate::GpuState {
                 let console = self.console.as_mut().ok_or("Console unavailable")?;
                 return crate::am_color::run(console, args);
             }
+            crate::chat_sounds::PREVIEW_COMMAND => return crate::chat_sounds::command(args),
             "pmonly" => {
                 return crate::chat::pm_only::command(
                     self.console.as_mut().ok_or("Console unavailable")?,
@@ -1071,6 +1096,11 @@ impl crate::GpuState {
             crate::holocrons::rehearsal::COMMAND => return self.debug_holocron_command(args),
             crate::cards::rehearsal::COMMAND => return self.debug_open_command(args),
             crate::unlock_toast::UPDATE_COMMAND => return self.debug_update_command(args),
+            crate::official::ANNOUNCEMENT_COMMAND => return self.announcement_command(args),
+            crate::official::REWARDS_COMMAND => return self.rewards_command(),
+            crate::official::ANNOUNCE_COMMAND => return self.announce_command(),
+            crate::official::DEBUG_ANNOUNCE_COMMAND => return self.debug_announce_command(args),
+            crate::official::DEBUG_REWARD_COMMAND => return self.debug_reward_command(args),
             crate::saber_skin_command::COMMAND => return self.saber_skin_command(args),
             crate::console::SJK_CHAT_COMMAND => {
                 if let Some(console) = &mut self.console {

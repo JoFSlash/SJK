@@ -6,10 +6,35 @@
 use super::*;
 use sjk_runtime::EntityId;
 
+/// The players typing in `snapshot` ([`emotes::typing_slots`]): the own player by
+/// `own_typing` (their open chat, console or menu, known here at once), else by their
+/// talk balloon as the others.
+fn typing(enabled: bool, snapshot: &sjk_protocol::Snapshot, own_typing: Option<bool>) -> u64 {
+    let player = &snapshot.player;
+    let own = u8::try_from(player.client_num()).ok().map(|slot| {
+        let balloon = player.entity_flags() & sjk_game_jka::pmove_talk::EF_TALK != 0;
+        (slot, own_typing.unwrap_or(balloon))
+    });
+    emotes::typing_slots(
+        enabled,
+        own,
+        snapshot
+            .entities
+            .iter()
+            .map(|entity| (entity.number(), entity.e_flags())),
+    )
+}
+
 impl GpuState {
     /// Start the emotes received, end those that are over.
     pub(crate) fn update_emotes(&mut self) {
         let received = player_identity::take_emotes();
+        let keep_typing = self
+            .console
+            .as_ref()
+            .and_then(|console| console.bool_cvar(emotes::TYPING_KEEP_CVAR))
+            .unwrap_or(emotes::DEFAULT_TYPING_KEEP);
+        let own_typing = self.talk_button();
         if let Some(vfs) = self.vfs.as_deref() {
             {
                 let mut state = emotes::lock();
@@ -26,6 +51,9 @@ impl GpuState {
                 // until they end or their player moves; none arrive from the hub.
                 Some(demo) => {
                     let world = demo.world();
+                    state
+                        .active
+                        .hold(typing(keep_typing, demo.latest_snapshot(), None));
                     state.active.update(Instant::now(), |slot: u8| {
                         world
                             .entity(EntityId::new(u64::from(slot) + 1))
@@ -130,6 +158,12 @@ impl GpuState {
             blocked &= blocked - 1;
             state.active.stop(slot);
         }
+        // A player typing keeps their emote until they move after (`cg_emoteTypingKeep`).
+        state.active.hold(typing(
+            keep_typing,
+            session.latest_snapshot(),
+            Some(own_typing),
+        ));
         state.active.update(now, position);
     }
 

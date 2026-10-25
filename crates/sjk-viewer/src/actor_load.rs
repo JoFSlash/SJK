@@ -140,6 +140,7 @@ pub(crate) fn build_actor_mesh(
         disintegration: None,
         surfaces,
         limb: None,
+        ragdoll: Default::default(),
     })
 }
 

@@ -70,6 +70,10 @@ pub(super) fn load<'a>(
         model: crate::cardboard_box::MODEL.to_owned(),
         variant: String::new(),
     });
+    appearances.insert(Appearance {
+        model: crate::drone::MODEL.to_owned(),
+        variant: String::new(),
+    });
     // The Profile screen's Holocrons tab: a model per tier and the locked look.
     appearances.extend(crate::holocrons::stage::models().map(|model| Appearance {
         model: model.to_owned(),

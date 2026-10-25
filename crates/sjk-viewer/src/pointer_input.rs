@@ -286,6 +286,11 @@ impl GpuState {
         if !self.text_dialog.is_open() && self.profile_hub_pointer(event) {
             return true;
         }
+        // The SJK team's window, over the console too.
+        if self.official.window.is_open() {
+            self.official_pointer(event);
+            return true;
+        }
         if self
             .console
             .as_ref()

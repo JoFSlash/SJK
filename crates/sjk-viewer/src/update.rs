@@ -27,6 +27,8 @@ const PLATFORM: Option<&str> = if cfg!(all(target_os = "windows", target_arch = 
     Some("windows-x64")
 } else if cfg!(all(target_os = "linux", target_arch = "x86_64")) {
     Some("linux-x64")
+} else if cfg!(all(target_os = "macos", target_arch = "aarch64")) {
+    Some("macos-arm64")
 } else {
     None
 };
@@ -665,6 +667,8 @@ pub(crate) fn open_page(url: &str) {
         std::process::Command::new("cmd")
             .args(["/C", "start", "", url])
             .spawn()
+    } else if cfg!(target_os = "macos") {
+        std::process::Command::new("open").arg(url).spawn()
     } else {
         std::process::Command::new("xdg-open").arg(url).spawn()
     };

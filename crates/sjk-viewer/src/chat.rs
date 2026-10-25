@@ -103,6 +103,9 @@ struct HubLine {
     /// The line is a holocron drop of this tier (`holocrons/line.rs`): in the tier's
     /// colour, a gem before it instead of the verified tick.
     tier: Option<&'static crate::holocrons::Tier>,
+    /// The line is the SJK team's (an announcement or a reward round, `official.rs`):
+    /// "SJK" in the SJK UI's accent gold, no label.
+    official: bool,
 }
 
 /// Bounded incoming history and the currently active unboxed composer.
@@ -124,6 +127,8 @@ pub(crate) struct ChatOverlay {
     ui: MenuCanvas,
     /// The feed's name or card target a press began on, until its release.
     pressed_action: Option<u16>,
+    /// Whose name that press began on, when it began on a name (`chat/card.rs`).
+    pressed_who: Option<card::Who>,
     /// Whose name each feed token is, for the profile card (`chat/card.rs`).
     visible_people: [Option<card::Who>; MAX_VISIBLE],
     /// The profile card on show while the composer is open.
@@ -146,6 +151,9 @@ pub(crate) struct ChatOverlay {
     sjk_seen: Option<u64>,
     /// The reading of the hub (`ChatState::loaded`) whose backlog was marked.
     sjk_epoch: Option<u64>,
+    /// The announcements whose lines the feed has shown (`chat/sjk.rs`): one the service
+    /// put at the chat's end takes the newest message's id, so it is followed by its own.
+    sjk_officials: Vec<u64>,
     /// The serial of the last SJK chat outcome shown.
     sjk_outcome: u64,
     /// The SJK chat's revision, outcome serial and mutes revision last followed.
@@ -235,6 +243,7 @@ impl ChatOverlay {
             notice: "",
             ui: MenuCanvas::with_text_capacity(512),
             pressed_action: None,
+            pressed_who: None,
             visible_people: [None; MAX_VISIBLE],
             card: None,
             mute_request: None,
@@ -248,6 +257,7 @@ impl ChatOverlay {
             emojis: emoji::Emojis::default(),
             sjk_seen: None,
             sjk_epoch: None,
+            sjk_officials: Vec::new(),
             sjk_outcome: 0,
             sjk_mark: None,
             sjk_sound_at: None,
@@ -460,6 +470,14 @@ impl ChatOverlay {
             recipient: None,
         };
         self.push_line(line, server_private);
+    }
+
+    /// Whether the newest line is a server's private message from a player not muted
+    /// here: what flashes the taskbar (`chat_sounds.rs`).
+    pub(crate) fn newest_is_open_private(&self) -> bool {
+        self.lines
+            .back()
+            .is_some_and(|line| line.server_private && !line.muted)
     }
 
     fn push_line(&mut self, line: ChatLine, private: bool) {

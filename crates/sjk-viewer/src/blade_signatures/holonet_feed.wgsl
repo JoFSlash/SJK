@@ -10,8 +10,11 @@
 // the blade, brighter and dimmer, and small flecks of data drift up beside it. No letters or signs
 // are drawn.
 fn holonet_feed_glow0(g: vec3<f32>, b: vec2<f32>, r: f32, px: f32) -> vec3<f32> {
-    let q = vec2(floor(b.x * 6.0), floor(b.y * 1.5 - uTime * 3.0));
-    let on = step(0.5, h21(q)) * smoothstep(0.1, 0.3, fract(b.y * 1.5 - uTime * 3.0));
+    // round 23: the dashes' ends and sides smoothed (the next dash began at a hard line)
+    let u = b.y * 1.5 - uTime * 3.0;
+    let q = vec2(floor(b.x * 6.0), floor(u));
+    let lit = mix(step(0.5, h21(q)), step(0.5, h21(q + vec2<f32>(1.0, 0.0))), cellMix(b.x * 6.0, px * 6.0));
+    let on = lit * smoothstep(0.1, 0.3, fract(u)) * (1.0 - smoothstep(1.0 - min(px * 1.5 + 0.05, 0.5), 1.0, fract(u)));
     return g * (0.75 + 0.45 * on * part(0.0));
 }
 

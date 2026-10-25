@@ -35,10 +35,17 @@ jobs:
             platform: windows-x64
             target: x86_64-pc-windows-msvc
             rustflags: '-C target-feature=+crt-static'
+          # Apple Silicon only; unsigned (docs/packages.md#macos).
+          - os: macos-latest
+            platform: macos-arm64
+            target: aarch64-apple-darwin
+            rustflags: ''
     runs-on: ${{ matrix.os }}
     env:
       CARGO_INCREMENTAL: 0
       RUSTFLAGS: ${{ matrix.rustflags }}
+      # The oldest macOS the Mac build starts on; ignored by the other targets.
+      MACOSX_DEPLOYMENT_TARGET: '11.0'
     steps:
       - uses: actions/checkout@v7
         with:

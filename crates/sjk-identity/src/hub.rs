@@ -313,6 +313,44 @@ pub trait Hub: Send {
             "this hub client does not read the feed".to_owned(),
         ))
     }
+    /// The SJK team's newest announcements (`GET /v1/announcements`, 25/10/2026), newest
+    /// first.
+    fn announcements(
+        &mut self,
+        _identity: &Identity,
+    ) -> Result<Vec<crate::news::Announcement>, HubError> {
+        Err(HubError::Protocol(
+            "this hub client does not read announcements".to_owned(),
+        ))
+    }
+    /// The person's rewards and the newest reward rounds (`GET /v1/rewards`, 25/10/2026).
+    fn rewards(&mut self, _identity: &Identity) -> Result<crate::news::Rewards, HubError> {
+        Err(HubError::Protocol(
+            "this hub client does not read rewards".to_owned(),
+        ))
+    }
+    /// Claim reward `id` (`POST /v1/rewards/claim`, 25/10/2026): the hub grants it and
+    /// answers the person's profile and rewards after it.
+    fn claim_reward(
+        &mut self,
+        _identity: &Identity,
+        _id: u64,
+    ) -> Result<crate::news::ClaimAnswer, HubError> {
+        Err(HubError::Protocol(
+            "this hub client does not claim rewards".to_owned(),
+        ))
+    }
+    /// The creator's announcement (`POST /v1/creator/announce`, 25/10/2026), checked by
+    /// [`crate::news::check`] first; the hub answers it as stored.
+    fn announce(
+        &mut self,
+        _identity: &Identity,
+        _request: &crate::news::AnnounceRequest,
+    ) -> Result<crate::news::Announcement, HubError> {
+        Err(HubError::Protocol(
+            "this hub client does not announce".to_owned(),
+        ))
+    }
     /// Make `png` (already cropped and scaled, `crate::avatar`) the identity's picture;
     /// the hub answers with the key's profile, whose `avatar` is the new version.
     fn set_avatar(&mut self, _identity: &Identity, _png: &[u8]) -> Result<Profile, HubError> {
@@ -943,7 +981,9 @@ fn feed_path(after: u64, server: Option<&str>, wait: u64) -> String {
 /// `POST /v1/look`'s body: exactly the server and the look's fields. `saber_off` goes only
 /// when it names an option (and with a blade skin): a hub from before 11/10/2026 refuses
 /// the field, so a look with every part on stays as it was. `toys` goes only when a toy
-/// is out, for the same reason (hubs before 16/10/2026).
+/// is out, for the same reason (hubs before 16/10/2026). `saber_sounds` goes only when
+/// the player chose sounds apart from their blade (hubs before it refuse the field, and
+/// the service then sends the look without it).
 fn look_body(server: &str, look: &Look) -> Value {
     let mut body = json!({ "server": server, "saber": look.saber, "illuminate": look.illuminate });
     if !look.saber.is_empty() && !look.saber_off.is_empty() {
@@ -951,6 +991,9 @@ fn look_body(server: &str, look: &Look) -> Value {
     }
     if !look.toys.is_empty() {
         body["toys"] = json!(look.toys);
+    }
+    if !look.saber_sounds.is_empty() {
+        body["saber_sounds"] = json!(look.saber_sounds);
     }
     body
 }
@@ -966,6 +1009,21 @@ fn claim_body(server: &str, slot: u8, name: &str, active: bool) -> Value {
 }
 
 /// `POST /v1/holocrons/open`'s path and body.
+/// The body of a creator's announcement (`PROTOCOL.md`, "Announcements"): `version` only
+/// with a release.
+fn announce_body(request: &crate::news::AnnounceRequest) -> Value {
+    if request.release {
+        json!({
+            "kind": "release",
+            "title": request.title,
+            "text": request.text,
+            "version": request.version,
+        })
+    } else {
+        json!({ "kind": "news", "title": request.title, "text": request.text })
+    }
+}
+
 fn open_call(ids: &[u64]) -> (&'static str, Value) {
     ("/v1/holocrons/open", json!({ "ids": ids }))
 }
@@ -1377,6 +1435,45 @@ impl Hub for HttpHub {
 
     fn shop(&mut self, identity: &Identity) -> Result<crate::wire::ShopDay, HubError> {
         parse(self.send(Some(identity), "GET", "/v1/shop", None)?)
+    }
+
+    fn announcements(
+        &mut self,
+        identity: &Identity,
+    ) -> Result<Vec<crate::news::Announcement>, HubError> {
+        let answer: crate::news::Announcements =
+            parse(self.send(Some(identity), "GET", "/v1/announcements", None)?)?;
+        Ok(answer.announcements)
+    }
+
+    fn rewards(&mut self, identity: &Identity) -> Result<crate::news::Rewards, HubError> {
+        parse(self.send(Some(identity), "GET", "/v1/rewards", None)?)
+    }
+
+    fn claim_reward(
+        &mut self,
+        identity: &Identity,
+        id: u64,
+    ) -> Result<crate::news::ClaimAnswer, HubError> {
+        parse(self.send(
+            Some(identity),
+            "POST",
+            "/v1/rewards/claim",
+            Some(json!({ "id": id })),
+        )?)
+    }
+
+    fn announce(
+        &mut self,
+        identity: &Identity,
+        request: &crate::news::AnnounceRequest,
+    ) -> Result<crate::news::Announcement, HubError> {
+        parse(self.send(
+            Some(identity),
+            "POST",
+            "/v1/creator/announce",
+            Some(announce_body(request)),
+        )?)
     }
 
     fn buy_offer(
@@ -1852,6 +1949,7 @@ mod tests {
             illuminate: true,
             saber_off: Vec::new(),
             toys: Vec::new(),
+            saber_sounds: String::new(),
         };
         assert_eq!(
             look_body("1.2.3.4:29070", &look),
@@ -1889,6 +1987,42 @@ mod tests {
             look_body("1.2.3.4:29070", &boxed),
             json!({"server": "1.2.3.4:29070", "saber": "", "illuminate": false,
                 "toys": ["cardboard_box"]})
+        );
+        // The sounds chosen apart from the blade go only when chosen, stock or a skin's.
+        for sounds in ["stock", "saber_void"] {
+            let chosen = Look {
+                saber_sounds: sounds.to_owned(),
+                ..look.clone()
+            };
+            assert_eq!(
+                look_body("1.2.3.4:29070", &chosen),
+                json!({"server": "1.2.3.4:29070", "saber": "saber_sun", "illuminate": true,
+                    "saber_sounds": sounds})
+            );
+        }
+    }
+
+    #[test]
+    fn an_announcement_sends_the_protocols_fields() {
+        let news = crate::news::AnnounceRequest {
+            release: false,
+            title: "Hello".into(),
+            text: "Line\n\n- point".into(),
+            version: String::new(),
+        };
+        assert_eq!(
+            announce_body(&news),
+            json!({"kind": "news", "title": "Hello", "text": "Line\n\n- point"})
+        );
+        let release = crate::news::AnnounceRequest {
+            release: true,
+            version: "2026.1025.1".into(),
+            ..news
+        };
+        assert_eq!(
+            announce_body(&release),
+            json!({"kind": "release", "title": "Hello", "text": "Line\n\n- point",
+                "version": "2026.1025.1"})
         );
     }
 

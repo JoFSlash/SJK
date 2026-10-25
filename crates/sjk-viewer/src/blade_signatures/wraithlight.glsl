@@ -63,10 +63,11 @@ vec3 r8_vol(vec3 ro, vec3 rd, float px){
   if (cl > 0.0){
     vec3 h = rayAt(ro, rd, uLength*0.55);
     if (h.z > 0.0){
-      float rr = (length(h.xy) + 1e3*behindBlade(ro, rd, h.z)), aa = atan(h.x, h.y);
+      // round 23: hidden behind the blade softly (see hideD in lab.glsl)
+      float rr = length(h.xy), aa = atan(h.x, h.y), seen = 1.0 - behindBlade(ro, rd, h.z);
       float R = 0.6 + (1.0 - cl)*4.5;
       float n = 0.6 + 0.4*vn(vec2(aa*3.0, rr*2.0));
-      col += WL_PALE*halo(abs(rr - R), 0.6)*cl*n*0.9*uFx;
+      col += WL_PALE*halo(abs(rr - R), 0.6)*cl*n*0.9*uFx*seen;
     }
   }
   return col;

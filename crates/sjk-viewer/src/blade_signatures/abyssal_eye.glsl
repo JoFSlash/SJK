@@ -263,7 +263,7 @@ vec3 r8_vol(vec3 ro, vec3 rd, float px){
     // clash: a crimson shock ring and a flash
     if (cl > 0.01){
       vec3 h = rayAt(ro, rd, L*0.55);
-      if (h.z > 0.0) fx += red*halo(abs((length(h.xy) + 1e3*behindBlade(ro, rd, h.z)) - 1.0 - 6.0*(1.0 - cl)), 0.18 + 0.2*(1.0 - cl))*cl*1.6;
+      if (h.z > 0.0) fx += red*halo(hideD(abs(length(h.xy) - 1.0 - 6.0*(1.0 - cl)), behindBlade(ro, rd, h.z)), 0.18 + 0.2*(1.0 - cl))*cl*1.6;
       float tq;
       fx += red*halo(rayPtRaw(ro, rd, vec3(0.0, L*0.55, 0.0), tq), 1.2)*pow(cl, 3.0);
     }

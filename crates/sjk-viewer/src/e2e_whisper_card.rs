@@ -40,8 +40,11 @@ const BODY_TOP: f32 = CARD_TOP + 134.0;
 const LINE: f32 = 28.0;
 const LINES: usize = 7;
 const LINE_CHARS: usize = 90;
-/// A safety code's line, above the explanation, and its height.
-const CODE_HEIGHT: f32 = 70.0;
+/// A safety code's rows, above the explanation: four groups of five digits a row,
+/// each row this tall, and the room they take with the gap under them.
+const CODE_GROUPS_A_ROW: usize = 4;
+const CODE_ROW: f32 = 46.0;
+const CODE_HEIGHT: f32 = CODE_ROW * 3.0 + 18.0;
 /// The most of the whisper quoted.
 const QUOTE_CHARS: usize = 120;
 /// The buttons along the card's foot, this far under the explanation.
@@ -363,20 +366,28 @@ impl Card {
             TextAlign::Start,
         );
         if let Some(code) = &code {
-            text(
-                ui,
-                TextFamily::Display,
-                format_args!("{code}"),
-                frame.rect(TEXT_X, BODY_TOP - 6.0, TEXT_WIDTH, CODE_HEIGHT - 10.0),
-                48.0 * s,
-                if verified {
-                    color::GOLD_BRIGHT
-                } else {
-                    color::TEXT
-                },
-                FontWeight::Semibold,
-                TextAlign::Start,
-            );
+            let groups: Vec<&str> = code.split_whitespace().collect();
+            for (row, groups) in groups.chunks(CODE_GROUPS_A_ROW).enumerate() {
+                text(
+                    ui,
+                    TextFamily::Display,
+                    format_args!("{}", groups.join("  ")),
+                    frame.rect(
+                        TEXT_X,
+                        BODY_TOP - 6.0 + row as f32 * CODE_ROW,
+                        TEXT_WIDTH,
+                        CODE_ROW,
+                    ),
+                    40.0 * s,
+                    if verified {
+                        color::GOLD_BRIGHT
+                    } else {
+                        color::TEXT
+                    },
+                    FontWeight::Semibold,
+                    TextAlign::Start,
+                );
+            }
         }
         for (index, line) in lines.iter().enumerate() {
             text(
@@ -455,7 +466,7 @@ mod tests {
             name: "^5Creyon".into(),
             key_id: "c0ffee00c0ffee01".into(),
             key: "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8".into(),
-            code: "4821 0937 5512".into(),
+            code: "84017 83486 07110 59323 10299 40656 37217 30494 56215 28645 39432 28934".into(),
             checked,
         }
     }

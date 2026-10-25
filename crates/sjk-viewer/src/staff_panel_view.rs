@@ -185,6 +185,9 @@ impl Panel {
                 View::ChatBans => self.chat_bans(&frame, inputs.staff),
             }
         }
+        if !self.shown.creator {
+            self.order.retain(|token| !super::owner_only(*token));
+        }
         self.status(&frame, inputs.staff);
         self.keys(&frame);
         if !self.order.contains(&self.focus) {
@@ -467,7 +470,7 @@ impl Panel {
                     "Give"
                 },
                 true,
-                can_give,
+                can_give && self.shown.creator,
                 self.focus == give,
                 give,
             );
@@ -477,7 +480,7 @@ impl Panel {
                 [right - 128.0, y + 10.0, 128.0, 40.0],
                 "Take back",
                 false,
-                held > 0,
+                held > 0 && self.shown.creator,
                 self.focus == take,
                 take,
             );
@@ -611,7 +614,7 @@ impl Panel {
                 [x + cell - 88.0, y + 3.0, 88.0, 30.0],
                 if held { "Relock" } else { "Unlock" },
                 !held,
-                true,
+                self.shown.creator,
                 self.focus == token,
                 token,
             );
@@ -702,7 +705,7 @@ impl Panel {
             ],
             "Give",
             true,
-            true,
+            self.shown.creator,
             self.focus == HOLOCRON_GIVE_TOKEN,
             HOLOCRON_GIVE_TOKEN,
         );
@@ -765,7 +768,7 @@ impl Panel {
                 [MIDDLE_X + MIDDLE_WIDTH - 100.0, y - 1.0, 100.0, 30.0],
                 "Remove",
                 false,
-                true,
+                self.shown.creator,
                 self.focus == token,
                 token,
             );
@@ -811,7 +814,7 @@ impl Panel {
                 "Clear all"
             },
             false,
-            !profile.achievements.is_empty(),
+            !profile.achievements.is_empty() && self.shown.creator,
             self.focus == CLEAR_ALL_TOKEN,
             CLEAR_ALL_TOKEN,
         );
@@ -890,7 +893,7 @@ impl Panel {
                 [x + width - 96.0, y - 2.0, 96.0, 30.0],
                 "Clear",
                 false,
-                true,
+                self.shown.creator,
                 self.focus == token,
                 token,
             );
@@ -1129,7 +1132,11 @@ impl Panel {
         );
         let third = (RIGHT_WIDTH - 16.0) / 3.0;
         for (column, (label, enabled, token)) in [
-            ("Take down", self.shown.picture, PICTURE_DOWN_TOKEN),
+            (
+                "Take down",
+                self.shown.picture && self.shown.creator,
+                PICTURE_DOWN_TOKEN,
+            ),
             ("Block pictures", true, AVATAR_BLOCK_TOKEN),
             ("Allow pictures", true, AVATAR_ALLOW_TOKEN),
         ]
@@ -1280,7 +1287,7 @@ impl Panel {
                 [RIGHT_X, row_y, half, 40.0],
                 give,
                 true,
-                ready,
+                ready && self.shown.creator,
                 self.focus == give_token,
                 give_token,
             );
@@ -1290,7 +1297,7 @@ impl Panel {
                 [RIGHT_X + half + 8.0, row_y, half, 40.0],
                 take,
                 false,
-                ready,
+                ready && self.shown.creator,
                 self.focus == take_token,
                 take_token,
             );
@@ -1828,7 +1835,7 @@ impl Panel {
                 [MIDDLE_X + PANE_WIDTH - 140.0, row_y - 1.0, 140.0, 30.0],
                 label,
                 false,
-                true,
+                self.shown.creator,
                 self.focus == token,
                 token,
             );
@@ -1977,7 +1984,7 @@ impl Panel {
             [MIDDLE_X, y + 88.0, 180.0, 42.0],
             "Merge...",
             ready,
-            ready,
+            ready && self.shown.creator,
             self.focus == MERGE_TOKEN,
             MERGE_TOKEN,
         );
@@ -2089,6 +2096,18 @@ impl Panel {
             ("Working...".to_owned(), color::MUTED)
         } else if staff.failed {
             (cut(&staff.message, 90), color::EMBER)
+        } else if staff.message.is_empty()
+            && !self.shown.creator
+            && matches!(
+                self.view,
+                View::Rewards | View::Economy | View::Achievements | View::Keys
+            )
+        {
+            (
+                "Only the owner gives, takes back, clears or merges; this tab is to read."
+                    .to_owned(),
+                color::MUTED,
+            )
         } else {
             (cut(&staff.message, 90), color::GOLD_BRIGHT)
         };
@@ -2145,6 +2164,7 @@ mod tests {
     fn crowded() -> Profile {
         Profile {
             staff: true,
+            creator: true,
             verified: true,
             name: "^1Sol^7Vulpes the Very Long Named One^5!".into(),
             medals: Medal::ALL

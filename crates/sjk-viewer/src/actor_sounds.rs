@@ -61,7 +61,7 @@ pub(crate) fn update(gpu: &mut GpuState, time: i64, audio: &mut Option<GameAudio
         mesh.audio_events.last_time = Some(time);
         let id = entity.id.get();
         let is_local = local == Some(id);
-        let skin = gpu.saber_skins.get(id);
+        let skin = gpu.saber_skins.sound_of(id);
         let footstep_class = snapshot
             .and_then(|s| {
                 s.entities
@@ -193,17 +193,18 @@ pub(crate) fn update(gpu: &mut GpuState, time: i64, audio: &mut Option<GameAudio
     }
 }
 
-/// The swing loaded blade skin `skin` plays for a stock `saberhup` animation cue.
+/// The swing the loaded skin numbered `skin` (the sound set a player is heard with)
+/// plays for a stock `saberhup` animation cue.
 fn skin_swing<'a>(
     skins: &'a crate::saber_skins::LoadedSkins,
-    skin: crate::saber_skins::SkinColor,
+    skin: u8,
     standard: &str,
     variant: usize,
 ) -> Option<&'a str> {
     if !standard.starts_with("sound/weapons/saber/saberhup") {
         return None;
     }
-    skins.swing(skin.index, variant)
+    skins.swing(skin, variant)
 }
 
 #[cfg(test)]
@@ -213,7 +214,7 @@ mod tests {
     #[test]
     fn a_skin_adds_to_only_the_stock_swing_cues() {
         let skins = crate::saber_skins::tests::loaded_sample(1);
-        let skin = skins.color_of("saber_tidal").unwrap();
+        let skin = skins.color_of("saber_tidal").unwrap().index;
         assert_eq!(
             skin_swing(&skins, skin, "sound/weapons/saber/saberhup3.wav", 4),
             Some("sound/test/blade/s2.wav")

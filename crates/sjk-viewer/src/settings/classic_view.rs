@@ -653,6 +653,7 @@ impl SettingsMenu {
                 | ValueKind::ImportPage
                 | ValueKind::AssetBrowser
                 | ValueKind::JofContent
+                | ValueKind::SoundPreview
                 | ValueKind::GameplayFps
                 | ValueKind::Quality => {
                     let open = self.dropdown.as_ref().is_some_and(|open| open.row == row);
@@ -880,6 +881,7 @@ impl SettingsMenu {
                 "ENTER to enable or disable installed PK3 packs for the next start"
             }
             ValueKind::JofContent => "ENTER to choose and download JoF's content",
+            ValueKind::SoundPreview => "ENTER or a click to hear the sound chosen above",
         });
         if self
             .defaults
@@ -1042,6 +1044,7 @@ pub(super) fn row_default(console: &ViewerConsole, setting: &Setting) -> RowDefa
             | ValueKind::ImportPage
             | ValueKind::AssetBrowser
             | ValueKind::JofContent
+            | ValueKind::SoundPreview
     ) {
         return RowDefault::default();
     }

@@ -1,16 +1,31 @@
 //! Timed, presentation-only player monitoring, from JoF EJKSol's CG_Peek_f
 //! and CG_CalcViewValues. Only players in the received snapshot are available.
+//!
+//! Peek flies the Drone toy (`drone.rs`, from Slash's #199): a player may be watched
+//! only while their Drone switch is on, and their turning it off ends the watch.
 use crate::{GpuState, movement_collision};
 use glam::Vec3;
 use sjk_protocol::GameState;
 use sjk_runtime::EntityId;
 
 const CS_PLAYERS: usize = 1131;
+/// The watched player's point the camera looks at, above their origin.
+pub(crate) const FOCUS_HEIGHT: f32 = 26.;
 #[derive(Default)]
 pub(crate) struct State {
     target: Option<Target>,
 }
 impl State {
+    /// End the peek: the camera comes back.
+    pub(crate) fn stop(&mut self) {
+        self.target = None;
+    }
+
+    /// The slot of the player watched, while a peek lasts.
+    pub(crate) fn watching(&self) -> Option<u16> {
+        self.target.as_ref().map(|target| target.client)
+    }
+
     /// Missing PVS data pauses a peek without changing its deadline or identity.
     fn can_render(&mut self, time: i64, identity_current: bool, available: bool) -> bool {
         let Some(target) = self.target.as_ref() else {
@@ -155,6 +170,12 @@ impl GpuState {
             );
         }
         let target_name = name(game, client).ok_or("peek: player left")?;
+        if !self.drone_allowed(client) {
+            return Err(format!(
+                "peek: {} has not let drones follow them (their Drone toy is off)",
+                String::from_utf8_lossy(&sjk_game_jka::client_view::strip_colours(target_name))
+            ));
+        }
         self.peek.target = Some(Target {
             client,
             name: target_name.to_vec(),
@@ -176,11 +197,23 @@ pub(crate) fn camera(state: &mut GpuState, time: i64) -> Option<(Vec3, Vec3)> {
         state.peek.target = None;
         return None;
     }
-    let Some(session) = state.live_session.as_ref() else {
+    if state.live_session.is_none() {
         state.peek.target = None;
         return None;
-    };
+    }
     let target = state.peek.target.as_ref()?;
+    // The watched player turned their Drone off: the drone comes back.
+    if !state.drone_allowed(target.client) {
+        state.peek.target = None;
+        state.chat.receive(
+            sjk_client::ServerEventKind::CenterPrint,
+            "Your drone was sent away".to_owned(),
+            None,
+            std::time::Instant::now(),
+        );
+        return None;
+    }
+    let session = state.live_session.as_ref()?;
     let game = session.game_state();
     let snapshot = session.snapshot_at_or_before(time as i32);
     let identity_current = map(game) == target.map
@@ -203,16 +236,8 @@ pub(crate) fn camera(state: &mut GpuState, time: i64) -> Option<(Vec3, Vec3)> {
         .sample_pose(time)
         .map_or(0., |pose| pose.view_angles_degrees[1])
         .to_radians();
-    let focus = Vec3::from_array(transform.translation) + Vec3::Z * 26.;
-    let wanted = focus - Vec3::new(yaw.cos(), yaw.sin(), 0.) * 80. + Vec3::Z * 32.;
-    let position = movement_collision::camera_trace(
-        &state.bsp,
-        &mut state.trace_scratch,
-        Some((game, snapshot)),
-        time as i32,
-        focus,
-        wanted,
-    );
+    let focus = Vec3::from_array(transform.translation) + Vec3::Z * FOCUS_HEIGHT;
+    let position = behind(state, time, focus, yaw);
     // A fully collapsed trace still has a defined look direction.
     let look = if position.distance_squared(focus) < 0.001 {
         focus + Vec3::new(yaw.cos(), yaw.sin(), 0.)
@@ -220,6 +245,26 @@ pub(crate) fn camera(state: &mut GpuState, time: i64) -> Option<(Vec3, Vec3)> {
         focus
     };
     Some((position, look))
+}
+
+/// Where the camera watching a player stands: behind `focus` as they face (`yaw`,
+/// radians) and above, drawn in by the world. The Drone shows there (`drone.rs`).
+pub(crate) fn behind(state: &mut GpuState, time: i64, focus: Vec3, yaw: f32) -> Vec3 {
+    let wanted = focus - Vec3::new(yaw.cos(), yaw.sin(), 0.) * 80. + Vec3::Z * 32.;
+    let solids = state.live_session.as_ref().map(|session| {
+        (
+            session.game_state(),
+            session.snapshot_at_or_before(time as i32),
+        )
+    });
+    movement_collision::camera_trace(
+        &state.bsp,
+        &mut state.trace_scratch,
+        solids,
+        time as i32,
+        focus,
+        wanted,
+    )
 }
 
 #[cfg(test)]

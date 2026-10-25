@@ -301,7 +301,8 @@ impl Layer {
     ) {
         let bind = self.source(device, scene);
         // Pixels outside `region` keep older contents: neither the merge nor the write-back
-        // reads them.
+        // reads them, and the region is wide enough for the haze and lens, which sample the
+        // `original` image bent (`effect_bounds::Bounds::bend`).
         let mut pass = self.pass(encoder, wgpu::LoadOp::Load, "SJK effect layer encode");
         if let Some([x, y, w, h]) = region {
             pass.set_scissor_rect(x, y, w, h);

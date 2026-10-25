@@ -33,11 +33,13 @@ mod chat;
 mod chat_ban;
 mod chat_gifs;
 mod chat_mutes;
+mod chat_sounds;
 mod cinematic_roq;
 mod client_guid;
 mod client_state;
 mod clientinfo_refresh;
 mod debug_collectibles;
+mod drone;
 mod duel_blades;
 mod duel_ghost;
 mod duel_visibility;
@@ -185,12 +187,14 @@ mod notice;
 mod npc_refresh;
 mod object_meshes;
 mod oblique_clip;
+mod official;
 mod order66;
 mod particle_atlas;
 mod particle_draw;
 mod peek;
 mod portal;
 mod prediction_preview;
+mod ragdoll;
 mod scene_views;
 mod scope;
 mod sender_card;
@@ -271,6 +275,7 @@ mod saber_rgb;
 mod saber_skin_command;
 mod saber_skin_options;
 mod saber_skins;
+mod saber_sound_choice;
 mod saber_submission;
 mod saber_trail;
 mod saber_trail_gpu;
@@ -418,6 +423,8 @@ struct GpuState {
     mod_notice: mod_notice_card::State,
     /// What the update brought ([`whats_new_card`]).
     whats_new_card: whats_new_card::Card,
+    /// The SJK team's announcements and contributor rewards ([`official`]).
+    official: official::Official,
     window: Option<Arc<Window>>,
     post_aa: Option<frame_target::aa::Runtime>,
     render_scale: Option<frame_target::scale::Runtime>,
@@ -486,8 +493,12 @@ struct GpuState {
     order66: order66::Order66,
     /// The Hax toy (`toy_hax`): a hack under way, the player steered or steering.
     hax: hax::Hax,
-    /// Order 66's and the Hax's switches as last saved (`toy_saved`).
-    toys_saved: [toy_saved::Saved; 2],
+    /// The Drone toy (`toy_drone`): its consent switch and the other players' drones.
+    drone: drone::Drone,
+    /// The Ragdoll toy (`toy_ragdoll`): the player's own fall and the falls of others.
+    ragdoll: ragdoll::Ragdoll,
+    /// Order 66's, the Hax's and the Drone's switches as last saved (`toy_saved`).
+    toys_saved: [toy_saved::Saved; 3],
     /// The Holocrons tab's 3D holocron ([`holocrons::stage`]).
     holocron_stage: holocrons::stage::Stage,
     /// The time its turn and bob are drawn at, instead of the clock's, for a world shot.
@@ -1400,6 +1411,7 @@ impl GpuState {
             log_request_card: log_request_card::Card::default(),
             mod_notice: mod_notice_card::State::default(),
             whats_new_card: whats_new_card::Card::default(),
+            official: official::Official::default(),
 
             screenshots: screenshot_setup.manager,
             menu_pictures: menu_pictures::Painter::default(),
@@ -1446,6 +1458,8 @@ impl GpuState {
             cardboard_box: Default::default(),
             order66: Default::default(),
             hax: Default::default(),
+            drone: Default::default(),
+            ragdoll: Default::default(),
             toys_saved: Default::default(),
             holocron_stage: Default::default(),
             #[cfg(test)]
@@ -1704,6 +1718,8 @@ impl GpuState {
             demo_playback::Session::current_server_time,
         );
         prediction_preview::tick(self, game_audio, Instant::now(), presentation_time as i32);
+        // The Ragdoll's bodies at this frame's time, for the camera and the actors.
+        self.step_ragdolls(presentation_time);
         timing.mark(Phase::Config);
         self.refresh_config_strings(game_audio);
         timing.mark(Phase::View);
@@ -1756,6 +1772,7 @@ impl GpuState {
             .then(|| {
                 peek::camera(self, presentation_time)
                     .or_else(|| hax::camera(self, presentation_time))
+                    .or_else(|| ragdoll::camera(self, presentation_time))
             })
             .flatten();
         let fall = self.update_fall_camera(presentation_time as i32);
@@ -2024,6 +2041,19 @@ impl GpuState {
                 || self.medal_popup.pending()
                 || self.holocron_popup.pending(),
         );
+        // The SJK team's windows: an announcement or the rounds asked for (over the
+        // console too), or a reward waiting.
+        let official_shown = self.prepare_official(
+            alpha_shown
+                || self.alpha_card.wants()
+                || medal_shown
+                || holocron_shown
+                || reload_shown
+                || fps_shown
+                || logs_shown
+                || self.medal_popup.pending()
+                || self.holocron_popup.pending(),
+        );
         // And what the update brought, last.
         let news_shown = self.prepare_whats_new_card(
             covered
@@ -2032,6 +2062,7 @@ impl GpuState {
                 || reload_shown
                 || fps_shown
                 || logs_shown
+                || official_shown
                 || self.medal_popup.pending()
                 || self.holocron_popup.pending(),
         );
@@ -2043,6 +2074,7 @@ impl GpuState {
                 || reload_shown
                 || fps_shown
                 || logs_shown
+                || official_shown
                 || news_shown
                 || self.medal_popup.pending()
                 || self.holocron_popup.pending(),
@@ -2055,6 +2087,7 @@ impl GpuState {
                 || reload_shown
                 || fps_shown
                 || logs_shown
+                || official_shown
                 || news_shown
                 || emote_help_shown
                 || self.medal_popup.pending()
@@ -2068,6 +2101,7 @@ impl GpuState {
                 || reload_shown
                 || fps_shown
                 || logs_shown
+                || official_shown
                 || news_shown
                 || emote_help_shown
                 || emote_picker_shown
@@ -2082,6 +2116,7 @@ impl GpuState {
                 || reload_shown
                 || fps_shown
                 || logs_shown
+                || official_shown
                 || news_shown
                 || emote_help_shown
                 || emote_picker_shown
@@ -2090,6 +2125,7 @@ impl GpuState {
                 || self.holocron_popup.pending(),
         );
         let medal_popup = alpha_shown
+            || official_shown
             || mod_notice_shown
             || medal_shown
             || holocron_shown
@@ -2122,6 +2158,10 @@ impl GpuState {
                 .is_some_and(|menu| menu.is_visible());
         let scoreboard_held = self.gameplay_input.held(input::GameButton::Scores);
         self.append_world_pings(
+            viewport,
+            information_visible && intermission_view.is_none() && !scoreboard_held,
+        );
+        self.append_drone_names(
             viewport,
             information_visible && intermission_view.is_none() && !scoreboard_held,
         );
@@ -2313,6 +2353,8 @@ impl GpuState {
             self.append_fps_card(viewport);
         } else if logs_shown {
             self.append_log_request_card(viewport);
+        } else if official_shown {
+            self.append_official(viewport);
         } else if news_shown {
             self.append_whats_new_card(viewport);
         } else if emote_help_shown {
@@ -2343,6 +2385,7 @@ impl GpuState {
             self.world_notes.highlight(),
             self.entity_view.active().then(|| self.entity_view.list()),
             Some(&self.world_pings.list),
+            Some(&self.drone.list),
             information_visible.then(|| &self.hud.team_logo.list),
             information_visible.then(|| &self.hud.nameplate.list),
             information_visible.then(|| &self.hud.identification.list),
@@ -2374,6 +2417,7 @@ impl GpuState {
             reload_shown.then(|| self.graphics_reload.card.draw_list()),
             fps_shown.then(|| self.fps_card.draw_list()),
             logs_shown.then(|| self.log_request_card.draw_list()),
+            official_shown.then(|| self.official.window.draw_list()),
             news_shown.then(|| self.whats_new_card.draw_list()),
             emote_help_shown.then(|| self.emote_help.card.draw_list()),
             emote_picker_shown.then(|| self.emote_picker.card.draw_list()),
@@ -2452,6 +2496,7 @@ impl GpuState {
         self.submit_illuminate(presentation_time, visual_now);
         self.submit_cardboard_boxes(presentation_time, visual_now);
         self.submit_order66(presentation_time, visual_now);
+        self.submit_drones(presentation_time, visual_now);
         self.submit_holocron_stage(visual_now);
         self.sync_saber_skins(game_audio, presentation_time);
         let debug_missiles = effect_debug::sync(self.console.as_ref());

@@ -25,7 +25,10 @@ fn ut_top() -> f32 {
 fn ut_sap(y: f32) -> f32 {
     let u = y * 0.11 - uTime * 0.55;
     let f = fract(u);
-    return 1.6 * pow(f, 8.0) * smoothstep(1.0, 0.96, f) + 0.6 * pow(fract(u * 1.7 + 0.37), 12.0);
+    // round 23: the second, smaller pulse's front softened as the first's (a hard line across it)
+    let g = fract(u * 1.7 + 0.37);
+    // (0.96 rather than 0.6, as the softened front peaks at 0.63: as bright at its peak as before)
+    return 1.6 * pow(f, 8.0) * smoothstep(1.0, 0.96, f) + 0.96 * pow(g, 12.0) * (1.0 - smoothstep(0.96, 1.0, g));
 }
 
 // distance (in units) from a cross-section point to a set of n strands wound at radius rr,
@@ -107,10 +110,12 @@ fn r8_vol(ro: vec3<f32>, rd: vec3<f32>, px: f32) -> vec3<f32> {
     // clash: a ring of light blooms out across the blade
     if cl > 0.0 {
         let h = rayAt(ro, rd, uLength * 0.62);
-        let rr = (length(h.xy) + 1.0e3 * behindBlade(ro, rd, h.z));
+        // round 23: hidden behind the blade softly (see hideD in lab.glsl)
+        let rr = length(h.xy);
+        let seen = 1.0 - behindBlade(ro, rd, h.z);
         let R = 0.6 + (1.0 - cl) * 4.5;
         if h.z > 0.0 {
-            col += (UT_PALE * halo(abs(rr - R), 0.35) + vec3<f32>(1.0) * halo(abs(rr - R), 0.08)) * cl * 1.4 * uFx;
+            col += (UT_PALE * halo(abs(rr - R), 0.35) + vec3<f32>(1.0) * halo(abs(rr - R), 0.08)) * cl * 1.4 * uFx * seen;
         }
     }
     // sap sparks: bright drops of the Force flung off the fibres as a pulse passes

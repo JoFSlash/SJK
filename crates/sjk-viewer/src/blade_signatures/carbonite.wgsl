@@ -273,7 +273,7 @@ fn base_vol(ro: vec3<f32>, rd: vec3<f32>, px: f32) -> vec3<f32> {
         let a = 1.0 - uClash;
         let h = rayAt(ro, rd, L * 0.6);
         if h.z > 0.0 {
-            light += vec3<f32>(0.75, 0.95, 1.0) * halo(abs((length(h.xy) + 1.0e3 * behindBlade(ro, rd, h.z)) - 0.8 - 6.0 * a), 0.25) * 1.4 * uClash;
+            light += vec3<f32>(0.75, 0.95, 1.0) * halo(hideD(abs(length(h.xy) - 0.8 - 6.0 * a), behindBlade(ro, rd, h.z)), 0.25) * 1.4 * uClash;
         }
         let dc = rayPtRaw(ro, rd, vec3(0.0, L * 0.6, 0.0), &ta);
         light += vec3<f32>(0.75, 0.95, 1.0) * halo(dc, 1.4) * pow(uClash, 2.0);

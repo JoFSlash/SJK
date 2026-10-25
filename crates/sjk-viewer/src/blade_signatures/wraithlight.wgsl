@@ -77,11 +77,13 @@ fn r8_vol(ro: vec3<f32>, rd: vec3<f32>, px: f32) -> vec3<f32> {
     if cl > 0.0 {
         let h = rayAt(ro, rd, uLength * 0.55);
         if h.z > 0.0 {
-            let rr = (length(h.xy) + 1.0e3 * behindBlade(ro, rd, h.z));
+            // round 23: hidden behind the blade softly (see hideD in lab.glsl)
+            let rr = length(h.xy);
             let aa = atan2(h.x, h.y);
+            let seen = 1.0 - behindBlade(ro, rd, h.z);
             let R = 0.6 + (1.0 - cl) * 4.5;
             let n = 0.6 + 0.4 * vn(vec2(aa * 3.0, rr * 2.0));
-            col += WL_PALE * halo(abs(rr - R), 0.6) * cl * n * 0.9 * uFx;
+            col += WL_PALE * halo(abs(rr - R), 0.6) * cl * n * 0.9 * uFx * seen;
         }
     }
     return col;

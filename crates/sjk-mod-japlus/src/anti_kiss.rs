@@ -1,4 +1,4 @@
-//! Anti-kiss: JoF EternalJK's `cg_antiAmKiss` (`cg_view.c:2635-2640`, in
+//! Anti-kiss (`japlus.antiAmKiss`): JoF EternalJK's `cg_antiAmKiss` (`cg_view.c:2635-2640`, in
 //! `CG_DrawActiveFrame`). When another player's JA+ `amkiss` puts the local player in
 //! the kiss-victim animation, the client uses Force Push once, which breaks the pair.
 //!
@@ -12,8 +12,11 @@
 use sjk_mod::ServerKind;
 use sjk_protocol::PlayerState;
 
-/// The setting, under JoF EternalJK's name so a config made for it keeps working.
-pub const CVAR: &str = "cg_antiAmKiss";
+/// The setting.
+pub const CVAR: &str = "japlus.antiAmKiss";
+
+/// JoF EternalJK's name for it, kept as an alias so a config made for it still works.
+pub const EJK_CVAR: &str = "cg_antiAmKiss";
 
 /// What the client sends in response: the bind command whose `genCmds_t` value
 /// the next user command carries (`GENCMD_FORCE_THROW`).

@@ -19,7 +19,7 @@ fn bww_ring(ro: vec3<f32>, rd: vec3<f32>, h: f32, R: f32) -> f32 {
     var best: f32 = 1.0e3;
     let q = rayAt(ro, rd, h);
     if q.z > 0.0 {
-        best = abs(length(q.xy) - R) + 1.0e3 * behindBlade(ro, rd, q.z);
+        best = hideD(abs(length(q.xy) - R), behindBlade(ro, rd, q.z));
     }
     let a = dot(rd.xz, rd.xz);
     let b = dot(ro.xz, rd.xz);
@@ -30,10 +30,10 @@ fn bww_ring(ro: vec3<f32>, rd: vec3<f32>, h: f32, R: f32) -> f32 {
         let t0 = (-b - k) / a;
         let t1 = (-b + k) / a;
         if t0 > 0.0 {
-            best = min(best, abs(ro.y + rd.y * t0 - h) + 1.0e3 * behindBlade(ro, rd, t0));
+            best = min(best, hideD(abs(ro.y + rd.y * t0 - h), behindBlade(ro, rd, t0)));
         }
         if t1 > 0.0 {
-            best = min(best, abs(ro.y + rd.y * t1 - h) + 1.0e3 * behindBlade(ro, rd, t1));
+            best = min(best, hideD(abs(ro.y + rd.y * t1 - h), behindBlade(ro, rd, t1)));
         }
     }
     return best;

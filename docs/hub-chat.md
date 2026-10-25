@@ -50,12 +50,14 @@ The hub's side is described in Sol-Vulpes/SJK-hub (`PROTOCOL.md`, "Chat", "Emote
 | Emotes | [emotes.rs](../crates/sjk-viewer/src/emotes.rs), [emotes_frame.rs](../crates/sjk-viewer/src/emotes_frame.rs) |
 | GIFs from GIPHY: links, fetching, decoding, the cache, drawing | [chat_gifs.rs](../crates/sjk-viewer/src/chat_gifs.rs) and its `link`, `fetch`, `decode`, `draw` modules; textures in [gif_textures.rs](../crates/sjk-viewer/src/ui_renderer/gif_textures.rs) |
 | The GIF picker: tabs, tiles, picking; favourites; GIPHY's search | [sjk_chat_gif_picker.rs](../crates/sjk-viewer/src/sjk_chat_gif_picker.rs); [chat_gifs/favourites.rs](../crates/sjk-viewer/src/chat_gifs/favourites.rs); [chat_gifs/search.rs](../crates/sjk-viewer/src/chat_gifs/search.rs) |
+| Announcements and reward rounds: wire types, rules, requests | [news.rs](../crates/sjk-identity/src/news.rs), [hub.rs](../crates/sjk-identity/src/hub.rs), [feed.rs](../crates/sjk-identity/src/feed.rs), [service.rs](../crates/sjk-identity/src/service.rs) |
+| Announcements and reward rounds: lines, seen file, windows, commands | [official.rs](../crates/sjk-viewer/src/official.rs) and its `words`, `seen`, `window` modules |
 
 ## Hub protocol (additions to version 1)
 
 Old clients ignore all of it, so it stays `/v1/`.
 
-- A message in the feed carries `client` (hub since 21/10/2026): `sjk` when it was
+- A message in the feed carries `client` (hub since 25/10/2026): `sjk` when it was
   sent with SJK's User-Agent, `ejk` with JoF EternalJK's (`EJK/...`), left out for
   any other (`ChatMessage::client`, empty then). It picks the line's emblem ([How a
   line looks](#how-a-line-looks)).
@@ -107,6 +109,14 @@ Old clients ignore all of it, so it stays `/v1/`.
   `target_verified` (403, the target is verified or staff), `bad_target` (400, oneself).
   `POST /v1/chat` then refuses the banned player `chat_banned` (403) with `until`. Staff
   lift bans with `/v1/staff/chat-unban` `{"key_id"}` (answer `{"lifted":<n>}`).
+
+- Announcements and reward rounds (25/10/2026, [below](#announcements-and-reward-rounds)):
+  `GET /v1/announcements`, `GET /v1/rewards`, `POST /v1/rewards/claim` `{"id":n}` and the
+  creator's `POST /v1/creator/announce`; the feed's `announcements`
+  (`[{"id":<feed id>,"announcement":{..}}]`) and `rounds`
+  (`[{"id":<feed id>,"round","at","title","count"}]`), every reader told, kept 5 minutes,
+  a fresh reader getting those of the last 60 seconds, left out when none. The hub's
+  side is `PROTOCOL.md`, "Announcements" and "Reward rounds".
 
 ## Client service
 
@@ -256,11 +266,11 @@ feed: the hub took them, so the sound says the message went out.
 - **How it plays:** as the game's chat beep does, beside the listener at full volume
   under `s_volume`, through the interface cues' mailbox (`ui_cues::Cue::SjkChat`) on a
   channel of its own, so it never cuts a menu sound or the game's beep.
-- **Switches:** `cl_sjkChatSound` (archived, default 1; Settings > Chat > SJK chat
-  sound, under SJK chat, so in every settings screen and settings search). The master
-  chat sound switch `cg_chatSounds` gates it too: 0 silences every chat sound, the
-  game's `cg_chatBeep` and `cg_teamChatBeep` already, and SJK chat is chat. With
-  `cl_sjkChat 0` no message arrives, so nothing plays.
+- **Switches:** `cl_sjkChatSound` (archived, default 1; Settings > Sound > Chat sounds,
+  SJK chat messages, since 23/10/2026 with the other chat kinds), and `cl_chatSoundSjk`
+  picks another sound in its place ([client.md](client.md#chat-sounds)). The master
+  chat sound switch `cg_chatSounds` gates it too: 0 silences every chat sound, and SJK
+  chat is chat. With `cl_sjkChat 0` no message arrives, so nothing plays.
 
 ## In the menus
 
@@ -394,7 +404,7 @@ Only GIPHY: Tenor's API shut down on 30/06/2026.
   for a GIF (`chat_gifs::for_message`); the chat box shows "Messages hidden on this
   client" and never asks for a muted line's GIF.
 - **Switch**: `cl_sjkChatGifs` (archived, default 1; Settings > Chat > SJK chat GIFs,
-  under SJK chat sound, so in every settings screen and settings search). 0 keeps links
+  under SJK chat, so in every settings screen and settings search). 0 keeps links
   as text and fetches nothing. With `cl_sjkChat 0` no message shows, so nothing is
   fetched either. Video clips have their own opt-in, `cl_sjkChatVideo` (default 0,
   under it: [Trusted media sources](#trusted-media-sources)).
@@ -865,7 +875,9 @@ and plays changes. The code still says "mute" (`chat_mutes.rs`, `muted_players.r
   verified tick; whether the hub knows
   them (and staff); their hub name when it differs from the one shown; their key; their
   medals' medallions; where they are on the server being played ("On this server, slot
-  5", or "slot 5, matched by name"); and Block or Unblock. The Players page's card could
+  5", or "slot 5, matched by name"); and Block or Unblock. In the game's chat a click on
+  the name pins the card and, for a player on the server, adds Whisper above Block
+  ([client.md](client.md)). The Players page's card could
   not be reused: it is that page's right column, with score and ping. The page's
   chosen message keeps its Block on this PC, which uses the same list. The console's
   `block <player>` blocks a player of the server being played (`target` for the one
@@ -987,7 +999,18 @@ and plays changes. The code still says "mute" (`chat_mutes.rs`, `muted_players.r
   the server performs the attack whatever the emote shows, so it stops here and the
   client sends the hub a `stop`, as `sjkemote stop` does, which ends it for the others.
   Off, the dance goes on through the attacks (the meme way; on 19/10/2026 this was
-  briefly always on). A rig model plays an emote's `clip`
+  briefly always on). With Settings > Sound > Emotes: Typing keeps emote
+  (`cg_emoteTypingKeep`, on; since 23/10/2026, Rollembones' idea), a player typing keeps
+  their emote: while their chat, console or a menu is open (their talk balloon,
+  `EF_TALK`, which their client's `BUTTON_TALK` sets on the server, so every SJK client
+  sees it without the hub; for the own player, the open field itself), moving does not
+  end it (being pushed, knocked back or carried) and neither does an attack; once they
+  close it, where they stand then is the place they may not leave, so the next move of
+  24 units or attack ends it (`ActiveEmotes::hold`, `emotes::typing_slots`). Typing
+  never moved a player (the server clears the movement of a command with
+  `BUTTON_TALK`, `PmoveSingle`), so what it changes is what happens to them meanwhile.
+  The rule is the reader's: a client with it off ends a typist's emote as before. An
+  alt-tabbed player sends `BUTTON_TALK` too, so they keep theirs the same way. A rig model plays an emote's `clip`
   (`emotes::playing`), and so does a stock model when the emote names its `rig`
   ([Emotes on stock models](rig-models.md#emotes-on-stock-models)); the `sound` plays
   on the player (`emotes::Cue`, channel 13,
@@ -1005,8 +1028,13 @@ and plays changes. The code still says "mute" (`chat_mutes.rs`, `muted_players.r
   20/10/2026, hub report #107), unless they are away already. Going away, an emote the player plays goes quiet for everyone: the client
   posts `quiet` and each client stops its music (`ActiveEmotes::set_quiet`) while it
   keeps time, so `loud`, posted on the way back, plays it again from where it would be.
+  Alt-tabbing out or minimising always does this to an emote playing, whatever
+  `cg_awayAltTab` says (Sol's rule, 23/10/2026, `away_emote::alt_tab_quiets`): the
+  setting only decides whether alt-tabbing with no emote playing starts the away emote
+  below (and counts as away for toys). The window's focus reaches the others only this
+  way, through `quiet` and `loud` on the emotes' hub path; nothing else shares it.
   With no emote playing, the pick starts: on a JA+ server (its `gamename`, JoF
-  included) the JA+ emote of `cg_awayEmoteJaplus` (JA+ away emote: the sit, kneel,
+  included) the JA+ emote of `japlus.awayEmote` (JA+ away emote: the sit, kneel,
   hips, wait, surrender and Neo ones, which hold the player until they crouch), sent to
   the server; on the way back, while it still holds the player (`PM_FREEZE`), the
   commands crouch until it lets go, for a second at most (`away_emote::shape_command`;
@@ -1085,7 +1113,9 @@ the hub's toy events once a frame and hands them to every toy (`identity_frame.r
 The toy relay (since 21/10/2026, Sol-Vulpes/SJK-hub, `PROTOCOL.md`, "Toy relay")
 carries toy events that must reach one player at once, many times a
 second, which the feed's toy events (one a second, read by a poll every few seconds)
-cannot: the [Hax](client.md#hax)'s hacker steering the hacked player. Two threads of
+cannot: the [Hax](client.md#hax)'s hacker steering the hacked player, the
+[Ragdoll](client.md#ragdoll)'s falls, told to every SJK player on the server, and the
+[Drone](client.md#drone)'s place, told to each in turn. Two threads of
 the identity service of their own ([relay.rs](../crates/sjk-identity/src/relay.rs),
 `sjk-hub-relay-send` and `sjk-hub-relay-read`), each with its own HTTP client, read the
 hub and the game server as the feed does:
@@ -1096,12 +1126,13 @@ hub and the game server as the feed does:
   replacing (a control frame) gives way to the next one of the same toy and target
   while it waits, so a slow way to the hub sends the newest frame, not a backlog. The hub
   takes 40 a second per key.
-- **Reading:** while the viewer listens (`Service::set_relay_listen`: the Hax's toy is
-  on), the reading thread keeps `GET /v1/relay?server=..&after=..&wait=20` open: the hub
+- **Reading:** while the viewer listens (`Service::set_relay_listen`: on a game server,
+  since 23/10/2026; before, while the Hax's toy was on), the reading thread keeps `GET /v1/relay?server=..&after=..&wait=20` open: the hub
   answers as soon as an event for the reader's own claimed slot comes. The first read
   (`after=0`) only learns the last id; another server or hub starts afresh, a failure
   waits 0.5 seconds, doubled up to 2 (under the 3 seconds the hub keeps an event). The events go to a queue the viewer takes once a
-  frame (`Service::take_relay_events`), with the server they were read for.
+  frame (`Service::take_relay_events`, once for every toy, `identity_frame.rs`), with
+  the server they were read for.
 
 The hub keeps an event 3 seconds, in memory, and gives it only to its target. As with
 toy events, a reader applies one only when the game shows, in the sender's slot, the
@@ -1154,7 +1185,8 @@ recipient's next read. When the hub took it, the feed shows "To <name>" with the
 recipient's marks as the SJK chat shows a sender's (SJK's emblem, the verified tick or
 trust mark, their name emoji), ENCRYPTED and the text in pink, the console `To <name>
 (encrypted): <text>`, and the encrypted whisper's sound plays (Sol, 22/10/2026: on the
-sender's side too, under `cg_chatSounds`). When it did not
+sender's side too, under the private messages' sound settings, `cg_privateChatBeep` and
+`cl_chatSoundPrivate`, [client.md](client.md#chat-sounds)). When it did not
 (or no answer came within 10 seconds), the [Encrypted whisper
 card](sjk-ui.md#encrypted-whisper) opens over the game menu and asks; Send unencrypted
 sends the same `tell` to the game server. A whisper to a verified player whose key
@@ -1165,7 +1197,8 @@ its own thread; the viewer takes them once a frame (`Service::take_whispers`) an
 one only when the game shows, in the sender's slot, the name the claim was made under,
 not from the player's own slot and never from a player blocked here. It goes to the
 feed in pink with the sender's name and ENCRYPTED, to the console as `<name>
-(encrypted): <text>`, plays the encrypted whisper's sound (under `cg_chatSounds`) and
+(encrypted): <text>`, plays the encrypted whisper's sound (under the private messages'
+sound settings), flashes the taskbar while the window is away (`cl_privateChatFlash`) and
 becomes the whisper `reply` answers. One that does not open is thrown away with a
 console line saying why.
 
@@ -1178,9 +1211,18 @@ player.
 
 **Safety codes (optional, Sol's decision 22/10/2026).** The first whisper to someone
 still trusts the key the hub gave. A player who wants proof compares a safety code
-with the other outside the game (voice, Discord, in person): twelve digits from both
-keys (`whisper::safety_code`, SHA-256 of the two keys in order, 60 bits), the same on
-both screens, and different if the hub handed out a key of its own. The chat's player
+with the other outside the game (voice, Discord, in person): 60 digits in twelve
+groups of five (`whisper::safety_code`, format v2 since 24/10/2026), the same on both
+screens, and different if the hub handed out a key of its own. The code is two halves,
+the lower key's fingerprint then the higher's, each 30 digits (about 100 bits) of 5200
+rounds of SHA-512 over that key alone, as Signal's safety numbers are made. Each half
+belongs to one key, so a hub that wants both screens to match with keys of its own must
+make a key whose fingerprint equals a real key's, all 30 digits. The first format (v1,
+22/10/2026: twelve digits, SHA-256 of both keys together, about 40 bits) did not hold:
+the hub chooses both of the keys it hands out, so it needed only two codes that meet,
+about a million keys a side, which a laptop found in 22 seconds (24/10/2026). A player
+on an older SJK shows the old twelve digits, which never match the new code; the keys
+already marked verified stay verified (the file keeps the key, not the code). The chat's player
 card (resting the pointer on a name with the composer open) has a Safety code button
 for a player who takes encrypted whispers, and `whisper_verify <player>` opens the same
 [card](sjk-ui.md#encrypted-whisper). Mark verified keeps their key in
@@ -1202,6 +1244,81 @@ hub sees who whispers to whom, when, and how long the box is. A whisper not read
 within 60 seconds, or held when the hub restarts, is lost without the sender knowing
 (the hub had taken it). Staff cannot read whispers to judge a report; a recipient can
 show one, signed by its sender, but nothing sends that yet.
+
+## Announcements and reward rounds
+
+25/10/2026, `personal/announcements` (Sol's decisions the same day: only the creator
+announces for now; rewards are claimed with a Claim button; a round's public list shows
+names and reasons, and what each person got stays private to them). The hub's side is
+the hub's `announcements` branch (`PROTOCOL.md`, "Announcements", "Reward rounds"); the
+wire is the contract between the two.
+
+**Announcements** are official messages from the SJK team, shown in the SJK chat only,
+never in a game server's chat.
+
+- The identity service reads `GET /v1/announcements` (the newest 10 not removed, at most
+  30 days old) at the registration and every 30 minutes, and the feed relays new ones as
+  they are made (`FeedNews`, told to the worker once per feed id); `Snapshot::announcements`
+  keeps them newest first. A hub without the route answers 404: the service treats it as
+  none and asks again in an hour, and the player is told nothing.
+- `announcements_seen.txt` beside `identity.key` keeps the key id and the highest
+  announcement number shown ([official/seen.rs](../crates/sjk-viewer/src/official/seen.rs),
+  as `holocrons_seen.txt`). Announcements above it, at most the newest three, go to the end
+  of the SJK chat oldest first (`Service::post_announcements`); with no file for the key
+  only the newest shows, so a fresh install is not flooded. They go in only once the hub
+  being read has answered (its backlog first), and only with the chat on (`cl_sjkChat`); an
+  announcement is counted as shown once the chat holds it. One the feed relayed is already
+  in the chat and is not added twice. An announcement put in this way takes the id of the
+  chat's newest message, so the feed's next message still follows it; the game's feed
+  tells these lines by their announcement number and shows each once.
+- The line, in all three places the SJK chat shows (the game's chat feed, the docked
+  chat, the chat page; [official/words.rs](../crates/sjk-viewer/src/official/words.rs)):
+  SJK's logo where a player's tick goes, "SJK" in the SJK UI's accent gold, then the
+  title in bold and a colon, the text's first line (cut with "..." past 110 characters)
+  and "Read more" when the text says more. The game's chat draws the logo before the name
+  as for every SJK sender and cannot draw the title in bold or be clicked, so its line
+  ends with "Read more: /announcement" instead. The line is kept with the chat's last
+  200, is not a message (no sound, no sender card, nothing to mute or ban) and is never
+  sent to a game server.
+- "Read more": a click on the line in the dock or on the chat page (Up and Down on the
+  page pass over it), or the console's `announcement [number]` (no number: the newest),
+  opens the announcement's card ([sjk-ui.md](sjk-ui.md#announcements-and-reward-rounds)).
+
+**Reward rounds** are the SJK team's contributor rewards, posted by the hub's operator.
+
+- The service reads `GET /v1/rewards` at the registration, every 30 minutes, soon after
+  the feed tells of a round, and when the round list opens (`Service::refresh_rewards`,
+  at most every 30 seconds); `Snapshot::rewards` holds the player's pending and claimed
+  rewards and the newest rounds.
+- A round's line, for everyone: the "from the SJK team" gift box (SJK Symbols U+E028) in
+  the accent gold where the tick goes, "SJK", then "Contributor rewards #1: 7 players
+  rewarded. See the list" ("1 player rewarded"); the game's chat starts it with the gift
+  box and ends it with ": /rewards". A click (or `rewards`) opens the round list.
+- A reward waiting for the player opens the claim window as the medal pop-up opens: on
+  the main menu, or when the game menu opens in a match, never over play; in a match an
+  unlock card says "Contributor reward waiting" / "Open the game menu to claim it" once
+  per reward. Claim calls `POST /v1/rewards/claim`; the hub's answer brings the profile
+  (its new gift holocrons then arrive through the holocron pop-up) and the rewards, and
+  the window shows the next reward or closes. A refusal says why in the window
+  ("This reward was claimed already.", "This reward is not waiting for you any more.",
+  else the hub's words). Later puts the window away until the menus close and open again.
+- `debug_announce [news|release|long]` and `debug_reward [list]` rehearse the lines (in
+  the game's chat) and the windows offline: nothing is sent, nothing is written to
+  `announcements_seen.txt`, a rehearsed Claim only closes the reward.
+
+**The creator** writes announcements in game: the `announce` window (Kind News or Release
+with its version, Title, Text; a live preview of the chat line; Ctrl+Enter or Send, then
+a confirmation) sends `POST /v1/creator/announce`, checked first with the hub's rules
+(`news::check`: a title of 1 to 80 characters on one line, a text of 1 to 2000 characters
+on at most 30 lines, the chat's alphabet without `^`, a release's version like
+`2026.1025.1`). Anyone else is told "Only SJK's creator can announce", and the hub refuses
+them too.
+
+Checked (25/10/2026): unit tests for the wire types (the spec's examples), the rules,
+the request bodies, the feed's merging and its news, the posting of read announcements,
+the service's readings, claims and announcements against a fake hub, the seen file, the
+line words, the windows' keys, and the round list. Not checked: anything against the real
+hub, or in a game.
 
 ## Vitals
 

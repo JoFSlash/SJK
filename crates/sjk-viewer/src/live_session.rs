@@ -231,6 +231,7 @@ impl GpuState {
             eprintln!("failed to request intermission scoreboard: {error}");
         }
         let snapshot = session.latest_snapshot();
+        let snapshot_origin = snapshot.player.origin();
         let delta_angles = self
             .gameplay_input
             .view_authority
@@ -301,10 +302,16 @@ impl GpuState {
                 .local_prediction
                 .committed_state()
                 .map(crate::ghost_replay::Pose::of);
-            // The Hax toy steers, or stands still while steering another (`hax`).
+            // The Hax toy steers, or stands still while steering another (`hax`); a
+            // limp player's real body walks to their ragdoll (`ragdoll`).
+            let origin = self
+                .local_prediction
+                .committed_state()
+                .map_or(snapshot_origin, |state| state.origin);
             let replay = self
                 .hax
                 .drive(&command, delta_angles, (self.camera_pitch, self.camera_yaw))
+                .or_else(|| self.ragdoll.drive(&command, delta_angles, origin))
                 .or_else(|| pose.and_then(|pose| self.ghost.drive(&command, &pose)));
             // Or the mimic copies another player (`mimic`).
             let replay = replay.or_else(|| {

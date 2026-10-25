@@ -97,6 +97,10 @@ pub(crate) enum InputAction {
     ExecuteOrder66,
     /// `toy_hax`: turn the Hax toy on or off ([`crate::hax`]).
     Hax,
+    /// `toy_ragdoll`: go limp, or get up ([`crate::ragdoll`]).
+    Ragdoll,
+    /// `toy_drone`: let drones follow the player, or not ([`crate::drone`]).
+    Drone,
     /// `cameracontrol`: open Camera control, as F8 does
     /// ([`crate::ingame_menu::Page::Shot`]).
     CameraControl,
@@ -298,6 +302,8 @@ impl GameplayInput {
                     | crate::order66::COMMAND
                     | crate::order66::EXECUTE_COMMAND
                     | crate::hax::COMMAND
+                    | crate::ragdoll::COMMAND
+                    | crate::drone::COMMAND
                     | "cameracontrol"
             )
     }
@@ -465,6 +471,8 @@ impl GameplayInput {
             crate::order66::COMMAND => Some(InputAction::Order66),
             crate::order66::EXECUTE_COMMAND => Some(InputAction::ExecuteOrder66),
             crate::hax::COMMAND => Some(InputAction::Hax),
+            crate::ragdoll::COMMAND => Some(InputAction::Ragdoll),
+            crate::drone::COMMAND => Some(InputAction::Drone),
             "cameracontrol" => Some(InputAction::CameraControl),
             "vote" => match words.next().map(str::to_ascii_lowercase).as_deref() {
                 Some("yes" | "y" | "1") => Some(InputAction::Vote(true)),
@@ -591,6 +599,8 @@ impl super::GpuState {
             Some(InputAction::Order66) => self.toggle_order66(),
             Some(InputAction::ExecuteOrder66) => self.execute_order66(),
             Some(InputAction::Hax) => self.toggle_hax(),
+            Some(InputAction::Ragdoll) => self.toggle_ragdoll(),
+            Some(InputAction::Drone) => self.toggle_drone(),
             Some(InputAction::FlipKick) => {
                 let restricted = self.live_session.as_ref().is_some_and(|session| {
                     session

@@ -190,7 +190,13 @@ impl LocalPrediction {
 
     /// Carry only the display copy to the exact time used to draw platforms.
     /// The raw predictor stays at physicsTime for subsequent command replay.
-    pub(crate) fn present_frame(&mut self, snapshot: &Snapshot, time: i32) -> Option<Vec3> {
+    pub(crate) fn present_frame(
+        &mut self,
+        snapshot: &Snapshot,
+        time: i32,
+        bsp: &Bsp,
+        scratch: &mut TraceScratch,
+    ) -> Option<Vec3> {
         self.presentation_time = time;
         self.render_movers.update(snapshot, time);
         self.physics_movers.set_angle_time(time);
@@ -208,6 +214,16 @@ impl LocalPrediction {
         // AttachRidersGeneric reads the driver bolt at BG_GetTime (the rendered
         // frame), not once per network snapshot. Keep the raw replay state intact.
         self.rides.present_pilot(&mut presented, time);
+        if !self.fake_noclip {
+            let collision =
+                BspMovementCollision::with_movers(bsp, scratch, &self.physics_movers.colliders);
+            wall_grab_view::align(
+                &mut presented,
+                &collision,
+                self.movement_config.debug_melee,
+                self.wall_grab_lock,
+            );
+        }
         let eye = Vec3::from_array(presented.origin) + Vec3::Z * presented.view_height as f32;
         self.presented = Some(presented);
         Some(eye)

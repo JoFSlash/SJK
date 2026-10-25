@@ -49,6 +49,8 @@ pub(super) fn upload(
         return Ok(());
     }
     let started = Instant::now();
+    // This map's figures only: models compressed during the last match counted too.
+    let _ = mips::compression::take_stats();
     let mut seen = HashSet::new();
     let mut jobs = Vec::new();
     for stage in materials.iter().flat_map(|material| &material.stages) {
@@ -99,18 +101,18 @@ pub(super) fn upload(
                     while let Some(job) =
                         batch.get(next.fetch_add(1, std::sync::atomic::Ordering::Relaxed))
                     {
-                        let chains = mips::cache::prepare(job.images, job.width, job.height);
-                        if sender.send((job, chains)).is_err() {
+                        let prepared = mips::prepare(job.images, job.width, job.height);
+                        if sender.send((job, prepared)).is_err() {
                             break;
                         }
                     }
                 });
             }
             drop(sender);
-            for (job, chains) in receiver {
+            for (job, prepared) in receiver {
                 let texture =
                     mips::upload_shared(device, queue, job.images, job.width, job.height, || {
-                        chains
+                        prepared
                     })?;
                 forge.texture_cache.insert(job.key.to_owned(), texture);
             }
@@ -123,5 +125,14 @@ pub(super) fn upload(
         jobs.len(),
         started.elapsed().as_secs_f64() * 1_000.0
     ));
+    let (compressed, stored, rgba, blocks) = mips::compression::take_stats();
+    if compressed > 0 {
+        crate::log::progress(format_args!(
+            "texture compression: {compressed} arrays ({stored} from the store), {} MiB as \
+             RGBA8, {} MiB as blocks",
+            rgba >> 20,
+            blocks >> 20
+        ));
+    }
     Ok(())
 }

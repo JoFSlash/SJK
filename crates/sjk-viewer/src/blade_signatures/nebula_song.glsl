@@ -22,14 +22,14 @@ float ns_front(){ return mod(uTime - 3.0, 11.0)/1.2; }
 float ns_ring(vec3 ro, vec3 rd, float h, float R, float w){
   float best = 1e3;
   vec3 q = rayAt(ro, rd, h);
-  if (q.z > 0.0) best = abs(length(q.xy) - R) + 1e3*behindBlade(ro, rd, q.z);
+  if (q.z > 0.0) best = hideD(abs(length(q.xy) - R), behindBlade(ro, rd, q.z));
   float a = dot(rd.xz, rd.xz), b = dot(ro.xz, rd.xz), c = dot(ro.xz, ro.xz) - R*R;
   float dsc = b*b - a*c;
   if (dsc > 0.0 && a > 1e-6){
     float k = sqrt(dsc);
     float t0 = (-b - k)/a, t1 = (-b + k)/a;
-    if (t0 > 0.0) best = min(best, abs(ro.y + rd.y*t0 - h) + 1e3*behindBlade(ro, rd, t0));
-    if (t1 > 0.0) best = min(best, abs(ro.y + rd.y*t1 - h) + 1e3*behindBlade(ro, rd, t1));
+    if (t0 > 0.0) best = min(best, hideD(abs(ro.y + rd.y*t0 - h), behindBlade(ro, rd, t0)));
+    if (t1 > 0.0) best = min(best, hideD(abs(ro.y + rd.y*t1 - h), behindBlade(ro, rd, t1)));
   }
   return halo(best, max(0.05, w*0.15))*1.4 + halo(best, w*0.45)*0.35;
 }

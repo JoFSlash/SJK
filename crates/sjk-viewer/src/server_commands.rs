@@ -174,6 +174,7 @@ pub(crate) fn consume_messages(
             // the chat box.
             sjk_client::ServerEventKind::Chat | sjk_client::ServerEventKind::TeamChat => {
                 let own_whisper = chat.own_whisper_body(&event.kind, &text, event.sender);
+                let private = event.is_private;
                 if let Some(console) = &mut console {
                     console.push_chat_line(
                         sjk_client::chat_display_text(&text),
@@ -188,6 +189,15 @@ pub(crate) fn consume_messages(
                     event.is_private,
                     Instant::now(),
                 );
+                // A tell, not the server's echo of the player's own: the taskbar
+                // flashes while the window is away (`chat_sounds.rs`).
+                if private
+                    && own_whisper.is_none()
+                    && chat.newest_is_open_private()
+                    && let Some(console) = &mut console
+                {
+                    console.note_private_message();
+                }
             }
             sjk_client::ServerEventKind::CenterPrint => {
                 chat.receive_classified(

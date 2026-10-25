@@ -758,6 +758,7 @@ mod tests {
             illuminate: false,
             saber_off: Vec::new(),
             toys: Vec::new(),
+            saber_sounds: String::new(),
         };
         let mut looks = Looks::default();
         looks.replace_roster([(3, "Fox", Some(&tidal))]);

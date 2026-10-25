@@ -10,8 +10,9 @@
 vec3 cargo_stack_glow0(vec3 g, vec2 b, float r, float px){
   float cyc = fract(uTime/8.0);
   float n = cyc*(uLength/2.5 + 2.0);
+  // round 23: the top of the stack smoothed over a pixel (it stair-stepped)
   float k = floor(b.y/2.5);
-  float lit = step(k + 1.0, n)*part(0.0);
+  float lit = mix(step(k + 1.0, n), step(k + 2.0, n), cellMix(b.y/2.5, px/2.5))*part(0.0);
   float edge = halo((0.5 - abs(fract(b.y/2.5) - 0.5))*2.5, 0.05);
   float clear = smoothstep(0.92, 1.0, cyc)*part(0.0);
   return g*(0.6 + 0.45*lit + 0.8*clear + 0.4*(1.0 - part(0.0))) + lvl(g)*vec3(1.0)*edge*0.3*lit;

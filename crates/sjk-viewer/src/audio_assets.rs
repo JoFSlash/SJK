@@ -352,6 +352,7 @@ impl GpuState {
             vfs,
             crate::audio::ui_cues::CUE_SOUNDS.iter().map(|cue| cue.1),
         );
+        audio.register_effect_paths(vfs, crate::chat_sounds::files());
         audio.register_sjk_chat_sound(vfs);
         let effects_done = Instant::now();
         crate::log::progress(format_args!(

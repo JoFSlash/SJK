@@ -142,6 +142,12 @@ impl BladeChoice {
             .map_or(0, |at| at + 1)
     }
 
+    /// The blade skins the player owns, the rarest tier first (the Sounds row offers
+    /// their sound sets).
+    pub(super) fn owned(&self) -> &[&'static Unlockable] {
+        &self.owned
+    }
+
     /// The blade skin worn, `None` for the stock blade.
     pub(super) fn worn(&self) -> Option<&'static Unlockable> {
         self.worn

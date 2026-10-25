@@ -172,6 +172,12 @@ pub trait ClientMod: Send {
     fn settings(&self) -> &'static [Setting] {
         &[]
     }
+    /// Earlier or other clients' names of its settings, as `(old, current)`: the
+    /// host accepts them as aliases, so saved profiles and configs keep working
+    /// and the value is saved under the current name.
+    fn old_setting_names(&self) -> &'static [(&'static str, &'static str)] {
+        &[]
+    }
     /// Userinfo opt-ins, applied only while this mod is loaded and the setting
     /// permits them. The host removes them on disable, leave or another server.
     fn userinfo_fields(&self) -> &'static [UserinfoField] {

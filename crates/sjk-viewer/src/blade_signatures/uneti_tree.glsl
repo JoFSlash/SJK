@@ -18,7 +18,10 @@ float ut_top(){ float g = clamp(uAge/0.45, 0.0, 1.0); return uLength*(1.0 - (1.0
 float ut_sap(float y){
   float u = y*0.11 - uTime*(0.55);
   float f = fract(u);
-  return 1.6*pow(f, 8.0)*smoothstep(1.0, 0.96, f) + 0.6*pow(fract(u*1.7 + 0.37), 12.0);
+  // round 23: the second, smaller pulse's front softened as the first's (a hard line across it)
+  float g = fract(u*1.7 + 0.37);
+  // (0.96 rather than 0.6, as the softened front peaks at 0.63: as bright at its peak as before)
+  return 1.6*pow(f, 8.0)*smoothstep(1.0, 0.96, f) + 0.96*pow(g, 12.0)*(1.0 - smoothstep(0.96, 1.0, g));
 }
 // distance (in units) from a cross-section point to a set of n strands wound at radius rr,
 // angle offset ph (turns); a is the point's angle in turns, r its radius
@@ -90,9 +93,10 @@ vec3 r8_vol(vec3 ro, vec3 rd, float px){
   // clash: a ring of light blooms out across the blade
   if (cl > 0.0){
     vec3 h = rayAt(ro, rd, uLength*0.62);
-    float rr = (length(h.xy) + 1e3*behindBlade(ro, rd, h.z));
+    // round 23: hidden behind the blade softly (see hideD in lab.glsl)
+    float rr = length(h.xy), seen = 1.0 - behindBlade(ro, rd, h.z);
     float R = 0.6 + (1.0 - cl)*4.5;
-    if (h.z > 0.0) col += (UT_PALE*halo(abs(rr - R), 0.35) + vec3(1.0)*halo(abs(rr - R), 0.08))*cl*1.4*uFx;
+    if (h.z > 0.0) col += (UT_PALE*halo(abs(rr - R), 0.35) + vec3(1.0)*halo(abs(rr - R), 0.08))*cl*1.4*uFx*seen;
   }
   // sap sparks: bright drops of the Force flung off the fibres as a pulse passes
   for (int i = 0; i < 14; i++){

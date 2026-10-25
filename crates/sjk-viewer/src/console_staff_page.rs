@@ -214,6 +214,11 @@ fn open_in_editor(path: &std::path::Path) {
     }
     let _ = if cfg!(target_os = "windows") {
         std::process::Command::new("explorer").arg(path).spawn()
+    } else if cfg!(target_os = "macos") {
+        std::process::Command::new("open")
+            .args(["-t"])
+            .arg(path)
+            .spawn()
     } else {
         std::process::Command::new("xdg-open").arg(path).spawn()
     };
