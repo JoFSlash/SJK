@@ -712,6 +712,11 @@ stays level over 12 map changes. With the hub's 333 card faces mounted, the menu
 pictures at r_picmip 2 went from 539 to 2316 MiB in use (3235 MiB reserved): every face
 was uploaded at 1024 pixels in every world (see [cards.md](cards.md)), which the hub's
 crash reports named (`label = 'SJK menu emblem'`, a GTX 1060 3GB in the main menu).
+The pictures now load only when a screen draws them, under `SJK card art`
+([cards.md](cards.md#in-the-client)); the audit no longer waits for them to decode and
+prints that label, which a menu showing no card leaves at none. Slash's `vram` on a
+built-in Radeon went from 2819 to 780 to 805 MiB on Academy6; the audit was not run
+again.
 
 ## Eye adaptation
 

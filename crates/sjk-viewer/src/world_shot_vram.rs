@@ -336,8 +336,9 @@ fn low_end_vram_audit() {
 }
 
 /// Audit: the menus on pictures at r_picmip 2 (a 3 GB card's start) with the SJK packs
-/// the hub serves mounted from `JKA_GAME_DATA/SJK/assets`, before and after the card
-/// faces upload, then the next map built beside it (a map change's peak).
+/// the hub serves mounted from `JKA_GAME_DATA/SJK/assets`, before and after they mount
+/// (the card faces' pictures load only when drawn), then the next map built beside it
+/// (a map change's peak).
 #[test]
 #[ignore = "renders with the GPU and the installed game data named by JKA_GAME_DATA"]
 fn card_faces_vram_audit() {
@@ -358,24 +359,16 @@ fn card_faces_vram_audit() {
         let _skins = crate::sjk_packs::mount(&directory);
         let faces = crate::cards::faces::current();
         let count = faces.list.len();
-        let started = std::time::Instant::now();
-        while (0..count).any(|index| faces.art(index).is_none())
-            && started.elapsed() < std::time::Duration::from_secs(120)
-        {
-            std::thread::sleep(std::time::Duration::from_millis(200));
-        }
-        eprintln!(
-            "audit: {count} card faces decoded in {:.1} s",
-            started.elapsed().as_secs_f64()
-        );
+        // The pictures load when a screen draws them (`cards::faces`): a menu that shows
+        // no card holds none, where all of them went up at start before 25/10/2026.
         let _ = frame(&mut gpu, (count as u32) / 2 + 20);
         let (after, by_label) = live(&gpu.device);
-        let emblem = by_label.get("SJK menu emblem").copied().unwrap_or(0);
+        let cards = by_label.get("SJK card art").copied().unwrap_or(0);
         eprintln!(
-            "audit: picture menu {:.0} MiB before the packs, {:.0} MiB after {count} faces (SJK menu emblem {:.0} MiB)",
+            "audit: picture menu {:.0} MiB before the packs, {:.0} MiB after {count} faces (SJK card art {:.0} MiB)",
             before as f64 / MIB,
             after as f64 / MIB,
-            emblem as f64 / MIB
+            cards as f64 / MIB
         );
         let (mut input, _next) = world_input("maps/mp/siege_desert.bsp", None, &cvars);
         input.console = None;
@@ -397,9 +390,9 @@ fn card_faces_vram_audit() {
         let _ = frame(&mut gpu, (count as u32) / 2 + 20);
         let (in_map, by_label) = live(&gpu.device);
         eprintln!(
-            "audit: siege_desert after its faces upload {:.0} MiB (SJK menu emblem {:.0} MiB)",
+            "audit: siege_desert with the packs {:.0} MiB (SJK card art {:.0} MiB)",
             in_map as f64 / MIB,
-            by_label.get("SJK menu emblem").copied().unwrap_or(0) as f64 / MIB
+            by_label.get("SJK card art").copied().unwrap_or(0) as f64 / MIB
         );
     });
 }
