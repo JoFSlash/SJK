@@ -957,7 +957,8 @@ impl ShapeRenderer {
             }
             None if crate::cards::faces::index_of(texture).is_some() => {
                 let index = crate::cards::faces::index_of(texture).unwrap_or_default();
-                // Not uploaded yet: the window stays dark until it is.
+                // Not uploaded yet: asked for, and the window stays dark until it is.
+                self.cards.touch(index);
                 self.cards.group(index)?;
                 Source::Card(index as u16)
             }

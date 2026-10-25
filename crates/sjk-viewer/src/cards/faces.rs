@@ -6,17 +6,20 @@
 //! looks like, so a client draws a card it has the face of and shows "Unknown card"
 //! (its id) for one it has not.
 //!
-//! The faces are read whenever the packs are mounted ([`install`]); their pictures are
-//! decoded on a worker thread, squeezed into a square mip chain the UI renderer uploads
-//! (`ui_renderer/card_art.rs`) and drawn back into the 6:5 window, which undoes the
-//! squeeze. Until a picture is decoded the window stays dark.
+//! The faces are read whenever the packs are mounted ([`install`]); a picture is decoded
+//! on a worker thread when a screen first draws it ([`Faces::request`]), squeezed into a
+//! square mip chain the UI renderer uploads (`ui_renderer/card_art.rs`) and takes back
+//! ([`Faces::take_art`]), then drawn back into the 6:5 window, which undoes the squeeze.
+//! Until a picture is decoded the window stays dark. All 339 pictures were decoded at
+//! every start and kept, 5.3 MiB each in memory and again on the graphics card: about
+//! 2 GB of each on Slash's built-in Radeon (`vram`, 25/10/2026), a card never opened.
 
 use super::Rarity;
 use crate::menu::emblem::MipChain;
 use serde::Deserialize;
 use sjk_ui::TextureId;
 use sjk_vfs::VirtualFileSystem;
-use std::sync::{Arc, Mutex, MutexGuard, OnceLock};
+use std::sync::{Arc, Mutex, MutexGuard, Weak, mpsc};
 
 /// Where the card files are in a pack, and their extension.
 pub(crate) const FOLDER: &str = "cards";
@@ -258,22 +261,43 @@ pub(crate) fn load(vfs: &VirtualFileSystem) -> Vec<Face> {
     faces
 }
 
-/// The faces of the last mount and their pictures, as they decode.
+/// Where one face's picture is.
+enum Art {
+    /// Not asked for, or handed to the renderer.
+    Idle,
+    /// On the worker.
+    Decoding,
+    /// Decoded, waiting for the renderer.
+    Ready(MipChain),
+    /// Missing or not a picture: not tried again under this mount.
+    Failed,
+}
+
+/// The faces of the last mount and their pictures, as they are asked for.
 pub(crate) struct Faces {
     pub(crate) list: Vec<Face>,
-    /// Each face's picture, once decoded (`None` inside when it could not be).
-    art: Vec<OnceLock<Option<MipChain>>>,
+    art: Vec<Mutex<Art>>,
+    /// The packs the pictures are read from.
+    packs: Option<VirtualFileSystem>,
+    /// The worker decoding the pictures asked for, started by the first request.
+    worker: Mutex<Option<mpsc::Sender<usize>>>,
     /// Counts mounts; the renderer uploads the pictures again when it changes.
     pub(crate) generation: u64,
 }
 
 impl Faces {
-    fn empty() -> Self {
+    fn new(list: Vec<Face>, packs: Option<VirtualFileSystem>, generation: u64) -> Self {
         Self {
-            list: Vec::new(),
-            art: Vec::new(),
-            generation: 0,
+            art: list.iter().map(|_| Mutex::new(Art::Idle)).collect(),
+            list,
+            packs,
+            worker: Mutex::new(None),
+            generation,
         }
+    }
+
+    fn empty() -> Self {
+        Self::new(Vec::new(), None, 0)
     }
 
     /// The face of card `id`, with its position in [`Self::list`].
@@ -289,16 +313,106 @@ impl Faces {
     /// Faces `list` without pictures, for tests (not the current ones).
     #[cfg(test)]
     pub(crate) fn of_list(list: Vec<Face>) -> Self {
-        Self {
-            art: list.iter().map(|_| OnceLock::new()).collect(),
-            list,
-            generation: 1,
+        Self::new(list, None, 1)
+    }
+
+    fn state(&self, index: usize) -> Option<MutexGuard<'_, Art>> {
+        self.art
+            .get(index)
+            .map(|art| art.lock().unwrap_or_else(|poisoned| poisoned.into_inner()))
+    }
+
+    /// Decode face `index`'s picture on the worker, unless it is decoding, waiting or
+    /// could not be read.
+    pub(crate) fn request(self: &Arc<Self>, index: usize) {
+        let Some(mut state) = self.state(index) else {
+            return;
+        };
+        if !matches!(*state, Art::Idle) || self.packs.is_none() {
+            return;
+        }
+        let mut worker = self
+            .worker
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        if worker.is_none() {
+            let (sender, receiver) = mpsc::channel();
+            let faces = Arc::downgrade(self);
+            let spawned = std::thread::Builder::new()
+                .name("sjk-card-art".into())
+                .spawn(move || decode_requests(&faces, &receiver));
+            match spawned {
+                Ok(_) => *worker = Some(sender),
+                Err(error) => {
+                    crate::log::progress(format_args!(
+                        "warning: card pictures not loaded, drawing without them: {error}"
+                    ));
+                    *state = Art::Failed;
+                    return;
+                }
+            }
+        }
+        if worker
+            .as_ref()
+            .is_some_and(|sender| sender.send(index).is_ok())
+        {
+            *state = Art::Decoding;
         }
     }
 
-    /// The decoded picture of face `index`, once it is.
-    pub(crate) fn art(&self, index: usize) -> Option<&MipChain> {
-        self.art.get(index)?.get()?.as_ref()
+    /// Face `index`'s decoded picture, handed over: the renderer keeps it on the card,
+    /// and asks again ([`Self::request`]) if it lets it go.
+    pub(crate) fn take_art(&self, index: usize) -> Option<MipChain> {
+        let mut state = self.state(index)?;
+        match std::mem::replace(&mut *state, Art::Idle) {
+            Art::Ready(chain) => Some(chain),
+            other => {
+                *state = other;
+                None
+            }
+        }
+    }
+
+    /// Whether face `index`'s picture is decoded and waiting, for tests.
+    #[cfg(test)]
+    pub(crate) fn art_ready(&self, index: usize) -> bool {
+        self.state(index)
+            .is_some_and(|state| matches!(*state, Art::Ready(_)))
+    }
+
+    /// Face `index`'s picture decoded now, on this thread, for a world shot.
+    #[cfg(test)]
+    fn decode_now(&self, index: usize) -> Option<MipChain> {
+        read_picture(self.packs.as_ref()?, &self.list.get(index)?.art)
+    }
+}
+
+/// The worker: decode each face asked for while its faces are the ones in use.
+fn decode_requests(faces: &Weak<Faces>, requests: &mpsc::Receiver<usize>) {
+    while let Ok(index) = requests.recv() {
+        let Some(faces) = faces.upgrade() else {
+            return;
+        };
+        let (Some(packs), Some(face)) = (faces.packs.as_ref(), faces.list.get(index)) else {
+            continue;
+        };
+        let decoded = read_picture(packs, &face.art);
+        if let Some(mut state) = faces.state(index) {
+            *state = decoded.map_or(Art::Failed, Art::Ready);
+        }
+    }
+}
+
+/// The picture at `path` in `packs` as the renderer's mip chain, or `None` (logged).
+fn read_picture(packs: &VirtualFileSystem, path: &str) -> Option<MipChain> {
+    match packs.read(path).ok().flatten() {
+        Some(asset) => decode(&asset.bytes)
+            .inspect_err(|why| crate::log::progress(format_args!("cards: {path}: {why}")))
+            .ok(),
+        None => {
+            crate::log::progress(format_args!("cards: {path}: missing"));
+            None
+        }
     }
 }
 
@@ -316,27 +430,20 @@ pub(crate) fn current() -> Arc<Faces> {
 }
 
 /// Make `list` the current faces, face `index`'s picture a copy of the current face
-/// `pictures(index)`'s (when decoded): a made-up catalogue over the packs' pictures, for
+/// `pictures(index)`'s (decoded here): a made-up catalogue over the packs' pictures, for
 /// a world shot.
 #[cfg(test)]
 pub(crate) fn install_for_shot(list: Vec<Face>, pictures: impl Fn(usize) -> usize) {
     let before = current();
-    let art: Vec<OnceLock<Option<MipChain>>> = (0..list.len())
-        .map(|index| {
-            let cell = OnceLock::new();
-            let copy = before.art(pictures(index)).map(|chain| MipChain {
-                size: chain.size,
-                levels: chain.levels.clone(),
-            });
-            let _ = cell.set(copy);
-            cell
-        })
-        .collect();
-    *lock() = Some(Arc::new(Faces {
-        art,
-        list,
-        generation: before.generation + 1,
-    }));
+    let faces = Faces::new(list, before.packs.clone(), before.generation + 1);
+    for index in 0..faces.list.len() {
+        if let (Some(chain), Some(mut state)) =
+            (before.decode_now(pictures(index)), faces.state(index))
+        {
+            *state = Art::Ready(chain);
+        }
+    }
+    *lock() = Some(Arc::new(faces));
 }
 
 /// The name of card `id` as players read it: its face's name, or its id when the packs
@@ -358,60 +465,20 @@ pub(crate) fn index_of(texture: TextureId) -> Option<usize> {
     (index < MAX_FACES).then_some(index)
 }
 
-/// Read the faces of the packs `vfs` (just mounted, under `generation`), make them the
-/// current ones, and decode their pictures on a worker thread.
+/// Read the faces of the packs `vfs` (just mounted, under `generation`) and make them the
+/// current ones; their pictures are read when asked for ([`Faces::request`]).
 pub(crate) fn install(vfs: &VirtualFileSystem, generation: u64) {
     let list = load(vfs);
-    let pictures: Vec<Option<Vec<u8>>> = list
-        .iter()
-        .map(|face| vfs.read(&face.art).ok().flatten().map(|asset| asset.bytes))
-        .collect();
-    let faces = Arc::new(Faces {
-        art: list.iter().map(|_| OnceLock::new()).collect(),
-        list,
-        generation,
-    });
-    if !faces.list.is_empty() {
+    if !list.is_empty() {
         crate::log::progress(format_args!(
             "SJK packs: card faces: {}",
-            faces
-                .list
-                .iter()
+            list.iter()
                 .map(|face| face.id.as_str())
                 .collect::<Vec<_>>()
                 .join(", ")
         ));
     }
-    *lock() = Some(Arc::clone(&faces));
-    if faces.list.is_empty() {
-        return;
-    }
-    let spawned = std::thread::Builder::new()
-        .name("sjk-card-art".into())
-        .spawn(move || {
-            for (index, bytes) in pictures.into_iter().enumerate() {
-                let face = &faces.list[index];
-                let chain = match bytes {
-                    Some(bytes) => match decode(&bytes) {
-                        Ok(chain) => Some(chain),
-                        Err(why) => {
-                            crate::log::progress(format_args!("cards: {}: {why}", face.art));
-                            None
-                        }
-                    },
-                    None => {
-                        crate::log::progress(format_args!("cards: {}: missing", face.art));
-                        None
-                    }
-                };
-                let _ = faces.art[index].set(chain);
-            }
-        });
-    if let Err(error) = spawned {
-        crate::log::progress(format_args!(
-            "warning: card pictures not loaded, drawing without them: {error}"
-        ));
-    }
+    *lock() = Some(Arc::new(Faces::new(list, Some(vfs.clone()), generation)));
 }
 
 /// A picture's bytes as the square mip chain the renderer uploads: cut to the window's

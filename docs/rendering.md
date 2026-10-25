@@ -595,6 +595,10 @@ Windows that memory also shows in the process's RAM in Task Manager.
   label = '...')`, then the causes and the video memory SJK held (allocator report), so a
   crash report says which texture a small card could not take; wgpu's own said only
   `Out of Memory` (Vin's crash in the main menu, 21/10/2026).
+- Card faces' pictures load when a screen draws them and the textures of faces not drawn
+  for a while go past 48 ([cards.md](cards.md#in-the-client)): uploading all 339 at start
+  held about 2 GB of video memory and as much memory again on Slash's built-in Radeon
+  (25/10/2026), most of the 2.8 GB SJK held, in the menu and in a match alike.
 - At start SJK reads the card's video memory before the first map
   ([video_memory.rs](../crates/sjk-viewer/src/video_memory.rs), through
   [sjk-gpu-memory](../crates/sjk-gpu-memory/src/lib.rs): DXGI's high-performance

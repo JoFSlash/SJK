@@ -1,3 +1,15 @@
+## Card pictures on demand
+
+25/10/2026, `claude/sweet-pasteur-card-memory`, based on `main` `bf804760` (Slash's
+`vram` on a built-in Radeon, a test build with the command: 2.8 GB in use, 2016 MiB of it
+339 textures under "SJK menu emblem", the card faces' pictures, all uploaded at start and
+kept decoded in memory too). A card's picture is decoded when a screen draws it, its
+decoded chain handed to the renderer, and past 48 textures those undrawn for 300 frames
+go ([cards.md](cards.md#in-the-client)); card and medal textures have labels of their
+own. Checked by unit tests (which textures go) and the viewer's card and renderer tests
+on Linux. Not verified: the Cards tab, an opening or the card up close in game (pictures
+appearing a few frames later than before), the memory saved.
+
 ## Announcements and contributor reward rounds
 
 25/10/2026, `personal/announcements`, based on `main` `ca5643de`: the client side of the

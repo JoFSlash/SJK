@@ -50,7 +50,7 @@ impl MedalTextures {
             let Some(chain) = decoded.picture(medal) else {
                 continue;
             };
-            let view = super::emblem::upload(device, queue, chain);
+            let view = super::emblem::upload_labelled(device, queue, chain, "SJK medal art");
             self.groups[medal.index()] =
                 Some(device.create_bind_group(&wgpu::BindGroupDescriptor {
                     label: Some("SJK medal bind group"),

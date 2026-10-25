@@ -505,10 +505,16 @@ not know is kept but named nowhere; `Face::blade` in
   that needs more than seven lines at the smallest size is cut at seven. Every face
   drawn (the Cards tab, the card looked at closely, the opening) does this, and the
   shapes are the same as before, only the words move.
-- **The pictures** are decoded on a worker thread when the packs are mounted, cut to
-  6:5 about their middle if they are not, squeezed into a 1024 square with its mip
-  chain and drawn back into the 6:5 window (which undoes the squeeze); the renderer
-  uploads two a frame. 512 faces at most.
+- **The pictures** are decoded on a worker thread when a screen first draws them
+  (`Faces::request`, from the renderer's `CardTextures::touch`), cut to 6:5 about their
+  middle if they are not, squeezed into a 1024 square with its mip chain and drawn back
+  into the 6:5 window (which undoes the squeeze); the renderer uploads two a frame and
+  takes the decoded chain over, so it is not kept in memory too. Past 48 textures, those
+  not drawn for 300 frames are let go and asked for again if drawn again; faces on screen
+  are never let go. 512 faces at most. Until 25/10/2026 every picture was decoded at
+  mount and uploaded at start: 339 faces at 5.3 MiB held about 2 GB of video memory and
+  as much memory again (Slash's `vram` on a built-in Radeon, the largest label, then
+  named "SJK menu emblem"; now "SJK card art").
 - **The kyber shard's mark** (17/10/2026) is a long crystal with a point at each end: a
   square turned on its point (one thick stroke) stretched upright by a transform, its left
   facet the same square again in the full kyber cyan (`shard::KYBER`) under a clip, its
