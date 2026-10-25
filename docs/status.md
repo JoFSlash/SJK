@@ -8,12 +8,12 @@ draws the 3D view smaller and stretches it before postprocessing and the HUD, wh
 at the window's size; built-in GPUs start at 75% ([rendering.md](rendering.md#3d-resolution)).
 Checked by unit tests (sizes, the stretch shader through naga, the built-in default and
 the player's own choice) and the viewer's settings, reload and changelog tests on Linux
-without a GPU. Not verified: any frame on a real card (look, FPS gained, effects or
-reflections at the reduced size), Windows. A code review's eight findings were fixed:
-cards already checked by the small-card settings get the 75% once
-(`r_renderScaleChecked`), supersampling wins without a needless reload, 1 GB cards a
-driver reports short keep 100%, one allocation transaction for both scales, the stretch
-shader without per-size constants, and labels naming the reduced scene.
+without a GPU. Played by Slash on the built-in Radeon, 1920x1080, a test build of this with the
+other low-end changes, 25/10/2026: mp/ffa5 at 75% 115 FPS (GPU 7.5 ms, scene-world 3.2
+ms) against about 102 at 95% (GPU 8.2 to 9.0 ms, scene-world 3.9 to 4.3 ms); Academy6
+at 75% 105 FPS against 101 at 100%. Postprocessing stays about 3 ms at the window's
+size. Built-in GPUs started at 75% as chosen. Not verified: the look against 100% on a
+fixed view, Windows on a discrete card.
 
 ## macOS build
 
