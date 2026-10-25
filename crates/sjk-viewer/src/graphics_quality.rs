@@ -313,6 +313,15 @@ pub(crate) fn command(console: &mut ViewerConsole, args: &[String]) -> Result<Ve
     }
 }
 
+/// The cvars `level` sets, for measurements that build a client at a preset.
+#[cfg(test)]
+pub(crate) fn preset_cvars(level: Level) -> Vec<(&'static str, &'static str)> {
+    VALUES
+        .iter()
+        .map(|(cvar, values)| (*cvar, values[level.index()]))
+        .collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
