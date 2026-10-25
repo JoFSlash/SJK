@@ -730,6 +730,7 @@ and the largest textures of all the pk3 files. Map textures only: not models pla
 the map, skins, effects, lightmaps or screen targets, and texture arrays fitted to a
 common layer size can take more. Written 24/10/2026 without a Windows PowerShell to try
 it on.
+
 The world shots above build their client from a fresh profile, whose renderer cvars are
 their defaults: the Experimental preset, not the SJK (recommended) one players start on.
 `low_end_vram_audit` (`world_shot_vram.rs`) builds each map at each preset
