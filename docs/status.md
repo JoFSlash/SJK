@@ -7,8 +7,11 @@ kept decoded in memory too). A card's picture is decoded when a screen draws it,
 decoded chain handed to the renderer, and past 48 textures those undrawn for 300 frames
 go ([cards.md](cards.md#in-the-client)); card and medal textures have labels of their
 own. Checked by unit tests (which textures go) and the viewer's card and renderer tests
-on Linux. Not verified: the Cards tab, an opening or the card up close in game (pictures
-appearing a few frames later than before), the memory saved.
+on Linux. Played by Slash on the built-in Radeon (a test build with this, the
+`vram` command, compression, 3D resolution and the hitch changes): `vram` read 553 MiB
+in the menu and 710 to 805 MiB on Academy6 and mp/ffa5, against 2819 MiB on Academy6
+before. Not verified: the Cards tab, an opening or the card up close in game (pictures
+appearing a few frames later than before).
 
 ## Announcements and contributor reward rounds
 
