@@ -595,6 +595,12 @@ Windows that memory also shows in the process's RAM in Task Manager.
   label = '...')`, then the causes and the video memory SJK held (allocator report), so a
   crash report says which texture a small card could not take; wgpu's own said only
   `Out of Memory` (Vin's crash in the main menu, 21/10/2026).
+- The `vram` console command ([vram_report.rs](../crates/sjk-viewer/src/vram_report.rs))
+  prints the allocator's report on request, to the console and the client log: the
+  memory in use and reserved, then the labels holding the most (summed, with how many
+  allocations each), the 25 largest and the rest in one line. It is the report a crash
+  on a full card adds to its message, for a player to read in the menu, on a map and
+  after a map change. Backends without gpu-allocator (OpenGL) say they give none.
 - At start SJK reads the card's video memory before the first map
   ([video_memory.rs](../crates/sjk-viewer/src/video_memory.rs), through
   [sjk-gpu-memory](../crates/sjk-gpu-memory/src/lib.rs): DXGI's high-performance

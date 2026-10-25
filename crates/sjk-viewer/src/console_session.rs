@@ -302,6 +302,11 @@ impl ViewerConsole {
                 "mark <note>: viewpos, kept with the note in marks.txt beside the configuration",
             ),
             (
+                "vram",
+                "vram: (diagnostic) the video memory SJK holds, by what it is (map textures, \
+                 fonts, shadows, screen targets...), largest first; also in the client log",
+            ),
+            (
                 "perfmark",
                 "perfmark <text>: a timestamped marker in the client log, to split timing                  runs (SJK_GPU_PHASES, SJK_FRAME_BUDGET) into steps",
             ),
@@ -672,6 +677,7 @@ impl ViewerConsole {
             pending_demo: None,
             pending_screenshot: None,
             pending_viewpos: false,
+            pending_vram: false,
             pending_mark: None,
             marks: config_directory.join("marks.txt"),
             copied: String::new(),

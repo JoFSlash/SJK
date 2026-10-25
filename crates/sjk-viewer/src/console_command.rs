@@ -70,6 +70,7 @@ impl ViewerConsole {
         let pending_demo = &mut self.pending_demo;
         let pending_screenshot = &mut self.pending_screenshot;
         let pending_viewpos = &mut self.pending_viewpos;
+        let pending_vram = &mut self.pending_vram;
         let pending_mark = &mut self.pending_mark;
         let pending_quit = &mut self.pending_quit;
         let exit_command = &self.qcommon.exit_command;
@@ -137,6 +138,13 @@ impl ViewerConsole {
                     .is_some_and(|name| name.eq_ignore_ascii_case("viewpos"))
                 {
                     *pending_viewpos = true;
+                    return Some(Ok(Vec::new()));
+                }
+                if tokens
+                    .first()
+                    .is_some_and(|name| name.eq_ignore_ascii_case("vram"))
+                {
+                    *pending_vram = true;
                     return Some(Ok(Vec::new()));
                 }
                 // `perfmark <text>`: a timestamped line in the client log, here so a
@@ -312,6 +320,11 @@ impl ViewerConsole {
 
         clipboard::copy(&line);
         self.copied = line;
+    }
+
+    /// Whether `vram` was asked for since the last call ([`crate::vram_report`]).
+    pub(crate) fn take_vram_request(&mut self) -> bool {
+        std::mem::take(&mut self.pending_vram)
     }
 
     /// Whether a pose was asked for since the last answer.

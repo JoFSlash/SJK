@@ -207,6 +207,7 @@ mod toy_saved;
 mod trip_mine_lasers;
 mod video_memory;
 mod viewer_app;
+mod vram_report;
 use object_meshes::StaticModelMesh;
 mod achievements_frame;
 mod blade_lab_designs;

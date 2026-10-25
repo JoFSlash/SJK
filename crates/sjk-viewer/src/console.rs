@@ -315,6 +315,8 @@ pub(crate) struct ViewerConsole {
     pending_screenshot: Option<crate::screenshot::Request>,
     /// `viewpos` was typed; the application answers with its camera pose.
     pending_viewpos: bool,
+    /// `vram` asked for the video memory report, answered by the next frame.
+    pending_vram: bool,
     /// `mark <note>` was typed: the pose is also kept, with the note, in [`Self::marks`].
     pending_mark: Option<String>,
     /// Where marks are appended: `marks.txt` beside the configuration.

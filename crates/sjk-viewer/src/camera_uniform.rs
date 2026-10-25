@@ -65,5 +65,14 @@ impl crate::GpuState {
             };
             console.answer_pose(&camera.viewpos(), map);
         }
+        if let Some(console) = &mut self.console
+            && console.take_vram_request()
+        {
+            let report = self.device.generate_allocator_report();
+            for line in crate::vram_report::lines(report.as_ref(), crate::video_memory::summary()) {
+                crate::log::progress(format_args!("{line}"));
+                console.push_log(line);
+            }
+        }
     }
 }

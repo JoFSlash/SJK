@@ -1,3 +1,13 @@
+## The `vram` command
+
+25/10/2026, `claude/sweet-pasteur-vram`, based on `main` `bf804760` (Slash: what the
+about 1.4 GB SJK holds at 1920x1080 before any map is made of; about 0.6 GB of it had no
+name in [rendering.md](rendering.md#gpu-memory)). `vram` prints the allocator's report
+by label, largest first, to the console and the client log. Checked by unit tests (sums
+by label, the overflow line, a backend without a report) and the viewer's console tests
+on Linux. Not verified: the command in game; the labels it names (unlabelled
+allocations show as one line).
+
 ## Announcements and contributor reward rounds
 
 25/10/2026, `personal/announcements`, based on `main` `ca5643de`: the client side of the
