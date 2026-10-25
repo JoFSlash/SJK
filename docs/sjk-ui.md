@@ -2069,6 +2069,48 @@ under it are not drawn and take no input. The same look in every menu style, on 
   the foot; focus starts on Don't send. Keys bottom right: Enter send logs, Esc don't
   send; Space does nothing, so sending takes a deliberate key.
 
+## Announcements and reward rounds
+
+[official/window.rs](../crates/sjk-viewer/src/official/window.rs), 25/10/2026: the SJK
+team's windows ([hub-chat.md](hub-chat.md#announcements-and-reward-rounds)). One SJK
+pop-up card over the darkened screen at a time, the same look in every menu style, on the
+16:9 frame; the menus under it are not drawn and take no input. A window the player opened
+(a click on a line, `announcement`, `rewards`, `announce`) shows at once, over the console
+too; the claim window opens on the main menu or over the game menu, after the medal,
+holocron, reload, FPS and log request cards and before the what's-new card, never in the
+middle of play. Every card is 920 wide from x 500, as tall as what it holds, centred; its
+head is the mark (SJK's logo, or the gift box U+E028 in gold for rewards, 52), a kicker in
+gold (Rajdhani 19) and on the right the date (`dd/mm/yyyy HH:MM`, UTC) or the round; then
+the title (Rajdhani 32, two lines at most). A click outside the card closes the
+announcement and the round list.
+
+- **Announcement:** "FROM THE SJK TEAM" (or "SJK RELEASE"), the title, then the text in
+  Exo 2 18: paragraphs with a gap between them, `- ` lines as gold bullets whose wrapped
+  lines stay indented; 16 lines at once, Up, Down and the wheel scroll the rest. Close
+  (gold for news; Esc, Enter, Space). A release adds Update (gold, U) while this build is
+  older than its version (the main menu's update action: install a release waiting, else
+  the Update page), else See what's new (W, the what's-new card's newest recap).
+- **Round list:** "REWARD ROUND 1 OF 3", the round's title and note, then each person
+  rewarded on a row of 34, alternate rows banded: the clan emblem for a known tag, the
+  name with its colour codes ("Someone" when the hub has none) and the verified seal in a
+  column of 290, the reason (muted, cut at 64 characters) beside it. Eleven rows at once,
+  Up, Down and the wheel scroll; Older and Newer (Left, Right) change the round. No
+  amounts.
+- **Claim:** "CONTRIBUTOR REWARD" with the round's title, "You received", "From the SJK
+  team, thank you.", then a row of 46 per item: each holocron tier's icon (its gem without
+  one) and "2 Rare Holocrons" in the tier's colour, in the tiers' order; the credits' sign
+  and "500 credits"; the kyber shard and "25 kyber shards"; then "Why: <reason>". Claim
+  (gold, Enter; "Claiming..." while the hub answers) and Later (Esc). The hub's refusal
+  shows over the buttons in ember.
+- **Composer** (the creator's `announce`): Kind (News, Release), Version (a release's),
+  Title and Text fields, Tab between them; the fields take Ctrl+A, Ctrl+C, Ctrl+V and a held
+  Backspace ([text_entry.rs](../crates/sjk-viewer/src/text_entry.rs)); Enter in the text
+  makes a new line (a paste keeps its lines), with a count of characters and lines under
+  it. Under them the chat line as players will read it (SJK's logo, "SJK" in gold, the
+  words). Send (or Ctrl+Enter) checks the hub's rules and asks to confirm; Send now
+  (Enter) sends, Back (Esc) returns; the hub's words show if it refuses, and the window
+  closes once it took it.
+
 ## Encrypted whisper
 
 [e2e_whisper_card.rs](../crates/sjk-viewer/src/e2e_whisper_card.rs): the pop-up a
@@ -2202,7 +2244,7 @@ group in the script (`SYMBOLS`) and gets its name in `symbols.rs`.
 | U+E025 | a smith's hammer | its saber smith |
 | U+E026 | a turning arrow | drag to turn |
 | U+E027 | a lightsaber held up | worn |
-| U+E028 | a gift box with a bow | from the SJK team |
+| U+E028 | a gift box with a bow | from the SJK team (also a reward round's chat line and the claim window, 25/10/2026) |
 | U+E029 | a five-pointed star | its edition |
 | U+E030 | a long crystal, a ridge down its middle | Kyber shards (17/10/2026) |
 

@@ -982,6 +982,11 @@ pub struct ChatMessage {
     /// the wire): `text` is empty and the viewer words the line.
     #[serde(skip)]
     pub holocron: Option<DropMark>,
+    /// Set when this "message" is the SJK team's (an announcement or a reward round,
+    /// [`crate::news`]; never read from the wire): `text` is empty and the viewer words
+    /// the line.
+    #[serde(skip)]
+    pub official: Option<crate::news::Official>,
 }
 
 /// What marks a [`ChatMessage`] as a holocron drop, or a grand find of one opened.
@@ -1156,6 +1161,14 @@ pub struct Feed {
     /// New grand finds (absent from hubs before 17/10/2026, and when none).
     #[serde(default)]
     pub finds: Vec<FindEvent>,
+    /// New announcements, oldest first (absent from hubs before 25/10/2026, and when
+    /// none).
+    #[serde(default)]
+    pub announcements: Vec<crate::news::FeedAnnouncement>,
+    /// New reward rounds, oldest first (absent from hubs before 25/10/2026, and when
+    /// none).
+    #[serde(default)]
+    pub rounds: Vec<crate::news::FeedRound>,
     /// Messages staff deleted.
     #[serde(default)]
     pub deleted: Vec<u64>,

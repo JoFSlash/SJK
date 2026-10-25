@@ -312,13 +312,16 @@ fn line_marks<'a>(
             icon: hub.client,
             mark: crate::ui_renderer::mark_texture(hub.verified, hub.trust),
             tier: hub.tier,
-            // Which chats it was said in; a holocron drop is the hub's news, unlabelled.
+            // Which chats it was said in; a holocron drop and the SJK team's lines are
+            // the hub's news, unlabelled.
             label: match hub.tier {
+                _ if hub.official => "",
                 Some(_) => "",
                 None if hub.in_all => "ALL/SJK",
                 None => "SJK",
             },
             emoji: &hub.emoji,
+            accent: hub.official,
         };
         return Some((&line.name, marks));
     }
@@ -363,6 +366,7 @@ fn line_marks<'a>(
             Channel::Global | Channel::Sjk => "",
         },
         emoji: mark.map_or("", |mark| mark.emoji.as_str()),
+        accent: false,
     };
     let name = mark
         .and_then(|mark| mark.name.as_deref())

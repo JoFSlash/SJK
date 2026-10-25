@@ -336,6 +336,9 @@ for a gift, the team's note. It follows the medal pop-up
 - The identity worker reads the own profile again soon (at most once every 30 seconds) when
   a drop for the player's own key arrives in the feed, and the pop-up sees the new holocron
   within half a second of the profile arriving.
+- A contributor reward's holocrons (25/10/2026, [hub-chat.md](hub-chat.md#announcements-and-reward-rounds))
+  are gifts: claiming the reward brings the profile that holds them, and they arrive
+  through this pop-up as any gift does.
 
 ### Chat lines
 

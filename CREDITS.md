@@ -61,11 +61,15 @@ includes:
 - the Hax, a meme toy: hold Use on another player who has it on to hack them
   with the siege hack bar, then steer them for a few seconds;
 - the Ragdoll, a meme toy: the body goes limp and falls where physics takes it,
-  every SJK player seeing the same fall from one relayed start (23/10/2026);
+  every SJK player seeing the same fall from one relayed start (23/10/2026), carried
+  by lifts and pushed by doors, each part heard as flesh and as what it hits
+  (25/10/2026);
 - the Drone toy: the free camera and Peek fly a training remote other SJK players see,
   peeking only players who switched it on (24/10/2026, after Slash's #199);
 - a macOS build for Apple Silicon Macs, drawn through Metal and built by GitHub with
   every release, unsigned and experimental (24/10/2026);
+- announcements from the SJK team in SJK chat, and contributor reward rounds: who was
+  rewarded and why, and a window to Claim one's own (25/10/2026);
 - end-to-end encrypted whispers: whispers between SJK players sealed to the
   recipient's key and carried by the SJK hub, which cannot read them
   (22/10/2026);

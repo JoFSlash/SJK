@@ -322,6 +322,7 @@ mod tests {
             client: "ejk".to_owned(),
             text: text.to_owned(),
             holocron: None,
+            official: None,
         }
     }
 

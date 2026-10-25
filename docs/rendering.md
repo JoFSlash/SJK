@@ -711,6 +711,28 @@ second build: about 3 s in release, 1.4 s of it hidden behind the file read, abo
 | --- | --- | --- | --- |
 | 2208 MiB | 3719 MiB | 1436 MiB | 3045 MiB |
 
+The world shots above build their client from a fresh profile, whose renderer cvars are
+their defaults: the Experimental preset, not the SJK (recommended) one players start on.
+`low_end_vram_audit` (`world_shot_vram.rs`) builds each map at each preset
+(`graphics_quality::preset_cvars`) and texture detail and prints every label, the
+allocator's reserved bytes and what DXGI says the process uses (`VideoMemory::usage`);
+`card_faces_vram_audit` mounts the SJK packs of `JKA_GAME_DATA/SJK/assets`, which the
+other shots never do. Measured 25/10/2026 at 1920x1080 (MiB in use):
+
+| Map, r_picmip 0 / 2 | Vanilla style | SJK (recommended) | Experimental |
+| --- | --- | --- | --- |
+| mp/ffa3 | 1769 / 626 | 1814 / 670 | 2213 / 1065 |
+| mp/siege_desert | 1915 / 618 | 1952 / 654 | 2572 / 1275 |
+| Menu on pictures | 1140 / 512 | 1168 / 539 | 1425 / 797 |
+
+The presets that leave the real-time lighting off differ by about 45 MiB; Experimental
+adds its lamp light cache (up to 360 MiB on ffa5), fixture visibility, GI, froxels and
+sun shadow maps. DXGI's count is the allocator's reserved bytes plus about 200 MiB, and
+stays level over 12 map changes. With the hub's 333 card faces mounted, the menu on
+pictures at r_picmip 2 went from 539 to 2316 MiB in use (3235 MiB reserved): every face
+was uploaded at 1024 pixels in every world (see [cards.md](cards.md)), which the hub's
+crash reports named (`label = 'SJK menu emblem'`, a GTX 1060 3GB in the main menu).
+
 ## Eye adaptation
 
 SJK adapts the exposure to what the camera sees, as eyes do: in a dark area the

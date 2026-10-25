@@ -21,11 +21,13 @@
 //!
 //! The fall is heard: an original flatline, the toy's own ([`FLATLINE`], made by
 //! `scripts/ragdoll_assets.py`; a PK3 with the same path replaces it), at the body, and
-//! the game's own body falls and slams as its points hit the world ([`SOFT_KNOCKS`],
-//! [`HARD_KNOCKS`]).
+//! every part's knocks and scrapes on the world, flesh and the surface's material
+//! ([`sounds`]). Lifts, doors and trains carry and push the body ([`scene`]).
 
 mod body;
+mod scene;
 mod skin;
+mod sounds;
 
 use crate::GpuState;
 use crate::ghost_replay::Drive;
@@ -47,22 +49,6 @@ pub(crate) const TOY: &str = "ragdoll";
 pub(crate) const ICON: &str = "gfx/sjk/toy_ragdoll.png";
 /// Heard as the body goes limp.
 pub(crate) const FLATLINE: &str = "sound/sjk/ragdoll/flatline.wav";
-/// The game's own body falls, for a point that hits the world, and its slams, for one
-/// that hits it hard ([`HARD_SPEED`]).
-const SOFT_KNOCKS: [&str; 3] = [
-    "sound/player/bodyfall_human1.mp3",
-    "sound/player/bodyfall_human2.mp3",
-    "sound/player/bodyfall_human3.mp3",
-];
-const HARD_KNOCKS: [&str; 2] = [
-    "sound/effects/body_slam1.mp3",
-    "sound/effects/body_slam2.mp3",
-];
-/// A knock this hard (units a second into the surface) is heard, and this hard slams.
-const KNOCK_SPEED: f32 = 140.0;
-const HARD_SPEED: f32 = 420.0;
-/// One knock of a body is heard at most every this many game server milliseconds.
-const KNOCK_GAP_MS: i64 = 140;
 /// The start event: this, then the start ([`body::encode`]); the end: this, then the
 /// fall's moment.
 const FALL_PREFIX: &str = "fall_";
@@ -95,8 +81,6 @@ const EF_TELEPORT_BIT: u32 = 1 << 3;
 const EF_NODRAW: u32 = 1 << 8;
 /// `PMF_FOLLOW`.
 const PMF_FOLLOW: u16 = 4096;
-/// `CONTENTS_SOLID`.
-const CONTENTS_SOLID: u32 = 1;
 
 /// A bundled file's bytes, by its name in `assets/ragdoll`.
 macro_rules! bundled {
@@ -144,8 +128,8 @@ impl Event {
 struct Fall {
     start: Start,
     body: Body,
-    /// The last knock heard (game server time).
-    knocked: i64,
+    /// When its parts' knocks were last heard.
+    heard: sounds::Heard,
     /// The `EF_TELEPORT_BIT` the faller had (another's): a flip is a respawn.
     teleport: Option<u32>,
     /// Since when their real body has been far from the ragdoll (another's).
@@ -157,7 +141,7 @@ impl Fall {
         Self {
             body: Body::new(&start),
             start,
-            knocked: i64::MIN,
+            heard: sounds::Heard::default(),
             teleport: None,
             astray: None,
         }
@@ -185,8 +169,10 @@ pub(crate) struct Ragdoll {
     /// The player's own slot, and where its real body is to walk to.
     own: Option<u8>,
     walk_to: Option<Vec3>,
-    /// The sounds to play: (path, where, whose slot); `None` where: the player's own.
-    cues: Vec<(&'static str, Option<Vec3>, u8)>,
+    /// The sounds to play.
+    cues: Vec<Cue>,
+    /// The movers in the bodies' way.
+    movers: scene::Movers,
     sounds_registered: Option<u64>,
     /// The game server time last stepped to.
     time: i64,
@@ -335,39 +321,23 @@ fn relay(event: Event, slot: u8) {
     crate::player_identity::relay_toy_event(TOY, event.text(), slot, false);
 }
 
-/// The world's brushes in a ragdoll's way.
-fn world<'a>(
-    bsp: &'a sjk_bsp::Bsp,
-    scratch: &'a mut sjk_bsp::TraceScratch,
-) -> impl FnMut(Vec3, Vec3, f32) -> Option<(Vec3, Vec3)> + 'a {
-    move |from, to, half| {
-        let bounds = sjk_bsp::Aabb::new([-half; 3], [half; 3]).unwrap_or(sjk_bsp::Aabb::POINT);
-        let trace = bsp.trace_box_with(
-            scratch,
-            from.to_array(),
-            to.to_array(),
-            bounds,
-            CONTENTS_SOLID,
-        );
-        // A point caught in a brush (the sticks pulled it in) may leave it for open
-        // space, else stays: never pushed out some way, which would walk it up a wall.
-        if trace.start_solid {
-            let free = !bsp
-                .trace_box_with(
-                    scratch,
-                    to.to_array(),
-                    to.to_array(),
-                    bounds,
-                    CONTENTS_SOLID,
-                )
-                .start_solid;
-            return (!free).then_some((from, Vec3::ZERO));
+/// A sound of the toy to play: its path, where (`None`: the player's own, not placed),
+/// whose body, and how loud.
+struct Cue {
+    path: &'static str,
+    at: Option<Vec3>,
+    slot: u8,
+    volume: f32,
+}
+
+impl Cue {
+    fn flatline(at: Option<Vec3>, slot: u8) -> Self {
+        Self {
+            path: FLATLINE,
+            at,
+            slot,
+            volume: 1.0,
         }
-        let plane = trace.plane.filter(|_| trace.fraction < 1.0)?;
-        Some((
-            Vec3::from_array(trace.end_position),
-            Vec3::from_array(plane.normal),
-        ))
     }
 }
 
@@ -445,7 +415,7 @@ impl GpuState {
                         if moment >= now - 1_000 {
                             self.ragdoll
                                 .cues
-                                .push((FLATLINE, Some(start_point(&start)), slot));
+                                .push(Cue::flatline(Some(start_point(&start)), slot));
                         }
                     }
                 }
@@ -516,7 +486,7 @@ impl GpuState {
             health,
             camera: (self.camera_pitch, self.camera_yaw),
         });
-        self.ragdoll.cues.push((FLATLINE, None, own));
+        self.ragdoll.cues.push(Cue::flatline(None, own));
     }
 
     /// The player gets up: everyone told hears of it (`tell`), the camera's angles are
@@ -587,7 +557,13 @@ impl GpuState {
         let snapshot = session.snapshot_at_or_before(time as i32);
         let own = self.ragdoll.own;
         let mut shown = [None; SLOTS];
-        let mut world = world(&self.bsp, &mut self.trace_scratch);
+        let mut movers = std::mem::take(&mut self.ragdoll.movers);
+        let mut world = scene::Scene::new(
+            &self.bsp,
+            &mut self.trace_scratch,
+            Some(session),
+            &mut movers,
+        );
         for (slot, entry) in self.ragdoll.falls.iter_mut().enumerate() {
             let Some(fall) = entry else {
                 continue;
@@ -628,27 +604,20 @@ impl GpuState {
             let fraction = (since % i64::from(STEP_MS)) as f32 / STEP_MS as f32;
             let before = fall.body.steps();
             fall.body.run_to(steps, &mut world);
-            // The knocks of this frame's steps, the hardest one heard (not while
-            // fast-forwarding a fall heard late).
-            if fall.body.steps() > before
-                && fall.body.steps() - before < 8
-                && time - fall.knocked >= KNOCK_GAP_MS
-                && let Some(&(joint, hard)) =
-                    fall.body.knocks.iter().max_by(|a, b| a.1.total_cmp(&b.1))
-                && hard >= KNOCK_SPEED
-            {
-                fall.knocked = time;
-                let pick = (time as usize / 7 + joint) % 6;
-                let path = if hard >= HARD_SPEED {
-                    HARD_KNOCKS[pick % HARD_KNOCKS.len()]
-                } else {
-                    SOFT_KNOCKS[pick % SOFT_KNOCKS.len()]
-                };
-                let at = fall.body.points()[joint];
-                self.ragdoll.cues.push((path, Some(at), slot));
+            // The knocks and scrapes of this frame's steps (not while fast-forwarding a
+            // fall heard late).
+            if fall.body.steps() > before && fall.body.steps() - before < 8 {
+                sounds::hear(
+                    &mut fall.heard,
+                    &fall.body,
+                    time,
+                    slot,
+                    &mut self.ragdoll.cues,
+                );
             }
             shown[usize::from(slot)] = Some(fall.body.between(fraction));
         }
+        self.ragdoll.movers = movers;
         // Where the player's own real body walks to: the ragdoll's pelvis.
         self.ragdoll.walk_to = own
             .and_then(|own| shown[usize::from(own)])
@@ -666,19 +635,22 @@ impl GpuState {
         if self.ragdoll.sounds_registered != Some(audio.generation())
             && let Some(vfs) = self.vfs.as_deref()
         {
-            audio.register_effect_paths(
-                vfs,
-                [FLATLINE].into_iter().chain(SOFT_KNOCKS).chain(HARD_KNOCKS),
-            );
+            audio.register_effect_paths(vfs, [FLATLINE].into_iter().chain(sounds::paths()));
             self.ragdoll.sounds_registered = Some(audio.generation());
         }
-        for (path, at, slot) in self.ragdoll.cues.drain(..) {
+        for Cue {
+            path,
+            at,
+            slot,
+            volume,
+        } in self.ragdoll.cues.drain(..)
+        {
             let source = sjk_audio::SourceId(u32::from(slot));
             match at {
-                None => audio.play_local(path, 1.0, source, crate::audio::TOY_CHANNEL),
+                None => audio.play_local(path, volume, source, crate::audio::TOY_CHANNEL),
                 Some(at) => audio.play_on_channel(
                     path,
-                    1.0,
+                    volume,
                     at.to_array(),
                     source,
                     if path == FLATLINE {
@@ -711,7 +683,11 @@ impl GpuState {
             yaw,
         };
         let mut body = Body::new(&start);
-        body.run_to(steps, &mut world(&self.bsp, &mut self.trace_scratch));
+        let mut movers = scene::Movers::default();
+        body.run_to(
+            steps,
+            &mut scene::Scene::new(&self.bsp, &mut self.trace_scratch, None, &mut movers),
+        );
         self.ragdoll.shot_frozen = true;
         shown_lock()[usize::from(slot)] = Some(*body.points());
     }

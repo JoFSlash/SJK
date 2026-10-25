@@ -406,6 +406,7 @@ mod tests {
             client: String::new(),
             text: "gg all".to_owned(),
             holocron: None,
+            official: None,
         };
         chat.sync_sjk(&state([message].into_iter().collect()), |_| false, now);
         chat.open(false);

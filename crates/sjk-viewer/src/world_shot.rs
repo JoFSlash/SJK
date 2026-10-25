@@ -343,6 +343,9 @@ mod emote_picker_shots;
 #[path = "world_shot_alpha_notice.rs"]
 mod alpha_notice_shots;
 
+#[path = "world_shot_official.rs"]
+mod official_shots;
+
 #[path = "world_shot_chat_gifs.rs"]
 mod chat_gifs_shots;
 
@@ -1276,6 +1279,12 @@ Found the fog bug, ask me about it!"
             kyber: None,
             shop: None,
             trade: None,
+            announcements: Vec::new(),
+            announcements_revision: 0,
+            rewards: None,
+            rewards_revision: 0,
+            claim: None,
+            announce: None,
             public_key: String::new(),
         };
         let standings = crate::achievements::ALL
@@ -3434,6 +3443,7 @@ like this one.",
                     client: String::new(),
                     text: (*text).to_owned(),
                     holocron: None,
+                    official: None,
                 },
             )
             .collect();

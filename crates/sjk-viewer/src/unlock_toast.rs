@@ -208,6 +208,9 @@ pub(crate) enum Unlock {
     /// A newer SJK release is out; `manual` when this folder cannot install it itself
     /// (the Update page then offers the release page).
     Update { version: Version, manual: bool },
+    /// A contributor reward (`official.rs`) waits for the player, numbered `id` at the
+    /// hub: the claim window waits for the game menu.
+    Reward { id: u64 },
 }
 
 impl Unlock {
@@ -224,6 +227,7 @@ impl Unlock {
             ) => medal == other && count == other_count,
             (Self::Holocron { id, .. }, Self::Holocron { id: other, .. }) => id == other,
             (Self::Update { version, .. }, Self::Update { version: other, .. }) => version == other,
+            (Self::Reward { id }, Self::Reward { id: other }) => id == other,
             _ => false,
         }
     }
@@ -236,6 +240,7 @@ impl Unlock {
             Self::Holocron { tier, .. } if tier.is_kyber() => "NEW KYBER CRYSTAL",
             Self::Holocron { .. } => "NEW HOLOCRON",
             Self::Update { .. } => "UPDATE AVAILABLE",
+            Self::Reward { .. } => "CONTRIBUTOR REWARD",
         }
     }
 
@@ -254,6 +259,7 @@ impl Unlock {
             Self::Medal { .. } | Self::Holocron { .. } => MENU_HINT,
             Self::Update { manual: false, .. } => UPDATE_HINT,
             Self::Update { manual: true, .. } => UPDATE_MANUAL_HINT,
+            Self::Reward { .. } => "From the SJK team",
         }
     }
 
@@ -261,7 +267,7 @@ impl Unlock {
     fn hue(self) -> Color {
         match self {
             Self::Achievement(kind) => tint(kind.category),
-            Self::Medal { .. } => color::GOLD,
+            Self::Medal { .. } | Self::Reward { .. } => color::GOLD,
             Self::Holocron { tier, .. } => tier.colour,
             Self::Update { .. } => color::HOLO,
         }
@@ -315,6 +321,7 @@ impl fmt::Display for Name {
             Unlock::Medal { medal, .. } => formatter.write_str(medal.name()),
             Unlock::Holocron { tier, .. } => formatter.write_str(tier.name),
             Unlock::Update { version, .. } => write!(formatter, "SJK {}", version.as_str()),
+            Unlock::Reward { .. } => formatter.write_str("Contributor reward waiting"),
         }
     }
 }
@@ -348,6 +355,7 @@ impl fmt::Display for Description {
             Unlock::Update { manual: true, .. } => {
                 formatter.write_str("This folder cannot update itself: see its page")
             }
+            Unlock::Reward { .. } => formatter.write_str("Open the game menu to claim it"),
         }
     }
 }
@@ -896,7 +904,9 @@ fn emblem(canvas: &mut MenuCanvas, unlock: Unlock, centre: [f32; 2], radius: f32
                 (None, Some(tier.colour))
             }
         }
-        Unlock::Update { .. } => (Some((crate::ui_renderer::LOGO_TEXTURE, 0.86)), None),
+        Unlock::Update { .. } | Unlock::Reward { .. } => {
+            (Some((crate::ui_renderer::LOGO_TEXTURE, 0.86)), None)
+        }
     };
     // The medallion's line widths at this size.
     let k = radius / MEDAL_RADIUS;

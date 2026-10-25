@@ -1208,6 +1208,12 @@ pub(crate) mod tests {
             kyber: None,
             shop: None,
             trade: None,
+            announcements: Vec::new(),
+            announcements_revision: 0,
+            rewards: None,
+            rewards_revision: 0,
+            claim: None,
+            announce: None,
             public_key: String::new(),
         }
     }

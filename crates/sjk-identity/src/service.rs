@@ -15,6 +15,7 @@ use crate::feed::{
 use crate::hub::{Hub, HubError};
 use crate::keys::Identity;
 use crate::logs::{LogRequest, LogUpload};
+use crate::news::{AnnounceRequest, Announcement, Rewards};
 use crate::relay::RelayHubs;
 use crate::report::{BugReport, PlayerReport, WorldNote};
 use crate::staff::{OpenedText, StaffQuery, StaffRequest, StaffState};
@@ -85,6 +86,16 @@ const ASSETS_RETRY_MIN: Duration = Duration::from_secs(60);
 const LOG_REQUESTS_EVERY: Duration = Duration::from_secs(120);
 /// How long a hub that refused the reading (from before log requests) is left alone.
 const LOG_REQUESTS_AGAIN: Duration = Duration::from_secs(3_600);
+/// How often the SJK team's announcements and the player's rewards are read while
+/// registered (the feed tells of new ones as they come).
+const NEWS_EVERY: Duration = Duration::from_secs(1_800);
+/// How long a hub that refused the reading (from before announcements) is left alone.
+const NEWS_AGAIN: Duration = Duration::from_secs(3_600);
+/// Shortest time between two readings of the rewards brought forward (a window that
+/// shows them opening, a round the feed told of).
+const REWARDS_SOON: Duration = Duration::from_secs(30);
+/// Announcements kept for the viewer, newest first.
+const ANNOUNCEMENTS_KEPT: usize = 20;
 
 /// What the player has configured.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
@@ -230,6 +241,40 @@ pub struct Snapshot {
     /// What became of the last shatter, craft or purchase ([`Service::shatter`],
     /// [`Service::craft`], [`Service::buy`]).
     pub trade: Option<TradeOutcome>,
+    /// The SJK team's announcements as the hub last listed them and the feed relayed
+    /// since, newest first (`GET /v1/announcements`, 25/10/2026): read at the
+    /// registration and every 30 minutes. Empty before, or from a hub without them.
+    pub announcements: Vec<Announcement>,
+    /// Counts changes to [`Snapshot::announcements`].
+    pub announcements_revision: u64,
+    /// The player's rewards and the newest reward rounds as the hub last said (read at the
+    /// registration, every 30 minutes, after a round the feed told of and on
+    /// [`Service::refresh_rewards`]); `None` before, or from a hub without them.
+    pub rewards: Option<Rewards>,
+    /// Counts changes to [`Snapshot::rewards`].
+    pub rewards_revision: u64,
+    /// What became of the last claim ([`Service::claim_reward`]).
+    pub claim: Option<ClaimOutcome>,
+    /// What became of the creator's last announcement ([`Service::announce`]).
+    pub announce: Option<ReportOutcome>,
+}
+
+/// What became of a claim of a reward.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ClaimOutcome {
+    /// Counts claims asked for, so a reader can tell a new outcome from the last one.
+    pub serial: u64,
+    /// The reward's number.
+    pub id: u64,
+    /// Why it failed, in the player's words; empty when the hub granted it.
+    pub message: String,
+}
+
+impl ClaimOutcome {
+    /// Whether the hub granted it.
+    pub fn done(&self) -> bool {
+        self.message.is_empty()
+    }
 }
 
 /// The shop as last read.
@@ -415,6 +460,12 @@ impl Snapshot {
             kyber: None,
             shop: None,
             trade: None,
+            announcements: Vec::new(),
+            announcements_revision: 0,
+            rewards: None,
+            rewards_revision: 0,
+            claim: None,
+            announce: None,
         }
     }
 
@@ -530,6 +581,14 @@ enum Command {
     Buy(String),
     /// Buy a holocron of this tier with credits.
     BuyHolocron(String),
+    /// The feed relayed the SJK team's news.
+    News(crate::feed::FeedNews),
+    /// The viewer wants fresh rewards.
+    RefreshRewards,
+    /// Claim this reward.
+    ClaimReward(u64),
+    /// The creator's announcement.
+    Announce(AnnounceRequest),
     Stop,
 }
 
@@ -643,6 +702,11 @@ struct Worker {
     /// Log requests the player answered, kept out of what the hub lists until it
     /// stops listing them.
     logs_answered: Vec<i64>,
+    /// When the announcements and the rewards are next read, and when the rewards may
+    /// next be read early.
+    due_announcements: Instant,
+    due_rewards: Instant,
+    rewards_soon_after: Instant,
 }
 
 /// What the hub holds as the player's look.
@@ -864,6 +928,9 @@ impl Worker {
             holocrons_soon_after: now,
             due_log_requests: now,
             logs_answered: Vec::new(),
+            due_announcements: now,
+            due_rewards: now,
+            rewards_soon_after: now,
         }
     }
 
@@ -1238,6 +1305,14 @@ impl Worker {
             Command::ReadShop => self.read_shop(now),
             Command::Buy(id) => self.trade(Trade::Buy, &id),
             Command::BuyHolocron(tier) => self.trade(Trade::Holocron, &tier),
+            Command::News(crate::feed::FeedNews::Announcements(list)) => {
+                self.update(|snapshot| merge_announcements(snapshot, list));
+            }
+            Command::News(crate::feed::FeedNews::Round) | Command::RefreshRewards => {
+                self.rewards_soon(now);
+            }
+            Command::ClaimReward(id) => self.claim_reward(id, now),
+            Command::Announce(request) => self.announce(&request),
             Command::Stop => self.release(),
         }
         self.publish_feed();
@@ -1255,6 +1330,16 @@ impl Worker {
         self.registered = false;
         self.name_sent = None;
         self.update(Snapshot::clear_me);
+        // Another hub's news, or none.
+        self.update(|snapshot| {
+            if !snapshot.announcements.is_empty() {
+                snapshot.announcements.clear();
+                snapshot.announcements_revision += 1;
+            }
+            if snapshot.rewards.take().is_some() {
+                snapshot.rewards_revision += 1;
+            }
+        });
         if settings.enabled && !settings.hub_url.trim().is_empty() {
             match (self.make_hub)(settings.hub_url.trim()) {
                 Ok(hub) => self.hub = Some(hub),
@@ -1833,6 +1918,8 @@ impl Worker {
                     self.due_assets = now;
                     self.due_holocrons = now;
                     self.due_log_requests = now;
+                    self.due_announcements = now;
+                    self.due_rewards = now;
                     self.update(|snapshot| {
                         snapshot.set_me(profile);
                         snapshot.status = Status::Online;
@@ -1848,6 +1935,8 @@ impl Worker {
         self.run_due(now);
         self.keep_holocrons(now);
         self.keep_log_requests(now);
+        self.keep_announcements(now);
+        self.keep_rewards(now);
         self.keep_assets(now);
         self.keep_map_edits(now);
         self.send_crashes(now);
@@ -1884,6 +1973,124 @@ impl Worker {
         }
         wait.min(self.due_holocrons.saturating_duration_since(now))
             .min(self.due_log_requests.saturating_duration_since(now))
+            .min(self.due_announcements.saturating_duration_since(now))
+            .min(self.due_rewards.saturating_duration_since(now))
+    }
+
+    /// Read the SJK team's announcements if it is due. A hub that refuses (from before
+    /// them) is asked again in an hour, one that cannot be reached after [`RETRY_MAX`];
+    /// either way the player is told nothing.
+    fn keep_announcements(&mut self, now: Instant) {
+        if now < self.due_announcements {
+            return;
+        }
+        let Some(hub) = self.hub.as_mut() else {
+            return;
+        };
+        match hub.announcements(&self.identity) {
+            Ok(mut list) => {
+                self.due_announcements = now + NEWS_EVERY;
+                list.sort_by_key(|announcement| std::cmp::Reverse(announcement.id));
+                list.truncate(ANNOUNCEMENTS_KEPT);
+                self.update(|snapshot| {
+                    if snapshot.announcements != list {
+                        snapshot.announcements = list;
+                        snapshot.announcements_revision += 1;
+                    }
+                });
+            }
+            Err(HubError::Network(_)) => self.due_announcements = now + RETRY_MAX,
+            Err(_) => self.due_announcements = now + NEWS_AGAIN,
+        }
+    }
+
+    /// Read the rewards soon, at most once every [`REWARDS_SOON`], and never later than
+    /// they were due anyway.
+    fn rewards_soon(&mut self, now: Instant) {
+        let at = self.rewards_soon_after.max(now);
+        if at < self.due_rewards {
+            self.due_rewards = at;
+            self.rewards_soon_after = at + REWARDS_SOON;
+        }
+    }
+
+    /// Read the player's rewards and the newest rounds if it is due, as the
+    /// announcements are read.
+    fn keep_rewards(&mut self, now: Instant) {
+        if now < self.due_rewards {
+            return;
+        }
+        let Some(hub) = self.hub.as_mut() else {
+            return;
+        };
+        match hub.rewards(&self.identity) {
+            Ok(rewards) => {
+                self.due_rewards = now + NEWS_EVERY;
+                self.update(|snapshot| set_rewards(snapshot, rewards));
+            }
+            Err(HubError::Network(_)) => self.due_rewards = now + RETRY_MAX,
+            Err(_) => self.due_rewards = now + NEWS_AGAIN,
+        }
+    }
+
+    /// Claim reward `id`: the hub grants it and answers the profile (holding the gift
+    /// holocrons it gave) and the rewards after it. A refusal says why in the player's
+    /// words, and the rewards are read again soon (it was claimed from another PC, or
+    /// taken back).
+    fn claim_reward(&mut self, id: u64, now: Instant) {
+        let outcome = match (self.hub.as_mut(), self.registered) {
+            (Some(hub), true) => hub.claim_reward(&self.identity, id),
+            _ => Err(not_connected()),
+        };
+        let message = match outcome {
+            Ok(answer) => {
+                self.update(|snapshot| {
+                    snapshot.set_me(answer.profile);
+                    set_rewards(snapshot, answer.rewards);
+                });
+                // The gift holocrons are new: their progress and pop-up follow.
+                self.holocrons_soon(now);
+                String::new()
+            }
+            Err(error) => {
+                if !matches!(error, HubError::Network(_)) {
+                    self.rewards_soon(now);
+                }
+                claim_refusal(&error)
+            }
+        };
+        self.update(|snapshot| {
+            let serial = snapshot.claim.as_ref().map_or(1, |last| last.serial + 1);
+            snapshot.claim = Some(ClaimOutcome {
+                serial,
+                id,
+                message,
+            });
+        });
+    }
+
+    /// Send the creator's announcement, checked first as the hub checks it; the hub's
+    /// words, or nothing, go in [`Snapshot::announce`].
+    fn announce(&mut self, request: &AnnounceRequest) {
+        let outcome = match crate::news::check(request) {
+            Err(error) => Err(HubError::Rejected {
+                status: 400,
+                code: error.code().to_owned(),
+                message: error.message().to_owned(),
+            }),
+            Ok(checked) => match (self.hub.as_mut(), self.registered) {
+                (Some(hub), true) => hub.announce(&self.identity, &checked),
+                _ => Err(not_connected()),
+            },
+        };
+        let outcome = outcome.map(|announcement| {
+            self.update(|snapshot| merge_announcements(snapshot, vec![announcement]));
+            String::new()
+        });
+        self.update(|snapshot| {
+            let serial = snapshot.announce.as_ref().map_or(1, |last| last.serial + 1);
+            snapshot.announce = Some(outcome_of(serial, outcome.map_err(announce_refusal)));
+        });
     }
 
     /// Read the progress toward the next holocron if it is due. Cosmetic, like the asset
@@ -2348,6 +2555,87 @@ impl Worker {
 }
 
 /// Put the hub's answer about the player's achievements into their profile.
+/// Take `rewards` into `snapshot`, counting a change.
+fn set_rewards(snapshot: &mut Snapshot, rewards: Rewards) {
+    if snapshot.rewards.as_ref() != Some(&rewards) {
+        snapshot.rewards = Some(rewards);
+        snapshot.rewards_revision += 1;
+    }
+}
+
+/// Add the announcements the feed relayed (or the creator just made) to the snapshot's,
+/// each once, newest first.
+fn merge_announcements(snapshot: &mut Snapshot, relayed: Vec<Announcement>) {
+    let mut changed = false;
+    for announcement in relayed {
+        match snapshot
+            .announcements
+            .iter_mut()
+            .find(|known| known.id == announcement.id)
+        {
+            Some(known) if *known == announcement => {}
+            Some(known) => {
+                *known = announcement;
+                changed = true;
+            }
+            None => {
+                snapshot.announcements.push(announcement);
+                changed = true;
+            }
+        }
+    }
+    if changed {
+        snapshot
+            .announcements
+            .sort_by_key(|announcement| std::cmp::Reverse(announcement.id));
+        snapshot.announcements.truncate(ANNOUNCEMENTS_KEPT);
+        snapshot.announcements_revision += 1;
+    }
+}
+
+/// Why a claim failed, in the player's words.
+fn claim_refusal(error: &HubError) -> String {
+    match error {
+        HubError::Rejected { code, .. } if code == "claimed" => {
+            "This reward was claimed already.".to_owned()
+        }
+        HubError::Rejected { code, .. } if code == "not_found" => {
+            "This reward is not waiting for you any more.".to_owned()
+        }
+        HubError::Rejected { message, .. } if !message.is_empty() => message.clone(),
+        HubError::Rejected { code, .. } => format!("The SJK hub refused it ({code})."),
+        HubError::Network(_) => "Cannot reach the SJK hub: try again in a moment.".to_owned(),
+        HubError::Protocol(why)
+            if why.starts_with("status 404") || why.starts_with("status 405") =>
+        {
+            "This SJK hub has no rewards yet.".to_owned()
+        }
+        other => other.to_string(),
+    }
+}
+
+/// An announcement's refusal with the hub's words (or its code when it sent none).
+fn announce_refusal(error: HubError) -> HubError {
+    match error {
+        HubError::Rejected {
+            status,
+            code,
+            message,
+        } if message.is_empty() => HubError::Rejected {
+            status,
+            message: match code.as_str() {
+                "creator_only" | "not_staff" | "staff" | "not_registered" => {
+                    "Only SJK's creator can announce".to_owned()
+                }
+                "announce_quota" => "Ten announcements an hour at most: wait a while".to_owned(),
+                _ => format!("the hub refused it ({code})"),
+            },
+            code,
+        },
+        other => other,
+    }
+}
+
 fn set_achievements(snapshot: &mut Snapshot, achievements: Vec<Achievement>) {
     if let Some(me) = snapshot.me.as_mut() {
         me.achievements = achievements;
@@ -2427,6 +2715,7 @@ impl Service {
         let ping_outcome = Arc::clone(&worker.ping_outcome);
         let feed = Arc::clone(&worker.feed);
         let own_drops = commands.clone();
+        let news = commands.clone();
         let emotes = Arc::new(Mutex::new(VecDeque::new()));
         let looks = Arc::new(Mutex::new(VecDeque::new()));
         let feed_stop = Arc::new(std::sync::atomic::AtomicBool::new(false));
@@ -2445,6 +2734,10 @@ impl Service {
                 }),
                 Instant::now(),
             );
+            let mut feed = feed;
+            feed.set_news(Box::new(move |relayed| {
+                let _ = news.send(Command::News(relayed));
+            }));
             pings = feed.pings();
             toys = feed.toys();
             let stop = Arc::clone(&feed_stop);
@@ -2633,6 +2926,33 @@ impl Service {
     /// [`Snapshot::trade`], and the profile after it.
     pub fn craft(&self, id: &str) {
         let _ = self.commands.send(Command::Craft(id.to_owned()));
+    }
+
+    /// Ask for the player's rewards and the newest rounds again ([`Snapshot::rewards`]);
+    /// read at most once every 30 seconds, for a window that shows them as it opens.
+    pub fn refresh_rewards(&self) {
+        let _ = self.commands.send(Command::RefreshRewards);
+    }
+
+    /// Claim reward `id` (one of [`Snapshot::rewards`]'s pending): what became of it
+    /// arrives in [`Snapshot::claim`], the profile and the rewards after it.
+    pub fn claim_reward(&self, id: u64) {
+        let _ = self.commands.send(Command::ClaimReward(id));
+    }
+
+    /// The creator's announcement: checked here ([`crate::news::check`]), then sent; what
+    /// became of it arrives in [`Snapshot::announce`]. The hub refuses anyone but the
+    /// creator.
+    pub fn announce(&self, request: AnnounceRequest) {
+        let _ = self.commands.send(Command::Announce(request));
+    }
+
+    /// Put `announcements` (oldest first, read from the hub: made while the player was
+    /// away) at the end of the SJK chat, each once ([`crate::feed::post_announcements`]).
+    /// Returns the ids of those the chat now holds; empty while it cannot take them (the
+    /// chat off, or its first answer still to come), so they wait for a later call.
+    pub fn post_announcements(&self, announcements: &[Announcement]) -> Vec<u64> {
+        crate::feed::post_announcements(&self.chat, announcements)
     }
 
     /// Read the shop's offers of the day into [`Snapshot::shop`].
@@ -2989,6 +3309,9 @@ mod tests {
     use crate::ban::ChatBan;
     use std::sync::atomic::{AtomicBool, Ordering};
 
+    /// What the fake hub serves of announcements and rewards.
+    type News = (Vec<Announcement>, Rewards);
+
     /// A hub that records what it is asked.
     #[derive(Clone, Default)]
     struct Fake {
@@ -3021,6 +3344,11 @@ mod tests {
         log_asks: Arc<Mutex<Option<Vec<LogRequest>>>>,
         /// How many times the log requests were looked for.
         log_ask_reads: Arc<Mutex<usize>>,
+        /// The announcements and rewards the fake hub serves; none is a hub from before
+        /// them, which answers 404.
+        news: Arc<Mutex<Option<News>>>,
+        /// How many times the announcements and the rewards were read.
+        news_reads: Arc<Mutex<(usize, usize)>>,
     }
 
     impl Fake {
@@ -3318,6 +3646,63 @@ mod tests {
             }
             let state = self.progress.lock().unwrap().clone();
             state.ok_or_else(|| refused(404, "not_found"))
+        }
+        fn announcements(&mut self, _: &Identity) -> Result<Vec<Announcement>, HubError> {
+            self.news_reads.lock().unwrap().0 += 1;
+            let news = self.news.lock().unwrap().clone();
+            news.map(|(list, _)| list)
+                .ok_or_else(|| HubError::Protocol("status 404".to_owned()))
+        }
+        fn rewards(&mut self, _: &Identity) -> Result<Rewards, HubError> {
+            self.news_reads.lock().unwrap().1 += 1;
+            let news = self.news.lock().unwrap().clone();
+            news.map(|(_, rewards)| rewards)
+                .ok_or_else(|| HubError::Protocol("status 404".to_owned()))
+        }
+        fn claim_reward(
+            &mut self,
+            _: &Identity,
+            id: u64,
+        ) -> Result<crate::news::ClaimAnswer, HubError> {
+            self.record(format!("claim {id}"))?;
+            let mut news = self.news.lock().unwrap();
+            let Some((_, rewards)) = news.as_mut() else {
+                return Err(HubError::Protocol("status 404".to_owned()));
+            };
+            if rewards.claimed.iter().any(|reward| reward.id == id) {
+                return Err(refused(409, "claimed"));
+            }
+            let Some(at) = rewards.pending.iter().position(|reward| reward.id == id) else {
+                return Err(refused(404, "not_found"));
+            };
+            let mut reward = rewards.pending.remove(at);
+            reward.claimed = Some(1);
+            rewards.claimed.insert(0, reward);
+            Ok(crate::news::ClaimAnswer {
+                profile: Profile {
+                    credits: 500,
+                    ..profile("Sol")
+                },
+                rewards: rewards.clone(),
+            })
+        }
+        fn announce(
+            &mut self,
+            _: &Identity,
+            request: &AnnounceRequest,
+        ) -> Result<Announcement, HubError> {
+            self.record(format!("announce {} {}", request.title, request.version))?;
+            if request.title == "refused" {
+                return Err(refused(403, "creator_only"));
+            }
+            Ok(Announcement {
+                id: 9,
+                at: 1,
+                kind: if request.release { "release" } else { "news" }.to_owned(),
+                title: request.title.clone(),
+                text: request.text.clone(),
+                version: request.version.clone(),
+            })
         }
         fn log_requests(&mut self, _: &Identity) -> Result<Vec<LogRequest>, HubError> {
             // Counted apart from the log, which the other tests read whole.
@@ -4589,6 +4974,161 @@ mod tests {
         // Known again: not repeated.
         worker.tick(t2 + Duration::from_secs(46));
         assert_eq!(fake.looks().len(), 2);
+    }
+
+    fn reward(id: u64) -> crate::news::Reward {
+        crate::news::Reward {
+            id,
+            round: 1,
+            round_title: "Contributor rewards #1".to_owned(),
+            reason: "Fixed the fog".to_owned(),
+            credits: 500,
+            ..crate::news::Reward::default()
+        }
+    }
+
+    fn news_item(id: u64) -> Announcement {
+        Announcement {
+            id,
+            at: 1,
+            kind: "news".to_owned(),
+            title: format!("News {id}"),
+            text: "Text".to_owned(),
+            version: String::new(),
+        }
+    }
+
+    /// Announcements and rewards are read at the registration and every 30 minutes; a
+    /// hub without them (404) is left alone an hour and nothing is said; the feed's
+    /// announcements join the list once, and a round reads the rewards again soon.
+    #[test]
+    fn announcements_and_rewards_are_read_at_the_registration_and_kept() {
+        let fake = Fake::default();
+        let t0 = Instant::now();
+        let (mut worker, snapshot) = worker(&fake, t0);
+        worker.handle(Command::Configure(on("https://hub")), t0);
+        worker.tick(t0);
+        assert_eq!(*fake.news_reads.lock().unwrap(), (1, 1));
+        assert!(lock(&snapshot).announcements.is_empty() && lock(&snapshot).rewards.is_none());
+        assert_eq!(lock(&snapshot).status, Status::Online, "no error said");
+        worker.tick(t0 + Duration::from_secs(1_900));
+        assert_eq!(*fake.news_reads.lock().unwrap(), (1, 1), "an hour's rest");
+        *fake.news.lock().unwrap() = Some((
+            vec![news_item(2), news_item(5)],
+            Rewards {
+                pending: vec![reward(7)],
+                ..Rewards::default()
+            },
+        ));
+        let later = t0 + Duration::from_secs(3_700);
+        worker.tick(later);
+        let shown = lock(&snapshot).clone();
+        let ids: Vec<u64> = shown.announcements.iter().map(|a| a.id).collect();
+        assert_eq!(ids, [5, 2], "newest first");
+        assert_eq!(shown.rewards.as_ref().unwrap().pending.len(), 1);
+        let revision = shown.announcements_revision;
+        worker.handle(
+            Command::News(crate::feed::FeedNews::Announcements(vec![
+                news_item(5),
+                news_item(6),
+            ])),
+            later,
+        );
+        let shown = lock(&snapshot).clone();
+        let ids: Vec<u64> = shown.announcements.iter().map(|a| a.id).collect();
+        assert_eq!(ids, [6, 5, 2]);
+        assert_eq!(shown.announcements_revision, revision + 1);
+        // A round: the rewards are read again at once, then not before 30 seconds.
+        worker.handle(Command::News(crate::feed::FeedNews::Round), later);
+        worker.tick(later);
+        assert_eq!(fake.news_reads.lock().unwrap().1, 3);
+        worker.handle(Command::RefreshRewards, later + Duration::from_secs(5));
+        worker.tick(later + Duration::from_secs(5));
+        assert_eq!(fake.news_reads.lock().unwrap().1, 3);
+        worker.tick(later + Duration::from_secs(31));
+        assert_eq!(fake.news_reads.lock().unwrap().1, 4);
+    }
+
+    /// A claim takes the hub's profile and rewards after it; a second says it was claimed
+    /// already in the player's words, and the rewards are read again.
+    #[test]
+    fn a_claim_takes_the_profile_and_the_rewards_after_it() {
+        let fake = Fake::default();
+        *fake.news.lock().unwrap() = Some((
+            Vec::new(),
+            Rewards {
+                pending: vec![reward(7), reward(8)],
+                ..Rewards::default()
+            },
+        ));
+        let t0 = Instant::now();
+        let (mut worker, snapshot) = worker(&fake, t0);
+        worker.handle(Command::ClaimReward(7), t0);
+        let first = lock(&snapshot).claim.clone().unwrap();
+        assert!(
+            !first.done() && fake.log().is_empty(),
+            "not before the registration"
+        );
+        worker.handle(Command::Configure(on("https://hub")), t0);
+        worker.tick(t0);
+        worker.handle(Command::ClaimReward(7), t0);
+        let claimed = lock(&snapshot).clone();
+        assert!(claimed.claim.as_ref().unwrap().done());
+        assert_eq!(claimed.claim.as_ref().unwrap().serial, 2);
+        assert_eq!(claimed.me.as_ref().map(|me| me.credits), Some(500));
+        let rewards = claimed.rewards.unwrap();
+        assert_eq!(rewards.pending.len(), 1);
+        assert_eq!(rewards.claimed[0].id, 7);
+        worker.handle(Command::ClaimReward(7), t0);
+        assert_eq!(
+            lock(&snapshot).claim.clone().unwrap().message,
+            "This reward was claimed already."
+        );
+        worker.handle(Command::ClaimReward(99), t0);
+        assert_eq!(
+            lock(&snapshot).claim.clone().unwrap().message,
+            "This reward is not waiting for you any more."
+        );
+    }
+
+    /// The creator's announcement is checked before it goes; the hub's refusal is said in
+    /// words, and one it took joins the list.
+    #[test]
+    fn an_announcement_is_checked_sent_and_kept() {
+        let fake = Fake::default();
+        let t0 = Instant::now();
+        let (mut worker, snapshot) = worker(&fake, t0);
+        worker.handle(Command::Configure(on("https://hub")), t0);
+        worker.tick(t0);
+        let request = |title: &str| AnnounceRequest {
+            release: true,
+            title: title.to_owned(),
+            text: "New things".to_owned(),
+            version: "2026.1025.1".to_owned(),
+        };
+        worker.handle(
+            Command::Announce(AnnounceRequest {
+                version: "soon".to_owned(),
+                ..request("SJK")
+            }),
+            t0,
+        );
+        let refused_here = lock(&snapshot).announce.clone().unwrap();
+        assert!(!refused_here.sent);
+        assert_eq!(
+            refused_here.message,
+            crate::news::AnnounceError::Version.message()
+        );
+        assert!(!fake.log().iter().any(|line| line.starts_with("announce")));
+        worker.handle(Command::Announce(request("refused")), t0);
+        assert_eq!(
+            lock(&snapshot).announce.clone().unwrap().message,
+            "Only SJK's creator can announce"
+        );
+        worker.handle(Command::Announce(request("SJK 2026.1025.1")), t0);
+        let sent = lock(&snapshot).clone();
+        assert!(sent.announce.unwrap().sent);
+        assert_eq!(sent.announcements[0].title, "SJK 2026.1025.1");
     }
 
     fn refused(status: u16, code: &str) -> HubError {

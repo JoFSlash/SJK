@@ -6,10 +6,12 @@
 //! ([`Start`]), in fixed steps of [`STEP_MS`] game server milliseconds counted from the
 //! fall's moment, so all of them show the body in the same place without any pose being
 //! sent: the start is one short relay event. The body's proportions are fixed, not the
-//! player model's (a client that lacks the model draws another), and nothing but the
-//! world's own brushes is in its way (movers stand where each client last saw them).
-//! Once every point has lain still for [`SLEEP_STEPS`] steps the body sleeps and is not
-//! stepped again.
+//! player model's (a client that lacks the model draws another). The world's brushes
+//! and its movers are in its way: a mover stands where its trajectory puts it at the
+//! step's own moment ([`World::at`]), which every client that sees the mover reads the
+//! same, so a lift carries the body and a closing door pushes it the same way everywhere.
+//! Once every point has lain still for [`SLEEP_STEPS`] steps the body sleeps, until a
+//! mover carries or pushes it again.
 
 use glam::Vec3;
 
@@ -137,6 +139,8 @@ pub(crate) const MAX_STEPS: u32 = 2_500;
 const FLOOR_DEPTH: f32 = 8_192.0;
 /// The fastest a point may go, in units a step (what the trace can follow).
 const TOP_SPEED: f32 = 40.0;
+/// A point sliding along a surface faster than this (units a second) scrapes.
+const SCRAPE_SPEED: f32 = 80.0;
 
 /// How a fall starts: where the player stood (their origin, 24 units above their feet,
 /// as the game keeps it), how fast they went, which way they faced (degrees), and the
@@ -149,16 +153,52 @@ pub(crate) struct Start {
     pub(crate) yaw: u16,
 }
 
-/// What the world is like round a point: what a box of half size `half` meets moving
-/// from one point to another, as the point it stopped at and the surface's normal.
-pub(crate) trait World {
-    fn trace(&mut self, from: Vec3, to: Vec3, half: f32) -> Option<(Vec3, Vec3)>;
+/// What a point met: where it stopped, the surface's normal, what the surface is made
+/// of (a footstep family, for its sound), and the mover it is, if one.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(crate) struct Hit {
+    pub(crate) stop: Vec3,
+    pub(crate) normal: Vec3,
+    pub(crate) surface: u8,
+    pub(crate) mover: Option<u16>,
 }
 
-impl<F: FnMut(Vec3, Vec3, f32) -> Option<(Vec3, Vec3)>> World for F {
-    fn trace(&mut self, from: Vec3, to: Vec3, half: f32) -> Option<(Vec3, Vec3)> {
-        self(from, to, half)
+/// What the world is like round a point.
+pub(crate) trait World {
+    /// What a box of half size `half` meets moving from one point to another.
+    fn trace(&mut self, from: Vec3, to: Vec3, half: f32) -> Option<Hit>;
+    /// Stand the movers near the body (its points between `low` and `high`) where they
+    /// are at `time` (game server milliseconds), the end of a step, and a step before.
+    fn at(&mut self, _time: i32, _low: Vec3, _high: Vec3) {}
+    /// Where mover `mover`'s move over the step takes a point at `at` that rides it.
+    fn carry(&mut self, _mover: u16, at: Vec3) -> Vec3 {
+        at
     }
+    /// The mover that moved into a box of half size `half` at `at` over the step.
+    fn pusher(&mut self, _at: Vec3, _half: f32) -> Option<u16> {
+        None
+    }
+}
+
+/// A world of brushes alone, giving the stop and the normal.
+impl<F: FnMut(Vec3, Vec3, f32) -> Option<(Vec3, Vec3)>> World for F {
+    fn trace(&mut self, from: Vec3, to: Vec3, half: f32) -> Option<Hit> {
+        self(from, to, half).map(|(stop, normal)| Hit {
+            stop,
+            normal,
+            surface: 0,
+            mover: None,
+        })
+    }
+}
+
+/// A point that hit a surface (how hard, into it) or slid along one (how fast), in units
+/// a second, and what the surface is made of ([`Hit::surface`]).
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(crate) struct Knock {
+    pub(crate) joint: usize,
+    pub(crate) speed: f32,
+    pub(crate) surface: u8,
 }
 
 /// The body, as it falls.
@@ -172,11 +212,19 @@ pub(crate) struct Body {
     earlier: [Vec3; JOINTS],
     lengths: [f32; STICKS.len()],
     reach: [f32; REACH.len()],
-    /// Steps taken since the moment, and how many of the last in a row all were still.
+    /// The fall's moment (game server milliseconds).
+    moment: i32,
+    /// Steps taken since the moment, how many of the last in a row all were still, and
+    /// how many since the start or since a mover last woke the body.
     steps: u32,
     still: u32,
-    /// Hit the world in the last step: (the point, how hard, in units a second).
-    pub(crate) knocks: Vec<(usize, f32)>,
+    restless: u32,
+    /// The mover each point lay on at the last step, and how far that step carried it.
+    riding: [Option<u16>; JOINTS],
+    ride: [Vec3; JOINTS],
+    /// Since [`Body::run_to`] began: the points that hit the world, and that slid along it.
+    pub(crate) knocks: Vec<Knock>,
+    pub(crate) scrapes: Vec<Knock>,
     lowest: f32,
 }
 
@@ -257,9 +305,14 @@ impl Body {
             earlier: points,
             lengths,
             reach,
+            moment: start.moment,
             steps: 0,
             still: 0,
+            restless: 0,
+            riding: [None; JOINTS],
+            ride: [Vec3::ZERO; JOINTS],
             knocks: Vec::with_capacity(JOINTS),
+            scrapes: Vec::with_capacity(JOINTS),
             lowest: feet.z - FLOOR_DEPTH,
         }
     }
@@ -281,9 +334,9 @@ impl Body {
         self.steps
     }
 
-    /// Whether it lies still for good (or has run for [`MAX_STEPS`]).
+    /// Whether it lies still (or has run for [`MAX_STEPS`] since it last woke).
     pub(crate) fn asleep(&self) -> bool {
-        self.still >= SLEEP_STEPS || self.steps >= MAX_STEPS
+        self.still >= SLEEP_STEPS || self.restless >= MAX_STEPS
     }
 
     /// Where the body is, for the camera and the player's own body: its pelvis.
@@ -291,10 +344,16 @@ impl Body {
         self.points[PELVIS]
     }
 
-    /// Step on to `steps` steps since the moment (nothing once asleep), against `world`.
+    /// Step on to `steps` steps since the moment, against `world`. Asleep, the steps go
+    /// by with the body lying still, unless a mover wakes it.
     pub(crate) fn run_to(&mut self, steps: u32, world: &mut impl World) {
         self.knocks.clear();
-        while self.steps < steps && !self.asleep() {
+        self.scrapes.clear();
+        while self.steps < steps {
+            if self.asleep() && !self.stirred(world) {
+                self.steps += 1;
+                continue;
+            }
             self.step(world);
         }
         if self.asleep() {
@@ -302,21 +361,70 @@ impl Body {
         }
     }
 
-    /// One step: move every point on by its speed and gravity, out of the world's way,
-    /// then hold the sticks.
+    /// The game server time at the end of step `steps`.
+    fn time_of(&self, steps: u32) -> i32 {
+        self.moment
+            .wrapping_add((steps as i32).wrapping_mul(STEP_MS))
+    }
+
+    /// The box round every point.
+    fn bounds(&self) -> (Vec3, Vec3) {
+        self.points
+            .iter()
+            .fold((self.points[0], self.points[0]), |(low, high), point| {
+                (low.min(*point), high.max(*point))
+            })
+    }
+
+    /// Whether a mover wakes the sleeping body at its next step: one carrying a point
+    /// that lies on it, or moving into one.
+    fn stirred(&mut self, world: &mut impl World) -> bool {
+        let (low, high) = self.bounds();
+        world.at(self.time_of(self.steps + 1), low, high);
+        let stirred = (0..JOINTS).any(|joint| {
+            let at = self.points[joint];
+            self.riding[joint].is_some_and(|mover| world.carry(mover, at) != at)
+                || world.pusher(at, half(joint)).is_some()
+        });
+        if stirred {
+            self.still = 0;
+            self.restless = 0;
+        }
+        stirred
+    }
+
+    /// One step: the movers carry or push the points they hold, then every point moves
+    /// on by its speed and gravity, out of the world's way, and the sticks hold.
     fn step(&mut self, world: &mut impl World) {
         self.steps += 1;
-        let fall = Vec3::new(0.0, 0.0, -GRAVITY * STEP * STEP);
+        self.restless += 1;
         let began = self.points;
         self.earlier = began;
-        let mut moved = 0.0_f32;
+        let (low, high) = self.bounds();
+        world.at(self.time_of(self.steps), low, high);
+        // A point on a mover goes with it, and one a mover moves into is pushed along:
+        // both keep their own speed on top (the previous point moves as well).
+        let mut carried = false;
         for joint in 0..JOINTS {
+            let at = self.points[joint];
+            let mover = self.riding[joint].or_else(|| world.pusher(at, half(joint)));
+            let shift = mover.map_or(Vec3::ZERO, |mover| world.carry(mover, at) - at);
+            self.points[joint] += shift;
+            self.previous[joint] += shift;
+            self.ride[joint] = shift;
+            carried |= shift != Vec3::ZERO;
+        }
+        let fall = Vec3::new(0.0, 0.0, -GRAVITY * STEP * STEP);
+        let mut touched = [None; JOINTS];
+        for (joint, touch) in touched.iter_mut().enumerate() {
             let at = self.points[joint];
             let speed = ((at - self.previous[joint]) * DRAG + fall).clamp_length_max(TOP_SPEED);
             let mut to = at + speed;
             to.z = to.z.max(self.lowest);
             self.previous[joint] = at;
-            self.points[joint] = self.collide(joint, at, to, world);
+            let (point, hit) = self.collide(joint, at, to, world);
+            self.points[joint] = point;
+            *touch = hit;
         }
         let moved_to = self.points;
         for _ in 0..ROUNDS {
@@ -324,45 +432,74 @@ impl Body {
         }
         // The sticks may have pushed points into the world: trace each from where it
         // was before them.
+        let mut moved = 0.0_f32;
         for (joint, &from) in moved_to.iter().enumerate() {
             let to = self.points[joint];
-            if let Some((stop, normal)) = world.trace(from, to, half(joint)) {
+            if let Some(hit) = world.trace(from, to, half(joint)) {
+                touched[joint] = touched[joint].or(Some(hit));
                 // What is left slides along the surface, as far as the world lets it.
-                let rest = to - stop;
-                let slide = rest - normal * rest.dot(normal);
-                let base = stop + normal * 0.125;
+                let rest = to - hit.stop;
+                let slide = rest - hit.normal * rest.dot(hit.normal);
+                let base = hit.stop + hit.normal * 0.125;
                 self.points[joint] = match world.trace(base, base + slide, half(joint)) {
                     None => base + slide,
-                    Some((stop, normal)) => stop + normal * 0.125,
+                    Some(hit) => hit.stop + hit.normal * 0.125,
                 };
             }
             moved = moved.max(self.points[joint].distance(began[joint]));
         }
-        if moved < STILL {
+        // A point that leaves the mover it lay on takes the mover's speed with it.
+        for (joint, touch) in touched.iter().enumerate() {
+            if self.riding[joint].is_some() && touch.is_none() {
+                self.previous[joint] -= self.ride[joint];
+            }
+            self.riding[joint] = touch.and_then(|hit| hit.mover);
+        }
+        if moved < STILL && !carried {
             self.still += 1;
         } else {
             self.still = 0;
         }
     }
 
-    /// Where a point going from `from` to `to` ends up: where it meets the world, its
-    /// speed off the surface kept in part ([`FRICTION_KEPT`], [`BOUNCE`]).
-    fn collide(&mut self, joint: usize, from: Vec3, to: Vec3, world: &mut impl World) -> Vec3 {
-        let Some((stop, normal)) = world.trace(from, to, half(joint)) else {
-            return to;
+    /// Where a point going from `from` to `to` ends up, and what it met: where it meets
+    /// the world, its speed off the surface kept in part ([`FRICTION_KEPT`], [`BOUNCE`]).
+    fn collide(
+        &mut self,
+        joint: usize,
+        from: Vec3,
+        to: Vec3,
+        world: &mut impl World,
+    ) -> (Vec3, Option<Hit>) {
+        let Some(hit) = world.trace(from, to, half(joint)) else {
+            return (to, None);
         };
+        let normal = hit.normal;
         let speed = to - from;
         let into = speed.dot(normal);
         let along = speed - normal * into;
         let hard = -into.min(0.0) / STEP;
         let bounce = if hard > BOUNCE_SPEED { BOUNCE } else { 0.0 };
         let after = along * FRICTION_KEPT - normal * into.min(0.0) * bounce;
-        let at = stop + normal * 0.125;
+        let at = hit.stop + normal * 0.125;
         self.previous[joint] = at - after;
+        let surface = hit.surface;
         if hard > BOUNCE_SPEED {
-            self.knocks.push((joint, hard));
+            self.knocks.push(Knock {
+                joint,
+                speed: hard,
+                surface,
+            });
         }
-        at
+        let slide = along.length() / STEP;
+        if slide > SCRAPE_SPEED && normal != Vec3::ZERO {
+            self.scrapes.push(Knock {
+                joint,
+                speed: slide,
+                surface,
+            });
+        }
+        (at, Some(hit))
     }
 
     /// One round of the sticks, the reaches and the hinges.
@@ -528,7 +665,7 @@ mod tests {
         let mut world = floor(false);
         body.run_to(MAX_STEPS, &mut world);
         assert!(body.asleep());
-        assert!(body.steps() < MAX_STEPS, "never came to rest");
+        assert!(body.still >= SLEEP_STEPS, "never came to rest");
         let points = body.points();
         for point in points {
             assert!(point.z >= 1.9 && point.z < 20.0, "{point}");
@@ -556,6 +693,79 @@ mod tests {
         let mut other = Body::new(&start(78));
         other.run_to(400, &mut world);
         assert_ne!(once.points(), other.points());
+    }
+
+    /// A lift, mover 7: a floor whose top rises from 0 to 200 between 6 and 8 seconds.
+    #[derive(Default)]
+    struct Lift {
+        top: f32,
+        before: f32,
+    }
+
+    impl Lift {
+        fn height(time: i32) -> f32 {
+            ((time - 6_000) as f32 / 10.0).clamp(0.0, 200.0)
+        }
+    }
+
+    impl World for Lift {
+        fn trace(&mut self, from: Vec3, to: Vec3, half: f32) -> Option<Hit> {
+            let low = self.top + half;
+            if to.z >= low {
+                return None;
+            }
+            let t = if from.z > low {
+                (from.z - low) / (from.z - to.z)
+            } else {
+                0.0
+            };
+            let mut stop = from + (to - from) * t;
+            stop.z = stop.z.max(low);
+            Some(Hit {
+                stop,
+                normal: Vec3::Z,
+                surface: 6,
+                mover: Some(7),
+            })
+        }
+
+        fn at(&mut self, time: i32, _low: Vec3, _high: Vec3) {
+            self.before = Self::height(time - STEP_MS);
+            self.top = Self::height(time);
+        }
+
+        fn carry(&mut self, mover: u16, at: Vec3) -> Vec3 {
+            assert_eq!(mover, 7);
+            at + Vec3::Z * (self.top - self.before)
+        }
+
+        fn pusher(&mut self, at: Vec3, half: f32) -> Option<u16> {
+            let bottom = at.z - half;
+            (bottom < self.top && bottom >= self.before).then_some(7)
+        }
+    }
+
+    #[test]
+    fn a_lift_carries_the_sleeping_body_up_and_it_sleeps_again_on_top() {
+        let mut body = Body::new(&start(1_000));
+        let mut lift = Lift::default();
+        // Lying still on the lift before it moves.
+        body.run_to(300, &mut lift);
+        assert!(body.asleep());
+        assert!(body.points().iter().all(|point| point.z < 20.0));
+        assert!(body.knocks.iter().any(|knock| knock.surface == 6));
+        // Up with it, still lying (no point left behind or thrown off), and asleep
+        // again once it has stopped; the same however the steps are taken.
+        let mut piecemeal = body.clone();
+        body.run_to(600, &mut lift);
+        for point in body.points() {
+            assert!(point.z > 200.0 && point.z < 220.0, "{point}");
+        }
+        assert!(body.asleep());
+        for steps in (300..=600).step_by(5) {
+            piecemeal.run_to(steps, &mut lift);
+        }
+        assert_eq!(body.points(), piecemeal.points());
     }
 
     #[test]

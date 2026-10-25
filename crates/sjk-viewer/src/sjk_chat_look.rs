@@ -91,15 +91,27 @@ pub(crate) struct Shown {
     pub(crate) text: String,
     /// The tier of a holocron drop.
     pub(crate) tier: Option<&'static crate::holocrons::Tier>,
+    /// The SJK team's line (`official.rs`): "SJK" in the accent gold, its mark (SJK's logo
+    /// or the gift box) where a tick goes, the title in bold; a click opens it.
+    pub(crate) official: Option<crate::official::words::Look>,
 }
 
 /// `message` as it shows; `None` for a drop of a tier this client does not know.
 pub(crate) fn shown(message: &sjk_identity::ChatMessage) -> Option<Shown> {
+    if let Some(words) = crate::official::words::words(message, "Read more") {
+        return Some(Shown {
+            name: crate::official::words::SENDER.to_owned(),
+            text: words.text,
+            tier: None,
+            official: Some(words.look),
+        });
+    }
     if message.holocron.is_none() {
         return Some(Shown {
             name: sjk_identity::chat::name_for_display(&message.name),
             text: message_text(&message.text),
             tier: None,
+            official: None,
         });
     }
     let words = crate::holocrons::line::words(message)?;
@@ -107,6 +119,7 @@ pub(crate) fn shown(message: &sjk_identity::ChatMessage) -> Option<Shown> {
         name: String::new(),
         text: words.text,
         tier: Some(words.tier),
+        official: None,
     })
 }
 
@@ -115,6 +128,42 @@ pub(crate) fn shown(message: &sjk_identity::ChatMessage) -> Option<Shown> {
 pub(crate) fn text_colour(tier: Option<&crate::holocrons::Tier>) -> Color {
     tier.map_or(GOLD, |tier| tier.colour)
 }
+
+/// Draw the SJK team's mark (`look`: SJK's logo, or the gift box in the accent gold for a
+/// round) in place of the verified tick after a name drawn at `size` that ends at `x`,
+/// centred on the height `middle`, at `alpha`; its room is [`tick_room`]'s. The gift box is
+/// a glyph (SJK Symbols, U+E028), so it goes to `glyph` as a character, a rectangle and
+/// a colour to draw as text.
+pub(crate) fn official_mark(
+    list: &mut DrawList,
+    look: crate::official::words::Look,
+    x: f32,
+    middle: f32,
+    size: f32,
+    alpha: f32,
+    glyph: impl FnOnce(char, Rect, Color),
+) -> Rect {
+    let side = tick_side(size) * 1.15;
+    let rect = Rect::new(x + size * 0.15, middle - side * 0.5, side, side);
+    if look.gift() {
+        let gold = crate::menu::sjk::color::GOLD;
+        glyph(
+            crate::symbols::GIFT,
+            Rect::new(rect.x, middle - size * 0.62, side * 1.3, size * 1.3),
+            Color::new(gold.r, gold.g, gold.b, alpha),
+        );
+    } else {
+        let _ = list.push(DrawCommand::TexturedQuad {
+            rect,
+            texture: crate::ui_renderer::LOGO_TEXTURE,
+            color: Color::new(1.0, 1.0, 1.0, alpha),
+        });
+    }
+    rect
+}
+
+/// The SJK UI's accent gold, the SJK team's sender's colour.
+pub(crate) const ACCENT: Color = crate::menu::sjk::color::GOLD;
 
 /// Draw a holocron drop's mark (the tier's gem, in place of the verified tick) after a
 /// name drawn at `size` that ends at `x`, centred on the height `middle`, at `alpha`.

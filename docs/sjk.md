@@ -220,7 +220,11 @@ Alphas are not marked as pre-releases, so the site's download link
 
 ## Donations
 
-**Shelved since 14/10/2026 (Sol's decision).** Nothing asks for donations for now: the
+**Shelved since 14/10/2026 (Sol's decision).** Nothing in the game or on the site asks
+for donations for now; only the GitHub repository's Sponsor button does, since
+25/10/2026, pointing at Sol's GitHub Sponsors page (https://github.com/sponsors/Sol-Vulpes)
+through [.github/FUNDING.yml](../.github/FUNDING.yml), with "Sponsorships" ticked in
+the repository's settings (General, Features). The
 site's Support SJK section and its two menu links carry `hidden` and `site.js` skips the
 hub (`DONATION.shelved`); the client's card never shows and its setting is out of the
 settings screens (`donation_goal::SHELVED`), and the Collection lists the Supporter
@@ -286,6 +290,14 @@ release is cut, from the "Unreleased" lines, in the same commit that renames the
 section; the tests reject a dated release from 12/10/2026 on without one, and the
 release notes' introduction may repeat it. A player who skips releases sees the recaps
 of each, so a recap must read on its own.
+
+Every release is also announced in SJK chat (Sol's rule, 25/10/2026), small ones too:
+an announcement of kind `release` with the release's version, titled "SJK <version>",
+its text (the card a click on the line opens, [hub-chat.md](hub-chat.md)) filled in
+full from the recap and the notable changes in player words, never a title alone. The
+draft is shown to Sol, then posted on the hub's host with
+`sjk-hub announce --release <version> "SJK <version>" <file>` once the release's
+download is live. Staff tools stay out of it, as they stay out of the changelog.
 
 A release that changes what a setting does, or its default, asks players to choose it
 again with a line `= <cvar>: <one sentence>` beside the recap, before the changes

@@ -242,6 +242,7 @@ mod tests {
             client: String::new(),
             text: "hi".to_owned(),
             holocron: None,
+            official: None,
         }
     }
 

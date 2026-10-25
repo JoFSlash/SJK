@@ -30,9 +30,13 @@ fn live(device: &wgpu::Device) -> (u64, BTreeMap<String, u64>) {
         return (0, BTreeMap::new());
     };
     eprintln!(
-        "    reserved {:.0} MiB in {} blocks",
+        "    reserved {:.0} MiB in {} blocks, DXGI process usage {:.0} MiB",
         report.total_reserved_bytes as f64 / MIB,
-        report.blocks.len()
+        report.blocks.len(),
+        sjk_gpu_memory::high_performance()
+            .and_then(|memory| memory.usage)
+            .unwrap_or(0) as f64
+            / MIB
     );
     let mut by_label = BTreeMap::new();
     for allocation in report.allocations {
@@ -233,5 +237,169 @@ fn menu_pictures_vram() {
                 eprintln!("    {:>8.1} MiB  {label}", *bytes as f64 / MIB);
             }
         }
+    });
+}
+
+/// Audit: every label an in-game map holds at each preset and texture detail, for the
+/// 3 GB cards. `SJK_AUDIT_MAPS` (comma separated) and `SJK_AUDIT_SIZE` (`WxH`) override
+/// the maps and the screen size.
+#[test]
+#[ignore = "renders with the GPU and the installed game data named by JKA_GAME_DATA"]
+fn low_end_vram_audit() {
+    on_big_stack(|| {
+        use crate::graphics_quality::{Level, preset_cvars};
+        let maps = std::env::var("SJK_AUDIT_MAPS")
+            .unwrap_or_else(|_| "maps/mp/ffa3.bsp,maps/mp/siege_desert.bsp".to_owned());
+        let size = std::env::var("SJK_AUDIT_SIZE")
+            .ok()
+            .and_then(|size| {
+                let (w, h) = size.split_once('x')?;
+                Some([w.parse().ok()?, h.parse().ok()?])
+            })
+            .unwrap_or([1920, 1080]);
+        let empty = crate::menu_pictures::menu_map("maps/mp/duel6.bsp", true);
+        let mut summary = Vec::new();
+        eprintln!(
+            "audit: DXGI process usage before any device {:.0} MiB",
+            sjk_gpu_memory::high_performance()
+                .and_then(|memory| memory.usage)
+                .unwrap_or(0) as f64
+                / MIB
+        );
+        let picmips: Vec<String> = std::env::var("SJK_AUDIT_PICMIPS")
+            .unwrap_or_else(|_| "0,2".to_owned())
+            .split(',')
+            .map(str::to_owned)
+            .collect();
+        for map in maps.split(',').chain([empty.as_str()]) {
+            for (level, name) in [
+                (Level::Vanilla, "vanilla"),
+                (Level::Sjk, "sjk"),
+                (Level::Experimental, "experimental"),
+            ] {
+                for picmip in picmips.iter().map(String::as_str) {
+                    let mut cvars = preset_cvars(level);
+                    cvars.push((crate::world_materials::filtering::mips::PICMIP_CVAR, picmip));
+                    if crate::menu_pictures::pictured(map).is_some() {
+                        cvars.push((crate::menu_pictures::CVAR, "1"));
+                    }
+                    let Some((mut gpu, _profile)) = open(map, size, None, &cvars) else {
+                        return;
+                    };
+                    let _ = frame(&mut gpu, 8);
+                    let _ = gpu.device.poll(wgpu::PollType::wait_indefinitely());
+                    let Some(report) = gpu.device.generate_allocator_report() else {
+                        return;
+                    };
+                    let mut by_label = BTreeMap::<String, (u64, u64)>::new();
+                    for allocation in &report.allocations {
+                        let entry = by_label.entry(allocation.name.clone()).or_default();
+                        entry.0 += 1;
+                        entry.1 += allocation.size;
+                    }
+                    let total = report.total_allocated_bytes;
+                    let dxgi = sjk_gpu_memory::high_performance()
+                        .and_then(|memory| memory.usage)
+                        .unwrap_or(0);
+                    eprintln!(
+                        "audit {map} {name} picmip {picmip}: {:.0} MiB in use, {:.0} MiB reserved, {} labels, DXGI process usage {:.0} MiB ({:?})",
+                        total as f64 / MIB,
+                        report.total_reserved_bytes as f64 / MIB,
+                        by_label.len(),
+                        dxgi as f64 / MIB,
+                        gpu.context.adapter_backend
+                    );
+                    let mut labels: Vec<_> = by_label.into_iter().collect();
+                    labels.sort_by_key(|(_, (_, bytes))| std::cmp::Reverse(*bytes));
+                    for (label, (count, bytes)) in labels.iter().take(45) {
+                        eprintln!("    {:>8.1} MiB {count:>5}x  {label}", *bytes as f64 / MIB);
+                    }
+                    let rest: u64 = labels.iter().skip(45).map(|(_, (_, b))| b).sum();
+                    eprintln!("    {:>8.1} MiB in the other labels", rest as f64 / MIB);
+                    drop(gpu);
+                    let after = sjk_gpu_memory::high_performance()
+                        .and_then(|memory| memory.usage)
+                        .unwrap_or(0);
+                    summary.push(format!(
+                        "{map:40} {name:12} picmip {picmip}: {:6.0} MiB allocator, {:6.0} MiB DXGI, {:6.0} MiB DXGI after drop",
+                        total as f64 / MIB,
+                        dxgi as f64 / MIB,
+                        after as f64 / MIB
+                    ));
+                }
+            }
+        }
+        for line in summary {
+            eprintln!("summary: {line}");
+        }
+    });
+}
+
+/// Audit: the menus on pictures at r_picmip 2 (a 3 GB card's start) with the SJK packs
+/// the hub serves mounted from `JKA_GAME_DATA/SJK/assets`, before and after the card
+/// faces upload, then the next map built beside it (a map change's peak).
+#[test]
+#[ignore = "renders with the GPU and the installed game data named by JKA_GAME_DATA"]
+fn card_faces_vram_audit() {
+    on_big_stack(|| {
+        use crate::graphics_quality::{Level, preset_cvars};
+        let game_data = std::env::var("JKA_GAME_DATA").expect("JKA_GAME_DATA");
+        let directory = std::path::Path::new(&game_data).join("SJK").join("assets");
+        let mut cvars = preset_cvars(Level::Sjk);
+        cvars.push((crate::world_materials::filtering::mips::PICMIP_CVAR, "2"));
+        cvars.push((crate::menu_pictures::CVAR, "1"));
+        let map = crate::menu_pictures::menu_map("maps/mp/duel6.bsp", true);
+        let size = [1920, 1080];
+        let Some((mut gpu, _profile)) = open(&map, size, None, &cvars) else {
+            return;
+        };
+        let _ = frame(&mut gpu, 8);
+        let (before, _) = live(&gpu.device);
+        let _skins = crate::sjk_packs::mount(&directory);
+        let faces = crate::cards::faces::current();
+        let count = faces.list.len();
+        let started = std::time::Instant::now();
+        while (0..count).any(|index| faces.art(index).is_none())
+            && started.elapsed() < std::time::Duration::from_secs(120)
+        {
+            std::thread::sleep(std::time::Duration::from_millis(200));
+        }
+        eprintln!(
+            "audit: {count} card faces decoded in {:.1} s",
+            started.elapsed().as_secs_f64()
+        );
+        let _ = frame(&mut gpu, (count as u32) / 2 + 20);
+        let (after, by_label) = live(&gpu.device);
+        let emblem = by_label.get("SJK menu emblem").copied().unwrap_or(0);
+        eprintln!(
+            "audit: picture menu {:.0} MiB before the packs, {:.0} MiB after {count} faces (SJK menu emblem {:.0} MiB)",
+            before as f64 / MIB,
+            after as f64 / MIB,
+            emblem as f64 / MIB
+        );
+        let (mut input, _next) = world_input("maps/mp/siege_desert.bsp", None, &cvars);
+        input.console = None;
+        let built = pollster::block_on(GpuState::new_with_context(
+            Arc::clone(&gpu.context),
+            size,
+            input,
+            None,
+        ))
+        .expect("the next map is built");
+        let (peak, _) = live(&gpu.device);
+        eprintln!(
+            "audit: map change peak (picture menu with faces + siege_desert) {:.0} MiB",
+            peak as f64 / MIB
+        );
+        let mut adopted = gpu.adopt_world(built);
+        attach_target(&mut adopted, size);
+        gpu = adopted;
+        let _ = frame(&mut gpu, (count as u32) / 2 + 20);
+        let (in_map, by_label) = live(&gpu.device);
+        eprintln!(
+            "audit: siege_desert after its faces upload {:.0} MiB (SJK menu emblem {:.0} MiB)",
+            in_map as f64 / MIB,
+            by_label.get("SJK menu emblem").copied().unwrap_or(0) as f64 / MIB
+        );
     });
 }

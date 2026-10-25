@@ -31,10 +31,24 @@ Add each release's notes here when it is tagged (docs/sjk.md "Releases").
 ## Unreleased
 
 - 3D resolution: Settings > Renderer can draw the 3D view smaller than the window (`r_renderScale`, 50 to 100%) while the HUD and text stay sharp, for more FPS on weak graphics; built-in graphics start at 75% _(Slash)_
+- Kyber crystals: every achievement now brings one, once, from Uncommon to Mythical (shown on the Achievements tab, its hover card and its unlock card). Opening one always gives a saber shader, the ones you do not have yet first, and every tenth crystal in a row without a Legendary or Mythical shader gives one: the Holocrons tab shows your crystals, how soon that is, and their loot table _(Sol)_
+
+## 2026.1025.1 (Alpha) | 25/10/2026
+
+News from the SJK team and contributor rewards in SJK chat, the Drone toy, ragdolls that ride lifts, and a first Mac build.
+
+> Announcements: News from the SJK team now shows in SJK chat.
+> Contributor rewards: Rounds say who was thanked and why; Claim your own.
+> Drone: `freecam` and `peek` fly a remote other players see.
+> Ragdoll: Lifts, doors and trains carry your limp body.
+> JA+ settings: They now start with `japlus.`; old names still work.
+> Mac: An experimental Apple Silicon build comes with each release.
+
+- Ragdoll: lifts, doors and trains now carry and push your limp body, and every part of it is heard on its own as it lands, the flesh and what it hits (stone, metal, wood, grass, snow...), with scrapes when it slides _(Sol)_
+- Announcements from the SJK team now show in SJK chat: the title and first line, and a click on the line (or `announcement` in a match) reads it in full; a release's announcement offers the update or what's new. Contributor reward rounds show who was rewarded and why (`rewards`), and when one is for you a window lets you Claim it: its holocrons then arrive as gifts _(Sol)_
 - JA+ settings now all start with `japlus.`: anti-kiss is `japlus.antiAmKiss` and sits in Settings > Mods next to the JA+ tools switch, and the JA+ away emote is `japlus.awayEmote`. Your saved values and configs using the old names keep working. `japlus.color` is gone: `amcolor` does the same on every server _(Sol)_
 - Experimental Mac build: releases now include a ZIP for Macs with Apple Silicon (M1 or later), drawn through Metal. It is not signed by Apple, so macOS blocks it until you allow it once (its README says how), and it has not been played on a Mac yet: reports welcome _(Sol)_
 - New toy, the Drone: `freecam` and `peek` now fly a little training remote that other SJK players see, your name over it; peek sends it to hover behind the player you watch. Peeking needs consent now: a player can be peeked only with their Drone switched on (`toy_drone`, the quick wheel's Toys page or Collection > Toys, "Peek me"), they read who is watching, and switching it off sends the drone away. Your binds for both commands stay as they are _(Sol, after Slash's Peek work in #199)_
-- Kyber crystals: every achievement now brings one, once, from Uncommon to Mythical (shown on the Achievements tab, its hover card and its unlock card). Opening one always gives a saber shader, the ones you do not have yet first, and every tenth crystal in a row without a Legendary or Mythical shader gives one: the Holocrons tab shows your crystals, how soon that is, and their loot table _(Sol)_
 
 ## 2026.1024.1 (Alpha) | 24/10/2026
 

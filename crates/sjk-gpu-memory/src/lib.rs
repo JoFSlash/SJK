@@ -20,6 +20,8 @@ pub struct VideoMemory {
     pub dedicated: u64,
     /// What Windows lets this process use of it now, when DXGI 1.4 says.
     pub budget: Option<u64>,
+    /// What this process uses of it now, when DXGI 1.4 says (the VRAM measurements).
+    pub usage: Option<u64>,
 }
 
 /// The high-performance adapter's memory, `None` without DXGI or an adapter.
@@ -47,10 +49,11 @@ pub fn high_performance() -> Option<VideoMemory> {
         }
         let mut info = DXGI_QUERY_VIDEO_MEMORY_INFO::default();
         // SAFETY: node 0 exists on every adapter; `info` is a valid place to write to.
-        let budget =
+        let queried =
             unsafe { adapter.QueryVideoMemoryInfo(0, DXGI_MEMORY_SEGMENT_GROUP_LOCAL, &mut info) }
-                .ok()
-                .map(|()| info.Budget);
+                .ok();
+        let budget = queried.map(|()| info.Budget);
+        let usage = queried.map(|()| info.CurrentUsage);
         let end = desc.Description.iter().position(|&c| c == 0);
         return Some(VideoMemory {
             name: String::from_utf16_lossy(
@@ -58,6 +61,7 @@ pub fn high_performance() -> Option<VideoMemory> {
             ),
             dedicated: desc.DedicatedVideoMemory as u64,
             budget,
+            usage,
         });
     }
     None

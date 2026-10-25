@@ -26,6 +26,18 @@ pub(crate) fn target_trace(
     )
 }
 
+/// A box swept through one solid (the Ragdoll's points against movers).
+pub(crate) fn solid_trace(
+    bsp: &Bsp,
+    collider: &Collider,
+    start: [f32; 3],
+    end: [f32; 3],
+    bounds: Aabb,
+    mask: u32,
+) -> MovementTrace {
+    inline::trace(bsp, collider, start, end, bounds, mask)
+}
+
 pub(super) struct BspMovementCollision<'a> {
     bsp: &'a Bsp,
     scratch: RefCell<&'a mut sjk_bsp::TraceScratch>,

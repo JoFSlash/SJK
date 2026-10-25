@@ -42,6 +42,8 @@ did: The cardboard box toy: hide in a carton, spotted with Use, tipping over
 did: The Order 66 toy: synced deaths that blow players apart, TF2 style
 did: The Hax toy: hack another player with the siege bar, then steer them
 did: The Ragdoll toy: go limp, sandbox style, the same fall on every SJK client
+did: Ragdoll lifts and doors, and each body part's knocks on what it hits
+did: SJK team announcements in chat, and contributor reward rounds with Claim
 did: The Drone toy: freecam and peek fly a remote others see; peek needs consent
 did: A macOS build for Apple Silicon, built by GitHub with every release (experimental)
 did: Medals from the SJK team, with medal pictures generated and chosen by Sol
