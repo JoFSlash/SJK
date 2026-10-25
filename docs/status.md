@@ -14,6 +14,7 @@ ms) against about 102 at 95% (GPU 8.2 to 9.0 ms, scene-world 3.9 to 4.3 ms); Aca
 at 75% 105 FPS against 101 at 100%. Postprocessing stays about 3 ms at the window's
 size. Built-in GPUs started at 75% as chosen. Not verified: the look against 100% on a
 fixed view, Windows on a discrete card.
+
 ## Announcements and contributor reward rounds
 
 25/10/2026, `personal/announcements`, based on `main` `ca5643de`: the client side of the
