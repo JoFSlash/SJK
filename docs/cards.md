@@ -509,9 +509,11 @@ not know is kept but named nowhere; `Face::blade` in
   (`Faces::request`, from the renderer's `CardTextures::touch`), cut to 6:5 about their
   middle if they are not, squeezed into a 1024 square with its mip chain and drawn back
   into the 6:5 window (which undoes the squeeze); the renderer uploads two a frame and
-  takes the decoded chain over, so it is not kept in memory too. Past 48 textures, those
-  not drawn for 300 frames are let go and asked for again if drawn again; faces on screen
-  are never let go. 512 faces at most. Until 25/10/2026 every picture was decoded at
+  takes the decoded chain over from a queue of finished faces, so it is not kept in
+  memory too. A face is asked for once; one that cannot be read is not asked again, and
+  a decoder panic fails that picture alone (the worker is started again if it stops).
+  Past 48 textures, those not drawn for 5 seconds are let go and asked for again if
+  drawn again; faces on screen are never let go. 512 faces at most. Until 25/10/2026 every picture was decoded at
   mount and uploaded at start: 339 faces at 5.3 MiB held about 2 GB of video memory and
   as much memory again (Slash's `vram` on a built-in Radeon, the largest label, then
   named "SJK menu emblem"; now "SJK card art").

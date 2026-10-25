@@ -4,10 +4,13 @@
 `vram` on a built-in Radeon, a test build with the command: 2.8 GB in use, 2016 MiB of it
 339 textures under "SJK menu emblem", the card faces' pictures, all uploaded at start and
 kept decoded in memory too). A card's picture is decoded when a screen draws it, its
-decoded chain handed to the renderer, and past 48 textures those undrawn for 300 frames
+decoded chain handed to the renderer, and past 48 textures those undrawn for 5 seconds
 go ([cards.md](cards.md#in-the-client)); card and medal textures have labels of their
-own. Checked by unit tests (which textures go) and the viewer's card and renderer tests
-on Linux. Played by Slash on the built-in Radeon (a test build with this, the
+own. A code review's findings were fixed: a worker that stops is started again and a
+decoder panic fails one picture, the idle limit is in seconds, finished faces come in a
+queue rather than a scan of every face each frame, a face is asked for once, and the
+card world shots decode every face first. Checked by unit tests (which textures go) and
+the viewer's card and renderer tests on Linux. Played by Slash on the built-in Radeon (a test build with this, the
 `vram` command, compression, 3D resolution and the hitch changes): `vram` read 553 MiB
 in the menu and 710 to 805 MiB on Academy6 and mp/ffa5, against 2819 MiB on Academy6
 before. Not verified: the Cards tab, an opening or the card up close in game (pictures

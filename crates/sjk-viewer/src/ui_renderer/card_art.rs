@@ -1,7 +1,7 @@
 //! The card faces' pictures (`crate::cards::faces`): one texture each, for the faces a
 //! screen draws. A face drawn without its texture asks for its picture
-//! ([`CardTextures::touch`]); the worker decodes it and the renderer uploads it a couple
-//! a frame. Past [`KEPT`] textures, those not drawn for [`IDLE_FRAMES`] are let go, to be
+//! ([`CardTextures::touch`]), once; the worker decodes it and the renderer uploads it, a
+//! couple a frame. Past [`KEPT`] textures, those not drawn for [`IDLE`] are let go, to be
 //! asked for again if drawn again. All are made again when the packs are mounted anew.
 //! Every face uploaded at start held about 2 GB of video memory on a built-in Radeon
 //! (339 faces at 5.3 MiB, `vram`, 25/10/2026).
@@ -13,16 +13,22 @@ const PER_FRAME: usize = 2;
 /// Textures kept when not drawn: about 250 MiB at 5.3 MiB each. Faces on screen are never
 /// let go, however many.
 const KEPT: usize = 48;
-/// Frames a face goes undrawn before its texture may be let go.
-const IDLE_FRAMES: u64 = 300;
+/// How long a face goes undrawn before its texture may be let go: time, not frames, so
+/// a fast menu does not let a page go as soon as it is left.
+const IDLE: std::time::Duration = std::time::Duration::from_secs(5);
 
 pub(super) struct CardTextures {
     /// The faces' generation the groups belong to.
     generation: u64,
+    /// The faces of that generation, for the frame's requests.
+    faces: std::sync::Arc<faces::Faces>,
     groups: Vec<Option<wgpu::BindGroup>>,
-    /// The frame each face was last drawn in (0 never).
-    drawn: Vec<u64>,
-    frame: u64,
+    /// When each face was last drawn.
+    drawn: Vec<Option<std::time::Instant>>,
+    /// Faces whose picture was asked for and has not come yet (or could not be read).
+    asked: Vec<bool>,
+    /// This frame's time.
+    now: std::time::Instant,
     sampler: Option<wgpu::Sampler>,
 }
 
@@ -30,9 +36,11 @@ impl CardTextures {
     pub(super) fn new() -> Self {
         Self {
             generation: 0,
+            faces: faces::current(),
             groups: Vec::new(),
             drawn: Vec::new(),
-            frame: 1,
+            asked: Vec::new(),
+            now: std::time::Instant::now(),
             sampler: None,
         }
     }
@@ -47,9 +55,10 @@ impl CardTextures {
         let Some(drawn) = self.drawn.get_mut(index) else {
             return;
         };
-        *drawn = self.frame;
-        if self.groups[index].is_none() {
-            faces::current().request(index);
+        *drawn = Some(self.now);
+        if self.groups[index].is_none() && !self.asked[index] {
+            self.asked[index] = true;
+            self.faces.request(index);
         }
     }
 
@@ -65,20 +74,20 @@ impl CardTextures {
         if faces.generation != self.generation || self.groups.len() != faces.list.len() {
             self.generation = faces.generation;
             self.groups = (0..faces.list.len()).map(|_| None).collect();
-            self.drawn = vec![0; faces.list.len()];
+            self.drawn = vec![None; faces.list.len()];
+            self.asked = vec![false; faces.list.len()];
         }
-        self.frame += 1;
+        self.faces = faces;
+        self.now = std::time::Instant::now();
         let mut uploaded = 0;
-        for index in 0..self.groups.len() {
-            if uploaded == PER_FRAME {
+        while uploaded < PER_FRAME {
+            let Some((index, chain)) = self.faces.take_ready() else {
                 break;
-            }
-            if self.groups[index].is_some() {
-                continue;
-            }
-            let Some(chain) = faces.take_art(index) else {
-                continue;
             };
+            if index >= self.groups.len() || self.groups[index].is_some() {
+                continue;
+            }
+            self.asked[index] = false;
             let sampler = self.sampler.get_or_insert_with(|| {
                 device.create_sampler(&wgpu::SamplerDescriptor {
                     label: Some("SJK card art sampler"),
@@ -105,38 +114,47 @@ impl CardTextures {
             }));
             uploaded += 1;
         }
-        for index in released(&self.groups, &self.drawn, self.frame) {
+        for index in released(&self.groups, &self.drawn, self.now) {
             self.groups[index] = None;
         }
     }
 }
 
 /// The faces whose textures to let go: past [`KEPT`] uploaded, the ones drawn longest
-/// ago among those undrawn for [`IDLE_FRAMES`].
-fn released<T>(groups: &[Option<T>], drawn: &[u64], frame: u64) -> Vec<usize> {
+/// ago among those undrawn for [`IDLE`].
+fn released<T>(
+    groups: &[Option<T>],
+    drawn: &[Option<std::time::Instant>],
+    now: std::time::Instant,
+) -> Vec<usize> {
+    let uploaded = groups.iter().filter(|group| group.is_some()).count();
+    if uploaded <= KEPT {
+        return Vec::new();
+    }
     let mut idle: Vec<usize> = (0..groups.len())
         .filter(|&index| groups[index].is_some())
+        .filter(|&index| drawn[index].is_none_or(|at| now.duration_since(at) > IDLE))
         .collect();
-    let excess = idle.len().saturating_sub(KEPT);
-    idle.retain(|&index| frame.saturating_sub(drawn[index]) > IDLE_FRAMES);
     idle.sort_by_key(|&index| drawn[index]);
-    idle.truncate(excess);
+    idle.truncate(uploaded - KEPT);
     idle
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::time::{Duration, Instant};
 
     #[test]
     fn idle_textures_go_past_the_kept_number_longest_undrawn_first() {
+        let now = Instant::now() + Duration::from_secs(100);
         let groups: Vec<Option<()>> = vec![Some(()); KEPT + 3];
         // All drawn long ago except face 0, drawn now; face 5 the longest ago.
-        let mut drawn = vec![10_u64; KEPT + 3];
-        drawn[0] = 1_000;
-        drawn[5] = 1;
-        drawn[7] = 2;
-        let gone = released(&groups, &drawn, 1_000);
+        let mut drawn = vec![Some(now - Duration::from_secs(60)); KEPT + 3];
+        drawn[0] = Some(now);
+        drawn[5] = Some(now - Duration::from_secs(90));
+        drawn[7] = Some(now - Duration::from_secs(80));
+        let gone = released(&groups, &drawn, now);
         assert_eq!(gone.len(), 3);
         assert_eq!(&gone[..2], &[5, 7]);
         assert!(!gone.contains(&0));
@@ -144,10 +162,13 @@ mod tests {
 
     #[test]
     fn nothing_goes_within_the_kept_number_or_while_drawn() {
+        let now = Instant::now() + Duration::from_secs(100);
+        let long_ago = Some(now - Duration::from_secs(60));
         let groups: Vec<Option<()>> = vec![Some(()); KEPT];
-        assert!(released(&groups, &vec![1; KEPT], 1_000).is_empty());
+        assert!(released(&groups, &vec![long_ago; KEPT], now).is_empty());
         // More on screen than are kept: none of them goes.
         let groups: Vec<Option<()>> = vec![Some(()); KEPT + 10];
-        assert!(released(&groups, &vec![995; KEPT + 10], 1_000).is_empty());
+        let recent = Some(now - Duration::from_secs(1));
+        assert!(released(&groups, &vec![recent; KEPT + 10], now).is_empty());
     }
 }

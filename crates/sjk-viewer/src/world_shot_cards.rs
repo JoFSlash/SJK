@@ -486,11 +486,8 @@ fn faces_ready() -> bool {
     for _ in 0..12_000 {
         let faces = crate::cards::faces::current();
         match faces.find("sjk_alpha_010") {
-            Some((index, _)) if faces.art_ready(index) => return true,
-            Some((index, _)) => {
-                faces.request(index);
-                std::thread::sleep(std::time::Duration::from_millis(25));
-            }
+            // Every face decoded before the shots: they draw them in their first frames.
+            Some(_) => return faces.decode_all(std::time::Duration::from_secs(300)),
             None => break,
         }
     }

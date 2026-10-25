@@ -8,8 +8,8 @@
 //!
 //! The faces are read whenever the packs are mounted ([`install`]); a picture is decoded
 //! on a worker thread when a screen first draws it ([`Faces::request`]), squeezed into a
-//! square mip chain the UI renderer uploads (`ui_renderer/card_art.rs`) and takes back
-//! ([`Faces::take_art`]), then drawn back into the 6:5 window, which undoes the squeeze.
+//! square mip chain the UI renderer uploads (`ui_renderer/card_art.rs`) and takes over
+//! ([`Faces::take_ready`]), then drawn back into the 6:5 window, which undoes the squeeze.
 //! Until a picture is decoded the window stays dark. All 339 pictures were decoded at
 //! every start and kept, 5.3 MiB each in memory and again on the graphics card: about
 //! 2 GB of each on Slash's built-in Radeon (`vram`, 25/10/2026), a card never opened.
@@ -279,8 +279,12 @@ pub(crate) struct Faces {
     art: Vec<Mutex<Art>>,
     /// The packs the pictures are read from.
     packs: Option<VirtualFileSystem>,
-    /// The worker decoding the pictures asked for, started by the first request.
-    worker: Mutex<Option<mpsc::Sender<usize>>>,
+    /// The worker decoding the pictures asked for, started by the first request; `Err`
+    /// once it could not be started, so the pictures are drawn without from then on.
+    worker: Mutex<Result<Option<mpsc::Sender<usize>>, ()>>,
+    /// Faces decoded and waiting for the renderer, in the order they finished, so it
+    /// takes them without looking at every face each frame.
+    ready: Mutex<Vec<usize>>,
     /// Counts mounts; the renderer uploads the pictures again when it changes.
     pub(crate) generation: u64,
 }
@@ -291,7 +295,8 @@ impl Faces {
             art: list.iter().map(|_| Mutex::new(Art::Idle)).collect(),
             list,
             packs,
-            worker: Mutex::new(None),
+            worker: Mutex::new(Ok(None)),
+            ready: Mutex::new(Vec::new()),
             generation,
         }
     }
@@ -335,49 +340,74 @@ impl Faces {
             .worker
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner());
-        if worker.is_none() {
-            let (sender, receiver) = mpsc::channel();
-            let faces = Arc::downgrade(self);
-            let spawned = std::thread::Builder::new()
-                .name("sjk-card-art".into())
-                .spawn(move || decode_requests(&faces, &receiver));
-            match spawned {
-                Ok(_) => *worker = Some(sender),
-                Err(error) => {
-                    crate::log::progress(format_args!(
-                        "warning: card pictures not loaded, drawing without them: {error}"
-                    ));
-                    *state = Art::Failed;
-                    return;
-                }
-            }
+        let Ok(sender) = &mut *worker else {
+            return;
+        };
+        // A worker that stopped (it never should: a panic is caught per picture) is
+        // started again rather than leaving every later request unanswered.
+        if sender.as_ref().is_some_and(|live| live.send(index).is_ok()) {
+            *state = Art::Decoding;
+            return;
         }
-        if worker
-            .as_ref()
-            .is_some_and(|sender| sender.send(index).is_ok())
-        {
+        let (next, receiver) = mpsc::channel();
+        let faces = Arc::downgrade(self);
+        let spawned = std::thread::Builder::new()
+            .name("sjk-card-art".into())
+            .spawn(move || decode_requests(&faces, &receiver));
+        if let Err(error) = spawned {
+            crate::log::progress(format_args!(
+                "warning: card pictures not loaded, drawing without them: {error}"
+            ));
+            *worker = Err(());
+            return;
+        }
+        if next.send(index).is_ok() {
             *state = Art::Decoding;
         }
+        *sender = Some(next);
     }
 
-    /// Face `index`'s decoded picture, handed over: the renderer keeps it on the card,
-    /// and asks again ([`Self::request`]) if it lets it go.
-    pub(crate) fn take_art(&self, index: usize) -> Option<MipChain> {
-        let mut state = self.state(index)?;
-        match std::mem::replace(&mut *state, Art::Idle) {
-            Art::Ready(chain) => Some(chain),
-            other => {
-                *state = other;
-                None
+    /// The next decoded picture waiting for the renderer, handed over with its face: the
+    /// renderer keeps it on the card, and asks again ([`Self::request`]) if it lets it go.
+    pub(crate) fn take_ready(&self) -> Option<(usize, MipChain)> {
+        loop {
+            let index = {
+                let mut ready = self
+                    .ready
+                    .lock()
+                    .unwrap_or_else(|poisoned| poisoned.into_inner());
+                if ready.is_empty() {
+                    return None;
+                }
+                ready.remove(0)
+            };
+            let Some(mut state) = self.state(index) else {
+                continue;
+            };
+            if let Art::Ready(chain) = std::mem::replace(&mut *state, Art::Idle) {
+                return Some((index, chain));
             }
         }
     }
 
-    /// Whether face `index`'s picture is decoded and waiting, for tests.
+    /// Ask for every face's picture and wait until each is decoded or failed, for world
+    /// shots that draw them in their first frames: whether all settled in `limit`.
     #[cfg(test)]
-    pub(crate) fn art_ready(&self, index: usize) -> bool {
-        self.state(index)
-            .is_some_and(|state| matches!(*state, Art::Ready(_)))
+    pub(crate) fn decode_all(self: &Arc<Self>, limit: std::time::Duration) -> bool {
+        let started = std::time::Instant::now();
+        for index in 0..self.list.len() {
+            self.request(index);
+        }
+        while started.elapsed() < limit {
+            if (0..self.list.len()).all(|index| {
+                self.state(index)
+                    .is_some_and(|state| matches!(*state, Art::Ready(_) | Art::Failed))
+            }) {
+                return true;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(25));
+        }
+        false
     }
 
     /// Face `index`'s picture decoded now, on this thread, for a world shot.
@@ -387,7 +417,8 @@ impl Faces {
     }
 }
 
-/// The worker: decode each face asked for while its faces are the ones in use.
+/// The worker: decode each face asked for while its faces are the ones in use. A picture
+/// that panics the decoder fails alone.
 fn decode_requests(faces: &Weak<Faces>, requests: &mpsc::Receiver<usize>) {
     while let Ok(index) = requests.recv() {
         let Some(faces) = faces.upgrade() else {
@@ -396,9 +427,23 @@ fn decode_requests(faces: &Weak<Faces>, requests: &mpsc::Receiver<usize>) {
         let (Some(packs), Some(face)) = (faces.packs.as_ref(), faces.list.get(index)) else {
             continue;
         };
-        let decoded = read_picture(packs, &face.art);
+        let decoded = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            read_picture(packs, &face.art)
+        }))
+        .unwrap_or_else(|_| {
+            crate::log::progress(format_args!("cards: {}: the decoder stopped", face.art));
+            None
+        });
+        let ready = decoded.is_some();
         if let Some(mut state) = faces.state(index) {
             *state = decoded.map_or(Art::Failed, Art::Ready);
+        }
+        if ready {
+            faces
+                .ready
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner())
+                .push(index);
         }
     }
 }
@@ -436,11 +481,24 @@ pub(crate) fn current() -> Arc<Faces> {
 pub(crate) fn install_for_shot(list: Vec<Face>, pictures: impl Fn(usize) -> usize) {
     let before = current();
     let faces = Faces::new(list, before.packs.clone(), before.generation + 1);
+    let mut decoded = std::collections::HashMap::new();
     for index in 0..faces.list.len() {
-        if let (Some(chain), Some(mut state)) =
-            (before.decode_now(pictures(index)), faces.state(index))
-        {
+        let source = pictures(index);
+        let chain = decoded
+            .entry(source)
+            .or_insert_with(|| before.decode_now(source))
+            .as_ref()
+            .map(|chain| MipChain {
+                size: chain.size,
+                levels: chain.levels.clone(),
+            });
+        if let (Some(chain), Some(mut state)) = (chain, faces.state(index)) {
             *state = Art::Ready(chain);
+            faces
+                .ready
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner())
+                .push(index);
         }
     }
     *lock() = Some(Arc::new(faces));
