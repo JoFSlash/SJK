@@ -220,7 +220,11 @@ Alphas are not marked as pre-releases, so the site's download link
 
 ## Donations
 
-**Shelved since 14/10/2026 (Sol's decision).** Nothing asks for donations for now: the
+**Shelved since 14/10/2026 (Sol's decision).** Nothing in the game or on the site asks
+for donations for now; only the GitHub repository's Sponsor button does, since
+25/10/2026, pointing at Sol's GitHub Sponsors page (https://github.com/sponsors/Sol-Vulpes)
+through [.github/FUNDING.yml](../.github/FUNDING.yml), with "Sponsorships" ticked in
+the repository's settings (General, Features). The
 site's Support SJK section and its two menu links carry `hidden` and `site.js` skips the
 hub (`DONATION.shelved`); the client's card never shows and its setting is out of the
 settings screens (`donation_goal::SHELVED`), and the Collection lists the Supporter
