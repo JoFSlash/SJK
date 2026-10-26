@@ -4331,7 +4331,8 @@ rooms that alternate sides, so every passage between them turns twice through a
 wider hall with braziers. Room 4's `func_plat` rises 632 units to a balcony and a
 narrow 1024-unit corridor that leads to rooms 5 to 7; room 7 is a 2560 × 1792
 hall, 1280 high, with lava channels, side galleries, a boss dais and a 7× hooded
-guardian statue with four smaller ones round it.
+guardian statue with four smaller ones round it. Its loading screen name
+(worldspawn `message`) is "Sith Base".
 
 ```sh
 python scripts/sith_coop_map.py --install      # then, in Free For All: devmap sjk_sith_coop
@@ -4349,6 +4350,18 @@ python scripts/sith_coop_map.py --install      # then, in Free For All: devmap s
   push reaches a mover only when the middle of its box lies within 53° of the aim
   from the pusher's origin (`force_throw.rs` `in_reach`), and a stand-in as tall
   as the statue refused a player standing against it.
+- **Crypt.** The guardian and its pedestal are a second Force-usable `func_door`
+  (spawnflags 66, `angle -1`), drawn by its `model2` at `model2scale 700`: an md3
+  holds no point more than 512 units out, so the 728-unit statue cannot be scaled
+  into the file. Pushed or used, it rises 448 units off a stairwell in the hall's
+  floor; on arriving its `opentarget` wakes three crypt guards, prints a hint and
+  plays the lift's sound. Nineteen steps lead down to a crypt under the hall
+  (896 × 704, 288 high, its ceiling the hall's floor slab) with pillars,
+  sarcophagi and an altar holding the Sith heart, a glowing `func_breakable`
+  (600 health, shown) whose `target` is a `target_print` of "MISSION COMPLETE".
+- **Statues.** Every figure is drawn from gray copies of `sith_map.py`'s statue
+  models (`models/map_objects/sjk_sith_coop/`), sharing one gray stone shader;
+  faces, eyes and blades keep the temple's shaders.
 - **Enemies.** Stock NPC classes, harder room by room, most using the dark side
   through their definitions: `npc_cultist` (spawnflags 2 grip, 4 lightning,
   8 drain), `npc_cultist_saber(_powers)`, `npc_reborn_new` (1 dual, 2 staff,
@@ -4368,13 +4381,13 @@ python scripts/sith_coop_map.py --install      # then, in Free For All: devmap s
   `sky_stage.rs`'s face mapping, so it has no seams, and a `q3map_sun`. With
   `r_dayNight 1` SJK draws its own day atmosphere and `r_clouds` over it, so the
   red box shows only with both off or in other clients.
-- **Checked** (26/10/2026, Linux, q3map2 `8216133`): no leak, 836 brushes,
-  57 duplicate-triangle warnings where detail trim meets at corners; the
+- **Checked** (26/10/2026, Linux, q3map2 `8216133`): no leak, 914 brushes,
+  58 duplicate-triangle warnings where detail trim meets at corners; the
   generator's own checks (every spawn, enemy, statue and waypoint clear and on a
-  floor) pass, 390 waypoints; the puzzle mover's model is local to its origin.
+  floor) pass, 395 waypoints; the puzzle mover's model is local to its origin.
 - **Not checked:** the NPCs (this environment has no retail NPC definitions, so
-  the server could not spawn them), the lift, triggers and the puzzle in play,
-  the map in a game.
+  the server could not spawn them), the lift, triggers, the crypt and the heart
+  in play. The room 6 puzzle was pushed in a game on Windows (user report).
 
 ## Default visual profile
 

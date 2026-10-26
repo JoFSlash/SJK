@@ -1670,8 +1670,8 @@ starts off is not sent (`SVF_NOCLIENT`, `EF_NODRAW`); it used to carry `EF_PERMA
 (bit 7) in the place of `EF_NODRAW` (bit 8).
 
 Doors, lifts and buttons carry theirs too: `spawn_doors` registers a `func_door`,
-`func_plat` or `func_button`'s md3 `model2` and sends it as `modelindex2`, which the
-server used to leave out, so `sjk_sith_coop`'s pushable statue (a `func_door` whose
+`func_plat` or `func_button`'s md3 `model2` and sends it as `modelindex2` with its
+`model2scale` percent as `iModelScale`, which the server used to leave out, so `sjk_sith_coop`'s pushable statue (a `func_door` whose
 only drawn part is its `model2`) showed only its block (26/10/2026).
 
 Used, by the use key or by name (`G_UseTargets`, a `target_counter`, a breakable's

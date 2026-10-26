@@ -293,7 +293,8 @@ def room(i):
     w, y0, y1, zf, h = r["w"], r["y0"], r["y1"], r["z"], r["h"]
     zc = zf + h
     holes = HOLES.get(i, [])
-    out = floor_with_holes(-w, w, y0, y1, zf, [hl[:4] for hl in holes],
+    shaft = [stairwell()] if i == 6 else []
+    out = floor_with_holes(-w, w, y0, y1, zf, [hl[:4] for hl in holes] + shaft,
                            {"*": f["trim"], "top": f["floor"]})
     for hl in holes:
         out += lava_pit(*hl[:4], zf)
@@ -557,7 +558,7 @@ def extras_r7(r):
     f = OBSIDIAN
     zf, y1 = r["z"], r["y1"]
     cy = giant()[1]
-    out = [octagon_brush(0, cy, 288, zf, zf + 64, {"*": f["trim"], "top": f["pillar"]})]
+    out = []  # the giant's pedestal is part of the giant's mover, giant_mover()
     dais = y1 - 448
     out.append(box((-512, dais, zf), (512, y1, zf + 96), {"*": f["trim"], "top": f["floor"]}))
     for k in range(1, 6):
@@ -601,6 +602,111 @@ def giant():
     return 0, (r["y0"] + r["y1"]) // 2 - 64, r["z"] + 64
 
 
+# ---------------------------------------------------------------- the crypt
+
+# The guardian and its pedestal are a func_door: the Force (or the use key) lifts
+# them GIANT_RISE and opens the stairwell beneath, down to a crypt under the hall,
+# where the Sith heart on the altar must be destroyed. Its breaking prints
+# "Mission complete".
+STATUE = "models/map_objects/%s/statue" % COOP  # gray copies of sith_map.py's figures
+GIANT_STATUE = STATUE + "_giant"
+GIANT_SCALE = 7.0
+GIANT_PEDESTAL = 288
+GIANT_SOLID = 360  # the stand-in's height above the pedestal, as PUZZLE_SOLID
+GIANT_RISE = 448
+CRYPT_Z = 320  # the crypt's floor; its ceiling is the hall's floor slab
+CRYPT_W, CRYPT_D = 448, 704
+SHAFT = 96  # the stairwell's half width; it runs 448 north under the pedestal
+
+
+def stairwell():
+    """The hole in room 7's floor the pedestal covers: (x0, x1, y0, y1)."""
+    _, cy, _ = giant()
+    return (-SHAFT, SHAFT, cy - 224, cy + 224)
+
+
+def crypt():
+    """The stairwell down from under the pedestal and the crypt north of it, under
+    the hall's floor: brushes, in room 7's coordinates (its cx is 0)."""
+    x0, x1, s0, s1 = stairwell()
+    top = ROOMS[6]["z"] - T  # the underside of the hall's floor
+    z, w, e = CRYPT_Z, CRYPT_W, s1 + CRYPT_D
+    f = OBSIDIAN
+    wall = {"*": f["wall"]}
+    out = [box((-w - T, s0 - T, z - T), (w + T, e + T, z), {"*": f["trim"], "top": f["floor"]})]
+    # the stairwell: walls, and steps from just under the hall's floor down north
+    out += [box((x0 - T, s0 - T, z), (x0, s1, top), wall),
+            box((x1, s0 - T, z), (x1 + T, s1, top), wall),
+            box((x0, s0 - T, z), (x1, s0, top), wall)]
+    out += stairs(x0, x1, s0, s1, z, ROOMS[6]["z"] - STEP, "n")
+    for y in (s0 + 96, s0 + 288):
+        height = ROOMS[6]["z"] - STEP * (1 + (y - s0) * 19 // 448)
+        out.append(sconce(x0, y, height + 48))
+        out.append(sconce(x1, y, height + 48))
+    # the crypt
+    out += [box((-w - T, s1 - T, z), (x0 - T, s1, top), wall),
+            box((x1 + T, s1 - T, z), (w + T, s1, top), wall),
+            box((-w - T, s1, z), (-w, e, top), wall),
+            box((w, s1, z), (w + T, e, top), wall),
+            box((-w - T, e, z), (w + T, e + T, top), wall)]
+    for x_face, inward in ((-w, 1), (w, -1)):
+        xs = sorted((x_face, x_face + inward * 6))
+        out.append(box((xs[0], s1 + 6, z + 160), (xs[1], e - 6, z + 176),
+                       {"*": f["trim"], "side": f["runes"]}, detail=True))
+        for y in range(s1 + 128, e - 63, 192):
+            out.append(sconce(x_face, y, z + 48))
+    for x in (-256, 256):
+        for y in (s1 + 192, s1 + 448):
+            out += pillar(x, y, z, top - z)
+    for sx in (-1, 1):  # sarcophagi along the walls
+        xs = sorted((sx * 336, sx * 432))
+        for y in (s1 + 96, s1 + 384):
+            out.append(box((xs[0], y, z), (xs[1], y + 192, z + 48), {"*": STONE, "side": TRIM}))
+            out.append(box((xs[0] - 8, y - 8, z + 48), (xs[1] + 8, y + 200, z + 64),
+                           {"*": f["trim"], "top": STONE}))
+    out.append(box((-128, e - 224, z), (128, e - 64, z + 32), {"*": f["trim"], "top": STONE}))
+    for x in (-160, 160):
+        out += brazier(x, e - 144, z)
+    for x in (-256, 0, 256):
+        for y in (s1 + 160, s1 + 512):
+            out.append(lamp(x, y, top, 32))
+    return out
+
+
+HEART = Face(COOP + "/heart", (0.5, 0.5))  # a glowing red crystal, which lights the crypt
+
+
+def crypt_heart():
+    """(func_breakable fields, brush) of the Sith heart on the crypt's altar."""
+    _, _, _, s1 = stairwell()
+    e = s1 + CRYPT_D
+    brush = octagon_brush(0, e - 144, 36, CRYPT_Z + 32, CRYPT_Z + 192, {"*": HEART})
+    fields = {"classname": "func_breakable", "health": "600", "showhealth": "1",
+              "material": "1", "target": "crypt_destroyed"}
+    return fields, brush
+
+
+CRYPT_WAVE = [("npc_reborn_new", 4, -192, 320), ("npc_reborn_new", 5, 192, 320),
+              ("npc_shadowtrooper", 0, 0, 400)]  # (class, flags, x, y from the crypt's door)
+
+
+def giant_mover():
+    """(func_door fields, brushes) of the guardian: its pedestal, an invisible
+    stand-in for its body and an origin brush at its feet, where the model is drawn."""
+    gx, gy, gz = giant()
+    zf = ROOMS[6]["z"]
+    brushes = [octagon_brush(gx, gy, GIANT_PEDESTAL, zf, gz, {"*": TRIM, "top": OBSIDIAN["pillar"]}),
+               octagon_brush(gx, gy, round(20 * GIANT_SCALE), gz, gz + GIANT_SOLID,
+                             {"*": "solid_nodraw"}),
+               box((gx - 8, gy - 8, gz - 8), (gx + 8, gy + 8, gz + 8), {"*": "origin"})]
+    size = gz + GIANT_SOLID - zf
+    fields = {"classname": "func_door", "model2": GIANT_STATUE + ".md3",
+              "model2scale": str(round(GIANT_SCALE * 100)), "angle": "-1",
+              "spawnflags": "66", "speed": "64", "wait": "-1", "lip": str(size - GIANT_RISE),
+              "opentarget": "crypt"}
+    return fields, brushes
+
+
 # ---------------------------------------------------------------- statues
 
 BRIDGE_FIGURES = ["acolyte", "caster", "lord", "acolyte"]
@@ -616,7 +722,6 @@ def statues():
            for k, (x, y, a) in enumerate(bridge_statues())]
     r7 = ROOMS[6]
     gx, gy, gz = giant()
-    out.append((gx + r7["cx"], gy, gz, 270, 7.0, None, "guardian"))
     for (x, y), figure in zip(GUARDS, GUARD_FIGURES):
         out.append((gx + x + r7["cx"], gy + y, r7["z"] + 48, 270, 3.4, None, figure))
     return out
@@ -686,6 +791,9 @@ def enemies():
     r4 = ROOMS[3]
     for c, f, x in BALCONY_WAVE:
         out.append((c, f, (x + r4["cx"], r4["y1"] - 96, r4["z"] + LIFT_HEIGHT + 8 + 40), 270, "room4"))
+    s1 = stairwell()[3]
+    for c, f, x, y in CRYPT_WAVE:
+        out.append((c, f, (x, s1 + y, CRYPT_Z + 40), 180, "crypt"))
     corridor_end = ROOMS[4]["y0"] - T - 96
     for c, f, x in CORRIDOR_WAVE:
         out.append((c, f, (x + ROOMS[4]["cx"], corridor_end, ROOMS[4]["z"] + 40), 270, "room4"))
@@ -710,7 +818,7 @@ def triggers():
 # glowing track; on the plate at its end it opens the door to room 7.
 PUZZLE_START, PUZZLE_END = 256, 576  # the block's centre, from room 6's south wall
 PUZZLE_BLOCK = 112
-PUZZLE_STATUE = "%s_puzzle" % sith.STATUE  # the acolyte, scaled for a mover's model2
+PUZZLE_STATUE = "%s_puzzle" % STATUE  # the acolyte, scaled for a mover's model2
 PUZZLE_SCALE = 2.6
 # The stand-in's height above the block. A push reaches a mover only if the middle
 # of its box lies within 53 degrees of the aim from the pusher's origin (force_throw.rs
@@ -809,6 +917,14 @@ def waypoint_candidates():
                 pts += [(x, cy, sill + 32) for x in range(x0 + 64, x1 - 63, 128)]
             else:
                 pts += [(cx, y, sill + 32) for y in range(y0 - 64, y1 + 65, 128)]
+    x0, x1, s0, s1 = stairwell()
+    for x in range(-CRYPT_W + 96, CRYPT_W - 95, 192):
+        for y in range(s1 + 96, s1 + CRYPT_D - 95, 192):
+            pts.append((x, y, CRYPT_Z + 32))
+    for k in range(0, 19, 3):
+        y = s0 + (448 * k + 224) // 19
+        # clear of the next step up, which a box 32 deep reaches over
+        pts.append((0, y, ROOMS[6]["z"] - STEP * k + 32))
     r4 = ROOMS[3]
     for x in range(-r4["w"] + 96, r4["w"] - 95, 192):
         pts.append((x + r4["cx"], r4["y1"] - 128, r4["z"] + LIFT_HEIGHT + 8 + 32))
@@ -828,7 +944,7 @@ def world_brushes():
         out += room(i)
     for i in range(len(PASSAGES)):
         out += passage(i)
-    return out + statue_brushes()
+    return out + crypt() + statue_brushes()
 
 
 def clear(brushes, p, half=16, below=23, above=40):
@@ -848,7 +964,9 @@ def build():
     plats = lift()
     trig = triggers()
     (statue_fields, block), (door_fields, door) = puzzle()
-    everything = brushes + plats + block + door
+    giant_fields, giant_brushes = giant_mover()
+    heart_fields, heart = crypt_heart()
+    everything = brushes + plats + block + door + giant_brushes + [heart]
     for p in player_spawns():
         if not (clear(everything, p) and grounded(solid, p)):
             sys.exit("player spawn %s is blocked or floating" % (p,))
@@ -865,7 +983,7 @@ def build():
     if not clear(everything, (x, y, z)):
         sys.exit("the X-wing at %s is blocked" % ((x, y, z),))
 
-    world = {"classname": "worldspawn", "message": "SJK Sith Temple (co-op)",
+    world = {"classname": "worldspawn", "message": "Sith Base",
              "_ambient": "16", "gridsize": "64 64 128", "music": MUSIC}
     ents = [entity(world, brushes)]
     ents.append(entity({"classname": "func_plat", "height": str(LIFT_HEIGHT),
@@ -874,6 +992,16 @@ def build():
         ents.append(entity({"classname": "trigger_once", "target": target}, [b]))
     ents.append(entity(statue_fields, block))
     ents.append(entity(door_fields, door))
+    ents.append(entity(giant_fields, giant_brushes))
+    ents.append(entity(heart_fields, [heart]))
+    gx, gy, gz = giant()
+    ents.append(entity({"classname": "target_print", "targetname": "crypt",
+                        "message": "The guardian rises: a crypt lies beneath. Destroy the Sith heart!"}))
+    ents.append(entity({"classname": "target_speaker", "targetname": "crypt",
+                        "noise": "%s/lift.wav" % COOP_SOUNDS,
+                        "origin": "%d %d %d" % (gx, gy, gz + 128)}))
+    ents.append(entity({"classname": "target_print", "targetname": "crypt_destroyed",
+                        "message": "MISSION COMPLETE"}))
     for b in hurt_brushes(brushes):  # lava kills players and NPCs alike, at once
         ents.append(entity({"classname": "trigger_hurt", "dmg": "1000"}, [b]))
     ride, speaker = lift_sound()
@@ -891,7 +1019,7 @@ def build():
         ents.append(entity({"classname": "misc_model_static", "model": WRECK % part,
                             "origin": "%d %d %d" % origin, "angles": angles}))
     for x, y, z, angle, scale, _, figure in statues():
-        ents.append(entity({"classname": "misc_model", "model": "%s_%s.md3" % (sith.STATUE, figure),
+        ents.append(entity({"classname": "misc_model", "model": "%s_%s.md3" % (STATUE, figure),
                             "origin": "%d %d %d" % (x, y, z), "angle": str(angle),
                             "modelscale": str(scale), "spawnflags": "4"}))
     for cls, flags, (x, y, z), angle, name in enemies():
@@ -954,6 +1082,11 @@ def draw_textures(folder):
     strata = (0.85 + 0.15 * np.sin(yy / s * 2 * np.pi * 9 + fbm(s, 2.0, 34) * 6))[..., None]
     cliff = tint(fbm(s, 1.3, 35), (40, 34, 34), (98, 86, 80)) * strata
     rgb(cliff * (1 - ridges(s, 36, 0.015)[..., None] * 0.6)).save(folder / "cliff.tga")
+    # every statue's stone: a plain gray, light enough to stay gray under the lava's glow
+    gray = tint(fbm(s, 1.5, 37), (118, 118, 122), (188, 188, 192))
+    rgb(gray * (1 - ridges(s, 38, 0.012)[..., None] * 0.45)).save(folder / "statue_gray.tga")
+    heart = tint(fbm(128, 1.2, 39), (150, 10, 8), (255, 70, 40))
+    rgb(heart + ridges(128, 40, 0.03)[..., None] * np.array((100, 90, 80))).save(folder / "heart.tga")
     img = Image.new("RGB", (64, 64), (40, 120, 40))
     ImageDraw.Draw(img).text((8, 24), "TRIG", fill=(255, 255, 255))
     img.save(folder / "trigger.tga")
@@ -991,17 +1124,41 @@ def shader_text():
 \tsurfaceparm nomarks
 }
 """ % {"t": t})
+    out.append("%(t)s/heart\n{\n\tqer_editorimage %(t)s/heart.tga\n"
+               "\tq3map_surfacelight 3000\n\tq3map_lightimage %(t)s/heart.tga\n"
+               "\tsurfaceparm nomarks\n\tsurfaceparm nolightmap\n"
+               "\t{\n\t\tmap %(t)s/heart.tga\n\t\trgbGen wave sin 0.8 0.2 0 0.5\n\t\tglow\n\t}\n}\n"
+               % {"t": t})
+    out.append("%(m)s/stone\n{\n\tqer_editorimage %(t)s/statue_gray.tga\n"
+               "\t{\n\t\tmap $lightmap\n\t\trgbGen identity\n\t}\n"
+               "\t{\n\t\tmap %(t)s/statue_gray.tga\n\t\tblendFunc GL_DST_COLOR GL_ZERO\n"
+               "\t\trgbGen identity\n\t}\n}\n" % {"t": t, "m": STATUE.rsplit("/", 1)[0]})
     return "\n".join(out)
+
+
+GRAY_PARTS = ("statue", "statue_dark", "statue_bronze", "hilt")  # all of them one gray stone
+
+
+def write_statue(path, figure, scale=1.0):
+    """sith_models' figure at `scale`, its stone gray: the coop shader for every part
+    but the dark face and the glowing eyes and blades, which stay sith_map.py's."""
+    surfaces = statue_mesh(figure)
+    scaled = {k: ([tuple(c * scale for c in v) for v in verts], uvs, tris)
+              for k, (verts, uvs, tris) in surfaces.items()}
+    coop_dir, sith_dir = STATUE.rsplit("/", 1)[0], sith.STATUE.rsplit("/", 1)[0]
+    write_md3(path, scaled, {k: "%s/stone" % coop_dir if k in GRAY_PARTS else "%s/%s" % (sith_dir, k)
+                             for k in scaled})
 
 
 def write_assets(stage):
     sith.write_assets(stage)  # the temple's textures, statues and sjk_sith.shader
     # the puzzle's statue is a mover's model, which the game draws at its own size
-    surfaces = statue_mesh("acolyte")
-    scaled = {k: ([tuple(c * PUZZLE_SCALE for c in v) for v in verts], uvs, tris)
-              for k, (verts, uvs, tris) in surfaces.items()}
-    model_dir = sith.STATUE.rsplit("/", 1)[0]
-    write_md3(stage / (PUZZLE_STATUE + ".md3"), scaled, {k: "%s/%s" % (model_dir, k) for k in scaled})
+    write_statue(stage / (PUZZLE_STATUE + ".md3"), "acolyte", PUZZLE_SCALE)
+    # an md3 holds no point further than 512 units out: the giant is scaled by its
+    # mover's model2scale instead
+    write_statue(stage / (GIANT_STATUE + ".md3"), "guardian")
+    for figure in set(BRIDGE_FIGURES + GUARD_FIGURES):
+        write_statue(stage / ("%s_%s.md3" % (STATUE, figure)), figure)
     sounds = stage / COOP_SOUNDS
     sith_audio.lift(sounds / "lift.wav", LIFT_HEIGHT / LIFT_SPEED)
     sith_audio.lava_loop(sounds / "lava.wav")
@@ -1095,8 +1252,9 @@ def main():
             z.write(stage / "shaders" / (prefix + ".shader"), "shaders/%s.shader" % prefix)
         for tga in sorted((stage / "textures").rglob("*.tga")):
             z.write(tga, tga.relative_to(stage).as_posix())
-        for md3 in sorted((stage / sith.STATUE).parent.glob("*.md3")):
-            z.write(md3, md3.relative_to(stage).as_posix())
+        for statue in (sith.STATUE, STATUE):
+            for md3 in sorted((stage / statue).parent.glob("*.md3")):
+                z.write(md3, md3.relative_to(stage).as_posix())
         for f in sorted((stage / "sound").rglob("*.wav")) + [stage / MUSIC]:
             z.write(f, f.relative_to(stage).as_posix())
         if args.levelshot:

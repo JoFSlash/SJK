@@ -468,6 +468,8 @@ mod tests {
         assert_eq!(door(&[("model2", statue)]).model2, statue);
         assert_eq!(door(&[("model2", "models/players/x/model.glm")]).model2, "");
         assert_eq!(door(&[]).model2, "");
+        assert_eq!(door(&[("model2scale", "700")]).model2_scale, 700);
+        assert_eq!(door(&[("model2scale", "5000")]).model2_scale, 1023);
     }
 
     fn player(team: i32) -> DoorToucher {

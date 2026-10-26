@@ -202,6 +202,15 @@ pub struct Door {
     /// `modelindex2`, `CG_Mover`); empty for none, or for a Ghoul2 model, which this
     /// server does not draw.
     pub model2: String,
+    /// `model2scale` (`s.iModelScale`): the percent the client scales `model2` by, 0
+    /// for its own size; at most 1023.
+    pub model2_scale: u32,
+}
+
+/// The `model2scale` key as `InitMover` reads it: a percent, 0 to 1023.
+fn model2_scale_key(entity: &Entity) -> u32 {
+    crate::userinfo::atoi(entity.get("model2scale").unwrap_or_default().as_bytes()).clamp(0, 1023)
+        as u32
 }
 
 /// The `model2` key as `InitMover` registers it: an md3, never a `.glm`.
@@ -353,6 +362,7 @@ pub fn spawn_door(entity: &Entity, bounds: ([f32; 3], [f32; 3])) -> Option<Door>
         shader_anim: spawnflags & MOVER_LOCKED != 0,
         frame: 0,
         model2: model2_key(entity),
+        model2_scale: model2_scale_key(entity),
     })
 }
 
@@ -448,6 +458,7 @@ pub fn spawn_plat(entity: &Entity, bounds: ([f32; 3], [f32; 3])) -> Option<Door>
         shader_anim: false,
         frame: 0,
         model2: model2_key(entity),
+        model2_scale: model2_scale_key(entity),
     })
 }
 
@@ -543,6 +554,7 @@ pub fn spawn_button(entity: &Entity, bounds: ([f32; 3], [f32; 3])) -> Option<Doo
         shader_anim: false,
         frame: 0,
         model2: model2_key(entity),
+        model2_scale: model2_scale_key(entity),
     })
 }
 
