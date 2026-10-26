@@ -4342,8 +4342,10 @@ python scripts/sith_coop_map.py --install      # then, in Free For All: devmap s
   side galleries with steps (rooms 2, 3, 6 and 7), a catwalk over a lava pool
   (3), pillars round the lift (4), a stepped octagonal dais with braziers (5).
   Every step rises 16 units, under the 18 a player walks up.
-- **Puzzle.** Room 6's statue is a `func_door` (spawnflags 66:
-  `MOVER_FORCE_ACTIVATE | MOVER_PLAYER_USE`) whose `model2` is the scaled statue
+- **Puzzle.** Room 6's statue is a `func_door` (spawnflags 2,
+  `MOVER_FORCE_ACTIVATE`: a Force push alone moves it) whose `model2` is the
+  scaled statue, turned in the file to face south (a door's model is drawn
+  unturned),
   and whose brushes are a block, an invisible `solid_nodraw` stand-in and an
   origin brush. Pushed north along its track onto the plate, its `opentarget`
   opens the door to room 7. The stand-in stops 120 units above the block: a
@@ -4351,17 +4353,25 @@ python scripts/sith_coop_map.py --install      # then, in Free For All: devmap s
   from the pusher's origin (`force_throw.rs` `in_reach`), and a stand-in as tall
   as the statue refused a player standing against it.
 - **Crypt.** The guardian and its pedestal are a second Force-usable `func_door`
-  (spawnflags 66, `angle -1`), drawn by its `model2` at `model2scale 700`: an md3
-  holds no point more than 512 units out, so the 728-unit statue cannot be scaled
-  into the file. Pushed or used, it rises 448 units off a stairwell in the hall's
+  (spawnflags 2, `angle -1`), drawn by its `model2` at `model2scale 700` and
+  facing the hall's door: an md3 holds no point more than 512 units out, so the
+  728-unit statue cannot be scaled into the file. Pushed, it rises 448 units off a stairwell in the hall's
   floor; on arriving its `opentarget` wakes three crypt guards, prints a hint and
   plays the lift's sound. Nineteen steps lead down to a crypt under the hall
   (896 × 704, 288 high, its ceiling the hall's floor slab) with pillars,
   sarcophagi and an altar holding the Sith heart, a glowing `func_breakable`
   (600 health, shown) whose `target` is a `target_print` of "MISSION COMPLETE".
-- **Statues.** Every figure is drawn from gray copies of `sith_map.py`'s statue
-  models (`models/map_objects/sjk_sith_coop/`), sharing one gray stone shader;
-  faces, eyes and blades keep the temple's shaders.
+- **Statues.** [sith_models.py](../scripts/sith_models.py)'s hooded figures,
+  about 34,000 triangles each: a robe folded deeper towards the hem, a cape with
+  a raised edge, a hood with a rolled rim over a shadowed face whose eyes glow,
+  wide folded sleeves with cuffs, hands with fingers gripping a saber hilt or a
+  sword, a belt with a buckle, pouches and a sash, a chained clasp, and a long
+  sword with a spiked pommel and gemmed crossguard for the guardian. The map
+  copies them to `models/map_objects/sjk_sith_coop/` in a dark red veined stone
+  and dark iron; the bridge and the hall's four are vertex lit (lightmaps for
+  sixteen such meshes would be far too many), the two movers' statues are lit as
+  entities (`rgbGen lightingDiffuse`). The figure with an outstretched hand is
+  not placed.
 - **Enemies.** Stock NPC classes, harder room by room, most using the dark side
   through their definitions: `npc_cultist` (spawnflags 2 grip, 4 lightning,
   8 drain), `npc_cultist_saber(_powers)`, `npc_reborn_new` (1 dual, 2 staff,

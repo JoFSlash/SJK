@@ -702,17 +702,17 @@ def giant_mover():
     size = gz + GIANT_SOLID - zf
     fields = {"classname": "func_door", "model2": GIANT_STATUE + ".md3",
               "model2scale": str(round(GIANT_SCALE * 100)), "angle": "-1",
-              "spawnflags": "66", "speed": "64", "wait": "-1", "lip": str(size - GIANT_RISE),
+              "spawnflags": "2", "speed": "64", "wait": "-1", "lip": str(size - GIANT_RISE),
               "opentarget": "crypt"}
     return fields, brushes
 
 
 # ---------------------------------------------------------------- statues
 
-BRIDGE_FIGURES = ["acolyte", "caster", "lord", "acolyte"]
+BRIDGE_FIGURES = ["acolyte", "lord", "guardian", "lord"]
 # The guardian's four, around its pedestal: (x, y from its centre) and figure.
 GUARDS = [(-416, -256), (416, -256), (-416, 256), (416, 256)]
-GUARD_FIGURES = ["caster", "lord", "lord", "caster"]
+GUARD_FIGURES = ["acolyte", "lord", "lord", "acolyte"]
 
 
 def statues():
@@ -844,8 +844,8 @@ def puzzle():
              box((x - 8, y - 8, z + 40), (x + 8, y + 8, z + 56), {"*": "origin"})]
     statue = {"classname": "func_door",
               "model2": PUZZLE_STATUE + ".md3", "angle": "90",
-              # MOVER_FORCE_ACTIVATE | MOVER_PLAYER_USE: pushed, or used up close
-              "spawnflags": "66",
+              # MOVER_FORCE_ACTIVATE: only a Force push moves it
+              "spawnflags": "2",
               "speed": "48", "wait": "-1", "lip": str(PUZZLE_BLOCK - (PUZZLE_END - PUZZLE_START)),
               "opentarget": "final_door"}
     w, sill, top = door_of(6)
@@ -1021,7 +1021,7 @@ def build():
     for x, y, z, angle, scale, _, figure in statues():
         ents.append(entity({"classname": "misc_model", "model": "%s_%s.md3" % (STATUE, figure),
                             "origin": "%d %d %d" % (x, y, z), "angle": str(angle),
-                            "modelscale": str(scale), "spawnflags": "4"}))
+                            "modelscale": str(scale)}))
     for cls, flags, (x, y, z), angle, name in enemies():
         fields = {"classname": cls, "origin": "%d %d %d" % (x, y, z), "angle": str(angle)}
         if flags:
@@ -1083,8 +1083,11 @@ def draw_textures(folder):
     cliff = tint(fbm(s, 1.3, 35), (40, 34, 34), (98, 86, 80)) * strata
     rgb(cliff * (1 - ridges(s, 36, 0.015)[..., None] * 0.6)).save(folder / "cliff.tga")
     # every statue's stone: a plain gray, light enough to stay gray under the lava's glow
-    gray = tint(fbm(s, 1.5, 37), (118, 118, 122), (188, 188, 192))
-    rgb(gray * (1 - ridges(s, 38, 0.012)[..., None] * 0.45)).save(folder / "statue_gray.tga")
+    # every statue's stone: a dark red veined with black, and its iron
+    red = tint(fbm(s, 1.5, 37), (62, 14, 12), (128, 34, 28))
+    red = red * (1 - ridges(s, 38, 0.012)[..., None] * 0.55) + ridges(s, 41, 0.006)[..., None] * 30
+    rgb(red).save(folder / "statue_red.tga")
+    rgb(tint(fbm(128, 1.0, 42), (34, 30, 32), (92, 84, 86))).save(folder / "statue_metal.tga")
     heart = tint(fbm(128, 1.2, 39), (150, 10, 8), (255, 70, 40))
     rgb(heart + ridges(128, 40, 0.03)[..., None] * np.array((100, 90, 80))).save(folder / "heart.tga")
     img = Image.new("RGB", (64, 64), (40, 120, 40))
@@ -1129,34 +1132,50 @@ def shader_text():
                "\tsurfaceparm nomarks\n\tsurfaceparm nolightmap\n"
                "\t{\n\t\tmap %(t)s/heart.tga\n\t\trgbGen wave sin 0.8 0.2 0 0.5\n\t\tglow\n\t}\n}\n"
                % {"t": t})
-    out.append("%(m)s/stone\n{\n\tqer_editorimage %(t)s/statue_gray.tga\n"
-               "\t{\n\t\tmap $lightmap\n\t\trgbGen identity\n\t}\n"
-               "\t{\n\t\tmap %(t)s/statue_gray.tga\n\t\tblendFunc GL_DST_COLOR GL_ZERO\n"
-               "\t\trgbGen identity\n\t}\n}\n" % {"t": t, "m": STATUE.rsplit("/", 1)[0]})
+    # the statues' stone and iron: vertex lit where q3map2 bakes them into the map,
+    # lit as an entity where a mover carries them ("_lit")
+    for name, tex in (("stone", "statue_red"), ("metal", "statue_metal")):
+        for suffix, rgb_gen in (("", "vertex"), ("_lit", "lightingDiffuse")):
+            out.append("%(m)s/%(n)s%(s)s\n{\n\tqer_editorimage %(t)s/%(x)s.tga\n"
+                       "\t{\n\t\tmap %(t)s/%(x)s.tga\n\t\trgbGen %(g)s\n\t}\n}\n"
+                       % {"t": t, "m": STATUE.rsplit("/", 1)[0], "n": name, "s": suffix, "x": tex,
+                          "g": rgb_gen})
     return "\n".join(out)
 
 
-GRAY_PARTS = ("statue", "statue_dark", "statue_bronze", "hilt")  # all of them one gray stone
+# every part of a statue in one dark red stone, its belt, buckles and sword iron
+STONE_PARTS = ("statue", "statue_dark", "statue_bronze")
 
 
-def write_statue(path, figure, scale=1.0):
-    """sith_models' figure at `scale`, its stone gray: the coop shader for every part
-    but the dark face and the glowing eyes and blades, which stay sith_map.py's."""
+def write_statue(path, figure, scale=1.0, yaw=0, lit=False):
+    """sith_models' figure at `scale`, turned `yaw` degrees from facing +x (a mover's
+    model is drawn unturned), in the coop's stone and iron; the dark face and the
+    glowing eyes and blades stay sith_map.py's. `lit`: for a mover, lit as an entity."""
     surfaces = statue_mesh(figure)
-    scaled = {k: ([tuple(c * scale for c in v) for v in verts], uvs, tris)
-              for k, (verts, uvs, tris) in surfaces.items()}
+    c, s = math.cos(math.radians(yaw)), math.sin(math.radians(yaw))
+    turned = {k: ([(scale * (x * c - y * s), scale * (x * s + y * c), scale * z) for x, y, z in verts],
+                  uvs, tris) for k, (verts, uvs, tris) in surfaces.items()}
     coop_dir, sith_dir = STATUE.rsplit("/", 1)[0], sith.STATUE.rsplit("/", 1)[0]
-    write_md3(path, scaled, {k: "%s/stone" % coop_dir if k in GRAY_PARTS else "%s/%s" % (sith_dir, k)
-                             for k in scaled})
+    suffix = "_lit" if lit else ""
+
+    def shader(k):
+        if k in STONE_PARTS:
+            return "%s/stone%s" % (coop_dir, suffix)
+        if k == "hilt":
+            return "%s/metal%s" % (coop_dir, suffix)
+        return "%s/%s" % (sith_dir, k)
+
+    write_md3(path, turned, {k: shader(k) for k in turned})
 
 
 def write_assets(stage):
     sith.write_assets(stage)  # the temple's textures, statues and sjk_sith.shader
     # the puzzle's statue is a mover's model, which the game draws at its own size
-    write_statue(stage / (PUZZLE_STATUE + ".md3"), "acolyte", PUZZLE_SCALE)
+    # both movers' statues face south, towards the players coming in
+    write_statue(stage / (PUZZLE_STATUE + ".md3"), "acolyte", PUZZLE_SCALE, 270, True)
     # an md3 holds no point further than 512 units out: the giant is scaled by its
     # mover's model2scale instead
-    write_statue(stage / (GIANT_STATUE + ".md3"), "guardian")
+    write_statue(stage / (GIANT_STATUE + ".md3"), "guardian", 1.0, 270, True)
     for figure in set(BRIDGE_FIGURES + GUARD_FIGURES):
         write_statue(stage / ("%s_%s.md3" % (STATUE, figure)), figure)
     sounds = stage / COOP_SOUNDS
