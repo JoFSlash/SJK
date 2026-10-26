@@ -1,10 +1,11 @@
 """Generated MD3 models for the Sith maps: the hooded statue, and the MD3 writer.
 
-The statue faces +x and is 100 units tall: a robed figure with a cape, a deep
-hood whose face is in shadow, sleeved arms meeting in front, and both hands on
-the hilt of a saber held point down. Surfaces (materials):
-`statue` (stone), `face` (the hood's shadow and the sleeves' openings) and
-`hilt` (metal). Triangles are built counter-clockwise seen from outside and
+The statues face +x and are 100 units tall: robed figures with a cape, boots,
+a belt and buckle, under a deep hood whose face is in shadow or a helm with
+glowing eye slits, in several poses ([`STATUES`]). Surfaces (materials): the
+stone (`statue`, `statue_dark`, `statue_bronze`), `face` (the hood's shadow,
+the face plate, the sleeves' openings), `hilt` (metal), `eyes`, and a lit
+saber's `blade` and `blade_core`. Triangles are built counter-clockwise seen from outside and
 written clockwise, as Quake 3 draws them.
 """
 import math
@@ -137,20 +138,23 @@ def cylinder(mesh, x, y, z0, z1, r, material, segments=12):
     mesh.cap(rows[0], (x, y, z0), material, False)
 
 
-# ---------------------------------------------------------------- the statue
+# ---------------------------------------------------------------- the statues
 
 PROFILE = [(0, 24), (6, 23), (20, 21), (36, 18.5), (46, 16), (50, 16.2), (62, 17.5),
            (70, 19.5), (74, 20.5), (77, 20), (79, 18.5), (81, 16), (83, 13.6), (86, 12.8),
            (90, 12.4), (94, 11), (97, 8), (99, 4.5), (100, 0.8)]
 HEIGHTS = [0, 2, 5, 9, 14, 20, 26, 32, 38, 43, 46, 49, 53, 58, 63, 68, 72, 75, 77, 79, 80.5,
-           82, 83.5, 85, 87, 89, 91, 93, 95, 96.5, 98, 99, 100]
-SEGMENTS = 40
+           82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96.5, 98, 99, 100]
+# A helmeted figure's body stops at the neck; the head is built on it.
+NECK = [(81, 15.5), (82.5, 8.5), (83.5, 7.5)]
+SEGMENTS = 48
 FACE_HALF_ANGLE = math.radians(55)  # the hood's opening, either side of +x
 FACE_CENTER, FACE_HALF_HEIGHT = 88.0, 5.2
+SHOULDERS = {1: (1, 16, 74), -1: (1, -16, 74)}
 
 
-def body_radius(h, theta):
-    r = lerp(PROFILE, h)
+def body_radius(h, theta, cape, hood=True):
+    r = lerp(PROFILE if hood or h <= 81 else PROFILE[:11] + NECK, h)
     c, s = math.cos(theta), math.sin(theta)
     k = 1.0
     if 62 <= h <= 81:  # shoulders, wider sideways
@@ -158,61 +162,140 @@ def body_radius(h, theta):
     if 56 <= h <= 76:  # chest
         k *= 1 + 0.05 * max(0.0, c) * math.sin(math.pi * (h - 56) / 20)
     if h < 76:  # the cape flares behind, down to the ground
-        k *= 1 + 0.17 * max(0.0, -c) * (1 - h / 76) ** 1.4
+        k *= 1 + cape * max(0.0, -c) * (1 - h / 76) ** 1.4
     if h < 46:  # folds in the skirt, deeper near the hem
         k *= 1 + 0.045 * (1 - h / 46) * math.sin(9 * theta + 0.8 * math.sin(2 * theta))
-    if 92 <= h <= 99.5:  # the hood's brim reaches forward over the face
+    if hood and 92 <= h <= 99.5:  # the hood's brim reaches forward over the face
         k *= 1 + 0.30 * max(0.0, c) ** 2 * math.sin(math.pi * (h - 92) / 7.5)
-    if 83 <= h <= 92:  # and the face sits back inside it
+    if hood and 83 <= h <= 92:  # and the face sits back inside it
         k *= 1 - 0.30 * max(0.0, c) ** 3 * math.sin(math.pi * (h - 83) / 9)
     return r * k
 
 
-def statue_mesh():
-    """Surfaces of the statue: name -> (vertices, uvs, triangles)."""
+def rod(mesh, a, b, r, material, segments=12):
+    """A closed cylinder from a to b."""
+    tube(mesh, [a, b], [r, r], material, segments, cap_end=material)
+    u, v = frame_for(sub(b, a))
+    ring = [add(a, add(scale(u, r * math.cos(2 * math.pi * j / segments)),
+                       scale(v, r * math.sin(2 * math.pi * j / segments)))) for j in range(segments)]
+    mesh.cap(ring, a, material, False)
+
+
+def saber(mesh, base, direction, blade):
+    """A hilt from `base` along `direction` (emitter last), and its lit blade."""
+    d = norm(direction)
+    at = lambda k: add(base, scale(d, k))  # noqa: E731
+    rod(mesh, at(-1), at(10), 1.7, "hilt", 14)
+    rod(mesh, at(-1.6), at(-0.6), 2.2, "hilt", 14)  # pommel
+    for k in (2.5, 4.5, 6.5):  # grip ridges
+        rod(mesh, at(k), at(k + 0.9), 2.05, "hilt", 14)
+    rod(mesh, at(9), at(11.5), 2.5, "hilt", 14)  # emitter
+    if blade:
+        rod(mesh, at(11.5), at(11.5 + blade), 1.25, "blade", 10)
+        rod(mesh, at(11.5), at(11.5 + blade + 0.6), 0.55, "blade_core", 8)
+
+
+def arm(mesh, side, elbow, wrist, stone, sleeve=(5.0, 5.8, 6.4, 7.4)):
+    """A sleeve from the shoulder through `elbow` to `wrist`, dark inside, and a hand."""
+    shoulder = SHOULDERS[side]
+    mid1 = tuple((a * 2 + b) / 3 for a, b in zip(shoulder, elbow))
+    mid2 = tuple((a + b * 2) / 3 for a, b in zip(elbow, wrist))
+    tube(mesh, [shoulder, mid1, elbow, mid2, wrist], [sleeve[0], sleeve[1], sleeve[2],
+                                                      (sleeve[2] + sleeve[3]) / 2, sleeve[3]],
+         stone, 14, cap_end="face")
+    out = norm(sub(wrist, elbow))
+    ellipsoid(mesh, add(wrist, scale(out, 2.8)), (3.2, 3.0, 3.4), stone, 6, 12)
+
+
+def helmet(mesh, stone, crest):
+    """A Sith helm on the neck: a dome, a dark face plate, glowing eye slits."""
+    ellipsoid(mesh, (0, 0, 90), (9, 8.6, 10.5), stone, 10, 18)
+    ellipsoid(mesh, (5.2, 0, 88.5), (5, 7.4, 7.6), "face", 8, 14)
+    for side in (1, -1):
+        ellipsoid(mesh, (9.9, side * 3, 91), (0.9, 2.2, 0.8), "eyes", 4, 8)
+        ellipsoid(mesh, (0.5, side * 8.4, 88), (2.5, 1.6, 6), stone, 6, 10)  # cheek guards
+    if crest:
+        tube(mesh, [(6, 0, 98), (1, 0, 102.5), (-6, 0, 101), (-10, 0, 95)],
+             [1.8, 2.4, 2.0, 1.0], stone, 10)
+        for side in (1, -1):  # horns
+            tube(mesh, [(1, side * 7, 96), (-1, side * 11, 101), (-5, side * 13, 106)],
+                 [1.8, 1.3, 0.4], stone, 8)
+
+
+def figure(head="hood", stone="statue", cape=0.17, pauldrons=False, arms=(), sabers=()):
+    """A robed figure 100 units tall facing +x; `arms` are (side, elbow, wrist) and
+    `sabers` (base, direction, blade length)."""
+    hood = head == "hood"
     mesh = Mesh()
+    heights = HEIGHTS if hood else [h for h in HEIGHTS if h <= 81] + [82.5, 83.5]
     rows, uvs = [], []
-    for h in HEIGHTS:
+    for h in heights:
         lean = -3.0 * max(0.0, (h - 84) / 16)  # the hood's peak falls back
         row = []
         for j in range(SEGMENTS + 1):  # the seam's column twice, for its texture
             th = 2 * math.pi * j / SEGMENTS
-            r = body_radius(h, th)
+            r = body_radius(h, th, cape, hood)
             row.append((lean + r * math.cos(th), r * math.sin(th), h))
         rows.append(row)
         uvs.append([(4 * j / SEGMENTS, h / 25) for j in range(SEGMENTS + 1)])
 
     def material(i, j):
-        h = (HEIGHTS[i] + HEIGHTS[i + 1]) / 2
+        h = (heights[i] + heights[i + 1]) / 2
         th = 2 * math.pi * (j + 0.5) / SEGMENTS
         th = math.atan2(math.sin(th), math.cos(th))
         oval = (th / FACE_HALF_ANGLE) ** 2 + ((h - FACE_CENTER) / FACE_HALF_HEIGHT) ** 2
-        return "face" if oval < 1 else "statue"
+        return "face" if hood and oval < 1 else stone
 
     mesh.grid(rows, uvs, material, wrap=False)
-    # the belt
-    belt = []
-    for h in (45.0, 48.5):
-        belt.append([(1.05 * body_radius(h, 2 * math.pi * j / SEGMENTS) * math.cos(2 * math.pi * j / SEGMENTS),
-                      1.05 * body_radius(h, 2 * math.pi * j / SEGMENTS) * math.sin(2 * math.pi * j / SEGMENTS),
-                      h) for j in range(SEGMENTS)])
+    if not hood:
+        mesh.cap(rows[-1][:-1], (0, 0, heights[-1]), stone, True)
+        helmet(mesh, stone, head == "crest")
+    # a belt with a buckle, boots under the hem
+    belt = [[(1.05 * body_radius(h, 2 * math.pi * j / SEGMENTS, cape) * math.cos(2 * math.pi * j / SEGMENTS),
+              1.05 * body_radius(h, 2 * math.pi * j / SEGMENTS, cape) * math.sin(2 * math.pi * j / SEGMENTS),
+              h) for j in range(SEGMENTS)] for h in (45.0, 48.5)]
     mesh.grid(belt, [[(j / 8, 0) for j in range(SEGMENTS)], [(j / 8, 1) for j in range(SEGMENTS)]],
               lambda i, j: "hilt")
-    # sleeves from inside the shoulders, bending at the elbow, widening to the
-    # wrist, where the opening is dark; the hands meet on the hilt
+    ellipsoid(mesh, (17.4, 0, 46.8), (1.4, 3.2, 2.6), "hilt", 4, 10)
     for side in (1, -1):
-        path = [(1, side * 16, 74), (4, side * 17.5, 66), (8, side * 17, 59),
-                (13, side * 11, 54.5), (16.5, side * 5, 52)]
-        tube(mesh, path, [5.0, 5.6, 6.0, 6.8, 7.6], "statue", 14, cap_end="face")
-        ellipsoid(mesh, (19.5, side * 2.4, 50.5), (3.3, 2.7, 3.8), "statue", 6, 12)
-    # the saber: emitter below, grip ridges, pommel under the hands
-    x = 22.0
-    cylinder(mesh, x, 0, 26, 50, 1.7, "hilt", 14)
-    cylinder(mesh, x, 0, 24, 28, 2.5, "hilt", 14)
-    for z in (33, 37, 41):
-        cylinder(mesh, x, 0, z, z + 1.2, 2.05, "hilt", 14)
-    ellipsoid(mesh, (x, 0, 50.6), (2.2, 2.2, 1.4), "hilt", 4, 12)
+        ellipsoid(mesh, (21, side * 7.5, 2.2), (6.5, 3.8, 2.6), stone, 6, 12)
+    if pauldrons:
+        for side in (1, -1):
+            ellipsoid(mesh, (0.5, side * 19, 77), (7.5, 7, 4.2), "hilt", 8, 14)
+            ellipsoid(mesh, (0.5, side * 20, 74.5), (6.5, 6, 2.5), "hilt", 6, 12)
+    for side, elbow, wrist in arms:
+        arm(mesh, side, elbow, wrist, stone)
+    for base, direction, blade in sabers:
+        saber(mesh, base, direction, blade)
     return mesh.surfaces()
+
+
+# The figures the maps place: name -> figure's arguments.
+STATUES = {
+    # hooded, both hands on a hilt held point down
+    "acolyte": dict(arms=[(1, (8, 17, 59), (16.5, 5, 52)), (-1, (8, -17, 59), (16.5, -5, 52))],
+                    sabers=[((22, 0, 52), (0, 0, -1), 0)]),
+    # helmeted, a lit blade raised high, the other arm down
+    "warrior": dict(head="helmet", stone="statue_dark", pauldrons=True, cape=0.12,
+                    arms=[(-1, (6, -25, 82), (11, -21, 96)), (1, (3, 20, 60), (6, 19, 48))],
+                    sabers=[((13, -20, 99), (0.35, 0.15, 1), 42)]),
+    # hooded lord, arms crossed, a heavy cape and armoured shoulders
+    "lord": dict(stone="statue_bronze", pauldrons=True, cape=0.26,
+                 arms=[(-1, (11, -14, 64), (14, 9, 67)), (1, (11, 14, 62), (15, -8, 64))]),
+    # hooded, one hand thrust out with the Force, the other on a hilt at the hip
+    "caster": dict(stone="statue_dark",
+                   arms=[(1, (12, 19, 70), (25, 14, 73)), (-1, (4, -19, 60), (9, -16, 50))],
+                   sabers=[((10, -18, 46), (0, 0, -1), 0)]),
+    # the giant: crested helm, both hands holding a lit saber upright before it
+    "sith_lord": dict(head="crest", stone="statue_dark", pauldrons=True, cape=0.3,
+                      arms=[(1, (9, 16, 62), (17, 3, 64)), (-1, (9, -16, 62), (17, -3, 64))],
+                      sabers=[((20, 0, 59), (0, 0, 1), 58)]),
+}
+
+
+def statue_mesh(name="acolyte"):
+    """Surfaces of a statue: material -> (vertices, uvs, triangles)."""
+    return figure(**STATUES[name])
 
 
 # ---------------------------------------------------------------- MD3

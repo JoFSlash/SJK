@@ -46,7 +46,7 @@ import numpy as np
 from PIL import Image, ImageDraw, ImageFilter
 
 from arena_map import compile_map
-from sith_models import statue_mesh, write_md3
+from sith_models import STATUES as FIGURES, statue_mesh, write_md3
 
 DEFAULT_GAMEDATA = r"C:\Program Files (x86)\Steam\steamapps\common\Jedi Academy\GameData"
 DEFAULT_Q3MAP2 = r"S:\Tools\netradiant-custom\q3map2.exe"
@@ -425,8 +425,9 @@ def build():
                + throne() + pillars() + beams() + lamps() + braziers() + pedestals())
     ents = [entity({"classname": "worldspawn", "message": "SJK Sith Temple",
                     "_ambient": "10", "gridsize": "64 64 64"}, brushes)]
-    for (x, y), angle in STATUES:
-        ents.append(entity({"classname": "misc_model", "model": STATUE + ".md3",
+    figures = ["warrior", "lord", "lord", "warrior", "caster", "caster"]
+    for ((x, y), angle), figure in zip(STATUES, figures):
+        ents.append(entity({"classname": "misc_model", "model": "%s_%s.md3" % (STATUE, figure),
                             "origin": "%d %d 48" % (x, y), "angle": str(angle),
                             "modelscale": str(STATUE_SCALE), "spawnflags": "4"}))
     for cls, origin, angle in spawns():
@@ -490,6 +491,26 @@ def ramp(x, stops):
     return out
 
 
+def lava_crust(size, seed, cells=14):
+    """Dark plates of cooled crust with glowing cracks between them (a multiplier:
+    white where the lava shows): tileable Voronoi edges."""
+    rng = np.random.default_rng(seed)
+    points = rng.random((cells, 2)) * size
+    yy, xx = np.mgrid[0:size, 0:size].astype(float)
+    nearest = np.full((size, size), 1e9)
+    second = np.full((size, size), 1e9)
+    for px, py in points:
+        for ox in (-size, 0, size):
+            for oy in (-size, 0, size):
+                d = np.hypot(xx - px - ox, yy - py - oy)
+                second = np.minimum(second, np.maximum(nearest, d))
+                nearest = np.minimum(nearest, d)
+    edge = np.clip(1 - (second - nearest) / 7, 0, 1) ** 1.5  # 1 on a crack
+    plate = 0.22 + 0.12 * fbm(size, 1.4, seed + 1)
+    v = plate * (1 - edge) + edge
+    return np.stack([v * 255, v * 235, v * 215], axis=-1)
+
+
 def draw_textures(folder):
     folder.mkdir(parents=True, exist_ok=True)
     save = lambda img, n: img.save(folder / (n + ".tga"))  # noqa: E731
@@ -544,6 +565,16 @@ def draw_textures(folder):
     save(rgb(np.full((32, 32, 3), 4)), "face")
     hilt = rgb(tint(fbm(64, 1.0, 9), (40, 40, 44), (120, 118, 124)))
     save(hilt, "hilt")
+    dark = tint(fbm(s, 1.5, 19), (30, 28, 34), (70, 66, 76)) * (1 - ridges(s, 20, 0.015)[..., None] * 0.4)
+    dark += ridges(s, 21, 0.008)[..., None] * np.array((90, 20, 16))  # faint red veins
+    save(rgb(dark), "statue_dark")
+    patina = fbm(s, 1.3, 22)
+    bronze = tint(fbm(s, 1.6, 23), (90, 60, 30), (170, 120, 64))
+    bronze = bronze * (1 - patina[..., None] * 0.35) + np.array((40, 90, 70)) * patina[..., None] * 0.35
+    save(rgb(bronze), "statue_bronze")
+    save(rgb(np.full((16, 16, 3), (255, 50, 30))), "eyes")
+    save(rgb(np.full((16, 16, 3), (255, 40, 24))), "blade")
+    save(rgb(np.full((16, 16, 3), (255, 230, 220))), "blade_core")
 
     # ceiling: dark rough rock
     save(rgb(tint(fbm(s, 1.3, 10), (24, 22, 28), (56, 50, 60))), "ceiling")
@@ -563,6 +594,7 @@ def draw_textures(folder):
     save(rgb(ramp(np.clip(n * 1.25 - 0.1, 0, 1), stops)), "lava")
     n = fbm(256, 1.2, 14)
     save(rgb(ramp(np.clip(n * 1.4 - 0.55, 0, 1), stops) * 0.6), "lava2")
+    save(rgb(lava_crust(256, 24)), "lava_crust")
     n = fbm(128, 1.1, 15)
     save(rgb(ramp(np.clip(n * 1.3 - 0.05, 0, 1), stops)), "embers")
 
@@ -682,10 +714,12 @@ def shader_text():
     parts.append("""%(t)s/lava
 {
 \tqer_editorimage %(t)s/lava.tga
-\tq3map_surfacelight 500
+\tq3map_surfacelight 700
 \tq3map_lightimage %(t)s/lava.tga
 \tq3map_lightsubdivide 128
 \tq3map_globaltexture
+\ttessSize 128
+\tdeformVertexes wave 160 sin 0 2.5 0 0.12
 \tsurfaceparm nonsolid
 \tsurfaceparm lava
 \tsurfaceparm trans
@@ -693,31 +727,56 @@ def shader_text():
 \tsurfaceparm nomarks
 \t{
 \t\tmap %(t)s/lava.tga
-\t\ttcMod turb 0 0.05 0 0.06
-\t\ttcMod scroll 0.012 0.008
+\t\ttcMod turb 0 0.06 0 0.05
+\t\ttcMod scroll 0.015 0.008
 \t\tglow
+\t}
+\t{
+\t\tmap %(t)s/lava_crust.tga
+\t\tblendFunc GL_DST_COLOR GL_ZERO
+\t\ttcMod scale 0.5 0.5
+\t\ttcMod scroll 0.006 0.003
 \t}
 \t{
 \t\tmap %(t)s/lava2.tga
 \t\tblendFunc GL_ONE GL_ONE
+\t\trgbGen wave sin 0.55 0.35 0 0.25
 \t\ttcMod scroll -0.01 0.015
+\t\tglow
 \t}
 }
 """ % {"t": t})
-    for n in ("statue", "face", "hilt"):
+    models = STATUE.rsplit("/", 1)[0]
+    for n in ("statue", "statue_dark", "statue_bronze", "face", "hilt"):
         tex = {"statue": "stone"}.get(n, n)
         parts.append("%s/%s\n{\n\tqer_editorimage %s/%s.tga\n"
                      "\t{\n\t\tmap $lightmap\n\t\trgbGen identity\n\t}\n"
                      "\t{\n\t\tmap %s/%s.tga\n\t\tblendFunc GL_DST_COLOR GL_ZERO\n"
-                     "\t\trgbGen identity\n\t}\n}\n" % (STATUE.rsplit("/", 1)[0], n, t, tex, t, tex))
+                     "\t\trgbGen identity\n\t}\n}\n" % (models, n, t, tex, t, tex))
+    # glowing parts: helm eyes and lit blades, which light what is near them
+    for n, power in (("eyes", 200), ("blade", 2500), ("blade_core", 1500)):
+        parts.append("%(m)s/%(n)s\n{\n\tqer_editorimage %(t)s/%(n)s.tga\n"
+                     "\tq3map_surfacelight %(p)d\n\tq3map_lightimage %(t)s/%(n)s.tga\n"
+                     "\tsurfaceparm nomarks\n\tsurfaceparm nolightmap\n"
+                     "\t{\n\t\tmap %(t)s/%(n)s.tga\n\t\tglow\n\t}\n}\n"
+                     % {"m": models, "n": n, "t": t, "p": power})
     return "\n".join(parts)
+
+
+def write_statues(stage):
+    """statue.md3 (the acolyte this map places) and statue_<name>.md3 for each figure."""
+    model_dir = STATUE.rsplit("/", 1)[0]
+    for name in FIGURES:
+        surfaces = statue_mesh(name)
+        shaders = {k: "%s/%s" % (model_dir, k) for k in surfaces}
+        write_md3(stage / ("%s_%s.md3" % (STATUE, name)), surfaces, shaders)
+        if name == "acolyte":
+            write_md3(stage / (STATUE + ".md3"), surfaces, shaders)
 
 
 def write_assets(stage):
     draw_textures(stage / "textures" / PREFIX)
-    model_dir = STATUE.rsplit("/", 1)[0]
-    write_md3(stage / (STATUE + ".md3"), statue_mesh(),
-              {k: "%s/%s" % (model_dir, k) for k in ("statue", "face", "hilt")})
+    write_statues(stage)
     shaders = stage / "shaders"
     shaders.mkdir(exist_ok=True)
     (shaders / (PREFIX + ".shader")).write_text(shader_text(), newline="\n")
@@ -799,7 +858,8 @@ def main():
         z.write(stage / "shaders" / (PREFIX + ".shader"), "shaders/%s.shader" % PREFIX)
         for tga in sorted((stage / "textures" / PREFIX).glob("*.tga")):
             z.write(tga, "textures/%s/%s" % (PREFIX, tga.name))
-        z.write(stage / (STATUE + ".md3"), STATUE + ".md3")
+        for md3 in sorted((stage / STATUE).parent.glob("*.md3")):
+            z.write(md3, md3.relative_to(stage).as_posix())
     print("wrote", pk3)
     if args.install:
         shutil.copy2(pk3, gamedata / "base" / pk3.name)
