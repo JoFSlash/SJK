@@ -95,6 +95,7 @@ def style_faces():
                 ceiling=Face("ceiling"), runes=Face("runes", (0.25, 0.25)),
                 lamp=Face("lamp", (1.0, 1.0)), pillar=Face("stone"))
 PASSAGES = [384, 448, 512, 1024, 512, 576]
+HALL_EXTRA = 64  # how much wider each side the hall across a turning passage is
 FACADE_DOOR = (256, 256)
 BALCONY_D = 256
 LIFT = 256  # the lift's side; it rises LIFT_HEIGHT to the balcony at LIFT_SPEED
@@ -349,8 +350,11 @@ def passage_cells(i):
     if ax == bx:
         return [(ax - h, ax + h, ya, yb)]
     ym = (ya + yb) // 2
-    return [(ax - h, ax + h, ya, ym - h), (min(ax, bx) - h, max(ax, bx) + h, ym - h, ym + h),
-            (bx - h, bx + h, ym + h, yb)]
+    # the stretch across is a hall half as wide again as the way in, but the
+    # narrow corridor from the balcony stays narrow
+    m = h if i == 3 else h + HALL_EXTRA
+    return [(ax - h, ax + h, ya, ym - m), (min(ax, bx) - h, max(ax, bx) + h, ym - m, ym + m),
+            (bx - h, bx + h, ym + m, yb)]
 
 
 def open_spans(cells, k, side):
@@ -403,6 +407,10 @@ def passage(i):
                     out.append(box((r0, a, sill + 96), (r1, b, sill + 112), {"*": TRIM, "side": RUNES},
                                    detail=True))
         cx, cy = (x0 + x1) / 2, (y0 + y1) / 2
+        if len(cells) == 3 and k == 1 and i != 3:
+            ax, bx = cells[0][0] + cells[0][1], cells[2][0] + cells[2][1]
+            out += brazier(ax // 2, y1 - 48, sill)
+            out += brazier(bx // 2, y0 + 48, sill)
         if x1 - x0 > y1 - y0:
             for x in range(int(x0) + 96, int(x1) - 31, 192):
                 out.append(lamp(x, cy, top, 24))
@@ -412,22 +420,85 @@ def passage(i):
     return out
 
 
+STEP = 16  # a stair's rise: a player walks up 18 without jumping
+
+
+def platform(x0, x1, y0, y1, z, top):
+    """A raised floor from z up to top."""
+    return box((x0, y0, z), (x1, y1, top), {"*": TRIM, "top": FLOOR})
+
+
+def stairs(x0, x1, y0, y1, z, top, down):
+    """Steps of STEP from top down to z across the rectangle, falling towards
+    `down` ('s', 'n', 'w' or 'e'); each step its own box, none overlapping."""
+    n = (top - z) // STEP
+    out = []
+    for k in range(n):
+        if down in "sn":
+            a = y0 + (y1 - y0) * k // n
+            b = y0 + (y1 - y0) * (k + 1) // n
+            lo, hi = (x0, a), (x1, b)
+            rise = top - STEP * (n - 1 - k) if down == "s" else top - STEP * k
+        else:
+            a = x0 + (x1 - x0) * k // n
+            b = x0 + (x1 - x0) * (k + 1) // n
+            lo, hi = (a, y0), (b, y1)
+            rise = top - STEP * (n - 1 - k) if down == "w" else top - STEP * k
+        out.append(platform(lo[0], hi[0], lo[1], hi[1], z, rise))
+    return out
+
+
+def side_galleries(r, x_in, y0, y1, top, stair_y, stair_w=128):
+    """Raised walkways along both side walls, from x_in out to the wall, with a
+    flight down their inner side at stair_y: high ground for both sides of a fight."""
+    w, z = r["w"], r["z"]
+    run = (top - z) // STEP * 24
+    out = []
+    for s in (-1, 1):
+        xs = sorted((s * x_in, s * w))
+        out.append(platform(xs[0], xs[1], y0, y1, z, top))
+        sx = sorted((s * x_in, s * (x_in - run)))
+        out += stairs(sx[0], sx[1], stair_y - stair_w // 2, stair_y + stair_w // 2, z, top,
+                      "w" if s > 0 else "e")
+    return out
+
+
+def cover(x0, x1, y0, y1, z, h=80):
+    """A low obsidian wall to fight from behind."""
+    return [box((x0, y0, z), (x1, y1, z + h), {"*": OBSIDIAN["wall"], "top": TRIM}),
+            box((x0 - 8, y0 - 8, z + h), (x1 + 8, y1 + 8, z + h + 8), {"*": TRIM}, detail=True)]
+
+
 def extras_r1(r):
-    return []
+    """The antechamber: a broken line of low walls across the way in."""
+    y = r["y0"] + 176
+    out = []
+    for s in (-1, 1):
+        xs = sorted((s * 128, s * 320))
+        out += cover(xs[0], xs[1], y, y + 48, r["z"])
+    return out
 
 
 def extras_r2(r):
+    """Pillars down the middle, galleries on both sides with steps at their middle."""
     out = []
-    for x in (-384, 384):
-        for k in range(3):
-            out += pillar(x, r["y0"] + 192 + k * 192, r["z"], r["h"])
+    for x in (-288, 288):
+        for y in (r["y0"] + 160, r["y1"] - 160):
+            out += pillar(x, y, r["z"], r["h"])
+    mid = (r["y0"] + r["y1"]) // 2
+    out += side_galleries(r, 448, r["y0"] + 192, r["y1"] - 192, r["z"] + 64, mid)
     return out
 
 
 def extras_r3(r):
-    """A grated catwalk over the lava pool."""
+    """A grated catwalk over the lava pool, raised ledges along both walls."""
     c = (r["y0"] + r["y1"]) // 2
-    return [box((-48, c - 224, r["z"] - 16), (48, c + 224, r["z"]), {"*": TRIM, "top": FLOOR})]
+    out = [box((-48, c - 224, r["z"] - 16), (48, c + 224, r["z"]), {"*": TRIM, "top": FLOOR})]
+    out += side_galleries(r, 448, r["y0"] + 192, r["y1"] - 192, r["z"] + 64, c, 256)
+    for s in (-1, 1):  # braziers on the ledges, either side of the steps
+        for y in (c - 192, c + 192):
+            out += brazier(s * 704, y, r["z"] + 64)
+    return out
 
 
 def extras_r4(r):
@@ -441,14 +512,26 @@ def extras_r4(r):
     for x in (-LIFT // 2 - 32, LIFT // 2 + 16):
         for y in (front - LIFT - 32, front - 16):
             out.append(box((x, y, r["z"]), (x + 16, y + 16, top - 16), {"*": TRIM, "side": LAMP}))
+    # pillars up to the vault round the floor where the climb is fought for
+    for x in (-448, 448):
+        for y in (r["y0"] + 192, r["y0"] + 416):
+            out += pillar(x, y, r["z"], r["h"])
     return out
 
 
 def extras_r5(r):
+    """Pillars round a stepped octagonal dais in the middle, its top a ring of fire."""
     out = []
     for x in (-384, 384):
         for k in (0, 1):
             out += pillar(x, r["y0"] + 256 + k * 256, r["z"], r["h"])
+    c = (r["y0"] + r["y1"]) // 2
+    for k, apothem in enumerate((288, 256, 224, 192)):
+        out.append(octagon_brush(0, c, apothem, r["z"], r["z"] + STEP * (k + 1),
+                                 {"*": TRIM, "top": FLOOR}))
+    for a in range(4):  # braziers on the top's rim, the ways across left open
+        t = math.radians(45 + 90 * a)
+        out += brazier(round(150 * math.cos(t)), round(c + 150 * math.sin(t)), r["z"] + 4 * STEP)
     return out
 
 
@@ -456,9 +539,11 @@ def extras_r6(r):
     """Pillars, and the puzzle's marks: a glowing track from the statue to the
     plate it must be pushed onto."""
     out = []
-    for x in (-576, 576):
-        for k in range(3):
-            out += pillar(x, r["y0"] + 192 + k * 256, r["z"], r["h"])
+    for x in (-448, 448):
+        for y in (r["y0"] + 192, r["y1"] - 192):
+            out += pillar(x, y, r["z"], r["h"])
+    mid = (r["y0"] + r["y1"]) // 2
+    out += side_galleries(r, 704, r["y0"] + 192, r["y1"] - 192, r["z"] + 96, mid)
     y0, y1 = PUZZLE_START + r["y0"] + 64, PUZZLE_END + r["y0"]
     for x in (-72, 64):
         out.append(box((x, y0, r["z"]), (x + 8, y1, r["z"] + 2), {"*": TRIM, "top": RUNES}, detail=True))
@@ -483,6 +568,15 @@ def extras_r7(r):
             out += pillar(s * 560, y, zf, r["h"], f)
     for x, y in GUARDS:  # the guardian's company stand on their own pedestals
         out.append(octagon_brush(x, cy + y, 96, zf, zf + 48, {"*": STONE, "side": TRIM}))
+    # galleries along the side walls, outside the lava, steps down at both ends
+    top, g0, g1 = zf + 64, r["y0"] + 256, y1 - 256
+    for s in (-1, 1):
+        xs = sorted((s * 1024, s * r["w"]))
+        out.append(platform(xs[0], xs[1], g0, g1, zf, top))
+        out += stairs(xs[0], xs[1], g0 - 96, g0, zf, top, "s")
+        out += stairs(xs[0], xs[1], g1, g1 + 96, zf, top, "n")
+        for y in range(g0 + 256, g1 - 255, 512):
+            out += brazier(s * 1152, y, top, f)
     return out
 
 
@@ -542,16 +636,16 @@ def statue_brushes():
 # wave, which the middle of the hall sets off.
 WAVES = [
     [("npc_cultist", 0, -192, 0.6), ("npc_cultist", 0, 192, 0.6), ("npc_cultist", 2, 0, 0.8)],
-    [("npc_cultist", 0, -224, 0.7), ("npc_cultist", 4, 224, 0.7), ("npc_reborn_new", 0, -128, 0.5),
+    [("npc_cultist", 0, -544, 0.6), ("npc_cultist", 4, 544, 0.6), ("npc_reborn_new", 0, -128, 0.5),
      ("npc_reborn_new", 0, 128, 0.5)],
-    [("npc_reborn_new", 1, -512, 0.5), ("npc_reborn_new", 2, 512, 0.5), ("npc_cultist", 8, -448, 0.8),
+    [("npc_reborn_new", 1, -512, 0.5), ("npc_reborn_new", 2, 512, 0.5), ("npc_cultist", 8, -576, 0.7),
      ("npc_shadowtrooper", 0, 256, 0.85), ("npc_cultist_saber", 0, 0, 0.88)],
     [("npc_reborn_new", 0, -320, 0.35), ("npc_reborn_new", 0, 320, 0.35),
      ("npc_cultist_saber_powers", 1, 0, 0.3)],
-    [("npc_reborn_new", 4, -256, 0.5), ("npc_reborn_new", 4, 256, 0.5),
-     ("npc_cultist_saber_powers", 10, 0, 0.8), ("npc_cultist", 4, 384, 0.8)],
+    [("npc_reborn_new", 4, -96, 0.5), ("npc_reborn_new", 4, 96, 0.5),
+     ("npc_cultist_saber_powers", 10, 0, 0.9), ("npc_cultist", 4, 384, 0.8)],
     [("npc_alora", 0, -448, 0.6), ("npc_reborn_new", 5, 320, 0.75), ("npc_reborn_new", 6, -320, 0.75),
-     ("npc_cultist", 4, 448, 0.45), ("npc_cultist", 2, -448, 0.45)],
+     ("npc_cultist", 4, 800, 0.45), ("npc_cultist", 2, -800, 0.45)],
     [("npc_reborn_new", 4, -224, 0.3), ("npc_reborn_new", 4, 224, 0.3), ("npc_cultist", 4, -1088, 0.15),
      ("npc_cultist", 4, 1088, 0.15)],
 ]
@@ -561,11 +655,20 @@ CORRIDOR_WAVE = [("npc_shadowtrooper", 0, 0)]
 OUTSIDE_WAVE = [("npc_cultist", 0, -160, FACADE_Y - 128), ("npc_cultist", 0, 160, FACADE_Y - 128)]
 
 
+_FLOORS = []
+
+
 def floor_z(x, y, r):
-    """The floor under (x, y) in room r: its dais or the room's floor."""
-    if r is ROOMS[6] and y >= r["y1"] - 448 and abs(x) <= 512:
-        return r["z"] + 96
-    return r["z"]
+    """The highest floor under (x, y) in room r, up to 160 above the room's own:
+    a gallery, step or dais where there is one. Decorations are not floors."""
+    if not _FLOORS:
+        _FLOORS.extend(b for b in world_brushes() if not (b.lava or b.detail)
+                       and "clip" not in [getattr(f, "tex", f) for f in b.faces.values()])
+    best = r["z"]
+    for b in _FLOORS:
+        if r["z"] < b.z1 <= r["z"] + 160 and b.z1 > best and b.contains((x + r["cx"], y, b.z1 - 1)):
+            best = b.z1
+    return best
 
 
 def enemies():
@@ -609,6 +712,11 @@ PUZZLE_START, PUZZLE_END = 256, 576  # the block's centre, from room 6's south w
 PUZZLE_BLOCK = 112
 PUZZLE_STATUE = "%s_puzzle" % sith.STATUE  # the acolyte, scaled for a mover's model2
 PUZZLE_SCALE = 2.6
+# The stand-in's height above the block. A push reaches a mover only if the middle
+# of its box lies within 53 degrees of the aim from the pusher's origin (force_throw.rs
+# in_reach): a stand-in as tall as the statue put the middle so high that a player
+# up against it, looking at it, was refused. This keeps the middle at chest height.
+PUZZLE_SOLID = 120
 
 
 def puzzle():
@@ -620,14 +728,16 @@ def puzzle():
              # the statue on it is the mover's model, not solid: an invisible solid
              # stands in, which a Force push's aim (a shot's trace) meets too, where
              # a player clip would let it through to the wall behind
-             octagon_brush(x, y, 44, z + 48, z + 48 + round(100 * PUZZLE_SCALE), {"*": "solid_nodraw"}),
+             octagon_brush(x, y, 44, z + 48, z + 48 + PUZZLE_SOLID, {"*": "solid_nodraw"}),
              # the origin brush: q3map2 sets the mover's origin, where its model is
              # drawn, to this brush's centre and makes the others relative to it (an
              # "origin" key alone would leave them where they are, and the game would
              # add the origin to them a second time)
              box((x - 8, y - 8, z + 40), (x + 8, y + 8, z + 56), {"*": "origin"})]
     statue = {"classname": "func_door",
-              "model2": PUZZLE_STATUE + ".md3", "angle": "90", "spawnflags": "2",
+              "model2": PUZZLE_STATUE + ".md3", "angle": "90",
+              # MOVER_FORCE_ACTIVATE | MOVER_PLAYER_USE: pushed, or used up close
+              "spawnflags": "66",
               "speed": "48", "wait": "-1", "lip": str(PUZZLE_BLOCK - (PUZZLE_END - PUZZLE_START)),
               "opentarget": "final_door"}
     w, sill, top = door_of(6)

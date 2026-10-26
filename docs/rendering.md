@@ -4324,37 +4324,57 @@ python scripts/sith_map.py --install           # then: devmap sjk_sith1
 ## Co-op Sith temple map
 
 [sith_coop_map.py](../scripts/sith_coop_map.py) builds `sjk_sith_coop` from
-`sith_map.py`'s pieces: a start outside under a sky box, a bridge over a lava
-chasm lined with statues, and seven rooms. Room 4's `func_plat` rises 632 units
-to a balcony and a 1024-unit corridor that leads to rooms 5 to 7; room 7 is a
-2560 × 1792 hall, 1280 high, with lava channels, a boss dais and an 8× statue.
+`sith_map.py`'s pieces: a start outside under a sky box with an X-wing (the
+game's own `npc_vehicle`) and its wreck (`misc_model_static` of the game's
+debris models), a bridge over a lava chasm lined with statues, and seven obsidian
+rooms that alternate sides, so every passage between them turns twice through a
+wider hall with braziers. Room 4's `func_plat` rises 632 units to a balcony and a
+narrow 1024-unit corridor that leads to rooms 5 to 7; room 7 is a 2560 × 1792
+hall, 1280 high, with lava channels, side galleries, a boss dais and a 7× hooded
+guardian statue with four smaller ones round it.
 
 ```sh
 python scripts/sith_coop_map.py --install      # then, in Free For All: devmap sjk_sith_coop
 ```
 
+- **Rooms.** One style throughout; the floors differ: low cover walls (room 1),
+  side galleries with steps (rooms 2, 3, 6 and 7), a catwalk over a lava pool
+  (3), pillars round the lift (4), a stepped octagonal dais with braziers (5).
+  Every step rises 16 units, under the 18 a player walks up.
+- **Puzzle.** Room 6's statue is a `func_door` (spawnflags 66:
+  `MOVER_FORCE_ACTIVATE | MOVER_PLAYER_USE`) whose `model2` is the scaled statue
+  and whose brushes are a block, an invisible `solid_nodraw` stand-in and an
+  origin brush. Pushed north along its track onto the plate, its `opentarget`
+  opens the door to room 7. The stand-in stops 120 units above the block: a
+  push reaches a mover only when the middle of its box lies within 53° of the aim
+  from the pusher's origin (`force_throw.rs` `in_reach`), and a stand-in as tall
+  as the statue refused a player standing against it.
 - **Enemies.** Stock NPC classes, harder room by room, most using the dark side
   through their definitions: `npc_cultist` (spawnflags 2 grip, 4 lightning,
   8 drain), `npc_cultist_saber(_powers)`, `npc_reborn_new` (1 dual, 2 staff,
   4 the stronger set), `npc_shadowtrooper`, `npc_alora`, `npc_tavion_new`
   (1 scepter, 2 Sith sword) and `npc_desann`. A room's spawners carry its
-  `targetname` and wait for the `trigger_once` across its door; two cultists
-  outside spawn at once. Spawners stand 40 units up; `check_in_solid` drops them.
-- **Navigation.** `waypoint` entities on a 192-unit grid of every floor, the
-  passages, the balcony and the bridge, kept where a player's box fits and has
-  floor under it; the server connects them at load.
+  `targetname` and wait for the `trigger_once` at the start of the passage into
+  it, so they are in place before the room comes into view; two cultists outside
+  spawn at once. Spawners stand 40 units above the highest floor under them
+  (a gallery, step or dais); `check_in_solid` drops them. Lava is a
+  `trigger_hurt` of 1000 for players and NPCs alike.
+- **Navigation.** `waypoint` entities on a 192-unit grid of every floor and
+  gallery, the passages, the balcony and the bridge, kept where a player's box
+  fits and has floor under it; the server connects them at load.
 - **Team.** In team game types the blue team is the NPCs' own, so play it in
   Free For All.
 - **Sky.** `skyParms` with a box the script computes per direction through
   `sky_stage.rs`'s face mapping, so it has no seams, and a `q3map_sun`. With
   `r_dayNight 1` SJK draws its own day atmosphere and `r_clouds` over it, so the
   red box shows only with both off or in other clients.
-- **Checked** (26/10/2026, Linux, q3map2 `8216133`): no compile warning or leak,
-  481 brushes; `sjk-server` loads it with 8 spawn points and 282 waypoints; the
-  ignored test `sjk_sith_coop_tour` rendered nine views on llvmpipe.
+- **Checked** (26/10/2026, Linux, q3map2 `8216133`): no leak, 836 brushes,
+  57 duplicate-triangle warnings where detail trim meets at corners; the
+  generator's own checks (every spawn, enemy, statue and waypoint clear and on a
+  floor) pass, 390 waypoints; the puzzle mover's model is local to its origin.
 - **Not checked:** the NPCs (this environment has no retail NPC definitions, so
-  the server could not spawn them), the lift and triggers in play, the map in a
-  game.
+  the server could not spawn them), the lift, triggers and the puzzle in play,
+  the map in a game.
 
 ## Default visual profile
 
