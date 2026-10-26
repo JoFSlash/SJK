@@ -692,6 +692,9 @@ def shader_text():
     t = "textures/" + PREFIX
     parts = [lit(n) for n in ("wall", "floor", "trim", "stone", "ceiling", "banner")]
     parts.append(lit("lavarock", "lavarock_glow", 200))
+    # a mover's origin brush: q3map2 takes the entity's origin from it and drops it
+    parts.append("%s/origin\n{\n\tqer_trans 0.4\n\tsurfaceparm origin\n\tsurfaceparm nodraw\n"
+                 "\tsurfaceparm nonsolid\n\tsurfaceparm trans\n}\n" % t)
     parts.append("%s/clip\n{\n\tqer_trans 0.4\n\tsurfaceparm nodraw\n\tsurfaceparm nolightmap\n"
                  "\tsurfaceparm nonsolid\n\tsurfaceparm trans\n\tsurfaceparm nomarks\n"
                  "\tsurfaceparm playerclip\n}\n" % t)

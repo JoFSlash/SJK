@@ -618,8 +618,13 @@ def puzzle():
     h = PUZZLE_BLOCK // 2
     block = [box((x - h, y - h, z), (x + h, y + h, z + 48), {"*": TRIM, "top": STONE}),
              # the statue on it is the mover's model, not solid: a clip stands in
-             octagon_brush(x, y, 44, z + 48, z + 48 + round(100 * PUZZLE_SCALE), {"*": "clip"})]
-    statue = {"classname": "func_door", "origin": "%d %d %d" % (x, y, z + 48),
+             octagon_brush(x, y, 44, z + 48, z + 48 + round(100 * PUZZLE_SCALE), {"*": "clip"}),
+             # the origin brush: q3map2 sets the mover's origin, where its model is
+             # drawn, to this brush's centre and makes the others relative to it (an
+             # "origin" key alone would leave them where they are, and the game would
+             # add the origin to them a second time)
+             box((x - 8, y - 8, z + 40), (x + 8, y + 8, z + 56), {"*": "origin"})]
+    statue = {"classname": "func_door",
               "model2": PUZZLE_STATUE + ".md3", "angle": "90", "spawnflags": "2",
               "speed": "48", "wait": "-1", "lip": str(PUZZLE_BLOCK - (PUZZLE_END - PUZZLE_START)),
               "opentarget": "final_door"}
