@@ -192,6 +192,8 @@ pub struct NativeGame {
     /// The limits it reads — `fraglimit`, `timelimit` and the rest — which an operator
     /// sets once and this server then honours every frame.
     limits: sjk_game_jka::match_end::Limits,
+    /// `g_forceRegenTime`: milliseconds a point of Force takes to come back.
+    force_regen_time: i32,
     /// `level.startTime`: when the match began, which the time limit measures from.
     level_start_time: i32,
     /// `level.teamScores[TEAM_RED]` and `[TEAM_BLUE]`.
@@ -422,6 +424,7 @@ impl NativeGame {
             gametype: GAMETYPE_FFA,
             match_end: Default::default(),
             limits: Default::default(),
+            force_regen_time: FORCE_REGEN_TIME,
             level_start_time: 0,
             team_scores: [0; 2],
             last_team_info: 0,
@@ -3288,6 +3291,8 @@ const SETTINGS: ForceServerSettings = ForceServerSettings {
     weapons_disabled: 0,
     cheats: false,
 };
+/// `g_forceRegenTime`'s default: a point of Force every 200 ms.
+const FORCE_REGEN_TIME: i32 = 200;
 /// `g_spawnInvulnerability`'s default, in milliseconds.
 const SPAWN_INVULNERABILITY: i32 = 3_000;
 /// `g_forceRespawn`'s default: a dead player is respawned after this many seconds.

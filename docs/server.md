@@ -72,6 +72,12 @@ password. The console implementation lives in
 [bridge_console.rs](../crates/sjk-dedicated/src/bridge_console.rs) and the server's
 [command buffer](../crates/sjk-dedicated/src/command_buffer.rs).
 
+`g_forceRegenTime` (default 200) is the milliseconds a player's point of Force
+takes to come back, read when it changes. Before 26/10/2026 the server ignored it
+and always used 200 (a full pool in 20 seconds). NPCs still use 200
+([npc_force_update.rs](../crates/sjk-game-jka/src/npc_force_update.rs)), and a
+client's `devmap` passes no such setting to the server it starts.
+
 Bots retain their slots and bot identity across map changes and `map_restart`.
 They enter the new map immediately because they have no network handshake.
 Player session data survives, while transient state and entity handles are reset
