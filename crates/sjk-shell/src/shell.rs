@@ -21,7 +21,7 @@ mod file_log;
 #[path = "shell_schedule.rs"]
 mod schedule;
 
-pub use completion::CompletionKey;
+pub use completion::{CompletionKey, MAP_EXTENSION};
 
 const DEFAULT_LOG_CAPACITY: usize = 256;
 /// Bytes of the `[HH:MM:SS] ` prefix of [`ConsoleLine::stamped_text`].

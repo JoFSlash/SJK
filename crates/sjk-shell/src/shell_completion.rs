@@ -3,18 +3,26 @@
 //! complete to their longest shared prefix and are listed in the scrollback, with
 //! descriptions while the listing is short. The file argument of `exec` and the
 //! other commands in [`FILE_ARGUMENTS`] completes the same way from the files the
-//! caller lists (`Cmd_CompleteCfgName`, `qcommon/cmd.cpp`).
+//! caller lists (`Cmd_CompleteCfgName`, `qcommon/cmd.cpp`), and the map argument of
+//! `devmap` from the maps it lists (`SV_CompleteMapName`, `server/sv_ccmds.cpp`).
 
 use super::{ConsoleLineKind, Shell, ascii_starts_with_ignore_case, builtin_commands};
 
 /// Commands whose first argument names a file, with the extension of the files it
-/// completes from, as the completion functions `Cmd_Init` and `Com_Init` register.
+/// completes from, as the completion functions `Cmd_Init`, `Com_Init` and
+/// `SV_AddOperatorCommands` register. [`MAP_EXTENSION`] asks for maps.
 const FILE_ARGUMENTS: &[(&str, &str)] = &[
     ("exec", "cfg"),
     ("execq", "cfg"),
     ("writeconfig", "cfg"),
     ("write", "cfg"),
+    ("devmap", MAP_EXTENSION),
 ];
+
+/// The extension a map argument asks the caller's file list for. The caller answers
+/// with map names as `devmap` takes them: the path under `maps/` without the
+/// extension (`mp/ffa3`).
+pub const MAP_EXTENSION: &str = "bsp";
 
 /// Longest cvar value shown in a completion listing, as `TRUNCATE_LENGTH`.
 const LISTED_VALUE_CHARS: usize = 64;
@@ -73,7 +81,12 @@ impl Shell {
         let (replaced, name, listing) = match typed_file_argument(line) {
             Some(argument) if key == CompletionKey::Tab => {
                 let names = files(argument.extension);
-                let (name, listing) = file_completion(&line[argument.start..], &names)?;
+                let typed = &line[argument.start..];
+                let (name, listing) = if argument.extension == MAP_EXTENSION {
+                    map_completion(typed, &names)?
+                } else {
+                    file_completion(typed, &names)?
+                };
                 (argument.start, name, listing)
             }
             Some(_) => return None,
@@ -284,6 +297,41 @@ fn file_completion(prefix: &str, names: &[String]) -> Option<(String, Vec<String
     Some((completed, listing))
 }
 
+/// The completed map name and, when it is not unique, the lines listing the
+/// candidates. A map matches when its name starts with `prefix`, or, for a prefix
+/// without a `/`, when the name after its folder does: `siege_ho` finds
+/// `mp/siege_hoth`. A unique map replaces the typed text; several extend it to their
+/// shared start when that still holds what was typed, and are listed as `Map` rows.
+fn map_completion(prefix: &str, names: &[String]) -> Option<(String, Vec<String>)> {
+    let base = |name: &str| name.rsplit('/').next().unwrap_or(name).to_owned();
+    let mut candidates = names
+        .iter()
+        .filter(|name| {
+            ascii_starts_with_ignore_case(name, prefix)
+                || (!prefix.contains('/') && ascii_starts_with_ignore_case(&base(name), prefix))
+        })
+        .collect::<Vec<_>>();
+    candidates.sort_by_cached_key(|name| name.to_ascii_lowercase());
+    candidates.dedup_by(|later, earlier| later.eq_ignore_ascii_case(earlier));
+    if let [only] = candidates.as_slice() {
+        return Some((format!("{only} "), Vec::new()));
+    }
+    let shared = shared_prefix(candidates.iter().map(|name| name.as_str()))?;
+    let completed = if ascii_starts_with_ignore_case(shared, prefix) {
+        format!("{prefix}{}", &shared[prefix.len()..])
+    } else if ascii_starts_with_ignore_case(&base(shared), prefix) {
+        // Every match is by its name after the folder, and all are in one folder.
+        shared.to_owned()
+    } else {
+        prefix.to_owned()
+    };
+    let listing = candidates
+        .iter()
+        .map(|name| format!("^9Map   ^7{name}"))
+        .collect();
+    Some((completed, listing))
+}
+
 /// Longest case-insensitive prefix shared by every name, spelled as the first.
 fn shared_prefix<'a>(mut names: impl Iterator<Item = &'a str>) -> Option<&'a str> {
     let first = names.next()?;
@@ -415,6 +463,55 @@ mod tests {
         assert_eq!(
             shell.complete_line_with_files("exec nothing", CompletionKey::Tab, cfgs),
             None
+        );
+    }
+
+    fn maps(extension: &str) -> Vec<String> {
+        assert_eq!(extension, super::MAP_EXTENSION);
+        [
+            "mp/ffa3",
+            "mp/siege_hoth",
+            "mp/siege_desert",
+            "sjk_arena1",
+            "mp/duel1",
+        ]
+        .map(str::to_owned)
+        .to_vec()
+    }
+
+    #[test]
+    fn devmap_completes_a_map_by_its_name_after_the_folder() {
+        let mut shell = shell();
+        let completed = shell.complete_line_with_files("devmap siege_ho", CompletionKey::Tab, maps);
+        assert_eq!(completed.as_deref(), Some("devmap mp/siege_hoth "));
+        let completed = shell.complete_line_with_files("devmap mp/FF", CompletionKey::Tab, maps);
+        assert_eq!(completed.as_deref(), Some("devmap mp/ffa3 "));
+        let completed = shell.complete_line_with_files("devmap sjk", CompletionKey::Tab, maps);
+        assert_eq!(completed.as_deref(), Some("devmap sjk_arena1 "));
+        let completed = shell.complete_line_with_files("devmap siege", CompletionKey::Tab, maps);
+        assert_eq!(completed.as_deref(), Some("devmap mp/siege_"));
+        assert_eq!(
+            shell.complete_line_with_files("devmap nothing", CompletionKey::Tab, maps),
+            None
+        );
+    }
+
+    #[test]
+    fn devmap_lists_every_map_on_tab() {
+        let mut shell = shell();
+        let completed = shell.complete_line_with_files("devmap ", CompletionKey::Tab, maps);
+        assert_eq!(completed.as_deref(), Some("devmap "));
+        let lines: Vec<_> = shell.lines().map(|line| line.text.as_str()).collect();
+        assert_eq!(
+            lines,
+            [
+                "]devmap ",
+                "^9Map   ^7mp/duel1",
+                "^9Map   ^7mp/ffa3",
+                "^9Map   ^7mp/siege_desert",
+                "^9Map   ^7mp/siege_hoth",
+                "^9Map   ^7sjk_arena1",
+            ]
         );
     }
 

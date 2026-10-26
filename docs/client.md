@@ -5293,8 +5293,12 @@ inside an open quote. Tab also completes the file name after `exec`, `execq`,
 the profile's folder, then those at the root of the search paths, matched without
 case and each name once. A unique file completes with a trailing space; several
 extend the typed text to their shared start, keeping its letter case, and are
-listed as grey `File` rows (`PrintFileMatches`). Enter does not complete
-arguments, and no other argument is completed. See
+listed as grey `File` rows (`PrintFileMatches`). Tab after `devmap` completes the
+map (`SV_CompleteMapName`) from every `maps/*.bsp` and `maps/*/*.bsp` of the game
+data, named as `devmap` takes them (`mp/ffa3`): a map matches by its whole name or,
+when nothing typed has a `/`, by the name after its folder, so `devmap siege_ho`
+completes to `devmap mp/siege_hoth `; `devmap` and Tab lists every map as `Map`
+rows. Enter does not complete arguments, and no other argument is completed. See
 [shell_completion.rs](../crates/sjk-shell/src/shell_completion.rs) and
 [console_scripting.rs](../crates/sjk-viewer/src/console_scripting.rs).
 

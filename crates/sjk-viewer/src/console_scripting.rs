@@ -45,6 +45,18 @@ impl<'a> Resolver<'a> {
         }
         names
     }
+
+    /// The maps `devmap` can load, named as it takes them: each `maps/**.bsp` of the
+    /// VFS, one folder deep, without `maps/` or the extension (`mp/ffa3`).
+    pub(super) fn map_names(&self) -> Vec<String> {
+        let Some(vfs) = self.vfs else {
+            return Vec::new();
+        };
+        vfs.list_files("maps", ".bsp")
+            .into_iter()
+            .filter_map(|name| name.strip_suffix(".bsp").map(str::to_owned))
+            .collect()
+    }
 }
 
 impl CommandFileResolver for Resolver<'_> {
@@ -113,5 +125,25 @@ mod tests {
             Resolver::new(directory.path(), None).root_files("cfg"),
             ["Moj.cfg"]
         );
+    }
+
+    #[test]
+    fn map_names_are_the_bsps_under_maps_without_the_extension() {
+        let directory = tempfile::tempdir().unwrap();
+        let mut vfs = sjk_vfs::VirtualFileSystem::new();
+        vfs.mount_memory(
+            "base",
+            [
+                ("maps/mp/Siege_Hoth.bsp", b"".to_vec()),
+                ("maps/sjk_arena1.bsp", b"".to_vec()),
+                ("maps/mp/ffa3.aas", b"".to_vec()),
+                ("levelshots/mp/ffa3.jpg", b"".to_vec()),
+            ],
+        )
+        .unwrap();
+        let mut names = Resolver::new(directory.path(), Some(&vfs)).map_names();
+        names.sort();
+        assert_eq!(names, ["mp/siege_hoth", "sjk_arena1"]);
+        assert!(Resolver::new(directory.path(), None).map_names().is_empty());
     }
 }
