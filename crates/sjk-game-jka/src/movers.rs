@@ -198,6 +198,18 @@ pub struct Door {
     /// `s.frame`: the shader frame, 0 while locked (`LockDoors`) and 1 once unlocked
     /// (`UnLockDoors`).
     pub frame: u32,
+    /// `model2`: an md3 every client draws at the mover's origin (`InitMover`'s
+    /// `modelindex2`, `CG_Mover`); empty for none, or for a Ghoul2 model, which this
+    /// server does not draw.
+    pub model2: String,
+}
+
+/// The `model2` key as `InitMover` registers it: an md3, never a `.glm`.
+fn model2_key(entity: &Entity) -> String {
+    match entity.get("model2") {
+        Some(name) if !name.contains(".glm") => name.to_owned(),
+        _ => String::new(),
+    }
 }
 
 /// `BMS_START`, `BMS_END` (`g_mover.c:55-57`): a mover's start and stop sounds.
@@ -340,6 +352,7 @@ pub fn spawn_door(entity: &Entity, bounds: ([f32; 3], [f32; 3])) -> Option<Door>
             != 0,
         shader_anim: spawnflags & MOVER_LOCKED != 0,
         frame: 0,
+        model2: model2_key(entity),
     })
 }
 
@@ -434,6 +447,7 @@ pub fn spawn_plat(entity: &Entity, bounds: ([f32; 3], [f32; 3])) -> Option<Door>
         vehicle_open: false,
         shader_anim: false,
         frame: 0,
+        model2: model2_key(entity),
     })
 }
 
@@ -528,6 +542,7 @@ pub fn spawn_button(entity: &Entity, bounds: ([f32; 3], [f32; 3])) -> Option<Doo
         vehicle_open: false,
         shader_anim: false,
         frame: 0,
+        model2: model2_key(entity),
     })
 }
 

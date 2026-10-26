@@ -1669,6 +1669,11 @@ neither placed nor solid), and the use key fires one only when the map made it
 starts off is not sent (`SVF_NOCLIENT`, `EF_NODRAW`); it used to carry `EF_PERMANENT`
 (bit 7) in the place of `EF_NODRAW` (bit 8).
 
+Doors, lifts and buttons carry theirs too: `spawn_doors` registers a `func_door`,
+`func_plat` or `func_button`'s md3 `model2` and sends it as `modelindex2`, which the
+server used to leave out, so `sjk_sith_coop`'s pushable statue (a `func_door` whose
+only drawn part is its `model2`) showed only its block (26/10/2026).
+
 Used, by the use key or by name (`G_UseTargets`, a `target_counter`, a breakable's
 `target`), a `func_usable` runs `func_usable_use`: it goes away (no contents, not sent)
 and fires its `target`, or comes back solid and fires its `target2`; an `ALWAYS_ON` one

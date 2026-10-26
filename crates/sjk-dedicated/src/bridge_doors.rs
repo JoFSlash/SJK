@@ -11,6 +11,8 @@ use sjk_game_jka::movers::{self, MoverKind, MoverState};
 /// `s.loopSound`, `s.loopIsSoundset`.
 const ES_LOOP_SOUND: usize = 55;
 const ES_LOOP_IS_SOUNDSET: usize = 70;
+/// `s.modelindex2`.
+const ES_MODEL2: usize = 41;
 /// `s.frame`, and `EF_SHADER_ANIM`, which a door spawned locked draws its lock by.
 const ES_FRAME: usize = 83;
 const EF_SHADER_ANIM: u32 = 1 << 4;
@@ -38,6 +40,19 @@ impl NativeGame {
                 state.set_raw_field(ES_EFLAGS, EF_SHADER_ANIM);
             }
             state.set_raw_field(ES_FRAME, door.frame);
+            // `InitMover`: its `model2` registered (`G_ModelIndex`) for every client to
+            // draw with the brush.
+            if !door.model2.is_empty() {
+                let (models, told) = (&mut self.models, &mut self.told);
+                let index = models.index(door.model2.as_bytes(), &mut |index, value| {
+                    told.push(Told::ConfigString {
+                        index,
+                        previous: Vec::new(),
+                        value: value.to_vec(),
+                    })
+                });
+                state.set_raw_field(ES_MODEL2, u32::from(index));
+            }
             if let Some(number) = self.pool.spawn_entity(state, 0) {
                 self.pool.set_bounds(number, door.bounds);
                 self.doors.push((number, door.clone()));

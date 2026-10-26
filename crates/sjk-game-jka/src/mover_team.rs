@@ -462,6 +462,14 @@ mod tests {
         spawn_door(&entity, ([-8.0, -64.0, 0.0], [8.0, 64.0, 128.0])).unwrap()
     }
 
+    #[test]
+    fn a_door_keeps_its_md3_model2_and_drops_a_ghoul2_one() {
+        let statue = "models/map_objects/sjk_sith/statue_puzzle.md3";
+        assert_eq!(door(&[("model2", statue)]).model2, statue);
+        assert_eq!(door(&[("model2", "models/players/x/model.glm")]).model2, "");
+        assert_eq!(door(&[]).model2, "");
+    }
+
     fn player(team: i32) -> DoorToucher {
         DoorToucher {
             client: Some(3),
