@@ -5,12 +5,18 @@ Usage:
     python scripts/sith_coop_map.py [--gamedata DIR] [--q3map2 EXE]
         [--out DIR] [--install] [--no-compile] [--preview PNG]
 
-The players start outside under a red volcanic sky, cross a long bridge over a
-lava chasm lined with hooded statues, and enter the temple. Rooms 1 to 4 are
-on the ground; room 4 is a tall hall whose lift (`func_plat`) rises to a
-balcony and a long narrow corridor, which leads to rooms 5 to 7. Room 7 is a
-huge hall with a giant Sith statue in the middle, lava channels and the
-final enemies on a raised dais.
+The players start outside under a red volcanic sky beside an X-wing (the
+game's own vehicle; an X-wing wreck, the game's debris models, smoulders by the
+chasm), cross a long bridge over a lava chasm lined with hooded statues, and
+enter the temple. Long, quiet passages lead from room to room. Rooms 1 to 4
+are on the ground; room 4 is a tall hall whose lift (`func_plat`, with rails,
+glowing posts and its own sound) rises to a balcony and a long narrow
+corridor, which leads to rooms 5 to 7. Room 7 is a huge hall with a giant
+Sith statue in the middle, lava channels and, past its middle, the last
+enemies on a raised dais.
+
+Music and sounds are made by sith_audio.py: an original dark score in D minor
+(`music` in worldspawn), the lift's ride, and looping wind and lava speakers.
 
 Enemies are the game's own NPCs, harder room by room, most of them users of
 the dark side of the Force: cultists with grip, lightning and drain, saber
@@ -41,6 +47,7 @@ from PIL import Image, ImageDraw
 
 import sith_map as sith
 from arena_map import compile_map
+import sith_audio
 from sith_map import (FLOOR, ROCK, STONE, TRIM, WALLF, Brush, Face, box, entity,
                       octagon, rgb, ridges, fbm, tint)
 
@@ -62,8 +69,8 @@ CEILING = Face("ceiling")
 LAVA = Face("lava", (0.5, 0.5))
 
 # Outdoors: the start plateau, the chasm the bridge crosses, the porch.
-OUT_W = 768
-START_Y0, CHASM_Y0, CHASM_Y1, FACADE_Y = -2304, -1536, -768, -544
+OUT_W = 1024
+START_Y0, CHASM_Y0, CHASM_Y1, FACADE_Y = -3840, -2560, -768, -544
 OUT_TOP, CLIFF_TOP, CHASM_FLOOR = 1024, 512, -576
 BRIDGE_W = 128
 
@@ -79,11 +86,27 @@ ROOMS = [
     dict(w=896, d=896, h=576, z=640, door=(256, 288, 0)),
     dict(w=1280, d=1792, h=1280, z=640, door=None),
 ]
-PASSAGES = [64, 64, 64, 1024, 64, 64]
+PASSAGES = [384, 448, 512, 1024, 512, 576]
 FACADE_DOOR = (256, 256)
 BALCONY_D = 256
-LIFT = 192  # the lift's side; it rises LIFT_HEIGHT to the balcony
+LIFT = 256  # the lift's side; it rises LIFT_HEIGHT to the balcony at LIFT_SPEED
 LIFT_HEIGHT = 632
+LIFT_SPEED = 140
+LAMP_SPACING = 384
+COOP_SOUNDS = "sound/" + COOP  # the lift's ride and the ambient loops
+MUSIC = "music/%s/sith_temple.mp3" % COOP
+# The X-wing at the start is the game's own vehicle; the wreck by the chasm is
+# the debris its model breaks into, also the game's, placed client-side.
+XWING = ("X-Wing", (-560, -3260, 48), 90)
+WRECK = "models/players/x-wing/x_wing_part%s.md3"
+WRECK_PARTS = [  # (part, origin, "pitch yaw roll")
+    ("_wing_l", (640, -2880, 40), "0 30 8"),
+    ("_wing_r", (880, -3160, 36), "0 -60 -12"),
+    ("1", (600, -3360, 40), "0 110 15"),
+    ("_nose", (840, -2740, 18), "20 200 0"),
+    ("3", (720, -3040, 26), "0 45 80"),
+    ("2", (920, -2960, 16), "0 10 0"),
+]
 
 
 def layout():
@@ -159,25 +182,33 @@ def lava_pit(x0, x1, y0, y1, top, depth=160):
     ]
 
 
-def octagon_brush(x, y, apothem, z0, z1, faces):
-    return Brush(octagon(x, y, apothem), z0, z1, faces)
+def octagon_brush(x, y, apothem, z0, z1, faces, detail=False):
+    return Brush(octagon(x, y, apothem), z0, z1, faces, detail=detail)
 
 
+# Pillars, braziers, lamps, sconces and rune bands are decorations: detail
+# brushes, which q3map2 leaves out of the BSP tree and the visibility.
 def pillar(x, y, z, h):
-    return [octagon_brush(x, y, 40, z, z + h, {"*": STONE}),
-            octagon_brush(x, y, 56, z, z + 32, {"*": TRIM}),
-            octagon_brush(x, y, 56, z + h - 64, z + h - 32, {"*": TRIM})]
+    return [octagon_brush(x, y, 40, z, z + h, {"*": STONE}, True),
+            octagon_brush(x, y, 56, z, z + 32, {"*": TRIM}, True),
+            octagon_brush(x, y, 56, z + h - 64, z + h - 32, {"*": TRIM}, True)]
 
 
 def brazier(x, y, z):
-    return [octagon_brush(x, y, 16, z, z + 48, {"*": TRIM}),
-            octagon_brush(x, y, 32, z + 48, z + 64, {"*": TRIM}),
-            octagon_brush(x, y, 28, z + 64, z + 68, {"*": TRIM, "top": Face("embers")})]
+    return [octagon_brush(x, y, 16, z, z + 48, {"*": TRIM}, True),
+            octagon_brush(x, y, 32, z + 48, z + 64, {"*": TRIM}, True),
+            octagon_brush(x, y, 28, z + 64, z + 68, {"*": TRIM, "top": Face("embers")}, True)]
 
 
-def lamp(x, y, ceiling):
-    return box((x - 32, y - 32, ceiling - 16), (x + 32, y + 32, ceiling),
-               {"*": TRIM, "bottom": LAMP})
+def lamp(x, y, ceiling, half=40):
+    return box((x - half, y - half, ceiling - 16), (x + half, y + half, ceiling),
+               {"*": TRIM, "bottom": LAMP}, detail=True)
+
+
+def sconce(x_wall, y, z):
+    """A glowing panel on a side wall at x = x_wall, facing into the room."""
+    xs = sorted((x_wall, x_wall + (6 if x_wall < 0 else -6)))
+    return box((xs[0], y - 32, z), (xs[1], y + 32, z + 96), {"*": TRIM, "side": LAMP}, detail=True)
 
 
 # ---------------------------------------------------------------- outdoors
@@ -218,13 +249,18 @@ def outdoors():
         out += brazier(x, FACADE_Y - 112, 0)
     for x in (-512, 512):
         out += pillar(x, FACADE_Y - 160, 0, 448)
+    # the wreck: an invisible clip round each piece, embers smouldering among them
+    for _, (x, y, _), _ in WRECK_PARTS:
+        out.append(box((x - 72, y - 72, 0), (x + 72, y + 72, 64), {"*": "clip"}))
+    for x, y in ((760, -2980), (700, -3200), (860, -2860)):
+        out.append(octagon_brush(x, y, 24, 0, 4, {"*": ROCK, "top": Face("embers")}))
     return out
 
 
 def bridge_statues():
     """(x, y, angle) of the statues on both sides of the bridge, facing it."""
     return [(s * 240, y, 0 if s < 0 else 180)
-            for y in (-1440, -1248, -1056, -864) for s in (-1, 1)]
+            for y in range(CHASM_Y0 + 96, CHASM_Y1 - 95, 224) for s in (-1, 1)]
 
 
 # ---------------------------------------------------------------- rooms
@@ -252,12 +288,13 @@ def room(i):
         cut = door and door[1] < z1 and door[2] > z0
         spans = [(-w, -door[0] // 2), (door[0] // 2, w)] if cut else [(-w, w)]
         for a, b in spans:
-            out.append(box((a, ys[0], z0), (b, ys[1], z1), {"*": TRIM, "side": RUNES}))
+            out.append(box((a, ys[0], z0), (b, ys[1], z1), {"*": TRIM, "side": RUNES}, detail=True))
     for x_face, inward in ((-w, 1), (w, -1)):
         xs = sorted((x_face, x_face + inward * 6))
-        out.append(box((xs[0], y0 + 6, z0), (xs[1], y1 - 6, z1), {"*": TRIM, "side": RUNES}))
-    # lamps on a 512 grid under the ceiling
-    nx, ny = max(1, round(2 * w / 512)), max(1, round(r["d"] / 512))
+        out.append(box((xs[0], y0 + 6, z0), (xs[1], y1 - 6, z1), {"*": TRIM, "side": RUNES},
+                       detail=True))
+    # lamps on a grid under the ceiling, sconces on the side walls
+    nx, ny = max(1, round(2 * w / LAMP_SPACING)), max(1, round(r["d"] / LAMP_SPACING))
     for a in range(nx):
         for b in range(ny):
             out.append(lamp(-w + (a + 0.5) * 2 * w / nx, y0 + (b + 0.5) * r["d"] / ny, zc))
@@ -267,6 +304,9 @@ def room(i):
         for y in range(y0 + 256, y1 - 191, 384):
             out.append(sith.banner("x", -w, y, 96, zf + 256, top))
             out.append(sith.banner("x", w, y, 96, zf + 256, top))
+    for y in range(y0 + 64, y1 - 63, 384):
+        out.append(sconce(-w, y, zf + 256))
+        out.append(sconce(w, y, zf + 256))
     for sx in (-1, 1):
         for y in (y0 + 128, y1 - 128):
             out += brazier(sx * (w - 128), y, zf)
@@ -283,12 +323,13 @@ def passage(i):
            box((-w // 2 - T, ya, top), (w // 2 + T, yb, top + T), {"*": TRIM, "bottom": CEILING}),
            box((-w // 2 - T, ya, sill), (-w // 2, yb, top), {"*": WALLF}),
            box((w // 2, ya, sill), (w // 2 + T, yb, top), {"*": WALLF})]
-    if yb - ya > 256:  # the long corridor: runes and dim lamps all the way
-        for s in (-1, 1):
-            x0, x1 = sorted((s * w // 2, s * (w // 2 - 6)))
-            out.append(box((x0, ya, sill + 96), (x1, yb, sill + 112), {"*": TRIM, "side": RUNES}))
-        for y in range(ya + 128, yb, 256):
-            out.append(box((-16, y - 16, top - 8), (16, y + 16, top), {"*": TRIM, "bottom": LAMP}))
+    # a quiet walk between fights: runes along both walls, lamps all the way
+    for s in (-1, 1):
+        x0, x1 = sorted((s * w // 2, s * (w // 2 - 6)))
+        out.append(box((x0, ya, sill + 96), (x1, yb, sill + 112), {"*": TRIM, "side": RUNES},
+                       detail=True))
+    for y in range(ya + 96, yb - 31, 192):
+        out.append(lamp(0, y, top, 24))
     return out
 
 
@@ -315,6 +356,10 @@ def extras_r4(r):
     out = [box((-w, front, top - 16), (w, y1, top), {"*": TRIM, "top": FLOOR})]
     for a, b in ((-w, -LIFT // 2), (LIFT // 2, w)):
         out.append(box((a, front, top), (b, front + 8, top + 40), {"*": TRIM}))
+    # glowing posts at the shaft's corners, floor to balcony, light the ride
+    for x in (-LIFT // 2 - 32, LIFT // 2 + 16):
+        for y in (front - LIFT - 32, front - 16):
+            out.append(box((x, y, r["z"]), (x + 16, y + 16, top - 16), {"*": TRIM, "side": LAMP}))
     return out
 
 
@@ -402,30 +447,29 @@ def statue_brushes():
 
 # ---------------------------------------------------------------- enemies
 
-# per room: (classname, spawnflags, x, fraction of the depth)
+# per room: (classname, spawnflags, x, fraction of the depth). A gentle climb:
+# plain cultists, then Force users, Reborn, the stronger Reborn and saber
+# cultists, Alora; Desann, Tavion and Alora wait at room 7's dais as its second
+# wave, which the middle of the hall sets off.
 WAVES = [
-    [("npc_cultist", 0, -192, 0.6), ("npc_cultist", 0, 192, 0.6), ("npc_cultist", 0, 0, 0.8),
-     ("npc_cultist", 2, 0, 0.55)],
-    [("npc_cultist", 4, -224, 0.7), ("npc_cultist", 4, 224, 0.7), ("npc_reborn_new", 0, -128, 0.5),
-     ("npc_reborn_new", 0, 128, 0.5), ("npc_cultist_saber", 0, 0, 0.85)],
+    [("npc_cultist", 0, -192, 0.6), ("npc_cultist", 0, 192, 0.6), ("npc_cultist", 2, 0, 0.8)],
+    [("npc_cultist", 0, -224, 0.7), ("npc_cultist", 4, 224, 0.7), ("npc_reborn_new", 0, -128, 0.5),
+     ("npc_reborn_new", 0, 128, 0.5)],
     [("npc_reborn_new", 1, -512, 0.5), ("npc_reborn_new", 2, 512, 0.5), ("npc_cultist", 8, -448, 0.8),
-     ("npc_cultist", 8, 448, 0.8), ("npc_shadowtrooper", 0, -256, 0.85),
-     ("npc_shadowtrooper", 0, 256, 0.85), ("npc_cultist_saber_powers", 9, 0, 0.88)],
-    [("npc_reborn_new", 4, -320, 0.35), ("npc_reborn_new", 4, 320, 0.35), ("npc_cultist", 4, -448, 0.2),
-     ("npc_cultist", 4, 448, 0.2), ("npc_cultist_saber_powers", 2, 0, 0.3)],
-    [("npc_reborn_new", 5, -256, 0.5), ("npc_reborn_new", 5, 256, 0.5), ("npc_reborn_new", 6, 0, 0.65),
-     ("npc_cultist_saber_powers", 12, -384, 0.8), ("npc_cultist_saber_powers", 12, 384, 0.8),
-     ("npc_cultist", 8, 0, 0.88)],
-    [("npc_alora", 1, 0, 0.6), ("npc_alora", 0, -320, 0.75), ("npc_tavion_new", 2, 0, 0.85),
-     ("npc_reborn_new", 6, 320, 0.75), ("npc_reborn_new", 6, -320, 0.45), ("npc_cultist", 4, 448, 0.45),
-     ("npc_cultist", 4, -448, 0.3)],
-    [("npc_desann", 0, 0, 0.94), ("npc_tavion_new", 1, -256, 0.92), ("npc_alora", 1, 256, 0.92),
-     ("npc_alora", 1, -384, 0.62), ("npc_reborn_new", 5, 384, 0.62), ("npc_reborn_new", 5, -384, 0.3),
-     ("npc_reborn_new", 6, 384, 0.3), ("npc_reborn_new", 6, 0, 0.22), ("npc_cultist", 4, -1088, 0.15),
-     ("npc_cultist", 4, 1088, 0.15), ("npc_cultist", 2, -1088, 0.85), ("npc_cultist", 2, 1088, 0.85)],
+     ("npc_shadowtrooper", 0, 256, 0.85), ("npc_cultist_saber", 0, 0, 0.88)],
+    [("npc_reborn_new", 0, -320, 0.35), ("npc_reborn_new", 0, 320, 0.35),
+     ("npc_cultist_saber_powers", 1, 0, 0.3)],
+    [("npc_reborn_new", 4, -256, 0.5), ("npc_reborn_new", 4, 256, 0.5),
+     ("npc_cultist_saber_powers", 10, 0, 0.8), ("npc_cultist", 4, 384, 0.8)],
+    [("npc_alora", 0, 0, 0.6), ("npc_reborn_new", 5, 320, 0.75), ("npc_reborn_new", 6, -320, 0.75),
+     ("npc_cultist", 4, 448, 0.45), ("npc_cultist", 2, -448, 0.45)],
+    [("npc_reborn_new", 4, -384, 0.3), ("npc_reborn_new", 4, 384, 0.3), ("npc_cultist", 4, -1088, 0.15),
+     ("npc_cultist", 4, 1088, 0.15)],
 ]
-BALCONY_WAVE = [("npc_cultist", 2, -384), ("npc_cultist", 2, 384)]
-CORRIDOR_WAVE = [("npc_shadowtrooper", 0, -24), ("npc_shadowtrooper", 0, 24)]
+BOSS_WAVE = [("npc_desann", 0, 0, 0.94), ("npc_tavion_new", 1, -256, 0.92), ("npc_alora", 1, 256, 0.92)]
+BOSS_TRIGGER = 0.5  # how far into room 7 the boss wave wakes
+BALCONY_WAVE = [("npc_cultist", 2, -384)]
+CORRIDOR_WAVE = [("npc_shadowtrooper", 0, 0)]
 OUTSIDE_WAVE = [("npc_cultist", 0, -160, FACADE_Y - 128), ("npc_cultist", 0, 160, FACADE_Y - 128)]
 
 
@@ -444,6 +488,10 @@ def enemies():
         for c, f, x, frac in wave:
             y = round(r["y0"] + frac * r["d"])
             out.append((c, f, (x, y, floor_z(x, y, r) + 40), 270, "room%d" % (i + 1)))
+    r7 = ROOMS[6]
+    for c, f, x, frac in BOSS_WAVE:
+        y = round(r7["y0"] + frac * r7["d"])
+        out.append((c, f, (x, y, floor_z(x, y, r7) + 40), 270, "room7b"))
     r4 = ROOMS[3]
     for c, f, x in BALCONY_WAVE:
         out.append((c, f, (x, r4["y1"] - 96, r4["z"] + LIFT_HEIGHT + 8 + 40), 270, "room4"))
@@ -464,19 +512,50 @@ def triggers():
     w, sill, _ = door_of(4)
     ya = r4["y1"] + T
     out.append((box((-w // 2, ya, sill), (w // 2, ya + 64, sill + 128), {"*": TRIGGER}), "corridor"))
+    r7 = ROOMS[6]
+    y = round(r7["y0"] + BOSS_TRIGGER * r7["d"])
+    out.append((box((-r7["w"], y, r7["z"]), (r7["w"], y + 64, r7["z"] + 256), {"*": TRIGGER}), "room7b"))
     return out
 
 
 def lift():
+    """The lift's brushes, drawn at the top: its floor, and a rail with a glowing
+    strip on each side, open to the south (on) and the north (off)."""
     r4 = ROOMS[3]
     front = r4["y1"] - BALCONY_D
     top = r4["z"] + LIFT_HEIGHT + 8
-    return box((-LIFT // 2, front - LIFT, top - 16), (LIFT // 2, front, top),
-               {"*": TRIM, "top": FLOOR})
+    h = LIFT // 2
+    out = [box((-h, front - LIFT, top - 16), (h, front, top), {"*": TRIM, "top": FLOOR})]
+    for x0, x1 in ((-h, -h + 8), (h - 8, h)):
+        out.append(box((x0, front - LIFT, top), (x1, front, top + 40), {"*": TRIM, "top": LAMP}))
+    return out
+
+
+def lift_sound():
+    """A trigger over the lift's floor at the bottom and the speaker it plays:
+    (trigger brush, speaker origin)."""
+    r4 = ROOMS[3]
+    front = r4["y1"] - BALCONY_D
+    h = LIFT // 2
+    floor = r4["z"] + 8
+    trigger = box((-h, front - LIFT, floor), (h, front, floor + 64), {"*": TRIGGER})
+    return trigger, (0, front - LIFT // 2, r4["z"] + LIFT_HEIGHT // 2)
+
+
+def ambient_speakers():
+    """(sound, origin) of the looping ambient speakers: wind outside, lava below."""
+    out = [("wind", (x, -3300, 256)) for x in (-640, 640)]
+    out += [("wind", (0, CHASM_Y1 - 160, 256))]
+    out += [("lava", (x, y, -320)) for x in (-640, 640) for y in range(CHASM_Y0 + 256, CHASM_Y1, 512)]
+    r3, r7 = ROOMS[2], ROOMS[6]
+    out.append(("lava", (0, (r3["y0"] + r3["y1"]) // 2, r3["z"] - 24)))
+    out += [("lava", (s * 768, y, r7["z"] - 24)) for s in (-1, 1)
+            for y in range(r7["y0"] + 384, r7["y1"] - 255, 512)]
+    return out
 
 
 def player_spawns():
-    return [(x, y, 24) for x in (-288, -96, 96, 288) for y in (START_Y0 + 160, START_Y0 + 352)]
+    return [(x, y, 24) for x in (96, 224, 352, 480) for y in (START_Y0 + 160, START_Y0 + 352)]
 
 
 def waypoint_candidates():
@@ -526,9 +605,9 @@ def grounded(solid, p, drop=48):
 def build():
     brushes = world_brushes()
     solid = [b for b in brushes if not b.lava]
-    plat = lift()
+    plats = lift()
     trig = triggers()
-    everything = brushes + [plat]
+    everything = brushes + plats
     for p in player_spawns():
         if not (clear(everything, p) and grounded(solid, p)):
             sys.exit("player spawn %s is blocked or floating" % (p,))
@@ -541,13 +620,31 @@ def build():
     waypoints = [p for p in waypoint_candidates()
                  if clear(everything, p, half=16, below=31) and grounded(solid, p, 64)]
 
+    xwing_name, (x, y, z), angle = XWING
+    if not clear(everything, (x, y, z)):
+        sys.exit("the X-wing at %s is blocked" % ((x, y, z),))
+
     world = {"classname": "worldspawn", "message": "SJK Sith Temple (co-op)",
-             "_ambient": "8", "gridsize": "64 64 128"}
+             "_ambient": "16", "gridsize": "64 64 128", "music": MUSIC}
     ents = [entity(world, brushes)]
-    ents.append(entity({"classname": "func_plat", "height": str(LIFT_HEIGHT), "speed": "160",
-                        "lip": "8"}, [plat]))
+    ents.append(entity({"classname": "func_plat", "height": str(LIFT_HEIGHT),
+                        "speed": str(LIFT_SPEED), "lip": "8"}, plats))
     for b, target in trig:
         ents.append(entity({"classname": "trigger_once", "target": target}, [b]))
+    ride, speaker = lift_sound()
+    ents.append(entity({"classname": "trigger_multiple", "target": "lift_ride", "wait": "6"}, [ride]))
+    ents.append(entity({"classname": "target_speaker", "targetname": "lift_ride",
+                        "noise": "%s/lift.wav" % COOP_SOUNDS,
+                        "origin": "%d %d %d" % speaker}))
+    for sound, origin in ambient_speakers():
+        ents.append(entity({"classname": "target_speaker", "spawnflags": "1",
+                            "noise": "%s/%s.wav" % (COOP_SOUNDS, sound),
+                            "origin": "%d %d %d" % origin}))
+    ents.append(entity({"classname": "npc_vehicle", "NPC_type": xwing_name,
+                        "origin": "%d %d %d" % (x, y, z), "angle": str(angle)}))
+    for part, origin, angles in WRECK_PARTS:
+        ents.append(entity({"classname": "misc_model_static", "model": WRECK % part,
+                            "origin": "%d %d %d" % origin, "angles": angles}))
     for x, y, z, angle, scale, _ in statues():
         ents.append(entity({"classname": "misc_model", "model": sith.STATUE + ".md3",
                             "origin": "%d %d %d" % (x, y, z), "angle": str(angle),
@@ -564,7 +661,7 @@ def build():
                             "origin": "%d %d %d" % (x, y, z), "angle": "90"}))
     for x, y, z in waypoints:
         ents.append(entity({"classname": "waypoint", "origin": "%d %d %d" % (x, y, z)}))
-    return brushes, plat, waypoints, "\n".join(ents) + "\n"
+    return brushes, plats[0], waypoints, "\n".join(ents) + "\n"
 
 
 # ---------------------------------------------------------------- assets
@@ -654,6 +751,12 @@ def shader_text():
 
 def write_assets(stage):
     sith.write_assets(stage)  # the temple's textures, statue and sjk_sith.shader
+    sounds = stage / COOP_SOUNDS
+    sith_audio.lift(sounds / "lift.wav", LIFT_HEIGHT / LIFT_SPEED)
+    sith_audio.lava_loop(sounds / "lava.wav")
+    sith_audio.wind_loop(sounds / "wind.wav")
+    (stage / MUSIC).parent.mkdir(parents=True, exist_ok=True)
+    sith_audio.music(stage / MUSIC)
     draw_textures(stage / "textures" / COOP)
     shaders = stage / "shaders"
     (shaders / (COOP + ".shader")).write_text(shader_text(), newline="\n")
@@ -739,6 +842,8 @@ def main():
         for tga in sorted((stage / "textures").rglob("*.tga")):
             z.write(tga, tga.relative_to(stage).as_posix())
         z.write(stage / (sith.STATUE + ".md3"), sith.STATUE + ".md3")
+        for f in sorted((stage / "sound").rglob("*.wav")) + [stage / MUSIC]:
+            z.write(f, f.relative_to(stage).as_posix())
     print("wrote", pk3)
     if args.install:
         shutil.copy2(pk3, gamedata / "base" / pk3.name)

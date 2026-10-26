@@ -15,7 +15,7 @@ Writes, in --out (default S:/Tools/sith):
   six hooded statues on pedestals. Two `info_player_duel` and eight
   `info_player_deathmatch` spawn points.
 - home/base/models/map_objects/sjk_sith/statue.md3: the statue, a robed and
-  hooded figure resting its hands on a saber hilt, generated here. q3map2
+  hooded figure resting its hands on a saber hilt, made by sith_models.py. q3map2
   bakes each `misc_model` into the BSP with lightmaps (spawnflags 4), so the
   game never loads the model itself. An invisible octagonal player clip
   stands in for its shape: q3map2's own model clip (spawnflags 2) made over
@@ -38,7 +38,6 @@ import argparse
 import math
 import random
 import shutil
-import struct
 import sys
 import zipfile
 from pathlib import Path
@@ -47,6 +46,7 @@ import numpy as np
 from PIL import Image, ImageDraw, ImageFilter
 
 from arena_map import compile_map
+from sith_models import statue_mesh, write_md3
 
 DEFAULT_GAMEDATA = r"C:\Program Files (x86)\Steam\steamapps\common\Jedi Academy\GameData"
 DEFAULT_Q3MAP2 = r"S:\Tools\netradiant-custom\q3map2.exe"
@@ -69,6 +69,7 @@ THRONE_TOP = 64
 RUNE_Z = (192, 208)
 STATUE_SCALE = 3.2
 CONTENTS_LAVA = 8
+CONTENTS_DETAIL = 0x8000000  # in a brush side's content flags
 
 
 # ---------------------------------------------------------------- brushes
@@ -90,8 +91,10 @@ class Brush:
     faces maps 'top', 'bottom' and 'side' (or '*') to a texture or Face.
     """
 
-    def __init__(self, poly, z0, z1, faces, lava=False):
+    def __init__(self, poly, z0, z1, faces, lava=False, detail=False):
+        """`detail`: a decoration q3map2 leaves out of the BSP tree and visibility."""
         assert z0 < z1
+        self.detail = detail
         poly = [(int(round(x)), int(round(y))) for x, y in poly]
         if signed_area(poly) < 0:  # keep counter-clockwise
             poly.reverse()
@@ -125,8 +128,9 @@ class Brush:
             assert n != (0, 0, 0)
             # a bare name is one of this map's textures; one with a folder is as given
             tex = f.tex if "/" in f.tex else "%s/%s" % (PREFIX, f.tex)
-            lines.append("( %d %d %d ) ( %d %d %d ) ( %d %d %d ) %s %.3f %.3f 0 %.6f %.6f 0 0 0"
-                         % (*a, *b, *c, tex, f.shift[0], f.shift[1], f.scale[0], f.scale[1]))
+            lines.append("( %d %d %d ) ( %d %d %d ) ( %d %d %d ) %s %.3f %.3f 0 %.6f %.6f %d 0 0"
+                         % (*a, *b, *c, tex, f.shift[0], f.shift[1], f.scale[0], f.scale[1],
+                            CONTENTS_DETAIL if self.detail else 0))
         lines.append("}")
         return "\n".join(lines)
 
@@ -317,8 +321,8 @@ def banner(axis, at, along, width, z0, z1):
     inward = -1 if at > 0 else 1
     t0, t1 = sorted((at, at + inward * 4))
     if axis == "x":
-        return box((t0, a0, z0), (t1, a0 + width, z1), {"*": TRIM, "side": face})
-    return box((a0, t0, z0), (a0 + width, t1, z1), {"*": TRIM, "side": face})
+        return box((t0, a0, z0), (t1, a0 + width, z1), {"*": TRIM, "side": face}, detail=True)
+    return box((a0, t0, z0), (a0 + width, t1, z1), {"*": TRIM, "side": face}, detail=True)
 
 
 def banners():
@@ -444,157 +448,6 @@ def check(brushes):
     for (x, y), _ in STATUES:
         if not any(b.contains((x, y, 40)) for b in solid):
             sys.exit("statue at %s has no pedestal" % ((x, y),))
-
-
-# ---------------------------------------------------------------- statue
-
-def statue_mesh():
-    """A robed, hooded figure 100 units tall facing +x, hands on a saber hilt.
-
-    Returns surfaces: name -> (vertices, normals, uvs, triangles).
-    """
-    seg = 32
-    # (height, radius); shoulders widen sideways, the hood overhangs forward
-    profile = [(0, 23), (6, 22.5), (18, 21), (32, 18.5), (46, 15.5), (54, 15.5),
-               (64, 17), (72, 19), (77, 20.5), (80, 18), (83, 13), (87, 12.5),
-               (92, 11.5), (96, 8.5), (99, 4), (100, 0.5)]
-
-    def radius(h, r, theta):
-        c, s = math.cos(theta), math.sin(theta)
-        k = 1.0
-        if 62 <= h <= 82:  # shoulders
-            k *= 1 + 0.28 * math.sin(math.pi * (h - 62) / 20) * s * s
-        if h < 40:  # folds in the robe's skirt
-            k *= 1 + 0.035 * (1 - h / 40) * math.sin(9 * theta)
-        if h > 82:  # the hood's brim reaches forward
-            k *= 1 + 0.22 * max(0.0, c) ** 2
-        if h < 30:  # the hem trails behind
-            k *= 1 + 0.12 * max(0.0, -c) * (1 - h / 30)
-        return r * k
-
-    verts, uvs = [], []
-    for row, (h, r) in enumerate(profile):
-        shift = -2.5 * max(0.0, (h - 84) / 16)  # the hood's peak leans back
-        for i in range(seg + 1):
-            theta = 2 * math.pi * i / seg
-            rr = radius(h, r, theta)
-            verts.append((shift + rr * math.cos(theta), rr * math.sin(theta), h))
-            uvs.append((4 * i / seg, h / 25))
-    tris = []
-    width = seg + 1
-    for row in range(len(profile) - 1):
-        for i in range(seg):
-            a, b = row * width + i, row * width + i + 1
-            c, d = a + width, b + width
-            tris += [(a, b, c), (b, d, c)]
-    surfaces = {"statue": [verts, uvs, tris]}
-
-    def add(name, v, uv, t):
-        s = surfaces.setdefault(name, [[], [], []])
-        base = len(s[0])
-        s[0].extend(v)
-        s[1].extend(uv)
-        s[2].extend(tuple(base + k for k in tri) for tri in t)
-
-    def ellipsoid(c, r, rings=8, segs=16):
-        v, uv, t = [], [], []
-        for j in range(rings + 1):
-            phi = math.pi * j / rings
-            for i in range(segs + 1):
-                th = 2 * math.pi * i / segs
-                v.append((c[0] + r[0] * math.sin(phi) * math.cos(th),
-                          c[1] + r[1] * math.sin(phi) * math.sin(th),
-                          c[2] + r[2] * math.cos(phi)))
-                uv.append((i / segs, j / rings))
-        for j in range(rings):
-            for i in range(segs):
-                a, b = j * (segs + 1) + i, j * (segs + 1) + i + 1
-                c2, d = a + segs + 1, b + segs + 1
-                if j > 0:  # the top pole's triangles would be degenerate
-                    t.append((a, c2, b))
-                if j < rings - 1:  # and the bottom pole's
-                    t.append((b, c2, d))
-        return v, uv, t
-
-    def cylinder(x, y, z0, z1, r, segs=12):
-        v, uv, t = [], [], []
-        for z in (z1, z0):
-            for i in range(segs + 1):
-                th = 2 * math.pi * i / segs
-                v.append((x + r * math.cos(th), y + r * math.sin(th), z))
-                uv.append((i / segs, z / 25))
-        for i in range(segs):
-            a, b, c2, d = i, i + 1, i + segs + 1, i + segs + 2
-            t += [(a, c2, b), (b, c2, d)]
-        return v, uv, t
-
-    # the hood's shadowed face, just inside the brim
-    face_v, face_uv, face_t = ellipsoid((12.5, 0, 88), (3.5, 7, 8), 6, 12)
-    add("face", face_v, face_uv, face_t)
-    # sleeves meeting over the hilt, and the hilt
-    add("statue", *ellipsoid((16.5, 0, 52), (6, 11, 5.5)))
-    add("statue", *ellipsoid((12, 9, 60), (5, 4.5, 9)))
-    add("statue", *ellipsoid((12, -9, 60), (5, 4.5, 9)))
-    add("hilt", *cylinder(22, 0, 26, 50, 1.6))
-    add("hilt", *ellipsoid((22, 0, 50.5), (2.2, 2.2, 1.2), 4, 12))
-    return surfaces
-
-
-def normals(verts, tris):
-    acc = [[0.0, 0.0, 0.0] for _ in verts]
-    for a, b, c in tris:
-        n = cross(sub(verts[b], verts[a]), sub(verts[c], verts[a]))
-        for k in (a, b, c):
-            for j in range(3):
-                acc[k][j] += n[j]
-    out = []
-    for n in acc:
-        length = math.sqrt(sum(v * v for v in n)) or 1.0
-        out.append(tuple(v / length for v in n))
-    return out
-
-
-def write_md3(path, surfaces, shaders):
-    """One frame. Triangles come counter-clockwise seen from outside and are
-    written clockwise, as Quake 3 draws them."""
-    def name(s, n):
-        return s.encode()[:n - 1].ljust(n, b"\0")
-
-    blobs = []
-    lo, hi = [1e9] * 3, [-1e9] * 3
-    for key, (verts, uvs, tris) in surfaces.items():
-        norms = normals(verts, tris)
-        for v in verts:
-            for k in range(3):
-                lo[k], hi[k] = min(lo[k], v[k]), max(hi[k], v[k])
-        tri_data = b"".join(struct.pack("<3i", a, c, b) for a, b, c in tris)  # CCW -> CW
-        st = b"".join(struct.pack("<2f", u, v) for u, v in uvs)
-        xyzn = b""
-        for (x, y, z), (nx, ny, nz) in zip(verts, norms):
-            # high byte: azimuth, low byte: angle from +z (R_LoadMD3's decoding)
-            azimuth = int(round(math.atan2(ny, nx) * 128 / math.pi)) & 255
-            polar = int(round(math.acos(max(-1.0, min(1.0, nz))) * 128 / math.pi)) & 255
-            xyzn += struct.pack("<3hH", round(x * 64), round(y * 64), round(z * 64),
-                                azimuth << 8 | polar)
-        shader = name(shaders[key], 64) + struct.pack("<i", 0)
-        hdr = 108
-        ofs_tri = hdr + len(shader)
-        ofs_st = ofs_tri + len(tri_data)
-        ofs_xyz = ofs_st + len(st)
-        end = ofs_xyz + len(xyzn)
-        assert len(verts) <= 1000 and len(tris) <= 2000, key
-        head = b"IDP3" + name(key, 64) + struct.pack(
-            "<10i", 0, 1, 1, len(verts), len(tris), ofs_tri, hdr, ofs_st, ofs_xyz, end)
-        blobs.append(head + shader + tri_data + st + xyzn)
-    radius = max(math.sqrt(sum(v * v for v in c)) for c in (lo, hi))
-    frame = struct.pack("<3f3f3ff", *lo, *hi, 0, 0, 0, radius) + name("frame0", 16)
-    ofs_frames = 108
-    ofs_surf = ofs_frames + len(frame)
-    eof = ofs_surf + sum(len(b) for b in blobs)
-    head = b"IDP3" + struct.pack("<i", 15) + name(path.stem, 64) + struct.pack(
-        "<9i", 0, 1, 0, len(blobs), 0, ofs_frames, ofs_surf, ofs_surf, eof)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_bytes(head + frame + b"".join(blobs))
 
 
 # ---------------------------------------------------------------- textures
@@ -812,7 +665,7 @@ def shader_text():
                  "\tsurfaceparm playerclip\n}\n" % t)
     parts.append(lit("runes", "runes_glow", 900, "\tsurfaceparm nomarks\n"))
     parts.append(lit("emblem", "emblem_glow", 400))
-    parts.append(lit("lamp", "lamp", 2500, "\tsurfaceparm nomarks\n"))
+    parts.append(lit("lamp", "lamp", 4000, "\tsurfaceparm nomarks\n"))
     parts.append("""%(t)s/embers
 {
 \tqer_editorimage %(t)s/embers.tga
