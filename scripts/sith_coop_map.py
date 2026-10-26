@@ -947,6 +947,9 @@ def main():
     ap.add_argument("--install", action="store_true")
     ap.add_argument("--no-compile", action="store_true")
     ap.add_argument("--preview", metavar="PNG")
+    ap.add_argument("--levelshot", metavar="IMAGE",
+                    help="a picture for the loading screen and map lists, packed as "
+                         "levelshots/%s.jpg (a world shot of the map does)" % MAP)
     args = ap.parse_args()
     gamedata, out = Path(args.gamedata), Path(args.out)
     home = out / "home"
@@ -979,6 +982,11 @@ def main():
             z.write(md3, md3.relative_to(stage).as_posix())
         for f in sorted((stage / "sound").rglob("*.wav")) + [stage / MUSIC]:
             z.write(f, f.relative_to(stage).as_posix())
+        if args.levelshot:
+            shot = stage / "levelshots" / (MAP + ".jpg")
+            shot.parent.mkdir(exist_ok=True)
+            Image.open(args.levelshot).convert("RGB").save(shot, quality=90)
+            z.write(shot, "levelshots/%s.jpg" % MAP)
     print("wrote", pk3)
     if args.install:
         shutil.copy2(pk3, gamedata / "base" / pk3.name)
