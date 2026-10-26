@@ -123,9 +123,10 @@ class Brush:
         for (a, b, c), f in self.planes():
             n = cross(sub(c, a), sub(b, a))  # q3map2's PlaneFromPoints
             assert n != (0, 0, 0)
-            lines.append("( %d %d %d ) ( %d %d %d ) ( %d %d %d ) %s/%s %.3f %.3f 0 %.6f %.6f 0 0 0"
-                         % (*a, *b, *c, PREFIX, f.tex, f.shift[0], f.shift[1],
-                            f.scale[0], f.scale[1]))
+            # a bare name is one of this map's textures; one with a folder is as given
+            tex = f.tex if "/" in f.tex else "%s/%s" % (PREFIX, f.tex)
+            lines.append("( %d %d %d ) ( %d %d %d ) ( %d %d %d ) %s %.3f %.3f 0 %.6f %.6f 0 0 0"
+                         % (*a, *b, *c, tex, f.shift[0], f.shift[1], f.scale[0], f.scale[1]))
         lines.append("}")
         return "\n".join(lines)
 
