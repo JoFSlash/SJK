@@ -874,7 +874,7 @@ and in the hub (same ids):
 | Master Craftsman | `craft_finishes` | blades crafted from a card of every finish (3: Normal, Holo, Solar, `cards::FINISHES`); three crafts from cards of one finish count 1 | hub |
 | Full Set | `full_set` | every card of a set that can be obtained, revealed copies only (sealed ones do not count) | hub |
 | Executor | `order66_kill` | an Order 66 execute on another player who also has the toy | hub |
-| Tactical Espionage | `box_minutes_10` | 10 minutes hidden in the cardboard box with another player close by | client |
+| Tactical Espionage | `box_minutes_10` | 10 minutes hidden in the cardboard box with another player close by: alive, within 512 units (about 14 m) and sent by the server, so not behind a wall (`tracker::BOX_NEAR`); the box comes off when the player dies or is lifted | client |
 | Flawless | `duel_flawless` | a duel won without taking damage | client |
 | Close Call | `duel_close_call` | a duel won with less than 5 health left | client |
 | Well Met | `duel_partners_25` | 25 different players duelled | client |

@@ -94,7 +94,7 @@ const TOYS: [Toy; TOY_COUNT] = [
         name: "Cardboard box",
         tag: "Hide in a carton; someone may lift it.",
         title: "Cardboard box",
-        what: "Hide in a carton: you crouch in it with its music. Other SJK players see the box; one who walks up and presses Use lifts it. Die in it and everyone hears.",
+        what: "Hide in a carton: you crouch in it with its music. Other SJK players see the box; one who walks up and presses Use lifts it. Die in it and everyone hears. Lifted or dead, you are out of it.",
         more: None,
         commands: &[("toy_box", "Your key")],
         switch: "In the box",

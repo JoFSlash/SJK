@@ -485,7 +485,7 @@ pub(crate) const ALL: [Kind; 35] = [
     kind(
         "box_minutes_10",
         "Tactical Espionage",
-        "Spend 10 minutes hidden in the cardboard box with players close by.",
+        "Hide 10 minutes in the cardboard box with a player in sight close by.",
         10,
         Toys,
         Client(C::BoxMinutes),

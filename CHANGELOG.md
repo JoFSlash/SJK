@@ -30,6 +30,10 @@ The site (site/assets/site.js, parseChangelog) reads the release headings,
 introductions and recap lines too.
 Add each release's notes here when it is tagged (docs/sjk.md "Releases").
 -->
+## Unreleased
+
+- Tactical Espionage says what it asks: a player in sight close by (about 14 m, not behind a wall), and the Cardboard box's page says that being lifted or dying takes you out of the box _(Slash, after Kushina's report)_
+
 ## 2026.1026.3 (Alpha) | 26/10/2026
 
 The Sun blade's own trails, the Monitor toy, a blade skin on each of two sabers, free look when held back by default, and a quieter, safer game.
