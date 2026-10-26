@@ -1084,7 +1084,10 @@ Both follow EternalJK's cgame (`cg_ents.c`, `cg_players.c`) and rd-vanilla's ren
   `cg_dismember` defaults to 2 (EternalJK: 0), so a server that enables
   dismemberment shows every cut limb (0 shows none, and a config that saved 0
   keeps it). `g_dismember` (0 to 100) set in the
-  console is handed to games this client hosts (Create game and `devmap`).
+  console is handed to games this client hosts (Create game and `devmap`), at
+  launch and, when it changes, typed into the running server as `set`; so is
+  `g_forceRegenTime` (default 200, the milliseconds a point of Force takes to come
+  back). See `HOSTED_CVARS` in [local_server.rs](../crates/sjk-viewer/src/local_server.rs).
 - **Disintegration** (`EF_DISINTEGRATION`): a disruptor kill, or a corpse shot or cut
   until it gives way, freezes the pose and burns the body away from the hit point:
   the model is eaten away with a blackened edge and `gfx/effects/burn` glows on what

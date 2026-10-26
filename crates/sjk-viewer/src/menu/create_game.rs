@@ -543,6 +543,11 @@ impl CreateGameMenu {
         }
     }
 
+    /// The server this screen started, while it runs.
+    pub(crate) fn server_mut(&mut self) -> Option<&mut LocalServer> {
+        self.server.as_mut()
+    }
+
     /// The address to join, once, when the server has started answering.
     pub(crate) fn take_join(&mut self) -> Option<SocketAddr> {
         let address = self.join_pending.take()?;

@@ -41,6 +41,16 @@ const MASTER_CVARS: [&str; 5] = [
     "sv_master5",
 ];
 
+/// `g_forceRegenTime`, the milliseconds a point of Force takes to come back, given
+/// to games this client hosts.
+pub(crate) const FORCE_REGEN_CVAR: &str = "g_forceRegenTime";
+
+/// The server's cvars the console keeps for the games this client hosts (`devmap`,
+/// Create game). EternalJK's listen server shares the console's cvars; the owned
+/// server is a separate process, so each is passed at launch and typed into the
+/// running server when it changes ([`LocalServer::share_cvar`]).
+pub(crate) const HOSTED_CVARS: [&str; 2] = [crate::dismember::SERVER_CVAR, FORCE_REGEN_CVAR];
+
 /// What the player chose on the Create game screen, independent of where
 /// the server binary and the game data are.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -259,6 +269,8 @@ pub(crate) struct LocalServer {
     ready: bool,
     console: Vec<String>,
     log_path: PathBuf,
+    /// The [`HOSTED_CVARS`] values the server has, as given at launch or typed since.
+    shared: Vec<(&'static str, i64)>,
 }
 
 impl LocalServer {
@@ -301,7 +313,25 @@ impl LocalServer {
             ready: false,
             console,
             log_path: log_path.to_owned(),
+            shared: Vec::new(),
         })
+    }
+
+    /// Give the server `name` = `value` unless it has it already: `set` is typed into
+    /// its console now if it answers, else once it does. The first value for a name
+    /// is the one given at launch and is only noted.
+    pub(crate) fn share_cvar(&mut self, name: &'static str, value: i64) {
+        match self.shared.iter_mut().find(|(shared, _)| *shared == name) {
+            None => self.shared.push((name, value)),
+            Some((_, current)) if *current == value => {}
+            Some((_, current)) => {
+                *current = value;
+                self.console.push(format!("set {name} {value}"));
+                if self.ready {
+                    self.type_console();
+                }
+            }
+        }
     }
 
     /// Where the server's output is written.

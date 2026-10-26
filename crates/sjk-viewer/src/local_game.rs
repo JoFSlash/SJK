@@ -35,19 +35,11 @@ impl crate::GpuState {
         );
         let port = local_server::choose_port(&settings);
         let mut arguments = settings.arguments(&self.game_data, port);
-        // A listen server shares the console's `g_dismember`, as in EternalJK; the
-        // owned server is a separate process, so it is handed over at launch.
-        if let Some(chance) = self
-            .console
-            .as_ref()
-            .and_then(|console| console.integer_cvar(crate::dismember::SERVER_CVAR))
-            .filter(|chance| *chance > 0)
-        {
-            arguments.extend([
-                "--set".into(),
-                crate::dismember::SERVER_CVAR.into(),
-                chance.to_string().into(),
-            ]);
+        // A listen server shares the console's server cvars, as in EternalJK; the
+        // owned server is a separate process, so they are handed over at launch.
+        let shared = hosted_cvars(self.console.as_ref());
+        for (name, value) in &shared {
+            arguments.extend(["--set".into(), (*name).into(), value.to_string().into()]);
         }
         crate::log::progress(format_args!(
             "local server: {} {}",
@@ -59,7 +51,10 @@ impl crate::GpuState {
                 .join(" ")
         ));
         match LocalServer::start(&program, &arguments, settings.console_lines(), &log) {
-            Ok(server) => {
+            Ok(mut server) => {
+                for (name, value) in shared {
+                    server.share_cvar(name, value);
+                }
                 // Detach before replacing the old owned child, so its disconnect
                 // cannot be mistaken for a failure of the new local game.
                 self.leave_session();
@@ -80,6 +75,21 @@ impl crate::GpuState {
         }
     }
 
+    /// Type into the hosted server the server cvars changed in the console since
+    /// (each frame).
+    pub(crate) fn share_hosted_cvars(&mut self) {
+        let shared = hosted_cvars(self.console.as_ref());
+        if let Some(server) = self
+            .client_menu
+            .as_mut()
+            .and_then(crate::menu::ClientMenu::local_server_mut)
+        {
+            for (name, value) in shared {
+                server.share_cvar(name, value);
+            }
+        }
+    }
+
     /// Join the hosted server once it answers (each frame).
     pub(crate) fn join_local_game(&mut self) {
         if let Some(address) = self
@@ -90,4 +100,15 @@ impl crate::GpuState {
             self.begin_address_join(address);
         }
     }
+}
+
+/// The console's values of the hosted server's cvars.
+fn hosted_cvars(console: Option<&crate::console::ViewerConsole>) -> Vec<(&'static str, i64)> {
+    let Some(console) = console else {
+        return Vec::new();
+    };
+    local_server::HOSTED_CVARS
+        .into_iter()
+        .filter_map(|name| Some((name, console.integer_cvar(name)?)))
+        .collect()
 }

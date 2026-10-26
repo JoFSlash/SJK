@@ -618,6 +618,12 @@ pub(super) fn register_daily_cvars(cvars: &mut CvarRegistry) -> Result<(), sjk_s
             archive,
             "Chance (0-100) that games you host cut off limbs",
         ),
+        CvarDefinition::new(
+            crate::connection::local_server::FORCE_REGEN_CVAR,
+            200_i64,
+            archive,
+            "Milliseconds a point of Force takes to come back in games you host (devmap, Create game)",
+        ),
         CvarDefinition::new("cg_drawGun", true, archive, "Draw the first-person weapon"),
         CvarDefinition::new(
             "cg_debugMissiles",

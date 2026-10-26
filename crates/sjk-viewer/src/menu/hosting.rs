@@ -90,6 +90,11 @@ impl ClientMenu {
         }
     }
 
+    /// The hosted game's server, while one runs.
+    pub(crate) fn local_server_mut(&mut self) -> Option<&mut LocalServer> {
+        self.create_game.server_mut()
+    }
+
     /// The hosted server's address, once, when it is ready to be joined.
     pub(crate) fn take_local_join(&mut self) -> Option<String> {
         self.create_game

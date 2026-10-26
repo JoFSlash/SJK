@@ -189,6 +189,7 @@ impl crate::GpuState {
             menu.poll();
         }
         self.join_local_game();
+        self.share_hosted_cvars();
         if self
             .live_session
             .as_ref()
