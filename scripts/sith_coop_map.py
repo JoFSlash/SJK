@@ -48,6 +48,7 @@ from PIL import Image, ImageDraw
 import sith_map as sith
 from arena_map import compile_map
 import sith_audio
+from sith_models import statue_mesh, write_md3
 from sith_map import (FLOOR, ROCK, STONE, TRIM, WALLF, Brush, Face, box, entity,
                       octagon, rgb, ridges, fbm, tint)
 
@@ -77,60 +78,22 @@ BRIDGE_W = 128
 # The rooms, south to north: half width, depth, height, floor, and the door
 # out (width, height, its sill above this room's floor). Each is followed by
 # a passage of the given length to the next.
+# `cx` puts each room to one side or the other, so the way between them turns.
 ROOMS = [
-    dict(w=512, d=512, h=384, z=0, door=(192, 192, 0), style="obsidian"),
-    dict(w=640, d=768, h=448, z=0, door=(192, 224, 0), style="sandstone"),
-    dict(w=768, d=896, h=512, z=0, door=(224, 256, 0), style="forge"),
-    dict(w=640, d=768, h=960, z=0, door=(128, 160, 640), style="crimson"),
-    dict(w=768, d=768, h=512, z=640, door=(224, 256, 0), style="archive"),
-    dict(w=896, d=896, h=576, z=640, door=(256, 288, 0), style="jade"),
-    dict(w=1280, d=1792, h=1280, z=640, door=None, style="throne"),
+    dict(w=512, d=512, h=384, z=0, door=(192, 192, 0), cx=0),
+    dict(w=640, d=768, h=448, z=0, door=(192, 224, 0), cx=-896),
+    dict(w=768, d=896, h=512, z=0, door=(224, 256, 0), cx=0),
+    dict(w=640, d=768, h=960, z=0, door=(128, 160, 640), cx=896),
+    dict(w=768, d=768, h=512, z=640, door=(224, 256, 0), cx=0),
+    dict(w=896, d=896, h=576, z=640, door=(256, 288, 0), cx=-768),
+    dict(w=1280, d=1792, h=1280, z=640, door=None, cx=0),
 ]
 
-# Each room has its own stone, metal and light: (wall kind and colours: low,
-# high, mortar, veins, vein strength), (floor kind, low, high, inlay), trim,
-# ceiling, the runes' glow, the lamps' light and the pillars. The first room
-# keeps sith_map.py's obsidian.
-PALETTES = {
-    "sandstone": dict(wall=("blocks", (140, 110, 72), (205, 170, 115), (90, 70, 45), (120, 60, 30), 0.25),
-                      floor=("slabs", (150, 122, 82), (200, 168, 120), (170, 120, 40)),
-                      trim=((120, 90, 30), (215, 175, 80)), ceiling=((90, 72, 50), (140, 115, 80)),
-                      runes=(255, 170, 50), lamp=(255, 215, 160), pillar=((160, 130, 90), (215, 185, 135))),
-    "forge": dict(wall=("plates", (42, 42, 48), (84, 80, 84), (18, 18, 20), (140, 70, 30), 0.5),
-                  floor=("grate", (36, 36, 40), (74, 72, 76), (255, 110, 20)),
-                  trim=((50, 40, 34), (120, 80, 50)), ceiling=((14, 12, 12), (40, 34, 32)),
-                  runes=(255, 120, 20), lamp=(255, 175, 100), pillar=((50, 50, 56), (95, 92, 98))),
-    "crimson": dict(wall=("marble", (90, 16, 20), (165, 40, 42), (30, 8, 10), (230, 200, 200), 0.35),
-                    floor=("checker", (18, 16, 20), (54, 48, 56), (190, 150, 60)),
-                    trim=((20, 18, 20), (190, 150, 60)), ceiling=((40, 8, 10), (80, 20, 24)),
-                    runes=(255, 40, 30), lamp=(255, 228, 215), pillar=((25, 22, 26), (70, 62, 72))),
-    "archive": dict(wall=("blocks", (38, 28, 54), (84, 64, 104), (14, 10, 20), (180, 120, 255), 0.2),
-                    floor=("slabs", (30, 28, 38), (66, 60, 80), (170, 90, 255)),
-                    trim=((70, 72, 84), (170, 175, 190)), ceiling=((20, 14, 30), (48, 36, 64)),
-                    runes=(200, 90, 255), lamp=(235, 215, 255), pillar=((45, 36, 60), (95, 80, 115))),
-    "jade": dict(wall=("marble", (22, 48, 38), (62, 104, 84), (8, 20, 14), (170, 240, 200), 0.3),
-                 floor=("slabs", (16, 26, 22), (44, 62, 54), (80, 255, 150)),
-                 trim=((90, 66, 34), (170, 130, 70)), ceiling=((10, 22, 18), (30, 52, 42)),
-                 runes=(80, 255, 150), lamp=(215, 255, 225), pillar=((30, 60, 48), (80, 125, 100))),
-    "throne": dict(wall=("marble", (18, 16, 20), (48, 44, 52), (6, 6, 8), (220, 175, 70), 0.45),
-                   floor=("checker", (70, 10, 14), (30, 26, 30), (220, 175, 70)),
-                   trim=((40, 30, 14), (225, 185, 85)), ceiling=((10, 9, 12), (30, 26, 32)),
-                   runes=(255, 40, 30), lamp=(255, 236, 210), pillar=((20, 18, 22), (60, 54, 64))),
-}
-PARTS = ("wall", "floor", "trim", "ceiling", "runes", "lamp", "pillar")
-
-
-def style_faces(style):
-    """A style's faces by part; obsidian is sith_map.py's own set."""
-    if style == "obsidian":
-        names = dict(wall="wall", floor="floor", trim="trim", ceiling="ceiling", runes="runes",
-                     lamp="lamp", pillar="stone")
-    else:
-        names = {k: "%s/%s_%s" % (COOP, style, k) for k in PARTS}
-    return dict(wall=Face(names["wall"], (1.0, 1.0)), floor=Face(names["floor"]),
-                trim=Face(names["trim"], (0.25, 0.25)), ceiling=Face(names["ceiling"]),
-                runes=Face(names["runes"], (0.25, 0.25)), lamp=Face(names["lamp"], (1.0, 1.0)),
-                pillar=Face(names["pillar"]))
+def style_faces():
+    """Every room's faces by part: sith_map.py's obsidian, red runes and warm lamps."""
+    return dict(wall=Face("wall", (1.0, 1.0)), floor=Face("floor"), trim=Face("trim", (0.25, 0.25)),
+                ceiling=Face("ceiling"), runes=Face("runes", (0.25, 0.25)),
+                lamp=Face("lamp", (1.0, 1.0)), pillar=Face("stone"))
 PASSAGES = [384, 448, 512, 1024, 512, 576]
 FACADE_DOOR = (256, 256)
 BALCONY_D = 256
@@ -143,7 +106,6 @@ MUSIC = "music/%s/sith_temple.mp3" % COOP
 # The X-wing at the start is the game's own vehicle; the wreck by the chasm is
 # the debris its model breaks into, also the game's, placed client-side.
 XWING = ("X-Wing", (-560, -3260, 48), 90)
-FIELD, FIELD_HEIGHT = 320, 288  # the force field's half width and height round it
 WRECK = "models/players/x-wing/x_wing_part%s.md3"
 WRECK_PARTS = [  # (part, origin, "pitch yaw roll")
     ("_wing_l", (640, -2880, 40), "0 30 8"),
@@ -228,7 +190,12 @@ def lava_pit(x0, x1, y0, y1, top, depth=160):
     ]
 
 
-OBSIDIAN = style_faces("obsidian")
+OBSIDIAN = style_faces()
+
+
+def moved(b, dx):
+    """`b` moved `dx` along x."""
+    return Brush([(x + dx, y) for x, y in b.poly], b.z0, b.z1, b.faces, lava=b.lava, detail=b.detail)
 
 
 def octagon_brush(x, y, apothem, z0, z1, faces, detail=False):
@@ -303,16 +270,6 @@ def outdoors():
         out += brazier(x, FACADE_Y - 112, 0)
     for x in (-512, 512):
         out += pillar(x, FACADE_Y - 160, 0, 448)
-    # a red force field round the X-wing: solid, so nobody reaches the ship to board it
-    field = Face(COOP + "/forcefield", (0.5, 0.5))
-    _, (fx, fy, _), _ = XWING
-    x0, x1, y0, y1, top = fx - FIELD, fx + FIELD, fy - FIELD, fy + FIELD, FIELD_HEIGHT
-    for lo, hi in (((x0, y0, 0), (x1, y0 + 8, top)), ((x0, y1 - 8, 0), (x1, y1, top)),
-                   ((x0, y0 + 8, 0), (x0 + 8, y1 - 8, top)), ((x1 - 8, y0 + 8, 0), (x1, y1 - 8, top)),
-                   ((x0, y0, top), (x1, y1, top + 8))):
-        out.append(box(lo, hi, {"*": field}, detail=True))
-    for x, y in ((x0, y0), (x0, y1), (x1, y0), (x1, y1)):  # emitters at its corners
-        out.append(octagon_brush(x, y, 20, 0, top + 24, {"*": TRIM, "top": Face("embers")}, True))
     # the wreck: an invisible clip round each piece, embers smouldering among them
     for _, (x, y, _), _ in WRECK_PARTS:
         out.append(box((x - 72, y - 72, 0), (x + 72, y + 72, 64), {"*": "clip"}))
@@ -331,7 +288,7 @@ def bridge_statues():
 
 def room(i):
     r = ROOMS[i]
-    f = style_faces(r["style"])
+    f = OBSIDIAN
     w, y0, y1, zf, h = r["w"], r["y0"], r["y1"], r["z"], r["h"]
     zc = zf + h
     holes = HOLES.get(i, [])
@@ -378,25 +335,80 @@ def room(i):
         for y in (y0 + 128, y1 - 128):
             out += brazier(sx * (w - 128), y, zf, f)
     out += EXTRAS[i](r)
-    return out
+    return [moved(b, r["cx"]) for b in out]
+
+
+def passage_cells(i):
+    """The floor plan of the passage from room i to room i + 1, as rectangles
+    (x0, x1, y0, y1) that do not overlap: straight on when the rooms line up,
+    else north, across to the next room's side, and north again."""
+    w, _, _ = door_of(i + 1)
+    ax, bx = ROOMS[i]["cx"], ROOMS[i + 1]["cx"]
+    ya, yb = ROOMS[i]["y1"] + T, ROOMS[i + 1]["y0"] - T
+    h = w // 2
+    if ax == bx:
+        return [(ax - h, ax + h, ya, yb)]
+    ym = (ya + yb) // 2
+    return [(ax - h, ax + h, ya, ym - h), (min(ax, bx) - h, max(ax, bx) + h, ym - h, ym + h),
+            (bx - h, bx + h, ym + h, yb)]
+
+
+def open_spans(cells, k, side):
+    """The stretches of cell k's side ('s', 'n', 'w', 'e') no other cell lies against."""
+    x0, x1, y0, y1 = cells[k]
+    if side in "sn":
+        line, lo, hi = (y0 if side == "s" else y1), x0, x1
+        touching = [(c[0], c[1]) for j, c in enumerate(cells)
+                    if j != k and (c[3] if side == "s" else c[2]) == line]
+    else:
+        line, lo, hi = (x0 if side == "w" else x1), y0, y1
+        touching = [(c[2], c[3]) for j, c in enumerate(cells)
+                    if j != k and (c[1] if side == "w" else c[0]) == line]
+    spans = [(lo, hi)]
+    for a, b in touching:
+        spans = [piece for s0, s1 in spans
+                 for piece in ((s0, min(s1, a)), (max(s0, b), s1)) if piece[1] > piece[0]]
+    return line, lo, hi, spans
 
 
 def passage(i):
-    """From room i's door out to room i + 1."""
-    a = ROOMS[i]
-    w, sill, top = door_of(i + 1)
-    ya, yb = a["y1"] + T, ROOMS[i + 1]["y0"] - T
-    out = [box((-w // 2 - T, ya, sill - T), (w // 2 + T, yb, sill), {"*": TRIM, "top": FLOOR}),
-           box((-w // 2 - T, ya, top), (w // 2 + T, yb, top + T), {"*": TRIM, "bottom": CEILING}),
-           box((-w // 2 - T, ya, sill), (-w // 2, yb, top), {"*": WALLF}),
-           box((w // 2, ya, sill), (w // 2 + T, yb, top), {"*": WALLF})]
-    # a quiet walk between fights: runes along both walls, lamps all the way
-    for s in (-1, 1):
-        x0, x1 = sorted((s * w // 2, s * (w // 2 - 6)))
-        out.append(box((x0, ya, sill + 96), (x1, yb, sill + 112), {"*": TRIM, "side": RUNES},
-                       detail=True))
-    for y in range(ya + 96, yb - 31, 192):
-        out.append(lamp(0, y, top, 24))
+    """From room i's door out to room i + 1: floor, ceiling, walls round its turns,
+    runes along the walls and lamps all the way, a quiet walk between fights."""
+    _, sill, top = door_of(i + 1)
+    cells = passage_cells(i)
+    out = []
+    for k, (x0, x1, y0, y1) in enumerate(cells):
+        out.append(box((x0, y0, sill - T), (x1, y1, sill), {"*": TRIM, "top": FLOOR}))
+        out.append(box((x0, y0, top), (x1, y1, top + T), {"*": TRIM, "bottom": CEILING}))
+        for side in "snwe":
+            if (k == 0 and side == "s") or (k == len(cells) - 1 and side == "n"):
+                continue  # the doors
+            line, lo, hi, spans = open_spans(cells, k, side)
+            for a, b in spans:
+                # reach past a corner of the cell to close it, never into another cell
+                # nor into a room's wall at either end
+                into_room_lo = k == 0 and side in "we"
+                into_room_hi = k == len(cells) - 1 and side in "we"
+                a2 = a - (T if a == lo and not into_room_lo else 0)
+                b2 = b + (T if b == hi and not into_room_hi else 0)
+                outward = 1 if side in "ne" else -1
+                t0, t1 = sorted((line, line + outward * T))
+                r0, r1 = sorted((line, line - outward * 6))
+                if side in "sn":
+                    out.append(box((a2, t0, sill - T), (b2, t1, top + T), {"*": WALLF}))
+                    out.append(box((a, r0, sill + 96), (b, r1, sill + 112), {"*": TRIM, "side": RUNES},
+                                   detail=True))
+                else:
+                    out.append(box((t0, a2, sill - T), (t1, b2, top + T), {"*": WALLF}))
+                    out.append(box((r0, a, sill + 96), (r1, b, sill + 112), {"*": TRIM, "side": RUNES},
+                                   detail=True))
+        cx, cy = (x0 + x1) / 2, (y0 + y1) / 2
+        if x1 - x0 > y1 - y0:
+            for x in range(int(x0) + 96, int(x1) - 31, 192):
+                out.append(lamp(x, cy, top, 24))
+        else:
+            for y in range(int(y0) + 96, int(y1) - 31, 192):
+                out.append(lamp(cx, y, top, 24))
     return out
 
 
@@ -405,38 +417,17 @@ def extras_r1(r):
 
 
 def extras_r2(r):
-    """A tomb: a colonnade, and sarcophagi along the walls."""
-    f = style_faces(r["style"])
     out = []
     for x in (-384, 384):
         for k in range(3):
-            out += pillar(x, r["y0"] + 192 + k * 192, r["z"], r["h"], f)
-    for s in (-1, 1):
-        x = s * (r["w"] - 112)
-        for k in range(3):
-            y = r["y0"] + 192 + k * 192
-            out.append(box((x - 44, y - 76, r["z"]), (x + 44, y + 76, r["z"] + 40),
-                           {"*": f["wall"], "top": f["trim"]}, detail=True))
-            out.append(box((x - 52, y - 84, r["z"] + 40), (x + 52, y + 84, r["z"] + 54),
-                           {"*": f["trim"]}, detail=True))
+            out += pillar(x, r["y0"] + 192 + k * 192, r["z"], r["h"])
     return out
 
 
 def extras_r3(r):
-    """A forge: a grated catwalk over the lava, machines along the walls."""
-    f = style_faces(r["style"])
+    """A grated catwalk over the lava pool."""
     c = (r["y0"] + r["y1"]) // 2
-    out = [box((-48, c - 224, r["z"] - 16), (48, c + 224, r["z"]), {"*": f["trim"], "top": f["floor"]})]
-    for s in (-1, 1):
-        x = s * (r["w"] - 80)
-        for y in (r["y0"] + 224, r["y1"] - 224):
-            out.append(box((x - 48, y - 80, r["z"]), (x + 48, y + 80, r["z"] + 160),
-                           {"*": f["wall"], "top": f["trim"]}, detail=True))
-            face_x = x - s * 48
-            xs = sorted((face_x, face_x - s * 4))
-            out.append(box((xs[0], y - 56, r["z"] + 96), (xs[1], y + 56, r["z"] + 112),
-                           {"*": f["trim"], "side": f["lamp"]}, detail=True))
-    return out
+    return [box((-48, c - 224, r["z"] - 16), (48, c + 224, r["z"]), {"*": TRIM, "top": FLOOR})]
 
 
 def extras_r4(r):
@@ -454,44 +445,31 @@ def extras_r4(r):
 
 
 def extras_r5(r):
-    """An archive: shelves of books along the walls, holocrons glowing on pedestals."""
-    f = style_faces(r["style"])
     out = []
     for x in (-384, 384):
         for k in (0, 1):
-            out += pillar(x, r["y0"] + 256 + k * 256, r["z"], r["h"], f)
-    shelf = Face(COOP + "/archive_shelf", (0.5, 0.5))
-    for s in (-1, 1):
-        xs = sorted((s * r["w"], s * (r["w"] - 24)))
-        for y0, y1 in ((r["y0"] + 32, r["y0"] + 224), (r["y0"] + 416, r["y0"] + 544),
-                       (r["y1"] - 224, r["y1"] - 32)):
-            out.append(box((xs[0], y0, r["z"]), (xs[1], y1, r["z"] + 224),
-                           {"*": f["trim"], "side": shelf}, detail=True))
-    for x, y in ((-160, r["y0"] + 192), (160, r["y0"] + 192), (0, r["y0"] + 256)):
-        out.append(octagon_brush(x, y, 20, r["z"], r["z"] + 48, {"*": f["trim"]}, True))
-        out.append(box((x - 7, y - 7, r["z"] + 56), (x + 7, y + 7, r["z"] + 70), {"*": f["lamp"]},
-                       detail=True))
+            out += pillar(x, r["y0"] + 256 + k * 256, r["z"], r["h"])
     return out
 
 
 def extras_r6(r):
-    """A hall of guardians: pillars, and two gates of posts and a lintel across it."""
-    f = style_faces(r["style"])
+    """Pillars, and the puzzle's marks: a glowing track from the statue to the
+    plate it must be pushed onto."""
     out = []
     for x in (-576, 576):
         for k in range(3):
-            out += pillar(x, r["y0"] + 192 + k * 256, r["z"], r["h"], f)
-    for y in (r["y0"] + 300, r["y1"] - 96):
-        for x in (-320, 320):
-            out.append(octagon_brush(x, y, 32, r["z"], r["z"] + 352, {"*": f["pillar"]}, True))
-        out.append(box((-360, y - 28, r["z"] + 352), (360, y + 28, r["z"] + 400),
-                       {"*": f["trim"], "bottom": f["runes"]}, detail=True))
+            out += pillar(x, r["y0"] + 192 + k * 256, r["z"], r["h"])
+    y0, y1 = PUZZLE_START + r["y0"] + 64, PUZZLE_END + r["y0"]
+    for x in (-72, 64):
+        out.append(box((x, y0, r["z"]), (x + 8, y1, r["z"] + 2), {"*": TRIM, "top": RUNES}, detail=True))
+    out.append(octagon_brush(0, PUZZLE_END + r["y0"], 72, r["z"], r["z"] + 2,
+                             {"*": TRIM, "top": LAMP}, True))
     return out
 
 
 def extras_r7(r):
     """The giant statue's pedestal, the boss dais and its steps, pillars."""
-    f = style_faces(r["style"])
+    f = OBSIDIAN
     zf, y1 = r["z"], r["y1"]
     cy = giant()[1]
     out = [octagon_brush(0, cy, 288, zf, zf + 64, {"*": f["trim"], "top": f["pillar"]})]
@@ -503,6 +481,8 @@ def extras_r7(r):
     for s in (-1, 1):
         for y in range(r["y0"] + 384, y1 - 383, 384):
             out += pillar(s * 560, y, zf, r["h"], f)
+    for x, y in GUARDS:  # the guardian's company stand on their own pedestals
+        out.append(octagon_brush(x, cy + y, 96, zf, zf + 48, {"*": STONE, "side": TRIM}))
     return out
 
 
@@ -529,37 +509,29 @@ def giant():
 
 # ---------------------------------------------------------------- statues
 
-BRIDGE_FIGURES = ["acolyte", "warrior", "caster", "lord"]
+BRIDGE_FIGURES = ["acolyte", "caster", "lord", "acolyte"]
+# The guardian's four, around its pedestal: (x, y from its centre) and figure.
+GUARDS = [(-416, -256), (416, -256), (-416, 256), (416, 256)]
+GUARD_FIGURES = ["caster", "lord", "lord", "caster"]
 
 
 def statues():
-    """(x, y, z, angle, scale, pedestal apothem or None, figure)."""
+    """(x, y, z, angle, scale, pedestal apothem or None, figure). Statues stand only
+    along the bridge and in the last hall."""
     out = [(x, y, 0, a, 2.2, None, BRIDGE_FIGURES[k // 2 % 4])
            for k, (x, y, a) in enumerate(bridge_statues())]
-    r1 = ROOMS[0]
-    out += [(s * 256, r1["y1"] - 96, 48, 270, 2.6, 80, "acolyte") for s in (-1, 1)]
-    r5, r6, r7 = ROOMS[4], ROOMS[5], ROOMS[6]
-    for r, inset, scale, figures in ((r5, 128, 3.0, ("caster", "lord")), (r6, 128, 3.2, ("warrior", "lord"))):
-        for s in (-1, 1):
-            for k, y in enumerate((r["y0"] + r["d"] // 3, r["y0"] + 2 * r["d"] // 3)):
-                out.append((s * (r["w"] - inset), y, r["z"] + 48, 0 if s < 0 else 180, scale, 96,
-                            figures[k]))
+    r7 = ROOMS[6]
     gx, gy, gz = giant()
-    out.append((gx, gy, gz, 270, 7.0, None, "sith_lord"))
-    for s in (-1, 1):
-        for k, y in enumerate((r7["y0"] + 448, r7["y0"] + 896, r7["y0"] + 1344)):
-            out.append((s * 1088, y, r7["z"] + 48, 0 if s < 0 else 180, 3.6, 112,
-                        ("warrior", "lord", "caster")[k]))
+    out.append((gx + r7["cx"], gy, gz, 270, 7.0, None, "guardian"))
+    for (x, y), figure in zip(GUARDS, GUARD_FIGURES):
+        out.append((gx + x + r7["cx"], gy + y, r7["z"] + 48, 270, 3.4, None, figure))
     return out
 
 
 def statue_brushes():
-    out = []
-    for x, y, z, _, scale, pedestal, _ in statues():
-        if pedestal:
-            out.append(octagon_brush(x, y, pedestal, z - 48, z, {"*": STONE, "side": TRIM}))
-        out.append(octagon_brush(x, y, round(20 * scale), z, z + round(104 * scale), {"*": "clip"}))
-    return out
+    """An invisible player clip round each statue (pedestals are the rooms')."""
+    return [octagon_brush(x, y, round(20 * scale), z, z + round(104 * scale), {"*": "clip"})
+            for x, y, z, _, scale, _, _ in statues()]
 
 
 # ---------------------------------------------------------------- enemies
@@ -578,9 +550,9 @@ WAVES = [
      ("npc_cultist_saber_powers", 1, 0, 0.3)],
     [("npc_reborn_new", 4, -256, 0.5), ("npc_reborn_new", 4, 256, 0.5),
      ("npc_cultist_saber_powers", 10, 0, 0.8), ("npc_cultist", 4, 384, 0.8)],
-    [("npc_alora", 0, 0, 0.6), ("npc_reborn_new", 5, 320, 0.75), ("npc_reborn_new", 6, -320, 0.75),
+    [("npc_alora", 0, -448, 0.6), ("npc_reborn_new", 5, 320, 0.75), ("npc_reborn_new", 6, -320, 0.75),
      ("npc_cultist", 4, 448, 0.45), ("npc_cultist", 2, -448, 0.45)],
-    [("npc_reborn_new", 4, -384, 0.3), ("npc_reborn_new", 4, 384, 0.3), ("npc_cultist", 4, -1088, 0.15),
+    [("npc_reborn_new", 4, -224, 0.3), ("npc_reborn_new", 4, 224, 0.3), ("npc_cultist", 4, -1088, 0.15),
      ("npc_cultist", 4, 1088, 0.15)],
 ]
 BOSS_WAVE = [("npc_desann", 0, 0, 0.94), ("npc_tavion_new", 1, -256, 0.92), ("npc_alora", 1, 256, 0.92)]
@@ -603,17 +575,17 @@ def enemies():
         r = ROOMS[i]
         for c, f, x, frac in wave:
             y = round(r["y0"] + frac * r["d"])
-            out.append((c, f, (x, y, floor_z(x, y, r) + 40), 270, "room%d" % (i + 1)))
+            out.append((c, f, (x + r["cx"], y, floor_z(x, y, r) + 40), 270, "room%d" % (i + 1)))
     r7 = ROOMS[6]
     for c, f, x, frac in BOSS_WAVE:
         y = round(r7["y0"] + frac * r7["d"])
-        out.append((c, f, (x, y, floor_z(x, y, r7) + 40), 270, "room7"))
+        out.append((c, f, (x + r7["cx"], y, floor_z(x, y, r7) + 40), 270, "room7"))
     r4 = ROOMS[3]
     for c, f, x in BALCONY_WAVE:
-        out.append((c, f, (x, r4["y1"] - 96, r4["z"] + LIFT_HEIGHT + 8 + 40), 270, "room4"))
+        out.append((c, f, (x + r4["cx"], r4["y1"] - 96, r4["z"] + LIFT_HEIGHT + 8 + 40), 270, "room4"))
     corridor_end = ROOMS[4]["y0"] - T - 96
     for c, f, x in CORRIDOR_WAVE:
-        out.append((c, f, (x, corridor_end, ROOMS[4]["z"] + 40), 270, "room4"))
+        out.append((c, f, (x + ROOMS[4]["cx"], corridor_end, ROOMS[4]["z"] + 40), 270, "room4"))
     return out
 
 
@@ -625,10 +597,38 @@ def triggers():
             "room1")]
     for i in range(1, len(ROOMS)):
         w, sill, _ = door_of(i)
-        ya = ROOMS[i - 1]["y1"] + T
-        out.append((box((-w // 2, ya, sill), (w // 2, ya + 64, sill + 128), {"*": TRIGGER}),
+        ya, x = ROOMS[i - 1]["y1"] + T, ROOMS[i - 1]["cx"]
+        out.append((box((x - w // 2, ya, sill), (x + w // 2, ya + 64, sill + 128), {"*": TRIGGER}),
                     "room%d" % (i + 1)))
     return out
+
+
+# The puzzle: room 6's statue stands on a block the Force pushes north along a
+# glowing track; on the plate at its end it opens the door to room 7.
+PUZZLE_START, PUZZLE_END = 256, 576  # the block's centre, from room 6's south wall
+PUZZLE_BLOCK = 112
+PUZZLE_STATUE = "%s_puzzle" % sith.STATUE  # the acolyte, scaled for a mover's model2
+PUZZLE_SCALE = 2.6
+
+
+def puzzle():
+    """(func_door fields, brushes) of the pushable statue, and of the last door."""
+    r6, r7 = ROOMS[5], ROOMS[6]
+    x, y, z = r6["cx"], r6["y0"] + PUZZLE_START, r6["z"]
+    h = PUZZLE_BLOCK // 2
+    block = [box((x - h, y - h, z), (x + h, y + h, z + 48), {"*": TRIM, "top": STONE}),
+             # the statue on it is the mover's model, not solid: a clip stands in
+             octagon_brush(x, y, 44, z + 48, z + 48 + round(100 * PUZZLE_SCALE), {"*": "clip"})]
+    statue = {"classname": "func_door", "origin": "%d %d %d" % (x, y, z + 48),
+              "model2": PUZZLE_STATUE + ".md3", "angle": "90", "spawnflags": "2",
+              "speed": "48", "wait": "-1", "lip": str(PUZZLE_BLOCK - (PUZZLE_END - PUZZLE_START)),
+              "opentarget": "final_door"}
+    w, sill, top = door_of(6)
+    dx = r7["cx"]
+    door = [box((dx - w // 2, r7["y0"] - T, sill), (dx + w // 2, r7["y0"], top), {"*": WALLF})]
+    last = {"classname": "func_door", "targetname": "final_door", "angle": "-1",
+            "speed": "120", "wait": "-1", "lip": "8"}
+    return (statue, block), (last, door)
 
 
 def hurt_brushes(brushes):
@@ -646,7 +646,7 @@ def lift():
     out = [box((-h, front - LIFT, top - 16), (h, front, top), {"*": TRIM, "top": FLOOR})]
     for x0, x1 in ((-h, -h + 8), (h - 8, h)):
         out.append(box((x0, front - LIFT, top), (x1, front, top + 40), {"*": TRIM, "top": LAMP}))
-    return out
+    return [moved(b, r4["cx"]) for b in out]
 
 
 def lift_sound():
@@ -656,8 +656,9 @@ def lift_sound():
     front = r4["y1"] - BALCONY_D
     h = LIFT // 2
     floor = r4["z"] + 8
-    trigger = box((-h, front - LIFT, floor), (h, front, floor + 64), {"*": TRIGGER})
-    return trigger, (0, front - LIFT // 2, r4["z"] + LIFT_HEIGHT // 2)
+    x = r4["cx"]
+    trigger = box((x - h, front - LIFT, floor), (x + h, front, floor + 64), {"*": TRIGGER})
+    return trigger, (x, front - LIFT // 2, r4["z"] + LIFT_HEIGHT // 2)
 
 
 def ambient_speakers():
@@ -666,8 +667,8 @@ def ambient_speakers():
     out += [("wind", (0, CHASM_Y1 - 160, 256))]
     out += [("lava", (x, y, -320)) for x in (-640, 640) for y in range(CHASM_Y0 + 256, CHASM_Y1, 512)]
     r3, r7 = ROOMS[2], ROOMS[6]
-    out.append(("lava", (0, (r3["y0"] + r3["y1"]) // 2, r3["z"] - 24)))
-    out += [("lava", (s * 768, y, r7["z"] - 24)) for s in (-1, 1)
+    out.append(("lava", (r3["cx"], (r3["y0"] + r3["y1"]) // 2, r3["z"] - 24)))
+    out += [("lava", (r7["cx"] + s * 768, y, r7["z"] - 24)) for s in (-1, 1)
             for y in range(r7["y0"] + 384, r7["y1"] - 255, 512)]
     return out
 
@@ -682,14 +683,18 @@ def waypoint_candidates():
     for r in ROOMS:
         for x in range(-r["w"] + 96, r["w"] - 95, 192):
             for y in range(r["y0"] + 96, r["y1"] - 95, 192):
-                pts.append((x, y, floor_z(x, y, r) + 32))
+                pts.append((x + r["cx"], y, floor_z(x, y, r) + 32))
     for i in range(len(PASSAGES)):
         _, sill, _ = door_of(i + 1)
-        for y in range(ROOMS[i]["y1"] - 32, ROOMS[i + 1]["y0"] + 33, 128):
-            pts.append((0, y, sill + 32))
+        for x0, x1, y0, y1 in passage_cells(i):
+            cx, cy = (x0 + x1) // 2, (y0 + y1) // 2
+            if x1 - x0 > y1 - y0:
+                pts += [(x, cy, sill + 32) for x in range(x0 + 64, x1 - 63, 128)]
+            else:
+                pts += [(cx, y, sill + 32) for y in range(y0 - 64, y1 + 65, 128)]
     r4 = ROOMS[3]
     for x in range(-r4["w"] + 96, r4["w"] - 95, 192):
-        pts.append((x, r4["y1"] - 128, r4["z"] + LIFT_HEIGHT + 8 + 32))
+        pts.append((x + r4["cx"], r4["y1"] - 128, r4["z"] + LIFT_HEIGHT + 8 + 32))
     for y in range(START_Y0 + 96, FACADE_Y - 95, 128):
         pts.append((0, y, 32))
     for x in range(-OUT_W + 128, OUT_W - 127, 192):
@@ -725,7 +730,8 @@ def build():
     solid = [b for b in brushes if not b.lava]
     plats = lift()
     trig = triggers()
-    everything = brushes + plats
+    (statue_fields, block), (door_fields, door) = puzzle()
+    everything = brushes + plats + block + door
     for p in player_spawns():
         if not (clear(everything, p) and grounded(solid, p)):
             sys.exit("player spawn %s is blocked or floating" % (p,))
@@ -749,6 +755,8 @@ def build():
                         "speed": str(LIFT_SPEED), "lip": "8"}, plats))
     for b, target in trig:
         ents.append(entity({"classname": "trigger_once", "target": target}, [b]))
+    ents.append(entity(statue_fields, block))
+    ents.append(entity(door_fields, door))
     for b in hurt_brushes(brushes):  # lava kills players and NPCs alike, at once
         ents.append(entity({"classname": "trigger_hurt", "dmg": "1000"}, [b]))
     ride, speaker = lift_sound()
@@ -833,133 +841,6 @@ def draw_textures(folder):
     ImageDraw.Draw(img).text((8, 24), "TRIG", fill=(255, 255, 255))
     img.save(folder / "trigger.tga")
     sky_box(folder / "env")
-    for style, palette in PALETTES.items():
-        style_textures(folder, style, palette)
-    shelf_texture(folder / "archive_shelf.tga")
-    field = fbm(256, 1.1, 41)
-    lines = (np.sin(np.mgrid[0:256, 0:256][0] / 256 * 2 * np.pi * 24) * 0.5 + 0.5) ** 6
-    v = np.clip(field * 0.6 + lines * 0.5, 0, 1)
-    rgb(np.stack([v * 255, v * 50, v * 40], axis=-1)).save(folder / "forcefield.tga")
-
-
-def blocks(s, lo, hi, mortar, veins, strength, seed, bw=128, bh=64):
-    yy, xx = np.mgrid[0:s, 0:s]
-    out = tint(fbm(s, 1.4, seed), lo, hi)
-    rnd = np.random.default_rng(seed)
-    for by in range(0, s, bh):
-        off = (by // bh % 2) * bw // 2
-        for bx in range(-bw, s, bw):
-            m = (yy >= by) & (yy < by + bh) & (((xx - bx - off) % s) < bw)
-            out[m] *= rnd.uniform(0.85, 1.12)
-    joint = ((yy % bh) < 3) | (((xx - (yy // bh % 2) * bw // 2) % bw) < 3)
-    out[joint] = mortar
-    v = ridges(s, seed + 1, 0.016)[..., None] * strength
-    return out * (1 - v) + np.array(veins) * v
-
-
-def plates(s, lo, hi, seam, rust, strength, seed):
-    yy, xx = np.mgrid[0:s, 0:s]
-    out = tint(fbm(s, 1.2, seed), lo, hi)
-    streak = np.clip(fbm(s, 1.8, seed + 1) * 1.6 - 0.7, 0, 1) * np.clip(1.2 - (yy % 128) / 128, 0, 1)
-    out = out * (1 - streak[..., None] * strength) + np.array(rust) * streak[..., None] * strength
-    out[((yy % 128) < 3) | ((xx % 128) < 3)] = seam
-    for cy in range(10, s, 128):
-        for cx in range(10, s, 128):
-            for dy, dx in ((0, 0), (0, 108), (108, 0), (108, 108)):
-                y, x = cy + dy, cx + dx
-                out[y - 3:y + 3, x - 3:x + 3] = np.array(hi) * 1.2
-    return out
-
-
-def marble(s, lo, hi, veins, strength, seed):
-    out = tint(fbm(s, 1.9, seed), lo, hi)
-    v = (ridges(s, seed + 1, 0.02, 1.4) + 0.5 * ridges(s, seed + 2, 0.01, 1.8))[..., None] * strength
-    return out * (1 - np.clip(v, 0, 1)) + np.array(veins) * np.clip(v, 0, 1)
-
-
-def floor_texture(s, kind, lo, hi, inlay, seed):
-    yy, xx = np.mgrid[0:s, 0:s]
-    if kind == "checker":
-        out = np.where((((yy // 256) + (xx // 256)) % 2 == 0)[..., None],
-                       tint(fbm(s, 1.9, seed), lo, np.array(lo) * 1.6),
-                       tint(fbm(s, 1.9, seed + 1), hi, np.array(hi) * 1.5))
-    elif kind == "grate":
-        out = tint(fbm(s, 1.2, seed), lo, hi)
-        holes = ((yy % 32) > 6) & ((yy % 32) < 26) & ((xx % 32) > 6) & ((xx % 32) < 26)
-        out[holes] *= 0.25
-        out[holes] += np.array(inlay) * 0.18
-    else:  # slabs
-        out = tint(fbm(s, 1.8, seed), lo, hi)
-        out += ridges(s, seed + 2, 0.02)[..., None] * 25
-    joint = ((yy % 256) < 4) | ((xx % 256) < 4)
-    line = ((yy % 256 >= 1) & (yy % 256 < 3)) | ((xx % 256 >= 1) & (xx % 256 < 3))
-    out[joint] = np.array(lo) * 0.4
-    out[line] = inlay
-    return out
-
-
-def style_textures(folder, style, p):
-    """A style's wall, floor, trim, ceiling, pillar, runes (and their glow) and lamp."""
-    seed = sum(map(ord, style))
-    s = 512
-    kind, lo, hi, mortar, veins, strength = p["wall"]
-    wall = {"blocks": lambda: blocks(s, lo, hi, mortar, veins, strength, seed),
-            "plates": lambda: plates(s, lo, hi, mortar, veins, strength, seed),
-            "marble": lambda: marble(s, lo, hi, veins, strength, seed)}[kind]()
-    rgb(wall).save(folder / ("%s_wall.tga" % style))
-    rgb(floor_texture(s, *p["floor"], seed + 5)).save(folder / ("%s_floor.tga" % style))
-    trim = rgb(tint(fbm(256, 1.2, seed + 7), *p["trim"]))
-    d = ImageDraw.Draw(trim)
-    d.rectangle([0, 0, 255, 255], outline=tuple(min(255, int(c * 1.3)) for c in p["trim"][1]), width=4)
-    d.rectangle([6, 6, 249, 249], outline=tuple(int(c * 0.4) for c in p["trim"][0]), width=2)
-    trim.save(folder / ("%s_trim.tga" % style))
-    rgb(tint(fbm(s, 1.3, seed + 9), *p["ceiling"])).save(folder / ("%s_ceiling.tga" % style))
-    rgb(marble(s, *p["pillar"], tuple(min(255, int(c * 1.4)) for c in p["pillar"][1]), 0.25, seed + 11)
-        ).save(folder / ("%s_pillar.tga" % style))
-    glyphs = sith_glyphs(512, 64, seed + 13)
-    base = tint(fbm(512, 1.2, seed + 15)[:64], np.array(p["trim"][0]) * 0.5, p["trim"][0])
-    color = np.array(p["runes"])
-    rgb(base * (1 - glyphs[..., None]) + color * 0.55 * glyphs[..., None]).save(
-        folder / ("%s_runes.tga" % style))
-    rgb(color * glyphs[..., None]).save(folder / ("%s_runes_glow.tga" % style))
-    lamp = Image.new("RGB", (64, 64), p["lamp"])
-    ImageDraw.Draw(lamp).rectangle([0, 0, 63, 63], outline=(20, 18, 20), width=6)
-    lamp.save(folder / ("%s_lamp.tga" % style))
-
-
-def sith_glyphs(w, h, seed):
-    """A strip of angular glyphs, 1 on a stroke."""
-    rnd = np.random.default_rng(seed)
-    mask = Image.new("L", (w, h), 0)
-    d = ImageDraw.Draw(mask)
-    for cx in range(16, w, 32):
-        pts = [(cx + int(rnd.choice((-8, 0, 8))), 12 + int(rnd.choice((0, 20, 40)))) for _ in range(4)]
-        d.line(pts, fill=255, width=3)
-        if rnd.random() < 0.5:
-            d.line([(cx - 8, 32), (cx + 8, 32)], fill=255, width=3)
-    d.line([(0, 3), (w, 3)], fill=160, width=2)
-    d.line([(0, h - 4), (w, h - 4)], fill=160, width=2)
-    return np.asarray(mask, dtype=float) / 255
-
-
-def shelf_texture(path):
-    """Shelves of books: rows of spines in old leather colours."""
-    rnd = np.random.default_rng(51)
-    img = Image.new("RGB", (256, 256), (26, 18, 14))
-    d = ImageDraw.Draw(img)
-    for row in range(4):
-        y0 = row * 64 + 6
-        d.rectangle([0, y0 + 52, 255, y0 + 57], fill=(60, 44, 30))  # the shelf board
-        x = 2
-        while x < 250:
-            w = int(rnd.integers(5, 13))
-            h = int(rnd.integers(34, 52))
-            c = tuple(int(v) for v in rnd.choice([(90, 20, 24), (40, 30, 70), (30, 60, 40),
-                                                  (110, 80, 40), (60, 50, 45), (20, 20, 24)]))
-            d.rectangle([x, y0 + 52 - h, x + w - 1, y0 + 51], fill=c)
-            d.line([(x, y0 + 52 - h + 6), (x + w - 1, y0 + 52 - h + 6)], fill=(170, 140, 70))
-            x += w + 1
-    img.save(path)
 
 
 def shader_text():
@@ -970,48 +851,6 @@ def shader_text():
                    "\t{\n\t\tmap $lightmap\n\t\trgbGen identity\n\t}\n"
                    "\t{\n\t\tmap %(t)s/%(n)s.tga\n\t\tblendFunc GL_DST_COLOR GL_ZERO\n"
                    "\t\trgbGen identity\n\t}\n}\n" % {"t": t, "n": name})
-    for style in PALETTES:
-        for part in ("wall", "floor", "trim", "ceiling", "pillar"):
-            out.append("%(t)s/%(s)s_%(n)s\n{\n\tqer_editorimage %(t)s/%(s)s_%(n)s.tga\n"
-                       "\t{\n\t\tmap $lightmap\n\t\trgbGen identity\n\t}\n"
-                       "\t{\n\t\tmap %(t)s/%(s)s_%(n)s.tga\n\t\tblendFunc GL_DST_COLOR GL_ZERO\n"
-                       "\t\trgbGen identity\n\t}\n}\n" % {"t": t, "s": style, "n": part})
-        for part, glow, power in (("runes", "runes_glow", 900), ("lamp", "lamp", 4000)):
-            out.append("%(t)s/%(s)s_%(n)s\n{\n\tqer_editorimage %(t)s/%(s)s_%(n)s.tga\n"
-                       "\tq3map_surfacelight %(p)d\n\tq3map_lightimage %(t)s/%(s)s_%(g)s.tga\n"
-                       "\tsurfaceparm nomarks\n"
-                       "\t{\n\t\tmap $lightmap\n\t\trgbGen identity\n\t}\n"
-                       "\t{\n\t\tmap %(t)s/%(s)s_%(n)s.tga\n\t\tblendFunc GL_DST_COLOR GL_ZERO\n"
-                       "\t\trgbGen identity\n\t}\n"
-                       "\t{\n\t\tmap %(t)s/%(s)s_%(g)s.tga\n\t\tblendFunc GL_ONE GL_ONE\n\t\tglow\n\t}\n}\n"
-                       % {"t": t, "s": style, "n": part, "g": glow, "p": power})
-    out.append("%(t)s/archive_shelf\n{\n\tqer_editorimage %(t)s/archive_shelf.tga\n"
-               "\t{\n\t\tmap $lightmap\n\t\trgbGen identity\n\t}\n"
-               "\t{\n\t\tmap %(t)s/archive_shelf.tga\n\t\tblendFunc GL_DST_COLOR GL_ZERO\n"
-               "\t\trgbGen identity\n\t}\n}\n" % {"t": t})
-    out.append("""%(t)s/forcefield
-{
-\tqer_editorimage %(t)s/forcefield.tga
-\tq3map_surfacelight 150
-\tsurfaceparm trans
-\tsurfaceparm nolightmap
-\tsurfaceparm nomarks
-\tcull none
-\t{
-\t\tmap %(t)s/forcefield.tga
-\t\tblendFunc GL_ONE GL_ONE
-\t\trgbGen wave sin 0.5 0.25 0 0.7
-\t\ttcMod scroll 0 0.25
-\t\tglow
-\t}
-\t{
-\t\tmap %(t)s/forcefield.tga
-\t\tblendFunc GL_ONE GL_ONE
-\t\ttcMod scale 0.5 0.5
-\t\ttcMod scroll 0.07 -0.11
-\t}
-}
-""" % {"t": t})
     out.append("""%(t)s/sky
 {
 \tqer_editorimage %(t)s/env/sky_ft.tga
@@ -1039,7 +878,13 @@ def shader_text():
 
 
 def write_assets(stage):
-    sith.write_assets(stage)  # the temple's textures, statue and sjk_sith.shader
+    sith.write_assets(stage)  # the temple's textures, statues and sjk_sith.shader
+    # the puzzle's statue is a mover's model, which the game draws at its own size
+    surfaces = statue_mesh("acolyte")
+    scaled = {k: ([tuple(c * PUZZLE_SCALE for c in v) for v in verts], uvs, tris)
+              for k, (verts, uvs, tris) in surfaces.items()}
+    model_dir = sith.STATUE.rsplit("/", 1)[0]
+    write_md3(stage / (PUZZLE_STATUE + ".md3"), scaled, {k: "%s/%s" % (model_dir, k) for k in scaled})
     sounds = stage / COOP_SOUNDS
     sith_audio.lift(sounds / "lift.wav", LIFT_HEIGHT / LIFT_SPEED)
     sith_audio.lava_loop(sounds / "lava.wav")

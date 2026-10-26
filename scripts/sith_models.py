@@ -94,8 +94,9 @@ def frame_for(tangent):
     return u, v
 
 
-def tube(mesh, path, radii, material, segments=12, cap_end=None):
-    """A tube along `path` with a radius per point; `cap_end` closes its far end."""
+def tube(mesh, path, radii, material, segments=12, cap_end=None, squash=(1.0, 1.0)):
+    """A tube along `path` with a radius per point; `cap_end` closes its far end.
+    `squash` stretches the cross-section along the frame's two axes (a blade's)."""
     rows, uvs = [], []
     for i, (p, r) in enumerate(zip(path, radii)):
         ahead = path[min(i + 1, len(path) - 1)]
@@ -104,7 +105,8 @@ def tube(mesh, path, radii, material, segments=12, cap_end=None):
         ring = []
         for j in range(segments):
             a = 2 * math.pi * j / segments
-            ring.append(add(p, add(scale(u, r * math.cos(a)), scale(v, r * math.sin(a)))))
+            ring.append(add(p, add(scale(u, r * squash[0] * math.cos(a)),
+                                   scale(v, r * squash[1] * math.sin(a)))))
         rows.append(ring)
         uvs.append([(j / segments, i / 4) for j in range(segments)])
     mesh.grid(rows, uvs, lambda i, j: material)
@@ -222,9 +224,21 @@ def helmet(mesh, stone, crest):
                  [1.8, 1.3, 0.4], stone, 8)
 
 
-def figure(head="hood", stone="statue", cape=0.17, pauldrons=False, arms=(), sabers=()):
-    """A robed figure 100 units tall facing +x; `arms` are (side, elbow, wrist) and
-    `sabers` (base, direction, blade length)."""
+def sword(mesh, x):
+    """A long sword held point down before the figure: pommel under the hands, a
+    crossguard, and a blade reaching almost to the ground."""
+    ellipsoid(mesh, (x, 0, 64), (2.0, 2.0, 2.0), "hilt", 6, 12)
+    rod(mesh, (x, 0, 53.5), (x, 0, 62.5), 1.3, "hilt", 10)
+    rod(mesh, (x, -8.5, 52.5), (x, 8.5, 52.5), 1.3, "hilt", 10)
+    tube(mesh, [(x, 0, 52), (x, 0, 12), (x, 0, 4)], [1.6, 1.6, 0.2], "hilt", 4,
+         squash=(2.2, 0.55))
+
+
+def figure(head="hood", stone="statue", cape=0.17, pauldrons=False, arms=(), sabers=(),
+           face="face", long_sword=False):
+    """A robed figure 100 units tall facing +x; `arms` are (side, elbow, wrist),
+    `sabers` (base, direction, blade length); `face` is the hood's inside (dark, or
+    the stone for a face that shows); `long_sword` adds a sword held point down."""
     hood = head == "hood"
     mesh = Mesh()
     heights = HEIGHTS if hood else [h for h in HEIGHTS if h <= 81] + [82.5, 83.5]
@@ -244,7 +258,7 @@ def figure(head="hood", stone="statue", cape=0.17, pauldrons=False, arms=(), sab
         th = 2 * math.pi * (j + 0.5) / SEGMENTS
         th = math.atan2(math.sin(th), math.cos(th))
         oval = (th / FACE_HALF_ANGLE) ** 2 + ((h - FACE_CENTER) / FACE_HALF_HEIGHT) ** 2
-        return "face" if hood and oval < 1 else stone
+        return face if hood and oval < 1 else stone
 
     mesh.grid(rows, uvs, material, wrap=False)
     if not hood:
@@ -267,6 +281,8 @@ def figure(head="hood", stone="statue", cape=0.17, pauldrons=False, arms=(), sab
         arm(mesh, side, elbow, wrist, stone)
     for base, direction, blade in sabers:
         saber(mesh, base, direction, blade)
+    if long_sword:
+        sword(mesh, 19.5)
     return mesh.surfaces()
 
 
@@ -275,10 +291,6 @@ STATUES = {
     # hooded, both hands on a hilt held point down
     "acolyte": dict(arms=[(1, (8, 17, 59), (16.5, 5, 52)), (-1, (8, -17, 59), (16.5, -5, 52))],
                     sabers=[((22, 0, 52), (0, 0, -1), 0)]),
-    # helmeted, a lit blade raised high, the other arm down
-    "warrior": dict(head="helmet", stone="statue_dark", pauldrons=True, cape=0.12,
-                    arms=[(-1, (6, -25, 82), (11, -21, 96)), (1, (3, 20, 60), (6, 19, 48))],
-                    sabers=[((13, -20, 99), (0.35, 0.15, 1), 42)]),
     # hooded lord, arms crossed, a heavy cape and armoured shoulders
     "lord": dict(stone="statue_bronze", pauldrons=True, cape=0.26,
                  arms=[(-1, (11, -14, 64), (14, 9, 67)), (1, (11, 14, 62), (15, -8, 64))]),
@@ -286,10 +298,10 @@ STATUES = {
     "caster": dict(stone="statue_dark",
                    arms=[(1, (12, 19, 70), (25, 14, 73)), (-1, (4, -19, 60), (9, -16, 50))],
                    sabers=[((10, -18, 46), (0, 0, -1), 0)]),
-    # the giant: crested helm, both hands holding a lit saber upright before it
-    "sith_lord": dict(head="crest", stone="statue_dark", pauldrons=True, cape=0.3,
-                      arms=[(1, (9, 16, 62), (17, 3, 64)), (-1, (9, -16, 62), (17, -3, 64))],
-                      sabers=[((20, 0, 59), (0, 0, 1), 58)]),
+    # the guardian of the last hall: hood back enough to show the face, a wide
+    # cape, both hands resting on the pommel of a long sword held point down
+    "guardian": dict(face="statue", cape=0.32, long_sword=True,
+                     arms=[(1, (9, 15, 63), (16.5, 3.5, 61)), (-1, (9, -15, 63), (16.5, -3.5, 61))]),
 }
 
 

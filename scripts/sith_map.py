@@ -425,7 +425,7 @@ def build():
                + throne() + pillars() + beams() + lamps() + braziers() + pedestals())
     ents = [entity({"classname": "worldspawn", "message": "SJK Sith Temple",
                     "_ambient": "10", "gridsize": "64 64 64"}, brushes)]
-    figures = ["warrior", "lord", "lord", "warrior", "caster", "caster"]
+    figures = ["acolyte", "lord", "lord", "acolyte", "caster", "caster"]
     for ((x, y), angle), figure in zip(STATUES, figures):
         ents.append(entity({"classname": "misc_model", "model": "%s_%s.md3" % (STATUE, figure),
                             "origin": "%d %d 48" % (x, y), "angle": str(angle),
