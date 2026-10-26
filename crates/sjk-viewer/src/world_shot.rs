@@ -459,8 +459,8 @@ mod tests {
     }
 
     /// `sjk_sith_coop` (`scripts/sith_coop_map.py`, installed in `base`): the
-    /// start by the X-wing, the wreck and the bridge, the bridge, room 2, a
-    /// passage, room 3's lava, the lift, room 6, and the giant statue's hall.
+    /// X-wing at the start, the bridge, room 1, a turning passage, room 3's lava,
+    /// the lift, room 6's statue puzzle, and the last hall and its guardian.
     #[test]
     #[ignore = "renders with the GPU and the installed game data named by JKA_GAME_DATA"]
     fn sjk_sith_coop_tour() {
@@ -468,14 +468,14 @@ mod tests {
             "maps/sjk_sith_coop.bsp",
             &[
                 ([300.0, -3700.0, 140.0], [-560.0, -3260.0, 80.0]),
-                ([-200.0, -3700.0, 260.0], [400.0, -2500.0, 0.0]),
                 ([0.0, -2400.0, 110.0], [0.0, -900.0, 150.0]),
-                ([0.0, 480.0, 110.0], [0.0, 1216.0, 120.0]),
-                ([0.0, 1260.0, 90.0], [0.0, 1700.0, 90.0]),
+                ([0.0, -480.0, 100.0], [0.0, 0.0, 100.0]),
+                ([0.0, 224.0, 90.0], [-900.0, 224.0, 90.0]),
                 ([-600.0, 1800.0, 160.0], [100.0, 2176.0, -40.0]),
-                ([0.0, 3240.0, 100.0], [0.0, 3584.0, 420.0]),
-                ([0.0, 6440.0, 760.0], [0.0, 7296.0, 780.0]),
+                ([896.0, 3240.0, 100.0], [896.0, 3584.0, 420.0]),
+                ([-768.0, 6430.0, 800.0], [-768.0, 6976.0, 700.0]),
                 ([0.0, 7990.0, 800.0], [0.0, 8768.0, 1250.0]),
+                ([0.0, 8300.0, 900.0], [0.0, 8768.0, 1100.0]),
             ],
             3,
             "sjk_sith_coop-tour",
