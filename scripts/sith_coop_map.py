@@ -617,8 +617,10 @@ def puzzle():
     x, y, z = r6["cx"], r6["y0"] + PUZZLE_START, r6["z"]
     h = PUZZLE_BLOCK // 2
     block = [box((x - h, y - h, z), (x + h, y + h, z + 48), {"*": TRIM, "top": STONE}),
-             # the statue on it is the mover's model, not solid: a clip stands in
-             octagon_brush(x, y, 44, z + 48, z + 48 + round(100 * PUZZLE_SCALE), {"*": "clip"}),
+             # the statue on it is the mover's model, not solid: an invisible solid
+             # stands in, which a Force push's aim (a shot's trace) meets too, where
+             # a player clip would let it through to the wall behind
+             octagon_brush(x, y, 44, z + 48, z + 48 + round(100 * PUZZLE_SCALE), {"*": "solid_nodraw"}),
              # the origin brush: q3map2 sets the mover's origin, where its model is
              # drawn, to this brush's centre and makes the others relative to it (an
              # "origin" key alone would leave them where they are, and the game would
