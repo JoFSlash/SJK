@@ -458,6 +458,30 @@ mod tests {
         );
     }
 
+    /// `sjk_sith_coop` (`scripts/sith_coop_map.py`, installed in `base`): the
+    /// start, the bridge, rooms 2 and 3, the lift hall, the corridor, room 6, and
+    /// the giant statue's hall from its door and from high on its side.
+    #[test]
+    #[ignore = "renders with the GPU and the installed game data named by JKA_GAME_DATA"]
+    fn sjk_sith_coop_tour() {
+        tour(
+            "maps/sjk_sith_coop.bsp",
+            &[
+                ([0.0, -2200.0, 140.0], [0.0, -900.0, 60.0]),
+                ([-60.0, -1500.0, 90.0], [100.0, -900.0, 140.0]),
+                ([0.0, 200.0, 110.0], [0.0, 896.0, 120.0]),
+                ([-600.0, 1100.0, 160.0], [100.0, 1500.0, -40.0]),
+                ([0.0, 2120.0, 100.0], [0.0, 2560.0, 520.0]),
+                ([0.0, 2880.0, 720.0], [0.0, 3900.0, 700.0]),
+                ([0.0, 4860.0, 760.0], [0.0, 5696.0, 780.0]),
+                ([0.0, 5900.0, 800.0], [0.0, 6656.0, 1250.0]),
+                ([-1150.0, 6000.0, 1500.0], [200.0, 7000.0, 700.0]),
+            ],
+            3,
+            "sjk_sith_coop-tour",
+        );
+    }
+
     /// The console's looks over duel6, half open on made-up scrollback with a
     /// command being typed (its unique completion ghosted) and two rows
     /// selected: the SJK UI's deck and the classic console; the deck

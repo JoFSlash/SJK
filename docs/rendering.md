@@ -4321,6 +4321,41 @@ python scripts/sith_map.py --install           # then: devmap sjk_sith1
 - **Not checked:** the map in a game; baked lighting (`r_dayNight 0`) is too
   dark (lightmap mean 19 of 255).
 
+## Co-op Sith temple map
+
+[sith_coop_map.py](../scripts/sith_coop_map.py) builds `sjk_sith_coop` from
+`sith_map.py`'s pieces: a start outside under a sky box, a bridge over a lava
+chasm lined with statues, and seven rooms. Room 4's `func_plat` rises 632 units
+to a balcony and a 1024-unit corridor that leads to rooms 5 to 7; room 7 is a
+2560 × 1792 hall, 1280 high, with lava channels, a boss dais and an 8× statue.
+
+```sh
+python scripts/sith_coop_map.py --install      # then, in Free For All: devmap sjk_sith_coop
+```
+
+- **Enemies.** Stock NPC classes, harder room by room, most using the dark side
+  through their definitions: `npc_cultist` (spawnflags 2 grip, 4 lightning,
+  8 drain), `npc_cultist_saber(_powers)`, `npc_reborn_new` (1 dual, 2 staff,
+  4 the stronger set), `npc_shadowtrooper`, `npc_alora`, `npc_tavion_new`
+  (1 scepter, 2 Sith sword) and `npc_desann`. A room's spawners carry its
+  `targetname` and wait for the `trigger_once` across its door; two cultists
+  outside spawn at once. Spawners stand 40 units up; `check_in_solid` drops them.
+- **Navigation.** `waypoint` entities on a 192-unit grid of every floor, the
+  passages, the balcony and the bridge, kept where a player's box fits and has
+  floor under it; the server connects them at load.
+- **Team.** In team game types the blue team is the NPCs' own, so play it in
+  Free For All.
+- **Sky.** `skyParms` with a box the script computes per direction through
+  `sky_stage.rs`'s face mapping, so it has no seams, and a `q3map_sun`. With
+  `r_dayNight 1` SJK draws its own day atmosphere and `r_clouds` over it, so the
+  red box shows only with both off or in other clients.
+- **Checked** (26/10/2026, Linux, q3map2 `8216133`): no compile warning or leak,
+  481 brushes; `sjk-server` loads it with 8 spawn points and 282 waypoints; the
+  ignored test `sjk_sith_coop_tour` rendered nine views on llvmpipe.
+- **Not checked:** the NPCs (this environment has no retail NPC definitions, so
+  the server could not spawn them), the lift and triggers in play, the map in a
+  game.
+
 ## Default visual profile
 
 New profiles use the owner-approved rendering setup: day/night enabled at a fixed
