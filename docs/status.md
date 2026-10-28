@@ -1,3 +1,28 @@
+## Map editor made easier
+
+28/10/2026, `personal/map-editor-ux`, based on `main` `db63b4f5` (Sol's request: the
+editor easier to use, and why syncing with the hub did not work). The sync: the live hub
+answers 404 on `/v1/map-edits` and `/v1/staff/map-edits` (checked with unsigned requests
+against `sjk.dfox.app`, which answers 401 on routes it has), because the hub's
+`map-edits` branch (19/10/2026) was never merged; Publish ended in a chat line the open
+panel hid ("unexpected answer from the hub: status 404, not JSON") and the worker's
+failed looks were never logged. That branch now carries the hub's `main` merged in
+(conflicts resolved, its `cargo test` and `cargo clippy --all-targets` clean); the live
+hub runs it only once Sol merges and deploys it. The client: refusals worded
+(`map_edits::refusal`), the publish's answer in the panel and the log, each look's
+summary or failure logged and a failure shown in the panel; the world-note key opens the
+panel and puts a grabbed model down (it only selected, though the docs and the strip
+said otherwise); a Map editor icon in the in-game menu for staff keys; undo and redo of
+every change (`History`, 100 steps); a shader search for remaps (shaders and images
+under `textures/` and `models/`, the selection's folder first); nudges along the nearest
+world axes, Shift for fine steps, the wheel turning a grabbed model; a placed model chosen
+in the Edits list becomes the one Place moves; short edit names. Verified on Windows 11:
+unit tests (refusals, the refresh's summary, labels, the shader search, buttons, the
+layout at four window shapes, the icon row) and the world shot `duel6_map_editor_panel`
+(the Selected page's shader list on a surface and a prop, Place's nudge row, Edits'
+Undo and Redo). Not verified: in a game (keys, wheel and clicks live), and Publish
+against the deployed hub.
+
 ## Tag toy
 
 27/10/2026, `personal/tag-toy`, based on `main` `26f546b6` (Sol's idea: TF2-style sprays,

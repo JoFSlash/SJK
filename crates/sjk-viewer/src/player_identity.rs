@@ -353,6 +353,29 @@ pub(crate) fn map_edits_revision() -> u64 {
     })
 }
 
+/// What the service's last look at the hub's map edits did (its summary, or why it fell
+/// short), when it is not `seen`: read twice a second, it allocates only on a change.
+pub(crate) fn map_edits_note(
+    seen: Option<&Result<String, String>>,
+) -> Option<Result<String, String>> {
+    lock().service.as_ref().and_then(|service| {
+        service.with_snapshot(|snapshot| {
+            snapshot
+                .map_edits_note
+                .as_ref()
+                .filter(|note| Some(*note) != seen)
+                .cloned()
+        })
+    })
+}
+
+/// Have the service look at the hub's map edits now (the editor turned on).
+pub(crate) fn refresh_map_edits() {
+    if let Some(service) = lock().service.as_ref() {
+        service.refresh_map_edits();
+    }
+}
+
 /// Staff: send a map's edits to the hub; the answer comes from
 /// [`map_edits_published`].
 pub(crate) fn publish_map_edits(
@@ -367,7 +390,7 @@ pub(crate) fn publish_map_edits(
     let service = runtime
         .service
         .as_ref()
-        .ok_or("Not connected to the SJK hub")?;
+        .ok_or("Not connected to the SJK hub: the SJK identity is off (cl_identity 1)")?;
     service.publish_map_edits(map, checksum, edits);
     Ok(())
 }

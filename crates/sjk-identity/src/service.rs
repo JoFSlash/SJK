@@ -246,6 +246,10 @@ pub struct Snapshot {
     /// Counts the map edit documents written or removed in the folder given to
     /// [`Service::keep_map_edits`], so the viewer reads the loaded map's again.
     pub map_edits_revision: u64,
+    /// What the last look at the hub's map edits did: its summary
+    /// ([`crate::map_edits::Refresh::summary`]), or why it fell short, for the log and the
+    /// editor. Map edits are cosmetic: a failure shows here, never in [`Snapshot::status`].
+    pub map_edits_note: Option<Result<String, String>>,
     /// The hub's answer to the last [`Service::publish_map_edits`], by serial: the map,
     /// the checksum and the new revision, or why it was refused.
     pub map_edits_published: Option<(u64, MapEditsPublished)>,
@@ -593,6 +597,7 @@ impl Snapshot {
             packs_revision: 0,
             assets_note: None,
             map_edits_revision: 0,
+            map_edits_note: None,
             map_edits_published: None,
             mystery_boxes: None,
             mystery_boxes_revision: 0,
@@ -703,6 +708,8 @@ enum Command {
     AssetsDir(PathBuf),
     /// The folder map edits are kept in ([`crate::map_edits`]).
     MapEditsDir(PathBuf),
+    /// Look at the hub's map edits now.
+    RefreshMapEdits,
     /// Open mystery box `id` on `server`.
     OpenMysteryBox {
         id: i64,
@@ -1547,6 +1554,7 @@ impl Worker {
                     self.due_map_edits = now;
                 }
             }
+            Command::RefreshMapEdits => self.due_map_edits = now,
             Command::PublishMapEdits {
                 map,
                 checksum,
@@ -2266,7 +2274,7 @@ impl Worker {
         if self.assets_dir.is_some() {
             wait = wait.min(self.due_assets.saturating_duration_since(now));
         }
-        if self.map_edits_dir.is_some() {
+        if self.map_edits_dir.is_some() && self.registered {
             wait = wait.min(self.due_map_edits.saturating_duration_since(now));
         }
         if self.registered {
@@ -2568,10 +2576,15 @@ impl Worker {
         });
     }
 
-    /// Bring the map edits' folder up to the hub's list if a folder was given and it is
-    /// time: next time [`MAP_EDITS_EVERY`] later. Cosmetic: the status stays.
+    /// Bring the map edits' folder up to the hub's list once registered, if a folder was
+    /// given and it is time: next time [`MAP_EDITS_EVERY`] later. Cosmetic: the status
+    /// stays; what it did goes in [`Snapshot::map_edits_note`].
     fn keep_map_edits(&mut self, now: Instant) {
-        let (Some(dir), Some(hub)) = (self.map_edits_dir.as_ref(), self.hub.as_mut()) else {
+        let (Some(dir), Some(hub), true) = (
+            self.map_edits_dir.as_ref(),
+            self.hub.as_mut(),
+            self.registered,
+        ) else {
             return;
         };
         if now < self.due_map_edits {
@@ -2579,9 +2592,14 @@ impl Worker {
         }
         self.due_map_edits = now + MAP_EDITS_EVERY;
         let refresh = crate::map_edits::refresh(hub.as_mut(), &self.identity, dir);
-        if refresh.changed > 0 {
-            self.update(|snapshot| snapshot.map_edits_revision += refresh.changed as u64);
-        }
+        let note = match &refresh.problem {
+            Some(problem) => Err(problem.clone()),
+            None => Ok(refresh.summary()),
+        };
+        self.update(|snapshot| {
+            snapshot.map_edits_revision += refresh.changed as u64;
+            snapshot.map_edits_note = Some(note);
+        });
     }
 
     /// Read the hub's mystery boxes once registered, if it is time: next time
@@ -2667,11 +2685,11 @@ impl Worker {
         self.map_edits_serial += 1;
         let serial = self.map_edits_serial;
         let outcome = match self.hub.as_mut() {
-            None => Err("not connected to the hub".to_owned()),
+            None => Err("Not connected to the SJK hub.".to_owned()),
             Some(hub) => hub
                 .publish_map_edits(&self.identity, map, checksum, edits)
                 .map(|revision| (map.to_owned(), checksum, revision))
-                .map_err(|error| error.to_string()),
+                .map_err(|error| crate::map_edits::refusal(&error)),
         };
         if outcome.is_ok() {
             self.due_map_edits = now;
@@ -3437,6 +3455,12 @@ impl Service {
     /// [`Snapshot::map_edits_revision`] counts the documents changed.
     pub fn keep_map_edits(&self, directory: PathBuf) {
         let _ = self.commands.send(Command::MapEditsDir(directory));
+    }
+
+    /// Look at the hub's map edits now rather than at the next 10 minutes (the editor
+    /// turned on), once registered.
+    pub fn refresh_map_edits(&self) {
+        let _ = self.commands.send(Command::RefreshMapEdits);
     }
 
     /// Open mystery box `id`, which the player stands at on `server`: what came of it

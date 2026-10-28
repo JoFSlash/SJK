@@ -35,6 +35,7 @@ Add each release's notes here when it is tagged (docs/sjk.md "Releases").
 - Mystery boxes have their own chest: wood and iron with glowing question marks, its lid swinging open as it rolls, and words over it everyone sees (its price, the roll, then what came out) _(Sol)_
 - Box hunt toy (Collection > Toys, `toy_boxhunt`): turn it on to take part. Every few minutes one player with it on becomes the mark, shown in red to the others with it on; kill the mark to win a free mystery box roll _(Sol)_
 - Mystery boxes are heard from the box itself: their sounds followed whoever played on the first slot of the server around the map, so they were heard only near that player (#185) _(Sol)_
+- Map editor (SJK team): a Map editor icon in the game menu; the World note key opens its panel and puts a grabbed model down, as its strip said; undo and redo for every change (`mapedit_undo`, `mapedit_redo`, Ctrl+Z, Ctrl+Y); a shader search to remap with; Left, Right, Away and Closer nudges, Shift for fine steps and the wheel turning a grabbed model; Publish says what the hub answered, and the log says when the hub cannot keep map edits _(Sol)_
 
 ## 2026.1027.2 (Alpha) | 27/10/2026
 
