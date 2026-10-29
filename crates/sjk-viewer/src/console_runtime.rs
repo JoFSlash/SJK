@@ -38,6 +38,11 @@ impl GpuState {
         if let Some(on) = console.take_box_hunt_request() {
             self.box_hunt.set_on(on);
         }
+        if let Some(on) = console.take_fishing_request()
+            && on != self.fishing.on()
+        {
+            self.fishing.toggle();
+        }
         // The boombox checks who may carry it, so it is switched once the console is let go.
         let boombox_request = console.take_boombox_request();
         let mut actions = [None; MAX_ACTIONS_PER_FRAME];
@@ -101,6 +106,7 @@ impl GpuState {
             console.set_boombox_on(self.boombox.on());
             console.set_monitor_on(self.monitor.on());
             console.set_box_hunt_on(self.box_hunt.on());
+            console.set_fishing_on(self.fishing.on());
         }
         let connection = self
             .console

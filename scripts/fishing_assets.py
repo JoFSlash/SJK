@@ -257,7 +257,7 @@ def rod(output: Path) -> None:
     mesh.tube(0, 0.0, 2.0, 0.9, 0.9, "grip")
     mesh.tube(0, 2.0, 13.0, 0.85, 0.7, "cork")
     # The reel under the rod, its spool across it.
-    mesh.tube(1, -1.6, 1.6, 1.6, 1.6, "reel", sides=10, centre=(-1.9, 15.0))
+    mesh.tube(1, -1.6, 1.6, 1.6, 1.6, "reel", sides=10, centre=(15.0, -1.9))
     mesh.tube(0, 13.0, 17.0, 0.55, 0.5, "grip")
     mesh.tube(0, 17.0, ROD_LENGTH, 0.45, 0.12, "rod")
     mesh.write(output, "fishing_rod")
@@ -341,12 +341,12 @@ def rock(radius: float, height: float, sides: int, twist: float) -> Mesh:
         loops.append(loop)
     for lower, upper in zip(loops, loops[1:]):
         for i in range(sides):
-            mesh.triangles += [(lower[i], upper[i + 1], upper[i]),
-                               (lower[i], lower[i + 1], upper[i + 1])]
+            mesh.triangles += [(lower[i], upper[i], upper[i + 1]),
+                               (lower[i], upper[i + 1], lower[i + 1])]
     top = mesh.vertex_st((0.0, 0.0, height * 1.05), (0, 0, 1), (0.5, height / 8.0 + 0.1))
     last = loops[-1]
     for i in range(sides):
-        mesh.triangles.append((top, last[i], last[i + 1]))
+        mesh.triangles.append((top, last[i + 1], last[i]))
     return mesh
 
 
@@ -406,7 +406,7 @@ def pond(output: Path) -> None:
     for inner, outer in zip(rings, rings[1:]):
         for i in range(sides):
             j = (i + 1) % sides
-            bank.triangles += [(inner[i], outer[j], inner[j]), (inner[i], outer[i], outer[j])]
+            bank.triangles += [(inner[i], inner[j], outer[j]), (inner[i], outer[j], outer[i])]
 
     stones = Mesh()
     count = 15

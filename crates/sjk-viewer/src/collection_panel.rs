@@ -101,6 +101,8 @@ const BOOMBOX_TOKEN: u16 = 1_307;
 const MONITOR_TOKEN: u16 = 1_303;
 /// Box hunt's niche on Toys.
 const BOX_HUNT_TOKEN: u16 = 1_304;
+/// Fishing's niche on Toys.
+const FISHING_TOKEN: u16 = 1_372;
 /// The Shaders tab's lone saber, where the pointer takes hold of it to turn it.
 const SABER_TOKEN: u16 = 1_316;
 /// The shader card's way to the Forge: Craft in the Forge (one not held) or Break down
@@ -117,8 +119,8 @@ const BOTH_TOKEN: u16 = 1_306;
 /// How far (frame pixels) a press on the lone saber may move and still be a click.
 const CLICK_SLOP: f32 = 6.0;
 /// The toys the Toys tab shows: Illuminate, the cardboard box, Order 66, the Hax, the
-/// Ragdoll, the Drone, the Boombox, the Monitor, then Box hunt.
-const TOY_COUNT: usize = 9;
+/// Ragdoll, the Drone, the Boombox, the Monitor, Box hunt, then Fishing.
+const TOY_COUNT: usize = 10;
 /// Each toy's row, in the order of [`Panel::toy`].
 const TOY_TOKENS: [u16; TOY_COUNT] = [
     TOY_TOKEN,
@@ -130,6 +132,7 @@ const TOY_TOKENS: [u16; TOY_COUNT] = [
     BOOMBOX_TOKEN,
     MONITOR_TOKEN,
     BOX_HUNT_TOKEN,
+    FISHING_TOKEN,
 ];
 /// Each toy row's own switch (25/10/2026): it turns that toy on or off in place.
 const TOY_SWITCH_BASE: u16 = 1_360;
@@ -342,6 +345,9 @@ pub(crate) enum PanelAction {
     /// Turn Box hunt on (`true`) or off: the same as `toy_boxhunt`, set rather than
     /// toggled.
     BoxHunt(bool),
+    /// Get the fishing rod out (`true`) or put it away: the same as `toy_fishing`, set
+    /// rather than toggled.
+    Fishing(bool),
     /// Set `cg_tag` to this tag's id: the one `toy_tag` sticks.
     ChooseTag(&'static str),
     /// Show a tab another page draws: the Holocrons page.
@@ -457,6 +463,8 @@ pub(crate) struct Inputs<'a> {
     pub(crate) monitor: bool,
     /// Box hunt is on now (kept as [`Self::illuminate`] is).
     pub(crate) box_hunt: bool,
+    /// The fishing rod is out now (kept as [`Self::illuminate`] is).
+    pub(crate) fishing: bool,
     /// The `name` cvar, for the nameplate.
     pub(crate) name: &'a str,
     /// The stock blade's colour (`color1`), for its swatch.
@@ -539,6 +547,8 @@ pub(crate) struct Panel {
     monitor_on: bool,
     /// Box hunt was on, as the last frame's inputs said.
     box_hunt_on: bool,
+    /// The fishing rod was out, as the last frame's inputs said.
+    fishing_on: bool,
     /// See and share nameplates was on, as the last frame's inputs said.
     share_on: bool,
     /// The toys (bits by the Toys tab's order) whose other players' are hidden here, as
@@ -697,6 +707,7 @@ impl Panel {
             boombox_on: false,
             monitor_on: false,
             box_hunt_on: false,
+            fishing_on: false,
             share_on: false,
             toys_unseen: 0,
             card: 0,
@@ -919,6 +930,7 @@ impl Panel {
             Tab::Toys if self.toy == 6 => PanelAction::Boombox(!self.boombox_on),
             Tab::Toys if self.toy == 7 => PanelAction::Monitor(!self.monitor_on),
             Tab::Toys if self.toy == 8 => PanelAction::BoxHunt(!self.box_hunt_on),
+            Tab::Toys if self.toy == 9 => PanelAction::Fishing(!self.fishing_on),
             Tab::Toys => PanelAction::Illuminate(!illuminate),
             Tab::Nameplates => PanelAction::SeeAndShare(!self.share_on),
             Tab::Tags => self.choose_tag(),
@@ -1666,7 +1678,7 @@ impl Panel {
             FORGE_LINK_TOKEN => self.open_forge_link(),
             // A toy's row chooses it; its own switch runs it.
             TOY_TOKEN | BOX_TOKEN | ORDER_TOKEN | HAX_TOKEN | RAGDOLL_TOKEN | DRONE_TOKEN
-            | BOOMBOX_TOKEN | MONITOR_TOKEN => {
+            | BOOMBOX_TOKEN | MONITOR_TOKEN | FISHING_TOKEN => {
                 self.toy = TOY_TOKENS.iter().position(|&row| row == token).unwrap_or(0);
                 PanelAction::None
             }
@@ -1884,6 +1896,7 @@ mod tests {
             boombox: false,
             monitor: false,
             box_hunt: false,
+            fishing: false,
             name: "^1Sol^7Vulpes",
             stock: sjk_ui::Color::new(0.16, 0.48, 1.0, 1.0),
             grid: false,

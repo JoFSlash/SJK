@@ -1,6 +1,6 @@
 //! Fishing, SJK's own toy (`toy_fishing`; Sanji's idea from #ideas, 29/10/2026, phase 1
 //! of Slash's design): facing water, the player props a rod beside them, sets a bucket at
-//! their feet and casts. Every 30 to 90 seconds the float bobs under (a bite) and `+use`
+//! their feet and casts. Every 20 to 60 seconds the float bobs under (a bite) and `+use`
 //! within about a second hooks the catch: nothing, junk or a fish, counted in the
 //! player's fish log (`fishing_log.txt`). Moving, jumping, attacking, taking damage or
 //! dying puts the rod away.
@@ -136,7 +136,7 @@ const REEL_BEND: f32 = 0.18;
 /// before the chest (`TORSO_WEAPONREADY3`, the rifles').
 const HOLD_POSE: &str = "TORSO_WEAPONREADY3";
 /// The wait for a bite, in seconds.
-const BITE_WAIT: (f32, f32) = (30.0, 90.0);
+const BITE_WAIT: (f32, f32) = (20.0, 60.0);
 /// A fish's bite holds this long (seconds): the time to press `+use`.
 const BITE_WINDOW: (f32, f32) = (0.8, 1.2);
 /// An Echo's bite holds longer, and comes this soon after the Echo dropped.
@@ -209,7 +209,7 @@ pub(crate) const CATCHES: [Catch; 18] = [
 ];
 
 /// The chance a hooked bite brings nothing, junk or a fish, in percent.
-const NOTHING_CHANCE: u32 = 40;
+const NOTHING_CHANCE: u32 = 15;
 const JUNK_CHANCE: u32 = 30;
 
 /// Roll a hooked bite's catch from `roll`, a uniform number below `u32::MAX`.
@@ -842,6 +842,27 @@ pub(crate) fn rod_in_hand(
     ))
 }
 
+/// Where the own rod is held in first person, in the camera's frame (ahead, left, up)
+/// from the eye: low on the right, as a weapon is.
+const VIEW_GRIP: Vec3 = Vec3::new(10.0, -8.0, -12.0);
+/// How far the own rod in first person points up from the view, and in towards its middle.
+const VIEW_PITCH: f32 = 0.5;
+const VIEW_IN: f32 = 0.18;
+
+/// The own rod in first person, where the body's hand is not drawn: held from the eye at
+/// `camera` looking `yaw` and `pitch` (radians, up positive), bent by `bend`. The
+/// instance and its tip.
+pub(crate) fn rod_in_view(camera: Vec3, yaw: f32, pitch: f32, bend: f32) -> (ActorInstance, Vec3) {
+    let view = Quat::from_rotation_z(yaw) * Quat::from_rotation_y(-pitch);
+    let tilt = view * Quat::from_rotation_z(VIEW_IN) * Quat::from_rotation_y(-(VIEW_PITCH - bend));
+    let butt = camera + view * VIEW_GRIP - tilt * Vec3::X * GRIP;
+    let tip = butt + tilt * Vec3::X * ROD_LENGTH;
+    (
+        ActorInstance::new(butt.to_array(), tilt.to_array(), [1.0; 3]),
+        tip,
+    )
+}
+
 /// The rod beside a player standing at `origin` facing `yaw`: the instance and its tip
 /// (the world shots, and where the tip is guessed before an actor said).
 fn rod(origin: [f32; 3], yaw: f32) -> (ActorInstance, Vec3) {
@@ -1319,7 +1340,7 @@ mod tests {
             unreachable!()
         };
         let wait = bite - now;
-        assert!(wait >= Duration::from_secs(29) && wait <= Duration::from_secs(91));
+        assert!(wait >= Duration::from_secs(19) && wait <= Duration::from_secs(61));
         fishing.update(frame(false), bite, || None);
         assert!(matches!(
             fishing.phase,
@@ -1432,10 +1453,10 @@ mod tests {
                 Some(_) => fish += 1,
             }
         }
-        assert_eq!((nothing, junk, fish), (40, 30, 30));
+        assert_eq!((nothing, junk, fish), (15, 30, 55));
         // Every catch can come up, and ids are distinct.
         for catch in &CATCHES {
-            let kind_roll = if catch.kind == Kind::Junk { 50 } else { 90 };
+            let kind_roll = if catch.kind == Kind::Junk { 30 } else { 90 };
             assert!(
                 (0..1000).any(|pick| roll_catch(kind_roll, pick) == Some(catch)),
                 "{}",

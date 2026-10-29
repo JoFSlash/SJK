@@ -172,6 +172,10 @@ impl ViewerConsole {
                 self.pending_boombox = Some(on);
                 self.boombox_on = on;
             }
+            PanelAction::Fishing(on) => {
+                self.pending_fishing = Some(on);
+                self.fishing_on = on;
+            }
             PanelAction::Monitor(on) => {
                 self.pending_monitor = Some(on);
                 self.monitor_on = on;
@@ -272,6 +276,16 @@ impl ViewerConsole {
         self.pending_boombox.take()
     }
 
+    /// The viewer says whether the fishing rod is out, once a frame.
+    pub(crate) fn set_fishing_on(&mut self, on: bool) {
+        self.fishing_on = on;
+    }
+
+    /// The Toys tab asked to get the rod out (`true`) or put it away, once.
+    pub(crate) fn take_fishing_request(&mut self) -> Option<bool> {
+        self.pending_fishing.take()
+    }
+
     /// The viewer says whether the Monitor toy is on, once a frame.
     pub(crate) fn set_monitor_on(&mut self, on: bool) {
         self.monitor_on = on;
@@ -369,6 +383,7 @@ impl ViewerConsole {
         let boombox = self.boombox_on;
         let monitor = self.monitor_on;
         let box_hunt = self.box_hunt_on;
+        let fishing = self.fishing_on;
         let stock = self.stock_blade();
         // Tiles unless the list is chosen (`ui_shaderList 1`).
         let grid = self.integer_cvar(super::collection_panel::SHADER_VIEW_CVAR) != Some(1);
@@ -429,6 +444,7 @@ impl ViewerConsole {
                 boombox,
                 monitor,
                 box_hunt,
+                fishing,
                 name: &name,
                 stock,
                 grid,
@@ -460,6 +476,7 @@ impl ViewerConsole {
             boombox,
             monitor,
             box_hunt,
+            fishing,
             name: &name,
             stock,
             grid,

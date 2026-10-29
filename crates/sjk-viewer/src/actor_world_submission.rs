@@ -855,7 +855,8 @@ fn submit_actor(
         }
     }
     // A fisher's rod in their right hand and the line from its tip, as the boombox: the
-    // rod only in mirrors in first person, the line always.
+    // rod in the hand only in mirrors in first person, where the own rod is held in view
+    // instead (and the line runs from that one's tip).
     if entity.kind == EntityKind::Actor
         && let (Some(mesh), (Some(rod), Some(line_mesh), lines)) = (mesh, sinks.fishing)
         && number < 64
@@ -874,6 +875,18 @@ fn submit_actor(
         }) {
             instance.view_flags = sinks.entity_view_flags | u32::from(!draw_actor);
             sinks.object_groups[rod].push(instance);
+            let mut tip = tip;
+            if !draw_actor && Some(entity.id.get()) == local_entity_id {
+                let (mut held, held_tip) = crate::fishing::rod_in_view(
+                    sinks.camera_position,
+                    sinks.camera_yaw,
+                    sinks.camera_pitch,
+                    lines.bend[usize::from(number)],
+                );
+                held.view_flags = sinks.entity_view_flags;
+                sinks.object_groups[rod].push(held);
+                tip = held_tip;
+            }
             if let Some(mut line) = crate::fishing::line(tip, Vec3::from_array(end)) {
                 line.view_flags = sinks.entity_view_flags;
                 sinks.object_groups[line_mesh].push(line);

@@ -2,12 +2,12 @@
 //! holocron (`docs/client.md`, Illuminate), the cardboard box (`docs/client.md`,
 //! Cardboard box), Order 66 (`docs/client.md`, Order 66), the Hax (`docs/client.md`,
 //! Hax), the Ragdoll (`docs/client.md`, Ragdoll), the Drone (`docs/client.md`, Drone),
-//! the Boombox (`docs/client.md`, Boombox), the Monitor (`docs/client.md`, Monitor) and
-//! Box hunt (`docs/client.md`, Box hunt), a row to each on the left (Sol's pick of
+//! the Boombox (`docs/client.md`, Boombox), the Monitor (`docs/client.md`, Monitor),
+//! Box hunt (`docs/client.md`, Box hunt) and Fishing (`docs/client.md`, Fishing), a row to each on the left (Sol's pick of
 //! 25/10/2026, the Collection revamp's canvas): its picture, its name and a line of what
 //! it does, the key bound to it and its own switch, which runs it in place
 //! (`toy_illuminate`, `toy_box`, `toy_order66`, `toy_hax`, `toy_ragdoll`, `toy_drone`,
-//! `toy_boombox`, `toy_monitor`, `toy_boxhunt`). The chosen one is described on a dark card beside the
+//! `toy_boombox`, `toy_monitor`, `toy_boxhunt`, `toy_fishing`). The chosen one is described on a dark card beside the
 //! model, where its key is bound without the console (a click or K, then the key). The
 //! holocron floats lit by the model while it is chosen.
 
@@ -18,12 +18,12 @@ use crate::menu_widgets::TextFamily;
 use sjk_ui::{Color, DrawCommand, FontWeight, TextAlign, TextureId};
 
 /// The rows: their left edge and width, where the column heads and the first row stand,
-/// a row's height and the room between rows. Nine fit over the keys.
+/// a row's height and the room between rows. Ten fit over the keys.
 const ROWS_X: f32 = LEFT_X - 12.0;
 const ROWS_WIDTH: f32 = 860.0;
 const HEADS_Y: f32 = 300.0;
 const ROWS_Y: f32 = 336.0;
-const ROW_HEIGHT: f32 = 68.0;
+const ROW_HEIGHT: f32 = 62.0;
 const ROW_GAP: f32 = 4.0;
 /// A row's key column: its width, and the room the switch keeps at the row's right.
 const KEY_WIDTH: f32 = 150.0;
@@ -45,7 +45,7 @@ const SIGHT_ROW: f32 = 48.0;
 /// Every command a toy is run by, in the order the page is told their keys
 /// ([`Inputs::toy_keys`]): each toy's switch, Order 66's order after its own, and the
 /// Monitor's throw (held, it charges) after its own.
-pub(crate) const COMMANDS: [&str; 11] = [
+pub(crate) const COMMANDS: [&str; 12] = [
     "toy_illuminate",
     "toy_box",
     "toy_order66",
@@ -57,6 +57,7 @@ pub(crate) const COMMANDS: [&str; 11] = [
     "toy_monitor",
     "+monitor_throw",
     "toy_boxhunt",
+    crate::fishing::COMMAND,
 ];
 
 /// One toy as the tab shows it.
@@ -195,6 +196,20 @@ const TOYS: [Toy; TOY_COUNT] = [
         sight: None,
         token: BOX_HUNT_TOKEN,
     },
+    Toy {
+        icon: "fishing",
+        name: "Fishing",
+        tag: "Cast a line, wait for the bite, reel it in.",
+        title: "Fishing",
+        what: "Stand still and cast: into the water ahead, or a pond where there is none. When the float dips, press Use in time to land a fish or some junk for your fish log. An Echo the hub drops you while you fish comes as a bite of its own. Other SJK players see your rod.",
+        more: Some(
+            "Moving or getting hurt puts the rod away. Your catches are in fishing_log.txt.",
+        ),
+        commands: &[(crate::fishing::COMMAND, "Your key")],
+        switch: "Rod out",
+        sight: None,
+        token: FISHING_TOKEN,
+    },
 ];
 
 /// The command toy `toy`'s key `slot` runs (0 its switch's, 1 Order 66's order).
@@ -279,6 +294,7 @@ fn states(inputs: &Inputs<'_>) -> [bool; TOY_COUNT] {
         inputs.boombox,
         inputs.monitor,
         inputs.box_hunt,
+        inputs.fishing,
     ]
 }
 
@@ -291,7 +307,7 @@ impl Panel {
             0 => "Switch them here or in a match; other SJK players on your server see what you turn on.".to_owned(),
             lit => format!("{lit} on now. Switch them here or in a match; other SJK players on your server see what you turn on."),
         };
-        self.lead(frame, "9 toys", &line);
+        self.lead(frame, "10 toys", &line);
         self.toy_heads(frame);
         let chosen = self.toy.min(TOY_COUNT - 1);
         for (index, toy) in TOYS.iter().enumerate() {
