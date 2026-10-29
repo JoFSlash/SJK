@@ -62,7 +62,7 @@ fn blade_skin(id: &str) -> Option<&'static str> {
 /// The toys a look can have out that this client draws, by id (`PROTOCOL.md`, "Looks"):
 /// a toy's bit in [`Worn::toys`] is its place here. A look naming another id (a newer
 /// client's toy) draws nothing more.
-pub(crate) const TOYS: [&str; 8] = [
+pub(crate) const TOYS: [&str; 9] = [
     crate::cardboard_box::TOY,
     crate::order66::TOY,
     crate::hax::TOY,
@@ -73,12 +73,13 @@ pub(crate) const TOYS: [&str; 8] = [
     crate::monitor::TOY,
     // Box hunt's switch: the hub picks the mark among the players whose look has it.
     crate::box_hunt::TOY,
+    crate::fishing::TOY,
 ];
-// A bit each in a `u8`: this is as many as there is room for.
-const _: () = assert!(TOYS.len() <= u8::BITS as usize);
+// A bit each in a `u16`.
+const _: () = assert!(TOYS.len() <= u16::BITS as usize);
 
 /// The bit of toy `id` in [`Worn::toys`], if this client knows it.
-fn toy_bit(id: &str) -> Option<u8> {
+fn toy_bit(id: &str) -> Option<u16> {
     TOYS.iter()
         .position(|toy| *toy == id)
         .map(|place| 1 << place)
@@ -94,7 +95,7 @@ pub(crate) struct Worn {
     /// The blade skin's options its wearer switched off (`crate::saber_skin_options`).
     pub(crate) options_off: crate::saber_skin_options::OptionsOff,
     /// The toys out, a bit per [`TOYS`] entry.
-    pub(crate) toys: u8,
+    pub(crate) toys: u16,
     /// What the second saber wears (since 21/10/2026: `saber2`).
     pub(crate) second: SecondSkin,
     /// The second saber's skin's options its wearer switched off.

@@ -268,6 +268,12 @@ impl HolocronPopup {
         !self.queue.is_empty()
     }
 
+    /// A holocron waits whose card has not been given yet (the Fishing toy hooks it
+    /// first, [`crate::fishing`]).
+    pub(crate) fn unannounced(&self) -> bool {
+        self.queue.iter().any(|waiting| !waiting.announced)
+    }
+
     /// Show the first holocron waiting; its ceremony begins once [`Self::update`] says
     /// the pop-up is seen.
     pub(crate) fn open_next(&mut self, now: Instant) {
@@ -516,7 +522,12 @@ impl crate::GpuState {
                 self.holocron_popup.open_next(now);
                 self.unlock_toast
                     .withdraw(now, |unlock| matches!(unlock, Unlock::Holocron { .. }));
-            } else if notifications && !menu && self.live_session.is_some() {
+            } else if notifications
+                && !menu
+                && self.live_session.is_some()
+                && !self.fishing.holds_echo()
+            {
+                // While fishing, an Echo's card waits for its bite (`fishing`).
                 let toast = &mut self.unlock_toast;
                 self.holocron_popup.announce(|unlock| toast.push(unlock));
             }

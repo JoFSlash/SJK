@@ -468,6 +468,10 @@ const HELP: &[(&str, &str)] = &[
         "Off: mystery boxes open silently on this PC, yours and other players'.",
     ),
     (
+        crate::toy_sounds::Toy::Fishing.cvar(),
+        "Off: your casts, bites and catches are silent. The toy still works.",
+    ),
+    (
         crate::away_emote::SJK_CVAR,
         "A looping emote you play while away (alt-tabbed out or idle), silent. Any emote you play then goes quiet too, for everyone.",
     ),
