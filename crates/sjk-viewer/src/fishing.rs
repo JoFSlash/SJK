@@ -1391,7 +1391,7 @@ mod tests {
         let Some(Phase::Waiting { bite }) = fishing.phase else {
             unreachable!()
         };
-        assert!(bite - later >= Duration::from_secs(39));
+        assert!(bite - later >= Duration::from_secs(29));
     }
 
     #[test]

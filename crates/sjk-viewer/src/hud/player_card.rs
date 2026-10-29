@@ -2200,7 +2200,10 @@ mod tests {
         assert_eq!(card.texts[T_STAFF], "SJK TEAM");
         assert_eq!(card.texts[T_HOLOCRON], "Legendary Holocron");
         // Out of the obtainable ones: they do not hold the retired Surveyor.
-        assert_eq!(card.texts[T_ACHIEVEMENTS], "Achievements  4 / 39");
+        assert_eq!(
+            card.texts[T_ACHIEVEMENTS],
+            format!("Achievements  4 / {}", crate::achievements::OBTAINABLE)
+        );
         assert_eq!(card.texts[T_BIO], "Fox of the JoF, maker of SJK.");
         assert!(card.texts[T_SINCE].starts_with("In SJK since "));
         assert_eq!(card.texts[T_GOAL], "1K");
