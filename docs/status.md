@@ -788,7 +788,9 @@ throws at Saber Throw 1), the hub accepting the new ids.
 person held in view), a bucket at the feet and a float on the water ahead, or on a small
 pond drawn where there is none, in the installed game's swamp textures
 ([client.md](client.md#fishing)). A bite every 20 to 60 seconds, `+use` within about a
-second: nothing 15%, junk 30%, one of 12 fish 55%, counted in `fishing_log.txt`. An Echo
+second: nothing 15%, junk 30%, one of 12 fish 55% (each its own model and painted skin),
+counted in `fishing_log.txt`; the bucket holds the last fish caught (`last <id>` in the
+log). An Echo
 the hub drops while fishing waits for a golden bite of its own and comes up on the line;
 fishing brings no Echo the hub did not drop. Collection > Toys has its tenth row (rows a
 little lower), the quick wheel's Toys page its icon. Five achievements in Toys,

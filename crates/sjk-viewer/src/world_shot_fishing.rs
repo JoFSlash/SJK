@@ -1,7 +1,8 @@
 //! World shots of the Fishing toy ([`crate::fishing`]): two rods on the floor ahead of a
 //! map's first spawn point, without a session (the shots place them): one fishing a
-//! pond (or water, where the map has it ahead), one with a fish on the line. Ignored
-//! like the other world shots.
+//! pond (or water, where the map has it ahead), one with a fish on the line: a sun carp
+//! in the first bucket, Old Whiskers on the second line. Ignored like the other world
+//! shots.
 //!
 //! `SJK_FISHING_MAPS` names the maps (`duel6,ffa3`; default duel6). Each map gives one
 //! sheet of four views: from behind, from the side, close up, and from above.
@@ -51,8 +52,8 @@ fn shoot_map(map: &str) {
     let second = standing(&mut gpu, eye + turn * Vec3::new(120.0, 110.0, 0.0));
     gpu.third_person_choice = true;
     gpu.fishing.shot_rods = vec![
-        (first.to_array(), yaw, false),
-        (second.to_array(), yaw + 0.3, true),
+        (first.to_array(), yaw, false, 6),
+        (second.to_array(), yaw + 0.3, true, 11),
     ];
     let mut images = Vec::new();
     for (index, (from, at)) in VIEWS.iter().enumerate() {

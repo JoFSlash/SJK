@@ -38,12 +38,12 @@ pub(crate) const ROD: &str = "models/sjk/fishing_rod.md3";
 pub(crate) const BUCKET: &str = "models/sjk/fishing_bucket.md3";
 pub(crate) const FLOAT: &str = "models/sjk/fishing_float.md3";
 pub(crate) const LINE: &str = "models/sjk/fishing_line.md3";
-pub(crate) const FISH: &str = "models/sjk/fishing_fish.md3";
 /// The pond a cast makes where there is no water.
 pub(crate) const POND: &str = "models/sjk/fishing_pond.md3";
 pub(crate) const ICON: &str = "gfx/sjk/toy_fishing.png";
-/// The models, in the order [`GpuState::submit_fishing`] finds their meshes.
-pub(crate) const MODELS: [&str; 6] = [ROD, BUCKET, FLOAT, LINE, FISH, POND];
+/// The models, in the order [`GpuState::submit_fishing`] finds their meshes (each fish's
+/// own in [`FISH_MODELS`]).
+pub(crate) const MODELS: [&str; 5] = [ROD, BUCKET, FLOAT, LINE, POND];
 /// The swing of the cast.
 const CAST: &str = "sound/weapons/melee/swing1.mp3";
 /// The float landing on the water.
@@ -65,22 +65,69 @@ macro_rules! bundled {
     };
 }
 
-/// The bundled files at their game paths.
+/// One fish's own model (`fishing_assets.py`'s `FISH`): its catch id, its game path and
+/// bundled bytes, and its length from the mouth (its origin, where the line holds it)
+/// back along -X to the tip of its tail.
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct FishModel {
+    pub(crate) id: &'static str,
+    pub(crate) model: &'static str,
+    bytes: &'static [u8],
+    length: f32,
+}
+
+macro_rules! fish_models {
+    ($(($id:literal, $length:literal)),* $(,)?) => {
+        [$(FishModel {
+            id: $id,
+            model: concat!("models/sjk/fishing_fish_", $id, ".md3"),
+            bytes: include_bytes!(concat!("../assets/fishing/fishing_fish_", $id, ".md3")),
+            length: $length,
+        }),*]
+    };
+}
+
+/// Each fish of [`CATCHES`] its own model, in the same order.
+pub(crate) const FISH_MODELS: [FishModel; 12] = fish_models![
+    ("silver_darter", 9.0),
+    ("mud_snapper", 11.0),
+    ("swamp_gulper", 12.0),
+    ("striped_bonefish", 13.0),
+    ("glow_perch", 10.0),
+    ("spiny_pike", 20.0),
+    ("sun_carp", 14.0),
+    ("moon_eel", 26.0),
+    ("kyber_minnow", 6.0),
+    ("ghost_ray", 17.0),
+    ("temple_koi", 15.0),
+    ("old_whiskers", 24.0),
+];
+
+/// The model of the fish `id`, and its place in [`FISH_MODELS`].
+fn fish_model(id: &str) -> Option<(usize, &'static FishModel)> {
+    FISH_MODELS
+        .iter()
+        .enumerate()
+        .find(|(_, fish)| fish.id == id)
+}
+
+/// The bundled files at their game paths (and the fish, [`FISH_MODELS`]).
 const FILES: [(&str, &[u8]); 9] = [
     (ROD, bundled!("fishing_rod.md3")),
     (BUCKET, bundled!("fishing_bucket.md3")),
     (FLOAT, bundled!("fishing_float.md3")),
     (LINE, bundled!("fishing_line.md3")),
-    (FISH, bundled!("fishing_fish.md3")),
     (POND, bundled!("fishing_pond.md3")),
     ("models/sjk/fishing.png", bundled!("fishing.png")),
+    ("models/sjk/fishing_fish.png", bundled!("fishing_fish.png")),
     ("shaders/sjk_fishing.shader", bundled!("fishing.shader")),
     (ICON, bundled!("toy_fishing.png")),
 ];
 
 /// Mount the bundled files.
 pub(crate) fn mount(vfs: &mut VirtualFileSystem) -> Result<(), VfsError> {
-    vfs.mount_memory("SJK fishing", FILES.iter().copied())?;
+    let fish = FISH_MODELS.iter().map(|fish| (fish.model, fish.bytes));
+    vfs.mount_memory("SJK fishing", FILES.iter().copied().chain(fish))?;
     Ok(())
 }
 
@@ -346,20 +393,31 @@ pub(crate) enum Say {
     Command(&'static str),
 }
 
-/// The fish log: how many of each catch the player brought up.
+/// The fish log: how many of each catch the player brought up, and the last fish (in the
+/// bucket while the rod is out).
 #[derive(Clone, Debug, Default, PartialEq)]
 pub(crate) struct Log {
     counts: Vec<(String, u32)>,
+    last: Option<&'static Catch>,
 }
 
+/// The fish log's line naming the last fish caught: `last <id>`.
+const LAST: &str = "last";
+
 impl Log {
-    /// Read `text` (`<id> <count>` a line; anything else is skipped).
+    /// Read `text` (`<id> <count>` a line, and `last <id>`; anything else is skipped).
     pub(crate) fn parse(text: &str) -> Self {
         let mut log = Self::default();
         for line in text.lines() {
             let mut words = line.split_whitespace();
-            if let (Some(id), Some(count), None) = (words.next(), words.next(), words.next())
-                && let Ok(count) = count.parse::<u32>()
+            let (Some(id), Some(value), None) = (words.next(), words.next(), words.next()) else {
+                continue;
+            };
+            if id == LAST {
+                log.last = CATCHES
+                    .iter()
+                    .find(|c| c.kind == Kind::Fish && c.id == value);
+            } else if let Ok(count) = value.parse::<u32>()
                 && !id.is_empty()
             {
                 log.counts.retain(|(known, _)| known != id);
@@ -370,10 +428,28 @@ impl Log {
     }
 
     pub(crate) fn text(&self) -> String {
-        self.counts
+        let mut text: String = self
+            .counts
             .iter()
             .map(|(id, count)| format!("{id} {count}\n"))
-            .collect()
+            .collect();
+        if let Some(last) = self.last {
+            text.push_str(&format!("{LAST} {}\n", last.id));
+        }
+        text
+    }
+
+    /// The last fish caught.
+    pub(crate) fn last(&self) -> Option<&'static Catch> {
+        self.last
+    }
+
+    /// Count `catch` (the last fish, if it is one); returns how many the log now holds.
+    pub(crate) fn caught(&mut self, catch: &'static Catch) -> u32 {
+        if catch.kind == Kind::Fish {
+            self.last = Some(catch);
+        }
+        self.add(catch.id)
     }
 
     pub(crate) fn count(&self, id: &str) -> u32 {
@@ -429,9 +505,10 @@ pub(crate) struct Fishing {
     /// The player moved, jumped or attacked since the last frame.
     stirred: bool,
     health: Option<i32>,
-    /// What was caught since the rod came out, for the bucket.
-    bucket: u32,
+    /// The fish log; `log_read`, it was read from the profile's folder (what was caught
+    /// before that is counted in when it is).
     log: Option<Log>,
+    log_read: bool,
     dice: Dice,
     said: Vec<Say>,
     /// Other players' floats, by slot.
@@ -444,9 +521,10 @@ pub(crate) struct Fishing {
     pub(crate) tips: [Option<[f32; 3]>; SLOTS],
     sounds_registered: Option<u64>,
     /// Rods to draw without a session, for the world shots: where the player stands,
-    /// their yaw, and whether a fish hangs from the tip.
+    /// their yaw, whether a fish hangs from the tip, and which fish ([`FISH_MODELS`]) is
+    /// in the bucket and on the line.
     #[cfg(test)]
-    pub(crate) shot_rods: Vec<([f32; 3], f32, bool)>,
+    pub(crate) shot_rods: Vec<([f32; 3], f32, bool, usize)>,
 }
 
 impl Default for Fishing {
@@ -464,8 +542,8 @@ impl Default for Fishing {
             use_held: false,
             stirred: false,
             health: None,
-            bucket: 0,
             log: None,
+            log_read: false,
             dice: Dice::seeded(),
             said: Vec::with_capacity(4),
             spots: [None; SLOTS],
@@ -609,7 +687,6 @@ impl Fishing {
         self.on = false;
         self.asked = false;
         self.phase = None;
-        self.bucket = 0;
         if matches!(self.echo, Echo::Hooked { .. }) {
             self.echo = Echo::Free;
         }
@@ -726,10 +803,7 @@ impl Fishing {
                         let catch = roll_catch(roll, pick);
                         match catch {
                             Some(catch) => {
-                                let count = self.log.get_or_insert_with(Log::default).add(catch.id);
-                                if catch.kind == Kind::Fish {
-                                    self.bucket += 1;
-                                }
+                                let count = self.log.get_or_insert_with(Log::default).caught(catch);
                                 self.said.push(Say::Caught(catch, count));
                             }
                             None => self.said.push(Say::Centre("The hook came up empty.")),
@@ -771,12 +845,27 @@ impl Fishing {
         }
     }
 
-    /// Load the fish log from `directory` the first time it is needed.
-    fn load_log(&mut self, directory: &Path) {
-        if self.log.is_none() {
-            let text = std::fs::read_to_string(directory.join(LOG_FILE)).unwrap_or_default();
-            self.log = Some(Log::parse(&text));
+    /// Read the fish log from `directory` once, counting in what was caught before.
+    fn read_log(&mut self, directory: &Path) {
+        if std::mem::replace(&mut self.log_read, true) {
+            return;
         }
+        let text = std::fs::read_to_string(directory.join(LOG_FILE)).unwrap_or_default();
+        let mut log = Log::parse(&text);
+        if let Some(pending) = self.log.take() {
+            for (id, count) in pending.counts {
+                for _ in 0..count {
+                    log.add(&id);
+                }
+            }
+            log.last = pending.last.or(log.last);
+        }
+        self.log = Some(log);
+    }
+
+    /// The last fish caught, for the bucket.
+    fn last_fish(&self) -> Option<&'static Catch> {
+        self.log.as_ref().and_then(Log::last)
     }
 
     fn save_log(&self, directory: &Path) {
@@ -938,21 +1027,46 @@ fn hanging_holocron(at: Vec3, turn: f32) -> ActorInstance {
     )
 }
 
-/// A fish hanging head down at `at`, swinging.
+/// A fish hanging by its mouth at `at` (the line's end), its tail down, swinging.
 fn hanging_fish(at: Vec3, swing: f32) -> ActorInstance {
     let rotation =
-        Quat::from_rotation_x(swing) * Quat::from_rotation_y(std::f32::consts::FRAC_PI_2);
+        Quat::from_rotation_x(swing) * Quat::from_rotation_y(-std::f32::consts::FRAC_PI_2);
     ActorInstance::new(at.to_array(), rotation.to_array(), [1.0; 3])
 }
 
-/// A fish lying in the bucket at `at` (its bottom), facing `yaw`.
-fn bucket_fish(at: Vec3, yaw: f32) -> ActorInstance {
-    let rotation =
-        Quat::from_rotation_z(yaw + 0.6) * Quat::from_rotation_x(std::f32::consts::FRAC_PI_2);
-    ActorInstance::new(
-        (at + Vec3::Z * 9.0).to_array(),
-        rotation.to_array(),
-        [0.8; 3],
+/// The bucket's water above its bottom, and its rim (`fishing_assets.py`'s bucket).
+const BUCKET_WATER: f32 = 8.0;
+const BUCKET_RIM: f32 = 11.0;
+/// A fish this long or shorter floats on its side on the bucket's water; a longer one
+/// stands in it head down, its tail out over the rim this far, leaning this much
+/// (radians), shrunk to at most this long.
+const BUCKET_FLOATS: f32 = 11.0;
+const BUCKET_TAIL_OUT: f32 = 5.0;
+const BUCKET_LEAN: f32 = 0.35;
+const BUCKET_LONGEST: f32 = 18.0;
+
+/// The last fish caught, `fish`, in the bucket at `at` (its bottom) facing `yaw`.
+fn bucket_fish(at: Vec3, yaw: f32, fish: &FishModel) -> ActorInstance {
+    let (mouth, rotation, scale) = in_bucket(at, yaw, fish);
+    ActorInstance::new(mouth.to_array(), rotation.to_array(), [scale; 3])
+}
+
+/// Where `fish` goes in the bucket at `at`: its mouth, its turn and its scale.
+fn in_bucket(at: Vec3, yaw: f32, fish: &FishModel) -> (Vec3, Quat, f32) {
+    let turn = Quat::from_rotation_z(yaw + 0.6);
+    if fish.length <= BUCKET_FLOATS {
+        let rotation = turn * Quat::from_rotation_x(std::f32::consts::FRAC_PI_2);
+        let mouth = at + turn * Vec3::X * (fish.length / 2.0) + Vec3::Z * (BUCKET_WATER + 0.3);
+        return (mouth, rotation, 1.0);
+    }
+    let scale = (BUCKET_LONGEST / fish.length).min(1.0);
+    let rotation = turn * Quat::from_rotation_y(std::f32::consts::FRAC_PI_2 - BUCKET_LEAN);
+    let height = fish.length * scale * BUCKET_LEAN.cos();
+    let mouth_z = (BUCKET_RIM + BUCKET_TAIL_OUT - height).clamp(1.0, BUCKET_WATER - 2.0);
+    (
+        at + turn * Vec3::X * 2.5 + Vec3::Z * mouth_z,
+        rotation,
+        scale,
     )
 }
 
@@ -974,28 +1088,37 @@ impl GpuState {
     }
 
     fn fishing_frame(&mut self, presentation_time: i64, now: Instant) {
-        let meshes = MODELS.map(|model| {
+        let mesh_of = |model: &str| {
             self.object_meshes
                 .iter()
                 .position(|mesh| mesh.appearance.model == model)
-        });
+        };
+        let meshes = MODELS.map(mesh_of);
+        let fish_meshes = FISH_MODELS.map(|fish| mesh_of(fish.model));
+        // The mesh and model of the fish `id`.
+        let fish_of = |id: &str| {
+            fish_model(id).and_then(|(index, fish)| fish_meshes[index].map(|mesh| (mesh, fish)))
+        };
         #[cfg(test)]
         if let [
             Some(rod_mesh),
             Some(bucket_mesh),
             Some(float_mesh),
             Some(line_mesh),
-            Some(fish_mesh),
             Some(pond_mesh),
         ] = meshes
         {
-            for &(stood, yaw, hanging) in &self.fishing.shot_rods {
+            for &(stood, yaw, hanging, fish) in &self.fishing.shot_rods {
                 let bsp = &self.bsp;
                 let (rod_instance, tip) = rod(stood, yaw);
                 let (bucket_instance, bucket_at) = bucket(stood, yaw);
                 self.object_groups[rod_mesh].push(rod_instance);
                 self.object_groups[bucket_mesh].push(bucket_instance);
-                self.object_groups[fish_mesh].push(bucket_fish(bucket_at, yaw));
+                let fish = FISH_MODELS[fish % FISH_MODELS.len()];
+                let Some((fish_mesh, fish)) = fish_of(fish.id) else {
+                    continue;
+                };
+                self.object_groups[fish_mesh].push(bucket_fish(bucket_at, yaw, fish));
                 let Some((water, in_pond)) = spot_ahead(stood, yaw, |point| {
                     bsp.point_contents(point, CONTENTS_SOLID | CONTENTS_WATER)
                 }) else {
@@ -1007,7 +1130,7 @@ impl GpuState {
                 }
                 let at = if hanging {
                     let hang = tip - Vec3::Z * 14.0;
-                    self.object_groups[fish_mesh].push(hanging_fish(hang - Vec3::Z * 4.0, 0.3));
+                    self.object_groups[fish_mesh].push(hanging_fish(hang, 0.3));
                     hang
                 } else {
                     water
@@ -1063,18 +1186,19 @@ impl GpuState {
                 .as_ref()
                 .map(|c| c.config_directory().to_owned())
             {
-                // The log was counted before it was read: read it, then count again.
-                let pending = self.fishing.log.take();
-                self.fishing.load_log(&directory);
-                if let (Some(pending), Some(log)) = (pending, self.fishing.log.as_mut()) {
-                    for (id, count) in pending.counts {
-                        for _ in 0..count {
-                            log.add(&id);
-                        }
-                    }
-                }
+                self.fishing.read_log(&directory);
                 self.fishing.save_log(&directory);
             }
+        }
+        // The rod out: the log is read for the last fish, in the bucket.
+        if self.fishing.on
+            && !self.fishing.log_read
+            && let Some(directory) = self
+                .console
+                .as_ref()
+                .map(|c| c.config_directory().to_owned())
+        {
+            self.fishing.read_log(&directory);
         }
         // What the actors drew the last frame, and what they draw this one.
         let tips = std::mem::replace(&mut self.fishing.tips, [None; SLOTS]);
@@ -1085,7 +1209,6 @@ impl GpuState {
             Some(bucket_mesh),
             Some(float_mesh),
             Some(line_mesh),
-            Some(fish_mesh),
             Some(pond_mesh),
         ] = meshes
         else {
@@ -1111,8 +1234,8 @@ impl GpuState {
                 .unwrap_or_else(|| rod(fishing.stood, fishing.yaw).1);
             let (bucket_instance, bucket_at) = bucket(fishing.stood, fishing.yaw);
             self.object_groups[bucket_mesh].push(bucket_instance);
-            if fishing.bucket > 0 {
-                self.object_groups[fish_mesh].push(bucket_fish(bucket_at, fishing.yaw));
+            if let Some((mesh, fish)) = fishing.last_fish().and_then(|last| fish_of(last.id)) {
+                self.object_groups[mesh].push(bucket_fish(bucket_at, fishing.yaw, fish));
             }
             let water = Vec3::from_array(fishing.water);
             if fishing.pond {
@@ -1142,8 +1265,9 @@ impl GpuState {
                             }
                         }
                         (Some(catch), None) if catch.kind == Kind::Fish => {
-                            self.object_groups[fish_mesh]
-                                .push(hanging_fish(at - Vec3::Z * 4.0, swing));
+                            if let Some((mesh, _)) = fish_of(catch.id) {
+                                self.object_groups[mesh].push(hanging_fish(at, swing));
+                            }
                         }
                         _ => self.object_groups[float_mesh].push(float(at)),
                     }
@@ -1495,6 +1619,68 @@ mod tests {
         assert_eq!(log.add("moon_eel"), 1);
         assert_eq!(Log::parse(&log.text()), log);
         assert_eq!(log.species(), (2, 12));
+    }
+
+    #[test]
+    fn the_log_keeps_the_last_fish_for_the_bucket() {
+        let catch = |id: &str| CATCHES.iter().find(|c| c.id == id).expect("a catch");
+        let mut log = Log::parse(
+            "silver_darter 3
+last moon_eel
+",
+        );
+        assert_eq!(log.last(), Some(catch("moon_eel")));
+        assert_eq!(log.caught(catch("sun_carp")), 1);
+        // Junk never goes in the bucket.
+        log.caught(catch("boot"));
+        assert_eq!(log.last(), Some(catch("sun_carp")));
+        assert_eq!(Log::parse(&log.text()), log);
+        // A last line naming no fish is skipped.
+        assert_eq!(
+            Log::parse(
+                "last boot
+last nothing
+"
+            )
+            .last(),
+            None
+        );
+    }
+
+    #[test]
+    fn each_fish_has_its_own_model_as_long_as_the_table_says() {
+        let fish: Vec<_> = CATCHES.iter().filter(|c| c.kind == Kind::Fish).collect();
+        assert_eq!(fish.len(), FISH_MODELS.len());
+        for (catch, model) in fish.iter().zip(&FISH_MODELS) {
+            assert_eq!(catch.id, model.id);
+            // The MD3's one frame: its bounds' lowest X is the tail's tip (the mouth at 0).
+            let bytes = model.bytes;
+            assert_eq!(&bytes[..4], b"IDP3", "{}", model.id);
+            let ofs_frames = u32::from_le_bytes(bytes[92..96].try_into().unwrap()) as usize;
+            let min_x = f32::from_le_bytes(bytes[ofs_frames..ofs_frames + 4].try_into().unwrap());
+            assert!((min_x + model.length).abs() < 0.1, "{}: {min_x}", model.id);
+        }
+    }
+
+    #[test]
+    fn the_last_fish_sits_in_the_bucket_with_its_tail_out() {
+        for fish in &FISH_MODELS {
+            let (mouth, rotation, scale) = in_bucket(Vec3::ZERO, 0.4, fish);
+            let tail = mouth + rotation * Vec3::NEG_X * fish.length * scale;
+            for end in [mouth, tail] {
+                // Within the bucket's rim (7.5 across from its middle), never under its
+                // bottom.
+                assert!(end.truncate().length() < 7.5, "{}: {end}", fish.id);
+                assert!(end.z >= 0.9, "{}: {end}", fish.id);
+            }
+            if fish.length > BUCKET_FLOATS {
+                assert!(tail.z > BUCKET_RIM, "{}: the tail at {tail}", fish.id);
+                assert!(mouth.z < BUCKET_WATER, "{}: the mouth at {mouth}", fish.id);
+            } else {
+                assert!((tail.z - mouth.z).abs() < 0.01, "{} floats flat", fish.id);
+                assert!(tail.z > BUCKET_WATER, "{} floats", fish.id);
+            }
+        }
     }
 
     #[test]

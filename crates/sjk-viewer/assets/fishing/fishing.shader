@@ -1,11 +1,23 @@
-// The Fishing toy's rod, bucket, float, line and fish (SJK; see README.md): flat
-// colours from one small atlas, lit by the world's light as a player model is, seen
-// from both sides so the open bucket and the thin line never show holes.
+// The Fishing toy's rod, bucket, float and line, and the fish's eyes and whiskers (SJK;
+// see README.md): flat colours from one small atlas, lit by the world's light as a
+// player model is, seen from both sides so the open bucket and the thin line never show
+// holes.
 models/sjk/fishing
 {
 	cull none
 	{
 		map models/sjk/fishing
+		rgbGen lightingDiffuse
+	}
+}
+
+// The fish: each one's own painted skin and fins from the fish atlas, lit the same way,
+// both sides drawn for the thin fins.
+models/sjk/fishing_fish
+{
+	cull none
+	{
+		map models/sjk/fishing_fish
 		rgbGen lightingDiffuse
 	}
 }

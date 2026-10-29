@@ -5190,9 +5190,18 @@ brings up are the ones the hub drops anyway.
   0.8 to 1.2 seconds hooks it. Too soon scares the fish (the next bite waits 10 to 20
   seconds more); too late lets it go. A hooked bite comes up empty 15% of the time, with
   junk 30% (six kinds) and a fish 55% (twelve kinds, from the Silver darter to Old
-  Whiskers, the great catfish, one fish in about 106), reeled in to the tip and dropped
-  in the bucket. Each catch is counted in `fishing_log.txt` in the settings folder
-  (`<id> <count>` a line) and said in the centre of the screen.
+  Whiskers, the great catfish, one fish in about 106), reeled in to the tip hanging by
+  its mouth, and said in the centre of the screen. Each catch is counted in
+  `fishing_log.txt` in the settings folder (`<id> <count>` a line, and `last <id>`).
+- **The fish** each have their own model and painted skin (`fishing_fish_<id>.md3`, one
+  fish atlas): the slim Silver darter, the deep spiny Mud snapper, the spotted
+  big-mouthed Swamp gulper, the barred Striped bonefish, the Glow perch with its glowing
+  spots, the long Spiny pike with spines down its back, the scaled golden Sun carp, the
+  Moon eel, the Kyber minnow with crystals on its back, the flat Ghost ray, the red and
+  white Temple koi and Old Whiskers with its long whiskers. The **bucket** holds the last
+  fish caught (kept in the log, so it is there the next time the rod comes out): a short
+  one floats on its side on the water, a longer one stands head down with its tail out
+  over the rim. Other players' buckets are empty, since their catches are not sent.
 - **Echoes:** when the hub drops the player an Echo while they fish, its card waits, and
   a golden bite comes 5 to 15 seconds later (1.5 seconds to hook it, two tries); hooked,
   the holocron comes up on the line and its card shows. Missed twice, or with the rod put
