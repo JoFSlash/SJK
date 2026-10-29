@@ -461,6 +461,7 @@ first drawn) and keys only a later remap uses. Not measured on a GPU; compare th
 | `r_sceneHdr` | Scene precision: 0 display format, 1 RGBA16F (default); applies after a graphics reload |
 | `r_superSample` | Scene supersampling, 1 (default, off), 2 or 3 per axis; applies after a graphics reload. See [Render scale and supersampling](#render-scale-and-supersampling) |
 | `r_renderScale` | The world's size in percent of the window per axis, 50 to 100 (default) in steps of 5, stretched to the window; ignored while `r_superSample` is above 1; applies after a graphics reload. See [Render scale and supersampling](#render-scale-and-supersampling) |
+| `r_highDpi` | 1 the window's size (`r_resolution`) and the world count the screen's pixels, 0 its points; default 0 on a Mac, 1 elsewhere. The window resizes at once, the world after a graphics reload. See [Render scale and supersampling](#render-scale-and-supersampling) |
 | `r_hdrExposure` | Base exposure multiplier, 0.25–4; live. Eye adaptation adjusts around it; `r_sceneHdr 0` ignores it |
 | `r_autoExposure` | Eye adaptation, default 1 (on); 0 holds `r_hdrExposure`. Live; see [eye adaptation](#eye-adaptation) |
 | `r_autoExposureMin`, `r_autoExposureMax` | Adaptation range in EV around the base: -2–0 (default -0.5) and 0–2 (default 1). Live |
@@ -619,7 +620,9 @@ the NVIDIA Control Panel fixed it). Three things handle it now:
 - **A message when nothing opens.** A start that fails shows a dialog with the error and
   what to try (setting `sjk.exe` to the fast card, updating the driver) before the
   game closes, as well as the crash report (`main.rs`, `show_start_failure`); a release
-  build on Windows has no console.
+  build on Windows has no console. `SJK_NO_START_DIALOG` set leaves the dialog out, for
+  unattended runs: the release's package smoke check, whose client fails on purpose,
+  hung on the macOS runner until it timed out (29/10/2026).
 
 Not verified on a laptop with two cards: the exports are checked in the built
 `sjk.exe`'s export table, the fallback and the dialog only by building.
@@ -685,6 +688,17 @@ a [graphics reload](#graphics-reload)):
 - **Supersampling wins**: at `r_superSample` 2 or 3 the render scale is ignored
   (`requested`); the two never combine. The graphics reload card names the side that moved
   ("supersampling" above 100 %, "render scale" below).
+- **High DPI**, `r_highDpi` (29/10/2026): at 0, the default on a Mac, the percent counts
+  the window's points, not its pixels: `in_points` divides it by the window's scale factor
+  when the scene target is installed, after `supported_bytes`, so 100 % on a Retina screen
+  (scale 2) draws the world at half its pixels each way and 50 % at a quarter, as EternalJK
+  draws it there (SDL without high DPI), while the 2D layer keeps every pixel. Supersampling
+  2 becomes native; 3 (150 %) has no whole factor and is native too. A screen without
+  scaling, or `r_highDpi 1` (the default elsewhere), keeps the pixels. The factor is read
+  from the window on every install, so moving the window to a screen of another scale
+  (which resizes it in pixels) installs the scene again at the new one. Glen's Mac lost
+  frames once fullscreen worked: a Retina MacBook's screen is about six times the pixels
+  of the 1280x720 window he had played in.
 - **100 %**, the default, makes no scene target (`GpuState::render_scale` stays `None`):
   the frame is the one from before the setting existed. A unit test pins the default; the
   world shot `render_scale_shots` at 100 differs from main's build as much as two runs of

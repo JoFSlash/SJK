@@ -2,7 +2,7 @@
 //! half, `codemp/game/bg_public.h`): the special moves it overrides or cancels, the
 //! poses it plays instead of the style's, and the flags that forbid moves. The stock
 //! saber (`WP_SaberSetDefaults`, `bg_saberLoad.c:401-500`) overrides nothing; saber
-//! definitions (`WP_SaberParseParms`) are not read yet, so every player carries it.
+//! definitions are supplied by the client's cached `.sab` catalog or by the game.
 
 /// `LS_INVALID`: a move the saber leaves to the style.
 pub const LS_INVALID: i32 = -1;

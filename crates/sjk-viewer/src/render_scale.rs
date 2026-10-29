@@ -46,6 +46,25 @@ pub(crate) fn register(cvars: &mut CvarRegistry) -> Result<(), CvarError> {
             crate::graphics_reload::APPLY
         ));
         crate::graphics_reload::notice();
+    })?;
+    // The window takes a new size at once (`runtime_settings.rs`); the world's resolution
+    // with the graphics reload.
+    cvars.register(CvarDefinition::new(
+        crate::settings::HIGH_DPI_CVAR,
+        crate::settings::HIGH_DPI_DEFAULT,
+        CvarFlags::ARCHIVE,
+        "1 the window's size (r_resolution) and the world count the screen's pixels, 0 its \
+         points as EternalJK on a Mac (the world at half a Retina screen's pixels each way, \
+         the HUD and menus sharp); default 0 on a Mac, 1 elsewhere; the world's resolution \
+         applies after a graphics reload (vid_restart)",
+    ))?;
+    cvars.on_change(crate::settings::HIGH_DPI_CVAR, |_| {
+        crate::log::progress(format_args!(
+            "{} changed: {}",
+            crate::settings::HIGH_DPI_CVAR,
+            crate::graphics_reload::APPLY
+        ));
+        crate::graphics_reload::notice();
     })
 }
 
@@ -68,6 +87,18 @@ pub(crate) fn requested(console: Option<&crate::console::ViewerConsole>) -> u32 
         .and_then(|c| c.integer_cvar(CVAR))
         .unwrap_or(i64::from(NATIVE))
         .clamp(i64::from(MIN_PERCENT), i64::from(NATIVE)) as u32
+}
+
+/// The scene's percent of the window's pixels for `percent` of its points: divided by the
+/// window's `scale_factor` (pixels per point) without high DPI (`r_highDpi` 0), so 100 %
+/// on a Retina screen draws half its pixels each way, as EternalJK does there. Unchanged
+/// with high DPI or on an unscaled screen. Supersampling that becomes a fraction above
+/// the pixels (3 on a Retina screen, 150 %) is drawn at the native size.
+pub(crate) fn in_points(percent: u32, high_dpi: bool, scale_factor: f64) -> u32 {
+    if high_dpi || scale_factor <= 1.0 {
+        return percent;
+    }
+    ((f64::from(percent) / scale_factor).round() as u32).max(1)
 }
 
 /// The scene's size for a window of `output` at `percent`, rounded, at least a pixel;
@@ -334,6 +365,19 @@ impl crate::GpuState {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn without_high_dpi_the_scene_counts_points() {
+        // A Retina screen: 100 % of its points is half its pixels each way.
+        assert_eq!(in_points(100, false, 2.0), 50);
+        assert_eq!(in_points(50, false, 2.0), 25);
+        assert_eq!(in_points(200, false, 2.0), NATIVE);
+        // Windows at 150 %.
+        assert_eq!(in_points(100, false, 1.5), 67);
+        // High DPI, or a screen without scaling, keeps the pixels.
+        assert_eq!(in_points(100, true, 2.0), 100);
+        assert_eq!(in_points(75, false, 1.0), 75);
+    }
 
     fn profile(cvars: &[(&str, &str)]) -> (tempfile::TempDir, crate::console::ViewerConsole) {
         let directory = tempfile::tempdir().expect("a profile directory");

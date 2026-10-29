@@ -59,7 +59,8 @@ Player blade tints in a player configstring's `c3`/`c4` keys are read for every
 profile; the JA+ 2.4 server module formats both keys too. The JA+ client
 plugin's `serverconfig` and `pluginDisable` commands are the JA+ tools mod's
 `japlus.serverconfig` and `japlus.plugin` ([mods.md](mods.md)); the setting stays
-in the core client.
+in the core client. Settings switches its bits one at a time, named after their
+feature, and `japro.plugin` lists jaPRO's ([plugin options](mods.md#plugin-options)).
 
 ### Player text
 
@@ -157,11 +158,60 @@ copy clears roll; outgoing user commands remain unchanged. Serverinfo refresh
 and snapshot reseeding refresh this policy and metadata. `cg_noPredict 1` is the
 existing player override to display server positions without local prediction.
 
-This is command-policy support, not complete jaPRO race physics: style-specific
-acceleration, jumps, ramps, restrictions, new jetpack and grapples still require
-their own reference-backed implementation and verification. Compiled reference
-fixtures cover slicing/snapping decisions; they do not establish full gameplay
-or live-server parity.
+The jaPRO held-jump gate runs before the shared zero-gravity push-off. At
+nonpositive gravity the push remains available even on styles that disable
+Force special jumps; those style restrictions apply to the positive-gravity
+special-jump branch (TaystJK `2d60c0fa`, `bg_pmove.c:3744-3796`). Focused
+regressions cover all 19 styles, held/released input and 8/7/4/3 ms.
+
+jaPRO on-foot acceleration and friction also follow the movement-style table
+in [pmove_japro_movement.rs](../crates/sjk-game-jka/src/pmove_japro_movement.rs).
+The 19 advertised style ordinals select ground acceleration, friction, crouch
+speed and whether jump input participates in command scaling. Air kernels cover
+QuakeWorld, CPM stop/strafe acceleration and air control, SP air deceleration,
+Tribes and Surf; Siege uses its vector-push accelerator. Slick and Tribes use
+their explicit walking/skiing friction and steep-plane clipping rules. The
+advertised `jcinfo` head-slide bit controls friction when standing on a player.
+Surf applies its reference input restriction, wish-speed and ground projection.
+The local player's vehicle selects Swoop policy while NPC vehicle simulation
+retains its vehicle controller. Server switches refresh both policy and snapshot
+metadata; reused stat slots on other mods cannot enable jaPRO physics.
+
+The [jump adapter](../crates/sjk-game-jka/src/pmove_japro_jump.rs) also selects
+style-specific takeoff, held-jump/bhop and Force-rise policy. It retains the
+reference's OCPM jump-release requirement and PJK delay, ramp/double-jump
+impulses, superjump scaling and QW/PJK Force-rise curve based on the server's
+integer last-jump speed. Existing stat slots 10/12/14 supply jump speed,
+restrictions and timer; the timer advances per command, not per rendered frame.
+`JAPRO_CINFO_BHOP1` (`jcinfo` bit 10) forces ordinary-height bunnyhops;
+`JAPRO_CINFO_BHOP2` (bit 26) enables the player's existing `cp_pluginDisable`
+bit 19 preference. The preference is remembered across sessions but can affect
+physics only on the current jaPRO/TaystJK profile. BHOP restrictions suppress
+wall moves and flips. There is no new setting or protocol field.
+
+The [new-jetpack adapter](../crates/sjk-game-jka/src/pmove_japro_jetpack.rs)
+implements jaPRO's separate active flag, inventory/resource/water/animation
+eligibility, hover-height activation, vertical thrust, Tribes horizontal thrust,
+1.75 air-control multiplier and directional airborne pose. It uses existing
+`jetpackFuel` snapshot field 39; fuel consumption remains server-owned. The
+advertised jetpack capability (`jcinfo` bit 12) or race mode enables activation,
+only after the current profile selects jaPRO. Reused flags/stats/capability bits
+on other mods do not enable it. Server switches reset flag ownership immediately,
+including before a new snapshot is replayed. Existing `cg_nopredict` remains the
+player override. This path is separate from stock `PM_JETPACK` below.
+
+Windows x64 comparisons cover 280 compiled TaystJK activation/thrust results
+and its 25 knockdown ordinals, with velocity tolerance 0.0005 units/s. Source
+branches use deterministic distance/shared eligibility stubs. Command tests cover
+8/7/4/3 ms, profile switches, authoritative fuel and pose priority with synthetic
+animation timing. No retail assets or live servers were used.
+
+This is not complete jaPRO race physics: ramp/step collision changes, remaining
+restrictions and grapples still require their own reference-backed
+implementation and verification. Compiled reference fixtures cover command
+policy, style kernels/parameters and jump decisions/curves/timers; they do not
+establish full Pmove output or live-server parity. Stock baseline corrections
+remain in their own changes; these additions do not certify the full baseline.
 
 Prediction follows rules the server advertises in `CS_SERVERINFO`, read by
 [pmove_rules.rs](../crates/sjk-game-jka/src/pmove_rules.rs): the roll fixes of
@@ -305,6 +355,20 @@ Inline-brush point contents use the presented origin and angles, matching
 Prediction keeps these transforms separately, including when the newest and
 displayed snapshots carry different mover trajectories.
 
+Jump prediction respects `PMF_RESPAWNED`: holding attack or use after spawning
+blocks jumping until those buttons are released. The latch is cleared before
+movement for every weapon, as in OpenJK `codemp/game/bg_pmove.c`.
+The dual forward jump attack raises the collision hull's feet during codemp's
+two authored animation windows. `PMF_FIX_MINS` restores the hull with downward
+and upward clearance traces, moving up or ending in a crouch when necessary.
+The animation window requires a loaded animation timing table.
+Local prediction loads the equipped hilts' movement flags, named special-move
+overrides and ready/draw/putaway animations from the shared `.sab` catalog.
+Clientinfo changes refresh this configuration for committed moves, replay and
+previews; unknown or multiplayer-forbidden names fall back to Kyle and
+two-handed hilts exclude a second saber. Authoritative moves keep the game's
+explicit context. No saber skill levels are inferred from hilt definitions.
+
 `PM_JETPACK` (movement type 1), used by the equipped jetpack on stock-derived
 servers including JA+, runs the reference's gravity, thrust and air-control
 rules ([pmove_jetpack.rs](../crates/sjk-game-jka/src/pmove_jetpack.rs)). The
@@ -320,8 +384,9 @@ direction, and jump pads accept movement type 1.
 Reference: OpenJK `codemp/game/bg_pmove.c` `PmoveSingle`, `PM_AirMove` and
 `PM_GroundTrace`, at `4d0dfaf1`. Focused tests cover 8/7/4/3 ms commands and
 height/thrust boundaries. This is not verification against a running JA+ server;
-its unpublished settings, the stock spinning-saber random horizontal impulses,
-and jaPRO's separate new/race jetpack path remain outside this implementation.
+its unpublished settings and the stock spinning-saber random horizontal impulses
+remain outside the stock implementation. jaPRO's separate new/race jetpack path
+is described under [server dialect movement rules](#server-dialect-movement-rules).
 Equipping and fuel state still arrive from the server.
 
 ### Local wall-grab facing
@@ -366,6 +431,18 @@ player never runs into his own missile, and another's explodes on touching him r
 than stopping him: missiles (`ET_MISSILE`) are now left out of the prediction's solid
 list altogether
 ([prediction_movers.rs](../crates/sjk-viewer/src/prediction_movers.rs)).
+
+### Remote vehicle collision
+
+Remote vehicle hulls use the loaded `.veh` dimensions and the presented pose,
+as codemp `CG_ClipMoveToEntities` calls `BG_VehicleAdjustBBoxForOrientation`.
+Remote poses interpolate between snapshots even with smooth-client
+extrapolation enabled. Fighter/flier bounds expand around the nose, tail and
+wingtips; other vehicle types use their definition's static width and height. Missing definitions or
+zero dimensions retain the packed snapshot hull. Definition data is cached by
+model slot and refreshed on encountered model-configstring changes, outside
+command replay. The local vehicle shares the geometry helper and keeps its
+clearance check; remote collision follows stock's no-clearance-callback path.
 
 ### When prediction steps aside
 
@@ -776,3 +853,26 @@ This follows OpenJK `codemp/cgame/cg_predict.c:722` at `4d0dfaf1`;
 items retain their separate proximity test. Unit tests cover 8/7/4/3 ms commands
 and both directions of a standing/crouching hull mismatch. Live trigger timing
 against an OpenJK server remains unverified.
+
+### Freeze prediction when command history is incomplete
+
+When the 512-command pending window evicts an unacknowledged command, local
+movement and speculative previews freeze at the last valid displayed endpoint,
+including its mover offset.
+Commands continue to leave for the server. Prediction resumes from a snapshot
+once its command time covers every missing command. A map transition or explicit
+prediction reset starts a fresh history window. A teleport received during the gap
+stays pending so recovery cannot smooth across it. Fixed-step commands use their rounded
+simulation times for this decision. This follows OpenJK `codemp/cgame/cg_predict.c:1020-1033`
+at `4d0dfaf1`, while retaining SJK's larger history window. Unit tests cover
+8/7/4/3 ms boundaries; live packet-loss recovery remains unverified.
+### Face the opponent during predicted saber locks
+
+An active saber lock faces the opponent before each committed, replayed or
+preview Pmove. The direction starts at the displayed snapshot's player origin
+and ends at the opponent's presented solid origin, including interpolation,
+as OpenJK `codemp/cgame/cg_predict.c:1252-1263` does at `4d0dfaf1`.
+Display-only frames refresh that facing through the camera's existing view-lock
+path. Expired locks, a changed client, a missing opponent and fake noclip do not
+take the view. Tests cover 8/7/4/3 ms endpoints, moving opponents, pitch/yaw and
+expiry; live saber locks remain unverified.

@@ -45,11 +45,16 @@ locked door (empty):
 | `jackpot` | a red crystal |
 | `explode` | a thermal detonator |
 | `holocron` | the tier's own holocron, every part of it, for the opener; SJK's holocron for the others (the hub tells them no tier) |
+| `shards` | three cyan kyber crystals; seven, bigger, for the opener's pile of more than 15 shards |
+| `again` | a little mystery box |
+| `blade` | a saber hilt; for an opener who holds the blade already, the shards it pays instead |
 
-What rolls before it stops is the game's weapons and these prizes, among them the four
-tiers' holocrons, Uncommon to Mythical, each drawn as the Holocrons tab draws it, its
-parts posed and turning (`mystery_box::HOLOCRONS`, Sol, 29/10/2026; before, one holocron
-for all). `world_shot::mystery_box_shots::duel6_mystery_box_holocrons` shows the four.
+What rolls before it stops is only these prizes (Sol, 29/10/2026: the game's weapons
+rolled with them before, which no box gave), among them both piles of shards and the
+four tiers' holocrons, Uncommon to Mythical, each drawn as the Holocrons tab draws it,
+its parts posed and turning (`mystery_box::HOLOCRONS`, Sol, 29/10/2026; before, one
+holocron for all). `world_shot::mystery_box_shots::duel6_mystery_box_holocrons` shows the
+four, and `duel6_mystery_box_loot` the piles, the little box and the hilt.
 
 The opener is told what came out in the centre of the screen. It floats over the box,
 turning slowly, until they take it with `+use` at the box (a sparkle; a chat line gives
@@ -69,16 +74,20 @@ The price and the odds are the hub's (`GET /v1/mystery-boxes`), PROVISIONAL, Sol
 
 | Outcome | Chance | Pays |
 | --- | --- | --- |
-| `empty` | 39 % | nothing |
-| `refund` | 26 % | the price back |
+| `empty` | 29 % | nothing |
+| `refund` | 24 % | the price back |
 | `double` | 15 % | twice the price |
 | `jackpot` | 5 % | five times the price |
 | `explode` | 5 % | nothing: the price goes to a hunter |
 | `holocron` | 10 % | a holocron |
+| `shards` | 6 % | 10 to 25 kyber shards |
+| `again` | 5 % | a free roll |
+| `blade` | 1 % | the Mystery blade (60 shards if you hold it) |
 
-On average a box pays back 81 of its 100 credits, and a holocron one time in ten (Sol,
+On average a box pays back 79 of its 100 credits, and a holocron one time in ten (Sol,
 29/10/2026; 2% before, with empty 43% and refund 30%): a green holocron sells for 150, so
-a box gives back about what it costs. A
+a box gives back about what it costs. The last three came the same day (Sol: "loot you
+can land on"), their odds taken from empty (39% before) and refund (26%). A
 newer hub's outcome the client does not know is shown by its credits alone.
 
 **It blows up** (`explode`, Sol's idea of 28/10/2026, after Call of Duty zombies' boxes):
@@ -99,6 +108,14 @@ in the chat (the hub's box hunt event `laugh_<opener>_<to>_<credits>`).
 gives one of any tier, rolled on the holocrons' own odds ([holocrons.md](holocrons.md));
 it counts against no daily cap and cannot be traded (source `box`). The opener reads its
 tier over the box and in the centre, and finds it in the Collection.
+
+**Shards, a free roll, the Mystery blade** (`shards`, `again`, `blade`, 29/10/2026): a
+pile of 10 to 25 kyber shards to spend in the shop; a free roll, spent on the next box
+the player opens like one won in the box hunt (the hub's answer says the free rolls left,
+`free`, and the client keeps that count); or the boxes' own saber shader, the Mystery
+blade (`saber_mystery`, blade 169, Legendary), which no holocron drops, the shop never
+sells and nobody trades. A player who holds it already gets 60 shards instead, what
+shattering a Legendary shader gives. The blade fanfares like the jackpot.
 
 ## Placing one (SJK's creator)
 

@@ -7,6 +7,7 @@ pub(crate) mod flip_kick;
 pub(crate) mod force_repeat;
 pub(crate) mod idrive;
 pub(crate) mod motion;
+pub(crate) mod mouse_repeat;
 
 pub(crate) mod force_abilities;
 mod selection_commands;
@@ -115,6 +116,10 @@ pub(crate) enum InputAction {
     ChargeMonitor(bool),
     /// `toy_boxhunt`: take part in the box hunt, or not ([`crate::box_hunt`]).
     BoxHunt,
+    /// `toy_banana`: drop banana peels and slip on them, or not ([`crate::banana`]).
+    Banana,
+    /// `banana_drop`: drop a banana peel ([`crate::banana`]).
+    DropBanana,
     /// `toy_tag`: stick the chosen tag where the crosshair meets the world
     /// ([`crate::tags`]).
     StickTag,
@@ -331,6 +336,8 @@ impl GameplayInput {
                     | crate::monitor::CHARGE_COMMAND
                     | crate::monitor::CHARGE_RELEASE
                     | crate::box_hunt::COMMAND
+                    | crate::banana::COMMAND
+                    | crate::banana::DROP_COMMAND
                     | crate::tags::COMMAND
                     | "cameracontrol"
             )
@@ -509,6 +516,8 @@ impl GameplayInput {
             crate::monitor::CHARGE_COMMAND => Some(InputAction::ChargeMonitor(true)),
             crate::monitor::CHARGE_RELEASE => Some(InputAction::ChargeMonitor(false)),
             crate::box_hunt::COMMAND => Some(InputAction::BoxHunt),
+            crate::banana::COMMAND => Some(InputAction::Banana),
+            crate::banana::DROP_COMMAND => Some(InputAction::DropBanana),
             crate::tags::COMMAND => match words.next().map(str::to_ascii_lowercase).as_deref() {
                 Some("clear" | "off") => Some(InputAction::ClearTag),
                 _ => Some(InputAction::StickTag),
@@ -655,6 +664,8 @@ impl super::GpuState {
             Some(InputAction::ThrowMonitor) => self.throw_monitor(),
             Some(InputAction::ChargeMonitor(pressed)) => self.charge_monitor(pressed),
             Some(InputAction::BoxHunt) => self.toggle_box_hunt(),
+            Some(InputAction::Banana) => self.toggle_banana(),
+            Some(InputAction::DropBanana) => self.drop_banana(),
             Some(InputAction::FlipKick) => {
                 let restricted = self.live_session.as_ref().is_some_and(|session| {
                     session
@@ -892,6 +903,8 @@ mod tests {
             ("toy_tag", InputAction::StickTag),
             ("toy_tag clear", InputAction::ClearTag),
             ("toy_tag OFF", InputAction::ClearTag),
+            ("toy_banana", InputAction::Banana),
+            ("banana_drop", InputAction::DropBanana),
         ] {
             assert!(GameplayInput::recognizes(command), "{command}");
             assert_eq!(input.apply(command), Some(action), "{command}");

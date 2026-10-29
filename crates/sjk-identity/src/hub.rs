@@ -475,6 +475,20 @@ pub trait Hub: Send {
         ))
     }
 
+    /// Set (`on`) or clear `mark` on saber shader `id` (`POST /v1/unlocks/marks`,
+    /// 29/10/2026, hubs whose economy says `marks`): the hub answers every mark after.
+    fn set_mark(
+        &mut self,
+        _identity: &Identity,
+        _id: &str,
+        _mark: crate::wire::Mark,
+        _on: bool,
+    ) -> Result<crate::wire::UnlockMarks, HubError> {
+        Err(HubError::Protocol(
+            "this hub client does not keep collection marks".to_owned(),
+        ))
+    }
+
     /// The shop's offers of the day (`GET /v1/shop`, 17/10/2026).
     fn shop(&mut self, _identity: &Identity) -> Result<crate::wire::ShopDay, HubError> {
         Err(HubError::Protocol(
@@ -1599,6 +1613,22 @@ impl Hub for HttpHub {
             "/v1/unlocks/craft",
             Some(json!({ "id": id })),
         )?)
+    }
+
+    fn set_mark(
+        &mut self,
+        identity: &Identity,
+        id: &str,
+        mark: crate::wire::Mark,
+        on: bool,
+    ) -> Result<crate::wire::UnlockMarks, HubError> {
+        let answer: crate::wire::MarksAnswer = parse(self.send(
+            Some(identity),
+            "POST",
+            "/v1/unlocks/marks",
+            Some(json!({ "id": id, "mark": mark.id(), "on": on })),
+        )?)?;
+        Ok(answer.marks)
     }
 
     fn shop(&mut self, identity: &Identity) -> Result<crate::wire::ShopDay, HubError> {

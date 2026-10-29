@@ -243,6 +243,7 @@ came in.
 | 166 | `saber_varykino_blossom` | Varykino Blossom blade | Mythical | Sol | yes |
 | 167 | `saber_thousand_cranes` | Thousand Cranes blade | Unique | Sol | no |
 | 168 | `saber_hearth` | Hearth blade | Unique | Sol | no |
+| 169 | `saber_mystery` | Mystery blade | Legendary | Sol | no |
 
 A client ignores an id it does not know. Both catalogues' tests pin this exact list
 (ids, names, order), so a change to one fails until the other follows.
@@ -1567,6 +1568,12 @@ All of it is the Collection's Forge tab ([cards.md](cards.md#the-forge)); its re
 What the Forge lists counts the profile's `Unlock::count` when it has no `medal` and no
 `card`; a shader not listed is not held. The kyber shard's mark to draw beside a count is
 `cards::shard::draw` (or the symbol `symbols::SHARD` in text).
+
+**Collection marks** (29/10/2026, [sjk-ui.md](sjk-ui.md#marks)): a player stars their
+favourite shaders and locks the ones they want to keep; both are kept at the hub, which
+refuses to break down or trade a locked one. `shader_marks::Marks` is what a page shows
+(worn, favourite, locked, New), `sjk_identity::Service::set_mark` asks the hub, and the
+New marks are kept on the PC (`shader-seen.txt`).
 
 ## Planned, not built
 

@@ -56,7 +56,11 @@ pub(crate) fn observe(
     visual_now: Instant,
     sinks: &mut Sinks<'_>,
 ) {
+    // `cg_fleshSparks`: the saber hits' sparks below, the special hit's sound above.
+    let flesh_sparks = impacts::flesh_sparks(sinks.console.as_ref());
+    sinks.impacts.set_flesh_sparks(flesh_sparks);
     if let Some(audio) = sinks.audio.as_mut() {
+        audio.set_flesh_sparks(flesh_sparks);
         audio.observe_snapshot(snapshot, game_state, sinks.vfs);
     }
     let impact = impact_spawn::observe_snapshot(

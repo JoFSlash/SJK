@@ -16,7 +16,7 @@ use crate::console::holocrons_panel::{Data, Recent, State};
 use crate::profile_hub::Tab;
 
 /// Made-up holdings: 12 uncommon, 3 rare, no legendary, 1 mythical; ten recent ones
-/// (a gift with a long note among them), the next one a third of the way, 3 of 8 in 24 hours.
+/// (a gift with a long note among them), the next one a third of the way, 3 of 8 today.
 pub(super) fn holdings() -> Data {
     let recent = |tier: usize, when: &str, note: Option<&str>| Recent {
         tier,

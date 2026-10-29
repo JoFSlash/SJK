@@ -332,19 +332,11 @@ pub(crate) fn refresh() {
     crate::player_identity::refresh_holocrons();
 }
 
-/// The hub's window for its caps: a key earns at most `daily_cap` holocrons by play in
-/// any 24 hours, a rolling window rather than a calendar day (`docs/holocrons.md`).
-const CAP_WINDOW: i64 = 86_400;
-
-/// Seconds from `now` until the cap no longer holds back a drop, when the progress says
-/// it is reached and `list` (a profile's, newest first) shows the play drops that fill
-/// the window; `None` otherwise. The window empties as its oldest drops turn a day old:
-/// the cap lifts when the `daily_cap`-th newest play drop does.
-pub(crate) fn cap_lifts_in(
-    progress: &HolocronProgress,
-    list: &[Holocron],
-    now: std::time::Instant,
-) -> Option<u64> {
+/// Seconds from `now` until the hub's caps' day ends and the cap lifts (`resets_at`:
+/// 09:00 in Paris, since 29/10/2026; `docs/holocrons.md`), when the progress says it is
+/// reached; `None` otherwise, or from a hub before that does not say. 0 once past it,
+/// until the next reading.
+pub(crate) fn cap_lifts_in(progress: &HolocronProgress, now: std::time::Instant) -> Option<u64> {
     if !progress.capped() {
         return None;
     }
@@ -352,19 +344,11 @@ pub(crate) fn cap_lifts_in(
         i64::try_from(now.saturating_duration_since(progress.read_at).as_secs())
             .unwrap_or(i64::MAX),
     );
-    let read_from = progress.server_time - CAP_WINDOW;
-    let mut drops: Vec<i64> = list
-        .iter()
-        .filter(|holocron| holocron.source == "play" && holocron.dropped > read_from)
-        .map(|holocron| holocron.dropped)
-        .collect();
-    drops.sort_unstable_by(|a, b| b.cmp(a));
-    let lifts = drops.get(progress.daily_cap as usize - 1)? + CAP_WINDOW;
-    u64::try_from(lifts.saturating_sub(hub_now)).ok()
+    u64::try_from(progress.resets_at?.saturating_sub(hub_now).max(0)).ok()
 }
 
-/// What the progress says in a line: how long to the next holocron, or that the limit
-/// of the last 24 hours is reached and, when `lifts_in` says, how long until it lifts
+/// What the progress says in a line: how long to the next holocron, or that the day's
+/// limit is reached and, when `lifts_in` says, how long until it resets
 /// ([`cap_lifts_in`]). The play time does not count down on its own (it is as the hub
 /// last said, and counts only while the player plays), so it is rounded up to whole
 /// minutes.
@@ -374,14 +358,14 @@ pub(crate) fn next_text(progress: &HolocronProgress, lifts_in: Option<u64>) -> S
             Some(secs) => {
                 let minutes = secs.div_ceil(60).max(1);
                 match (minutes / 60, minutes % 60) {
-                    (0, minutes) => format!("Limit reached: next one in about {minutes} min"),
-                    (hours, 0) => format!("Limit reached: next one in about {hours} h"),
+                    (0, minutes) => format!("Limit reached: resets in about {minutes} min"),
+                    (hours, 0) => format!("Limit reached: resets in about {hours} h"),
                     (hours, minutes) => {
-                        format!("Limit reached: next one in about {hours} h {minutes} min")
+                        format!("Limit reached: resets in about {hours} h {minutes} min")
                     }
                 }
             }
-            None => "Limit reached for the last 24 hours".to_owned(),
+            None => "Limit reached for today".to_owned(),
         };
     }
     let minutes = progress.remaining_secs().div_ceil(60).max(1);
@@ -568,6 +552,7 @@ mod tests {
             every_secs: 1_800,
             today,
             daily_cap: 8,
+            resets_at: None,
             server_time: 0,
             can_open: true,
             read_at: std::time::Instant::now(),
@@ -595,19 +580,19 @@ mod tests {
         );
         assert_eq!(
             next_text(&progress(300, 8), None),
-            "Limit reached for the last 24 hours"
+            "Limit reached for today"
         );
         assert_eq!(
             next_text(&progress(300, 8), Some(5 * 3_600 + 19 * 60 + 1)),
-            "Limit reached: next one in about 5 h 20 min"
+            "Limit reached: resets in about 5 h 20 min"
         );
         assert_eq!(
             next_text(&progress(300, 8), Some(2 * 3_600)),
-            "Limit reached: next one in about 2 h"
+            "Limit reached: resets in about 2 h"
         );
         assert_eq!(
             next_text(&progress(300, 8), Some(0)),
-            "Limit reached: next one in about 1 min"
+            "Limit reached: resets in about 1 min"
         );
         assert_eq!(
             next_text(&progress(600, 3), Some(600)),
@@ -616,42 +601,41 @@ mod tests {
         );
     }
 
-    /// A player's report (#77, 17/10/2026): the page said "8 of 8 today" on a new day.
-    /// The cap is the hub's rolling 24 hours, so the page says when it lifts.
+    /// Since 29/10/2026 the caps' day ends at 09:00 in Paris for everyone (Sol), and the
+    /// hub says when (`resets_at`): the page counts down to it. Before, the page worked
+    /// the end of a rolling 24 hours out of the profile's list, which a traded holocron
+    /// put off.
     #[test]
-    fn the_cap_lifts_when_the_eighth_newest_play_drop_turns_a_day_old() {
+    fn the_cap_lifts_when_the_hubs_day_ends() {
         let now = std::time::Instant::now();
-        let hub_now = 1_791_700_000;
+        // 29/10/2026 05:00 UTC (06:00 in Paris); the day ends at 08:00 UTC.
         let capped = HolocronProgress {
-            server_time: hub_now,
+            server_time: 1_793_250_000,
+            resets_at: Some(1_793_260_800),
             read_at: now,
-            ..progress(300, 8)
+            ..progress(1_800, 8)
         };
-        // Newest first: a gift, eight play drops an hour apart from 1 h ago, and an old
-        // play drop from two days ago.
-        let mut list = vec![wire(20, "rare", "staff", "")];
-        for hour in 1..=8 {
-            let mut drop = wire(20 - hour as u64, "rare", "play", "");
-            drop.dropped = hub_now - hour * 3_600;
-            list.push(drop);
-        }
-        let mut old = wire(1, "rare", "play", "");
-        old.dropped = hub_now - 2 * 86_400;
-        list.push(old);
-        list[0].dropped = hub_now - 60;
-        // The oldest of the eight dropped 8 h ago: it leaves the window in 16 h.
-        assert_eq!(cap_lifts_in(&capped, &list, now), Some(16 * 3_600));
+        assert_eq!(cap_lifts_in(&capped, now), Some(3 * 3_600));
         assert_eq!(
-            cap_lifts_in(&capped, &list, now + std::time::Duration::from_secs(600)),
-            Some(16 * 3_600 - 600),
+            cap_lifts_in(&capped, now + std::time::Duration::from_secs(600)),
+            Some(3 * 3_600 - 600),
             "counts down from when the hub answered"
         );
         assert_eq!(
-            cap_lifts_in(&capped, &list[..5], now),
+            cap_lifts_in(&capped, now + std::time::Duration::from_secs(4 * 3_600)),
+            Some(0),
+            "past it until the next reading"
+        );
+        let old_hub = HolocronProgress {
+            resets_at: None,
+            ..capped
+        };
+        assert_eq!(
+            cap_lifts_in(&old_hub, now),
             None,
-            "the list does not show the drops that fill the window"
+            "a hub before does not say"
         );
         let open = HolocronProgress { today: 3, ..capped };
-        assert_eq!(cap_lifts_in(&open, &list, now), None, "not capped");
+        assert_eq!(cap_lifts_in(&open, now), None, "not capped");
     }
 }

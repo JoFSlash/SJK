@@ -273,6 +273,16 @@ once). The look, keys and states are in [sjk-ui.md](sjk-ui.md#collection); the r
 and refusals in the hub's `PROTOCOL.md` ("Shards and the shop"). Checked by unit tests and
 world shots (`world_shot::forge_shots`); not tried in a game.
 
+Since 29/10/2026 (collection marks, the ideas of the players Atrosex and Kushina extended
+by Sol; [sjk-ui.md](sjk-ui.md#marks), the hub's `PROTOCOL.md` "Collection marks"): Break
+down marks the shader the player wears (on either saber or staff half) and its last
+copy's card says so first; the player's favourites are listed first in Craft and Break
+down, with a Favourites chip on Break down; and a shader the player locked is never broken
+down, one copy or the last, nor counted among all duplicates, nor offered in a trade, until
+they unlock it. The hub holds the lock (409 `locked`), so a client cannot get round it; the
+Forge shows the button dimmed with "Locked". Against a hub without marks, nothing of the
+star or the padlock shows.
+
 Fixed 22/10/2026, #117 (Nib: the Forge flickered on the last lines of Craft): Craft's grid
 on its Legendary and Mythical lines, its fifteen swatches drawn rather than live pictures
 (the menu pictures on, or before a live picture is ready), took up to about 2,100 draw
@@ -306,8 +316,8 @@ was "Sol lore" before). Its numbers 000 to 012 are the credits: Sol, Bishop (the
 of JKR, which SJK forked), Creyon, the early team and the projects and people SJK builds
 on; `sjk_alpha_010` is the Toxiee meme card (Legendary, it was `sol_lore_001`), and
 `sjk_alpha_000`, Sol's, brings the Sun blade while held (20/10/2026). Sol edits the cards
-himself since 20/10/2026 with the hub's Card Studio (`scripts/card_studio.py`), so the
-hub's `assets/dist/cards.json` is the list as it stands, not this page.
+on the live hub since 29/10/2026 (from 20/10/2026 with a card editor on their PC), so the
+hub's catalogue is the list as it stands, not this page.
 
 **Credits cards (20/10/2026, Sol's decision):** so that no credit reads as ranked above
 another, every credits card is Mythical (the hub's import and pack build refuse any other
@@ -403,20 +413,23 @@ not know is kept but named nowhere; `Face::blade` in
   knows); the binder's kind filter offers "Kind: Blade" once the packs have one. The
   opening and the reveal show the blade a Solar copy brought ([The ceremony](#in-the-client)).
 
-- **Where cards are made:** Sol keeps each card's picture and words in `card_import/`
-  at the repository's root, which git ignores (`card_import/README.txt` says the format):
-  `cards/card1.png` (1020 x 850, the 6:5 art window, framed as it will show) and
-  `cards/card1.txt` (`number`, `collection`, `kind`, `rarity`, `title`, `art`,
-  `description`, optional `artist`), the full paintings in `sources/`, a white canvas
-  and a frame overlay to frame new ones in `templates/`.
-- **How they reach players:** the hub's `scripts/import_cards.py <card_import>` writes
-  them into the hub's `sjk_cards` pack sources (`cards/<id>.card` JSON and
-  `cards/<id>.jpg`, id `<set>_<NNN>` such as `sjk_alpha_001`), and its
-  `scripts/build_packs.py` builds `sjk_cards.pk3` and the hub's catalogue
-  `cards.json` (id, set, number, rarity). The hub serves the pack like the blade skins'
-  (`GET /v1/assets`), so every SJK client downloads it into `assets/` beside
-  `identity.key` and mounts it; adding a card is a new pack and a hub restart, no client
-  release.
+- **Where cards are made:** on the live hub since 29/10/2026, which keeps each card's
+  picture (1020 x 850, the 6:5 art window, framed as it will show) and words (`number`,
+  `collection`, `kind`, `rarity`, `title`, `description`, optional `artist`). Before,
+  Sol kept them in `card_import/` at the repository's root, which git ignores
+  (`card_import/README.txt` says the format: `cards/card1.png` and `cards/card1.txt`, the
+  full paintings in `sources/`, a white canvas and a frame overlay in `templates/`).
+- **How they reach players:** the hub serves each card's `cards/<id>.card` JSON and
+  `cards/<id>.jpg` (id `<set>_<NNN>` such as `sjk_alpha_001`) in its `sjk_cards` pack,
+  and since 29/10/2026 in `sjk_cards_2`, `sjk_cards_3`... once one pack is full (the
+  client reads every pack's `cards/` alike, and a card pack once listed stays listed).
+  The hub serves them like the blade skins' (`GET /v1/assets`), so every SJK client
+  downloads them into `assets/` beside `identity.key` and mounts them. Since 29/10/2026 a
+  card edited, added or retired changes the hub's catalogue and card packs at once: no
+  hub restart and no client release; clients take the new packs at their next check (at
+  start, then every 6 hours). Until then the hub's `scripts/import_cards.py` and
+  `scripts/build_packs.py` turned `card_import/` into `sjk_cards.pk3` and the catalogue
+  `cards.json`, shipped with a hub restart; they now only seed a new hub.
 - **The hub picks:** opening a holocron rolls the copy's rarity and finish as before,
   then picks a card of that rarity from the catalogue (since 20/10/2026 a set first, then
   a card in it, [SJK Blades](#sjk-blades)); a rarity with no card yet stays sealed. `POST /v1/cards/reveal` gives the person's sealed copies of a

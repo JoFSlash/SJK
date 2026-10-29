@@ -4,11 +4,10 @@ use super::GpuState;
 use super::console::ViewerConsole;
 use super::pointer_input::MouseLook;
 use crate::settings::{
-    DisplayMode, MonitorModes, exclusive_supported, exclusive_video_mode, minimise_after_focus,
-    suspended_after_focus,
+    DisplayMode, MonitorModes, exclusive_supported, exclusive_video_mode, high_dpi,
+    minimise_after_focus, suspended_after_focus, window_size, window_size_request,
 };
 use std::time::{Duration, Instant};
-use winit::dpi::PhysicalSize;
 use winit::window::Fullscreen;
 
 impl GpuState {
@@ -66,6 +65,8 @@ impl GpuState {
             .set_show_miss(console.bool_cvar("cg_showMiss").unwrap_or(false));
         self.local_prediction
             .set_free_knockdown_view(crate::held_view::free_knockdown_view(Some(console)));
+        self.local_prediction
+            .set_ja_pro_plugin_disable(console.plugin_disable_bits());
         if let Some(adapter) = &mut self.legacy_world_adapter {
             adapter.set_smooth_clients(console.smooth_clients());
             let corpses_changed = adapter.set_hide_corpses_in_duel(console.hide_corpses_in_duel());
@@ -120,9 +121,10 @@ impl GpuState {
 
     /// Apply the requested display mode and `r_resolution` to the window.
     ///
-    /// While exclusive fullscreen is suspended (the window lost focus) the
-    /// window is windowed and `r_resolution` is left alone, so the exclusive
-    /// size is entered again unchanged when focus returns.
+    /// `r_resolution` sizes the window only while it is windowed
+    /// ([`window_size_request`]). While exclusive fullscreen is suspended (the
+    /// window lost focus) the window is windowed and `r_resolution` is left
+    /// alone, so the exclusive size is entered again unchanged when focus returns.
     fn apply_display(&mut self) {
         let (Some(console), Some(window)) = (&self.console, &self.window) else {
             return;
@@ -133,6 +135,7 @@ impl GpuState {
         let resolution = console
             .text_value("r_resolution")
             .and_then(parse_resolution);
+        let pixels = high_dpi(console);
         let exclusive = display == DisplayMode::Exclusive;
         // An exclusive video mode is the resolution, so a new size re-enters it.
         let resized = exclusive && resolution.is_some_and(|size| size != self.applied_resolution);
@@ -154,12 +157,17 @@ impl GpuState {
                 self.applied_resolution = size;
             }
         }
-        if let Some([width, height]) = resolution
-            && !suspended
-            && [width, height] != self.applied_resolution
-        {
-            let _ = window.request_inner_size(PhysicalSize::new(width, height));
+        if let Some([width, height]) = window_size_request(
+            display,
+            window.fullscreen().is_some(),
+            suspended,
+            resolution,
+            pixels,
+            (self.applied_resolution, self.applied_high_dpi),
+        ) {
+            let _ = window.request_inner_size(window_size([width, height], pixels));
             self.applied_resolution = [width, height];
+            self.applied_high_dpi = pixels;
         }
     }
 

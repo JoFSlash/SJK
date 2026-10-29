@@ -10,6 +10,12 @@
 //! the player's or how to get it, and Equip or Unequip, and grows upward to hold all its
 //! words. Body shaders, for the whole character, are to come: their kind is shown, not
 //! yet offered.
+//!
+//! Since 29/10/2026 every shader carries its marks (`crate::shader_marks`): a New sticker
+//! for one gained since the player last looked, and, on a hub that keeps them, a star for
+//! a favourite (listed first, under a heading of their own by tier) and a padlock for one
+//! the player locked against breaking down and trading; the card's two toggles, F and L set
+//! them, Shift+F shows the favourites alone and N marks every New one seen.
 
 use super::view::{LEAD_Y, LEFT_X, RIGHT_X, SABER_AREA};
 use super::*;
@@ -94,11 +100,23 @@ fn row_height() -> f32 {
     30.0 + 10.0 * text_scale()
 }
 
+/// The group a row stands in: under a heading of its own on the wall and in the list by
+/// tier.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(super) enum Group {
+    /// The stock blade.
+    Stock,
+    /// The player's favourites (29/10/2026), first after the stock blade.
+    Favourites,
+    /// A tier's.
+    Tier(Rarity),
+}
+
 /// One line of the Shaders tab, as the wall or the list lays it out.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(super) enum Line {
-    /// A section's heading: its tier, `None` for the stock blade's.
-    Head(Option<Rarity>),
+    /// A section's heading: its group.
+    Head(Group),
     /// Rows `start..end` side by side: a line of the wall's tiles, or one row of the
     /// list.
     Things(usize, usize),
@@ -126,17 +144,17 @@ fn lines_of(rows: &[Row], grid: bool, by_tier: bool) -> Vec<Line> {
     let mut lines = Vec::new();
     let mut index = 0;
     while index < rows.len() {
-        let tier = rows[index].tier();
+        let group = rows[index].group();
         let end = if grid || by_tier {
             rows[index..]
                 .iter()
-                .position(|row| row.tier() != tier)
+                .position(|row| row.group() != group)
                 .map_or(rows.len(), |count| index + count)
         } else {
             rows.len()
         };
-        if grid || (by_tier && tier.is_some()) {
-            lines.push(Line::Head(tier));
+        if grid || (by_tier && group != Group::Stock) {
+            lines.push(Line::Head(group));
         }
         let step = if grid { WALL_COLUMNS } else { 1 };
         let mut start = index;
@@ -374,6 +392,10 @@ struct Row {
     count: u32,
     /// Its blade number shows: only while `debug_collectibles` is on (Sol, 21/10/2026).
     numbered: bool,
+    /// Its collection marks (29/10/2026, `crate::shader_marks`): a favourite, locked, New.
+    favourite: bool,
+    locked: bool,
+    new: bool,
 }
 
 /// `word` with how many are held after it when there are several: "Yours x2".
@@ -404,6 +426,15 @@ impl Row {
         self.skin.map(|skin| skin.tier)
     }
 
+    /// The group it stands in: the stock blade's, the favourites' or its tier's.
+    fn group(self) -> Group {
+        match self.skin {
+            None => Group::Stock,
+            Some(_) if self.favourite => Group::Favourites,
+            Some(skin) => Group::Tier(skin.tier),
+        }
+    }
+
     /// Its frame's colour: its tier's, quieter when locked; the stock blade's is the
     /// page's own.
     fn frame_colour(self) -> sjk_ui::Color {
@@ -413,8 +444,9 @@ impl Row {
         }
     }
 
-    /// Its state in a word after its icon (a lightsaber worn, a tick held, a padlock
-    /// locked), with how many are held: a tile's line and a row's Yours.
+    /// Its state in a word after its icon (a lightsaber worn, a tick held; "Not owned"
+    /// without one, since 29/10/2026 the padlock is the player's own lock), with how many
+    /// are held: a tile's line and a row's Yours.
     fn status(self) -> String {
         match (self.skin, self.worn, self.owned) {
             (None, true, _) => format!("{}  Worn", symbols::SABER),
@@ -433,7 +465,7 @@ impl Row {
             (Some(_), false, true) => {
                 format!("{}  {}", symbols::TICK, held_words("Yours", self.count))
             }
-            (Some(_), false, false) => format!("{}  Locked", symbols::LOCK),
+            (Some(_), false, false) => "Not owned".to_owned(),
         }
     }
 
@@ -445,7 +477,7 @@ impl Row {
             (Some(_), true, _) => Some(format!("{}  Worn", symbols::SABER)),
             (Some(_), false, true) if self.second => Some(format!("{}  2nd blade", symbols::SABER)),
             (Some(_), false, true) => Some(format!("{}  Yours", symbols::TICK)),
-            (Some(_), false, false) => Some(format!("{}  Locked", symbols::LOCK)),
+            (Some(_), false, false) => Some("Not owned".to_owned()),
         }
     }
 }
@@ -513,12 +545,14 @@ impl Columns {
 impl Panel {
     /// The rows: the stock blade, then the shaders the player may see
     /// ([`unlockables::Holdings::listed`]: a Unique one only while held) that `filter` keeps,
-    /// by tier (the rarest first), or in the list's order `sort` when not `by_tier`.
+    /// by tier (the rarest first), or in the list's order `sort` when not `by_tier`; the
+    /// favourites among `marks` first, each part in that order.
     fn rows(
         inputs: &Inputs<'_>,
         filter: &ShaderFilter,
         sort: ShaderSort,
         by_tier: bool,
+        marks: &crate::shader_marks::Marks,
     ) -> Vec<Row> {
         let worn = inputs
             .holdings
@@ -531,7 +565,13 @@ impl Panel {
         let mut skins: Vec<Row> = inputs
             .holdings
             .listed()
-            .filter(|skin| filter.passes(skin, inputs.holdings.unlock(skin.id).is_some()))
+            .filter(|skin| {
+                filter.passes(
+                    skin,
+                    inputs.holdings.unlock(skin.id).is_some(),
+                    marks.favourite(skin.id),
+                )
+            })
             .map(|skin| Row {
                 skin: Some(skin),
                 owned: inputs.holdings.unlock(skin.id).is_some(),
@@ -542,6 +582,9 @@ impl Panel {
                     .unlock(skin.id)
                     .map_or(0, |unlock| unlock.count),
                 numbered: inputs.holdings.debug(),
+                favourite: marks.favourite(skin.id),
+                locked: marks.locked(skin.id),
+                new: marks.is_new(skin.id),
             })
             .collect();
         if !by_tier {
@@ -555,6 +598,10 @@ impl Panel {
                 }
             }
         }
+        // The favourites first, in whatever order stands (29/10/2026).
+        crate::shader_marks::favourites_first(&mut skins, marks, |row| {
+            row.skin.map_or("", |skin| skin.id)
+        });
         std::iter::once(Row {
             skin: None,
             owned: true,
@@ -562,6 +609,9 @@ impl Panel {
             second: pair && second == Some(None) && worn.is_some(),
             count: 1,
             numbered: false,
+            favourite: false,
+            locked: false,
+            new: false,
         })
         .chain(skins)
         .collect()
@@ -597,8 +647,25 @@ impl Panel {
         // (a Unique shader the hub's answer brings first, one given or taken back) keeps it
         // chosen rather than whatever now stands at its place.
         let chosen = self.skin_at(self.shader).map(|skin| skin.id);
-        let rows = Self::rows(inputs, &self.shader_filter, self.shader_sort, by_tier);
+        self.follow_marks(inputs);
+        if !self.marks.kept && self.shader_filter.favourite {
+            // A hub that keeps no marks (another one, or the identity off) has no favourites.
+            self.shader_filter.favourite = false;
+        }
+        let rows = Self::rows(
+            inputs,
+            &self.shader_filter,
+            self.shader_sort,
+            by_tier,
+            &self.marks,
+        );
         self.shader_list = rows.iter().filter_map(|row| row.skin).collect();
+        self.shader_owned.clear();
+        self.shader_owned.extend(
+            rows.iter()
+                .filter(|row| row.owned)
+                .filter_map(|row| row.skin.map(|skin| skin.id)),
+        );
         self.shader_count = rows.len();
         self.shader_swatches.clear();
         // A blade card's button (or a change of view or order) asked for its shader.
@@ -615,6 +682,12 @@ impl Panel {
             self.shader = rows.iter().position(|row| row.worn).unwrap_or(0);
             self.shader_first = 0;
         }
+        // A New one chosen is seen once the choice leaves it.
+        self.view(
+            rows.get(self.shader)
+                .and_then(|row| row.skin)
+                .map(|skin| skin.id),
+        );
         let owned = unlockables::blade_skins()
             .filter(|skin| inputs.holdings.unlock(skin.id).is_some())
             .count();
@@ -649,6 +722,7 @@ impl Panel {
             }
         };
         self.lead(frame, &headline, line);
+        self.new_count(frame, &headline);
         self.kinds(frame, owned, total);
         self.view_switches(frame);
         self.toolbar(frame);
@@ -727,7 +801,7 @@ impl Panel {
         for line in lines.iter().skip(first).take(shown) {
             let height = line_height(line, self.grid);
             match *line {
-                Line::Head(tier) => self.heading(frame, inputs, tier, y, height),
+                Line::Head(group) => self.heading(frame, inputs, group, y, height),
                 Line::Things(start, end) => {
                     for (index, row) in rows.iter().enumerate().take(end).skip(start) {
                         if self.grid {
@@ -753,6 +827,59 @@ impl Panel {
         if let Some(row) = rows.get(self.shader).copied() {
             self.shader_card(frame, row, inputs, seconds);
         }
+    }
+
+    /// How many shaders are New, after the headline (`headline`'s words), and Mark all
+    /// seen beside it (N), while there is one.
+    fn new_count(&mut self, frame: &Frame, headline: &str) {
+        let count = self.marks.new_count();
+        if count == 0 {
+            return;
+        }
+        let s = frame.s;
+        let k = text_scale();
+        let x = LEFT_X + crate::text::display_width(headline, 30.0) * k * self.widen + 18.0;
+        let y = LEAD_Y + 5.0;
+        let sticker = marks_view::new_sticker(&mut self.ui, frame, [x, y], 26.0);
+        let words = format!("{count} new");
+        let words_x = x + sticker + 10.0;
+        let words_width = crate::text::display_width(&words, 20.0) * k * self.widen + 8.0;
+        text(
+            &mut self.ui,
+            TextFamily::Display,
+            format_args!("{words}"),
+            frame.rect(words_x, y - 1.0, words_width, 28.0),
+            20.0 * s,
+            color::GOLD_BRIGHT,
+            FontWeight::Semibold,
+            TextAlign::Start,
+        );
+        let label = "Mark all seen";
+        let width = crate::text::display_width(label, 15.0) * k * self.widen + 30.0;
+        let rect = frame.rect(words_x + words_width + 8.0, y - 1.0, width, 28.0);
+        let hovered = self.ui.token_hovered(SEEN_ALL_TOKEN);
+        let _ = self.ui.draw_list_mut().push(DrawCommand::RoundedRect {
+            rect,
+            radius: 14.0 * s,
+            color: color::alpha(color::GOLD, if hovered { 0.18 } else { 0.06 }),
+        });
+        let _ = self.ui.draw_list_mut().push(DrawCommand::Border {
+            rect,
+            radius: 14.0 * s,
+            width: 1.2 * s,
+            color: color::alpha(color::GOLD, if hovered { 1.0 } else { 0.55 }),
+        });
+        text(
+            &mut self.ui,
+            TextFamily::Display,
+            format_args!("{label}"),
+            frame.rect(words_x + words_width + 8.0, y + 3.0, width, 22.0),
+            15.0 * s,
+            color::GOLD_BRIGHT,
+            FontWeight::Semibold,
+            TextAlign::Center,
+        );
+        self.ui.hit_region(SEEN_ALL_TOKEN, rect);
     }
 
     /// Scroll the wall or the list a line up (`up`) or down; the shader chosen stays in
@@ -791,22 +918,21 @@ impl Panel {
     }
 
     /// A section's heading at `y`: its tier's name in its colour, how many of it the
-    /// player holds, and a line after them in its colour; the stock blade's "Stock".
-    fn heading(
-        &mut self,
-        frame: &Frame,
-        inputs: &Inputs<'_>,
-        tier: Option<Rarity>,
-        y: f32,
-        height: f32,
-    ) {
+    /// player holds, and a line after them in its colour; the stock blade's "Stock", the
+    /// favourites' "Favourites" in gold.
+    fn heading(&mut self, frame: &Frame, inputs: &Inputs<'_>, group: Group, y: f32, height: f32) {
         let s = frame.s;
-        let (name, colour) = match tier {
-            Some(tier) => (
+        let (name, colour) = match group {
+            Group::Tier(tier) => (
                 format!("{}  {}", tier.symbol(), tier.label()),
                 tier.colour(),
             ),
-            None => (format!("{}  Stock", symbols::SABER), color::HOLO),
+            Group::Favourites => (format!("{}  Favourites", symbols::EDITION), color::GOLD),
+            Group::Stock => (format!("{}  Stock", symbols::SABER), color::HOLO),
+        };
+        let tier = match group {
+            Group::Tier(tier) => Some(tier),
+            _ => None,
         };
         let words_y = y + height - 30.0;
         let width = crate::text::display_width(&name, 20.0) * text_scale() + 16.0;
@@ -846,13 +972,14 @@ impl Panel {
         }
     }
 
-    /// The filters' line under the headline: Owned (O), Chroma (C), and the search field
-    /// to the list's right edge (/).
+    /// The filters' line under the headline: Owned (O), Chroma (C), Favourites (Shift+F,
+    /// while the hub keeps marks), and the search field to the list's right edge (/).
     fn toolbar(&mut self, frame: &Frame) {
         let s = frame.s;
         let y = TOOLBAR_Y;
         let mut left = LEFT_X;
-        for (token, label, lit, chroma) in [
+        let favourites = format!("{}  Favourites", symbols::EDITION);
+        let chips = [
             (FILTER_OWNED_TOKEN, "Owned", self.shader_filter.owned, false),
             (
                 FILTER_CHROMA_TOKEN,
@@ -860,7 +987,15 @@ impl Panel {
                 self.shader_filter.chroma,
                 true,
             ),
-        ] {
+            (
+                FILTER_FAVOURITE_TOKEN,
+                favourites.as_str(),
+                self.shader_filter.favourite,
+                false,
+            ),
+        ];
+        let shown = if self.marks.kept { 3 } else { 2 };
+        for (token, label, lit, chroma) in chips.into_iter().take(shown) {
             let mark = if chroma { MARK + 8.0 } else { 0.0 };
             let width = crate::text::display_width(label, 15.0) * text_scale() + 36.0 + mark;
             let rect = frame.rect(left, y, width, TOOLBAR_HEIGHT);
@@ -1340,6 +1475,18 @@ impl Panel {
                 seconds,
             );
         }
+        // The marks over the blade's right end, the New sticker on the top edge.
+        let _ = marks_view::glyph_pill(
+            &mut self.ui,
+            frame,
+            [x + width - 6.0, y + 9.0],
+            24.0,
+            row.favourite,
+            row.locked,
+        );
+        if row.new {
+            let _ = marks_view::new_sticker(&mut self.ui, frame, [x + 8.0, y - 8.0], 17.0);
+        }
         self.ui.hit_region(token, area);
     }
 
@@ -1401,7 +1548,30 @@ impl Panel {
                 );
             }
         }
-        let [name_x, name_width] = columns.name;
+        let [name_x, mut name_width] = columns.name;
+        // The marks at the name column's end: the New sticker last, the star and padlock
+        // before it.
+        let mut marks_right = name_x + name_width;
+        if row.new {
+            let width = marks_view::new_sticker(
+                &mut self.ui,
+                frame,
+                [marks_right - 40.0, middle - 9.0],
+                18.0,
+            );
+            marks_right -= width + 6.0 + (40.0 - width).max(0.0);
+        }
+        let marks_left = marks_view::glyph_pill(
+            &mut self.ui,
+            frame,
+            [marks_right, middle - 11.0],
+            22.0,
+            row.favourite,
+            row.locked,
+        );
+        if marks_left < name_x + name_width {
+            name_width = (marks_left - 6.0 - name_x).max(40.0);
+        }
         let chroma = row.skin.is_some_and(|skin| skin.chroma);
         let name_x = if chroma {
             swatch::chroma_mark(
@@ -1649,11 +1819,7 @@ impl Panel {
                 color::GOLD,
             ),
             (Some(skin), None) => (
-                format!(
-                    "{}  How to get it: {}",
-                    symbols::LOCK,
-                    crate::terms::say(skin.how_to_get)
-                ),
+                format!("How to get it: {}", crate::terms::say(skin.how_to_get)),
                 color::MUTED,
             ),
         }
@@ -1748,6 +1914,16 @@ impl Panel {
                 FontWeight::Semibold,
                 TextAlign::End,
             );
+            if row.new {
+                let kind_width =
+                    crate::text::display_width(&kind, 21.0) * text_scale() * self.widen;
+                let _ = marks_view::new_sticker(
+                    &mut self.ui,
+                    frame,
+                    [x + kind_width + 14.0, y + 3.0],
+                    22.0,
+                );
+            }
         }
         y += 36.0;
         let lit = row.owned && row.skin.is_some();
@@ -1946,7 +2122,35 @@ impl Panel {
             );
             left += button_width + 12.0;
         }
-        self.trade_buttons(frame, row, inputs, [left, button_y], x + width);
+        // The star and the padlock at the foot's right end, on a hub that keeps them; the
+        // padlock only for a shader the player holds.
+        let mut right = x + width;
+        if let Some(skin) = row.skin.filter(|_| self.marks.kept) {
+            let toggles_x = right - marks_view::TOGGLES;
+            marks_view::toggle(
+                &mut self.ui,
+                frame,
+                [toggles_x, button_y],
+                symbols::EDITION,
+                self.marks.favourite(skin.id),
+                true,
+                FAVOURITE_TOKEN,
+            );
+            marks_view::toggle(
+                &mut self.ui,
+                frame,
+                [
+                    toggles_x + marks_view::TOGGLE + marks_view::TOGGLE_GAP,
+                    button_y,
+                ],
+                symbols::LOCK,
+                self.marks.locked(skin.id),
+                row.owned || self.marks.locked(skin.id),
+                LOCK_TOKEN,
+            );
+            right = toggles_x - 12.0;
+        }
+        self.trade_buttons(frame, row, inputs, [left, button_y], right);
     }
 
     /// The way to the Forge at `[x, y]` on the card's foot, while the hub's economy is
@@ -2089,8 +2293,8 @@ impl Panel {
             TextAlign::End,
         );
         if !row.owned {
-            let words = format!("{}  Preview: not yours yet", symbols::LOCK);
-            let pill = crate::text::display_width(&words, 16.0) * text_scale() + 40.0;
+            let words = "Preview: not yours yet";
+            let pill = crate::text::display_width(words, 16.0) * text_scale() + 40.0;
             let rect = frame.rect(x, switch_bottom, pill, 34.0);
             let _ = self.ui.draw_list_mut().push(DrawCommand::RoundedRect {
                 rect,
@@ -2671,11 +2875,22 @@ mod tests {
     fn the_lines_head_each_tier_and_hold_the_rows() {
         let held = [unlock("saber_sun")];
         let inputs = super::super::tests::inputs(unlockables::Holdings::Known(&held), "");
-        let rows = Panel::rows(&inputs, &ShaderFilter::default(), ShaderSort::Tier, true);
+        let none = crate::shader_marks::Marks::default();
+        let rows = Panel::rows(
+            &inputs,
+            &ShaderFilter::default(),
+            ShaderSort::Tier,
+            true,
+            &none,
+        );
         let wall = lines_of(&rows, true, true);
-        assert_eq!(wall[0], Line::Head(None), "the stock blade's heading");
+        assert_eq!(
+            wall[0],
+            Line::Head(Group::Stock),
+            "the stock blade's heading"
+        );
         assert_eq!(wall[1], Line::Things(0, 1));
-        assert_eq!(wall[2], Line::Head(Some(Rarity::Mythical)));
+        assert_eq!(wall[2], Line::Head(Group::Tier(Rarity::Mythical)));
         let things: usize = wall
             .iter()
             .map(|line| match line {
@@ -2694,8 +2909,14 @@ mod tests {
             Line::Things(0, 1),
             "no heading over the stock blade"
         );
-        assert_eq!(list[1], Line::Head(Some(Rarity::Mythical)));
-        let by_name = Panel::rows(&inputs, &ShaderFilter::default(), ShaderSort::Name, false);
+        assert_eq!(list[1], Line::Head(Group::Tier(Rarity::Mythical)));
+        let by_name = Panel::rows(
+            &inputs,
+            &ShaderFilter::default(),
+            ShaderSort::Name,
+            false,
+            &none,
+        );
         let list = lines_of(&by_name, false, false);
         assert!(list.iter().all(|line| matches!(line, Line::Things(..))));
         assert_eq!(list.len(), by_name.len());
@@ -2704,7 +2925,13 @@ mod tests {
             .map(|row| row.name().to_lowercase())
             .collect();
         assert!(names.windows(2).all(|pair| pair[0] <= pair[1]), "{names:?}");
-        let yours = Panel::rows(&inputs, &ShaderFilter::default(), ShaderSort::Yours, false);
+        let yours = Panel::rows(
+            &inputs,
+            &ShaderFilter::default(),
+            ShaderSort::Yours,
+            false,
+            &none,
+        );
         assert_eq!(
             yours[1].skin.map(|skin| skin.id),
             Some("saber_sun"),
@@ -2712,12 +2939,96 @@ mod tests {
         );
     }
 
+    /// Favourites (29/10/2026) stand first after the stock blade: under a heading of their
+    /// own on the wall and in the list by tier, simply first in another order; the
+    /// favourites chip keeps them alone. A shader's marks reach its row.
+    #[test]
+    fn favourites_are_listed_first_under_their_heading() {
+        let held = [unlock("saber_sun"), unlock("saber_frost")];
+        let inputs = super::super::tests::inputs(unlockables::Holdings::Known(&held), "");
+        let marks = crate::shader_marks::Marks::shown(
+            &["saber_frost", "saber_storm"],
+            &["saber_sun"],
+            &["saber_frost"],
+            None,
+        );
+        let rows = Panel::rows(
+            &inputs,
+            &ShaderFilter::default(),
+            ShaderSort::Tier,
+            true,
+            &marks,
+        );
+        let ids: Vec<_> = rows
+            .iter()
+            .map(|row| row.skin.map(|skin| skin.id))
+            .collect();
+        // Storm is the rarer of the two, so it stands first among them.
+        let storm = unlockables::find("saber_storm").unwrap().tier;
+        let frost = unlockables::find("saber_frost").unwrap().tier;
+        let favourites = if storm >= frost {
+            [Some("saber_storm"), Some("saber_frost")]
+        } else {
+            [Some("saber_frost"), Some("saber_storm")]
+        };
+        assert_eq!(ids[0], None, "the stock blade first");
+        assert_eq!(ids[1..3], favourites);
+        let wall = lines_of(&rows, true, true);
+        assert_eq!(wall[2], Line::Head(Group::Favourites));
+        assert_eq!(wall[3], Line::Things(1, 3));
+        assert!(!wall[4..].contains(&Line::Head(Group::Favourites)));
+        let frost_row = rows
+            .iter()
+            .find(|row| row.skin.is_some_and(|skin| skin.id == "saber_frost"))
+            .unwrap();
+        assert!(frost_row.favourite && frost_row.new && !frost_row.locked);
+        let sun_row = rows
+            .iter()
+            .find(|row| row.skin.is_some_and(|skin| skin.id == "saber_sun"))
+            .unwrap();
+        assert!(sun_row.locked && !sun_row.favourite);
+        // By name: first, without a heading.
+        let by_name = Panel::rows(
+            &inputs,
+            &ShaderFilter::default(),
+            ShaderSort::Name,
+            false,
+            &marks,
+        );
+        assert!(by_name[1].favourite && by_name[2].favourite && !by_name[3].favourite);
+        assert!(
+            lines_of(&by_name, false, false)
+                .iter()
+                .all(|line| matches!(line, Line::Things(..)))
+        );
+        // The chip: the favourites alone.
+        let only = ShaderFilter {
+            favourite: true,
+            ..ShaderFilter::default()
+        };
+        let alone = Panel::rows(&inputs, &only, ShaderSort::Tier, true, &marks);
+        assert_eq!(alone.len(), 3, "the stock blade and the two favourites");
+        // Not held: no padlock in the state, the words say it.
+        let storm_row = alone
+            .iter()
+            .find(|row| row.skin.is_some_and(|skin| skin.id == "saber_storm"))
+            .unwrap();
+        assert_eq!(storm_row.status(), "Not owned");
+        assert_eq!(storm_row.state().as_deref(), Some("Not owned"));
+    }
+
     /// Up and Down on the wall go to the line above or under, past headings, keeping the
     /// column or the nearest one; a scroll window always shows the line of the one chosen.
     #[test]
     fn the_wall_moves_by_lines_and_keeps_the_chosen_in_view() {
         let inputs = super::super::tests::inputs(unlockables::Holdings::Known(&[]), "");
-        let rows = Panel::rows(&inputs, &ShaderFilter::default(), ShaderSort::Tier, true);
+        let rows = Panel::rows(
+            &inputs,
+            &ShaderFilter::default(),
+            ShaderSort::Tier,
+            true,
+            &crate::shader_marks::Marks::default(),
+        );
         let lines = lines_of(&rows, true, true);
         // The stock blade alone, then Mythical's twelve: rows 1 to 6 and 7 to 12.
         assert_eq!(vertical(&lines, 0, false), 0, "the top");
@@ -2797,8 +3108,13 @@ mod tests {
                 };
                 panel.shader = row + 1;
                 panel.build(&inputs, &font, [1_920.0, 1_080.0]);
-                let row = Panel::rows(&inputs, &ShaderFilter::default(), ShaderSort::Tier, true)
-                    [panel.shader];
+                let row = Panel::rows(
+                    &inputs,
+                    &ShaderFilter::default(),
+                    ShaderSort::Tier,
+                    true,
+                    &crate::shader_marks::Marks::default(),
+                )[panel.shader];
                 let height = panel.card_height(row, &inputs);
                 assert!(
                     height <= CARD_BOTTOM - CARD_TOP_MIN,

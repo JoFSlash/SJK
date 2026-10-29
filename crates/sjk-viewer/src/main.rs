@@ -22,6 +22,8 @@ mod auto_switch;
 mod avatar_command;
 mod avatars;
 mod away_emote;
+mod banana;
+mod banana_frame;
 mod block_command;
 mod bolt;
 mod boombox;
@@ -58,6 +60,7 @@ mod loot_odds;
 
 mod saber_colour_command;
 mod shader_image;
+mod shader_marks;
 mod shared_textures;
 
 mod body_fade;
@@ -133,6 +136,7 @@ mod file_dialog;
 mod fps_help;
 mod frame_target;
 mod free_camera;
+mod fs_restart;
 mod game_font;
 mod game_menu_actions;
 mod gameplay_fps;
@@ -428,8 +432,12 @@ fn main() {
 }
 /// Tell the player why the game closed: a release build on Windows has no console, so
 /// without this the window only vanished (a laptop with two graphics cards, #sjk player
-/// chat 28-29/10/2026).
+/// chat 28-29/10/2026). `SJK_NO_START_DIALOG` leaves it out for unattended runs (the
+/// release's package smoke check), where nobody would close it.
 fn show_start_failure(error: &str) {
+    if std::env::var_os("SJK_NO_START_DIALOG").is_some() {
+        return;
+    }
     let _ = rfd::MessageDialog::new()
         .set_level(rfd::MessageLevel::Error)
         .set_title("SJK could not start")
@@ -563,13 +571,15 @@ struct GpuState {
     monitor: monitor::Monitor,
     /// The Box hunt toy (`toy_boxhunt`): its switch, the consent to hunt and be the mark.
     box_hunt: box_hunt::BoxHunt,
+    /// The Banana peel toy (`toy_banana`): its switch and the peels on the floor.
+    banana: banana::Banana,
     /// The Tag toy (`toy_tag`): the own tag stuck on the world.
     tags: tags::Tags,
     /// The Ragdoll toy (`toy_ragdoll`): the player's own fall and the falls of others.
     ragdoll: ragdoll::Ragdoll,
-    /// Order 66's, the Hax's, the Drone's, the Monitor's and Box hunt's switches as last
-    /// saved (`toy_saved`).
-    toys_saved: [toy_saved::Saved; 5],
+    /// Order 66's, the Hax's, the Drone's, the Monitor's, Box hunt's and the Banana peel's
+    /// switches as last saved (`toy_saved`).
+    toys_saved: [toy_saved::Saved; 6],
     /// The Holocrons tab's 3D holocron ([`holocrons::stage`]).
     holocron_stage: holocrons::stage::Stage,
     /// The time its turn and bob are drawn at, instead of the clock's, for a world shot.
@@ -728,6 +738,8 @@ struct GpuState {
     /// screen with retail's opaque menu or loading screen.
     world_hidden: bool,
     applied_resolution: [u32; 2],
+    /// Whether [`Self::applied_resolution`] counted pixels or points (`r_highDpi`).
+    applied_high_dpi: bool,
     /// Monitor refresh rate behind `com_maxfps -1`, re-read at most once a second.
     refresh_cap: std::cell::Cell<Option<(Instant, u32)>>,
     frame_pacer: frame_pacing::FramePacer,
@@ -1550,6 +1562,7 @@ impl GpuState {
             boombox: Default::default(),
             monitor: Default::default(),
             box_hunt: Default::default(),
+            banana: Default::default(),
             tags: Default::default(),
             ragdoll: Default::default(),
             toys_saved: Default::default(),
@@ -1669,6 +1682,7 @@ impl GpuState {
             display_changed_at: Instant::now(),
             world_hidden: false,
             applied_resolution: [size.width, size.height],
+            applied_high_dpi: true,
             refresh_cap: std::cell::Cell::new(None),
             frame_pacer: frame_pacing::FramePacer::new(),
             upper_right_rate: String::with_capacity(16),
@@ -1819,9 +1833,11 @@ impl GpuState {
         prediction_preview::tick(self, game_audio, Instant::now(), presentation_time as i32);
         // Hidden in the box, the eye stays down while the server stands the player up.
         self.keep_boxed_eye();
-        // The Monitor's monitors, then the Ragdoll's bodies (one may strike) at this
-        // frame's time, for the camera and the actors.
+        // The Monitor's monitors and the Banana peel's peels, then the Ragdoll's bodies
+        // (one may strike, one may trip) at this frame's time, for the camera and the
+        // actors.
         self.step_monitors(presentation_time);
+        self.step_bananas(presentation_time);
         self.step_ragdolls(presentation_time);
         timing.mark(Phase::Config);
         self.refresh_config_strings(game_audio);
@@ -2677,6 +2693,7 @@ impl GpuState {
         self.submit_order66(presentation_time, visual_now);
         self.submit_drones(presentation_time, visual_now);
         self.submit_monitors(presentation_time);
+        self.submit_bananas(presentation_time);
         self.submit_holocron_stage(visual_now);
         self.sync_saber_skins(game_audio, presentation_time);
         let debug_missiles = effect_debug::sync(self.console.as_ref());

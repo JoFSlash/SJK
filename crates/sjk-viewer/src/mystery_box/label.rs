@@ -119,6 +119,9 @@ fn came_out(opening: &Opening, pays: impl Fn(&str) -> Option<u64>) -> Label {
         "empty" => ("EMPTY", Tone::Empty),
         wire::EXPLODE => ("BOOM!", Tone::Jackpot),
         wire::HOLOCRON => ("HOLOCRON!", Tone::Jackpot),
+        wire::SHARD_PILE => ("KYBER SHARDS", Tone::Win),
+        wire::AGAIN => ("FREE BOX!", Tone::Win),
+        wire::BLADE => ("MYSTERY BLADE!", Tone::Jackpot),
         _ if won > 0 => ("PRIZE", Tone::Win),
         _ => ("EMPTY", Tone::Empty),
     };
@@ -127,9 +130,16 @@ fn came_out(opening: &Opening, pays: impl Fn(&str) -> Option<u64>) -> Label {
         .as_ref()
         .and_then(|prize| prize.holocron.as_deref())
         .and_then(crate::holocrons::name);
+    let shards = opening.mine.as_ref().and_then(|prize| prize.shards);
     let mut line = match opening.outcome.as_str() {
         wire::EXPLODE => "It blew up".to_owned(),
         wire::HOLOCRON => tier.unwrap_or("A holocron").to_owned(),
+        wire::SHARD_PILE | wire::BLADE if shards.is_some() => {
+            format!("+{} kyber shards", shards.unwrap_or(0))
+        }
+        wire::SHARD_PILE => "A pile of kyber shards".to_owned(),
+        wire::AGAIN => "The next roll is free".to_owned(),
+        wire::BLADE => "The box's own saber shader".to_owned(),
         _ if won > 0 => format!("+{won} credits"),
         _ => "Nothing inside".to_owned(),
     };

@@ -39,6 +39,7 @@ impl GpuState {
             chat_gifs::set_enabled(console.bool_cvar(chat_gifs::CVAR) != Some(false));
             chat_gifs::set_video(console.bool_cvar(chat_gifs::VIDEO_CVAR) == Some(true));
             chat_gifs::favourites::load(console.config_directory());
+            crate::shader_marks::load(console.config_directory());
             chat_gifs::sources::load(console.config_directory());
             crate::jof_tag::set_shown(console.bool_cvar(crate::jof_tag::CVAR) != Some(false));
             crate::chat::client_icons::set_shown(
@@ -62,6 +63,11 @@ impl GpuState {
         });
         // A tag just stuck or taken off goes at once too.
         let due = player_identity::due() || skins_changed | self.tags.take_changed();
+        // The shaders seen on this PC follow what the player holds (New marks), on the
+        // identity's turns only.
+        if due {
+            let _ = player_identity::with_snapshot(crate::shader_marks::follow);
+        }
         self.update_looks(due);
         self.update_tags();
         // The hub's toy events for this server, taken once for every toy.
@@ -86,7 +92,8 @@ impl GpuState {
         self.update_order66(&toy_events);
         self.update_hax(&toy_events, &relay_events);
         self.update_ragdoll(&relay_events);
-        self.update_monitor(&relay_events);
+        self.update_monitor(&relay_events, &toy_events);
+        self.update_banana(&relay_events);
         self.update_drone(&relay_events);
         self.update_boombox(&relay_events);
         self.update_mystery_boxes(&toy_events);

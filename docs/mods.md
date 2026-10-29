@@ -91,7 +91,7 @@ decimals, as EternalJK's `%f` does.
 | `japlus.mark`, `japlus.recall` | `PTelemark`, `PTele` | Keeps your position and yaw in whole units; recall sends `setviewpos`, which only a server that allows it runs |
 | `japlus.autologin` | `autoLogin` | Sends `amlogin <password>` with the password saved for the current server in `japlus.loginServer1-3` / `japlus.loginPass1-3`. A server without a port is `:29070`, and a host name is looked up when the command runs. Like EJK it runs only when asked, not during the intermission, and the passwords are saved as plain text |
 | `japlus.serverconfig` | `serverconfig` | Lists a JA+ server's `jp_cinfo` options (flip kick, roll fix mode, DFA variants, kata, ledge grab, alternate dimension); on jaPRO/TaystJK asks the server |
-| `japlus.plugin [id]` | `pluginDisable` | Lists the fifteen JA+ plugin features as Allowed/Disallowed, or toggles one bit of `cp_pluginDisable` |
+| `japlus.plugin [number]` | `plugin`, `pluginDisable` | Lists JA+'s [plugin options](#plugin-options) as On or Off, or switches one by EJK's number |
 
 A player is named by client number, by name (colours and case ignored) or by a
 fragment of exactly one name. On a JA+ server the mod also completes JA+'s server
@@ -101,6 +101,7 @@ commands: the admin set, clan commands, duels and emotes, from EternalJK's `gcmd
 | --- | --- |
 | `japlus.loginServer1-3`, `japlus.loginPass1-3` | `japlus.autologin`'s servers and passwords |
 | `japlus.antiAmKiss` | [Anti-kiss](#anti-kiss); `cg_antiAmKiss` is its alias |
+| JA+ plugin options | Switches for bits of `cp_pluginDisable` ([Plugin options](#plugin-options)) |
 
 EternalJK's `amColor` is the core's `amcolor`: the tint is stock JKA userinfo, so it
 works on every server and is not a JA+ tool (an earlier `japlus.color` duplicate was
@@ -114,7 +115,8 @@ works with `mod_japlus 0` ([What stays in the core](#rules)).
 
 | Part | Where | Name |
 | --- | --- | --- |
-| Admin teleports, auto login, server options, plugin bits | [sjk-mod-japlus](../crates/sjk-mod-japlus/src/lib.rs) | `japlus.*` commands |
+| Admin teleports, auto login, server options | [sjk-mod-japlus](../crates/sjk-mod-japlus/src/lib.rs) | `japlus.*` commands |
+| Plugin options: the table, the command, the Settings switches | [plugin.rs](../crates/sjk-mod-japlus/src/plugin.rs), bridged by [plugin_rows.rs](../crates/sjk-viewer/src/settings/plugin_rows.rs) | `japlus.plugin` |
 | Anti-kiss | [anti_kiss.rs](../crates/sjk-mod-japlus/src/anti_kiss.rs), bridged by [anti_emote.rs](../crates/sjk-viewer/src/anti_emote.rs) | `japlus.antiAmKiss` |
 | Passwords the console masks | [secrets.rs](../crates/sjk-mod-japlus/src/secrets.rs) | |
 | Server command completion | [server_commands.rs](../crates/sjk-mod-japlus/src/server_commands.rs) | |
@@ -132,7 +134,8 @@ options in classic); the away emote stays beside the SJK one under Gameplay.
 
 Before the mod, `serverconfig` and `pluginDisable` were core commands. A bare
 `serverconfig` is now sent to the server like any unknown command, which
-jaPRO/TaystJK servers answer. TaystJK's completion lists it.
+jaPRO/TaystJK servers answer. TaystJK's completion lists it. EJK's `plugin` is
+`japlus.plugin` on JA+ and `japro.plugin` on jaPRO ([Plugin options](#plugin-options)).
 
 ### Anti-kiss
 
@@ -192,6 +195,7 @@ once.
 | --- | --- |
 | `japro.styles` | Lists the styles and which ones SJK predicts |
 | `japro.predictMoveStyles` | Off by default. On, every style is predicted as JKA, the earlier behaviour (Settings > Mods, "Predict all styles") |
+| `japro.plugin [number]` | JoF EJK's `plugin` on jaPRO: lists jaPRO's [plugin options](#plugin-options) as On or Off, or switches one by EJK's number ([plugin.rs](../crates/sjk-mod-japro/src/plugin.rs)) |
 
 With `mod_japro 0`, or a build without `mod-japro`, every style is predicted as JKA.
 
@@ -368,9 +372,85 @@ open its window, send responses or load its node audio. Demos send no replies.
 The remote server retains all quest conditions, stages, rewards and persistence;
 this is no native SJK quest server system.
 
+## Plugin options
+
+`cp_pluginDisable` is the userinfo bit mask a JA+ or jaPRO server reads, and the clients
+made for them read too, to switch plugin features for one player (the setting and its
+default, 1536, are the core client's: [networking.md](networking.md)). Players used to
+type a number (`cp_pluginDisable 1536`); since 29/10/2026 (Kushina's idea) Settings > Mods
+shows each option SJK can honour as a switch, under JA+ plugin options and jaPRO plugin
+options (classic: Game options), and `japlus.plugin` and `japro.plugin` are JoF
+EternalJK's `plugin` command.
+
+- **No double negatives** (Sol, 29/10/2026). Most bits switch a feature off when set, a
+  few switch one on. Every switch and every line of the commands is named after the
+  feature and says whether it is on: "Black sabers: On", never "No black sabers: Off".
+  Which way each bit works comes from where JoF EternalJK reads it (its cgame, and the
+  jaPRO server code it carries); the tables keep the evidence with each entry
+  ([sjk_mod::plugin_options](../crates/sjk-mod/src/plugin_options.rs)).
+- **Per family, as EternalJK.** Each mod holds its family's table in EternalJK's order
+  (`japlusPluginDisables[]`, `japroPluginDisables[]`, `cg_consolecmds.c`), so an option
+  has the number EternalJK's `plugin` gives it: `japlus.plugin 3` is black sabers, as in
+  EJK. With no argument the command lists the offered options with their state, then the
+  ones SJK does not offer; with a number it switches that option, or says why it cannot.
+- **Only what works in SJK.** An option whose bit changes how the server moves the player
+  is hidden while SJK's movement prediction does not follow it (switching it would snap
+  the view back), and one that only changes what a client draws is offered only if SJK
+  draws that difference. Hidden options stay in the table with the reason, so offering
+  one later is a change of its entry.
+- **One bit each.** A switch flips its bit and keeps every other one, so a value set by
+  hand or imported from another client keeps working, bits no option names included.
+  A profile that never touched it keeps sending 1536. The cvar is a userinfo one: a
+  change in a match reaches the server with the next userinfo update, as a name change
+  does.
+
+| Family | # | Bit | Switch (on while the bit is) | Offered |
+| --- | --- | --- | --- | --- |
+| JA+ | 0 | 0 | New drain effect (set) | No: SJK draws the stock Drain only |
+| JA+ | 1 | 1 | See others in duels (set) | Yes, read by `cg_duelHideOthers` Auto ([duel_hide.rs](../crates/sjk-client/src/duel_hide.rs)) |
+| JA+ | 2 | 2 | End-of-duel camera (clear; nothing reads it, unverified) | No: the JA+ plugin's own camera |
+| JA+ | 3 | 3 | Black sabers (clear) | Yes ([black_sabers.rs](../crates/sjk-viewer/src/black_sabers.rs)) |
+| JA+ | 4 | 4 | Auto replier (clear) | No: the JA+ plugin's own |
+| JA+ | 5 | 5 | New Force effects (clear) | Yes ([force_fx_policy.rs](../crates/sjk-viewer/src/force_fx_policy.rs)) |
+| JA+ | 6 | 6 | New death messages (clear) | No: nothing reads it, what it changes is unverified |
+| JA+ | 7 | 7 | Force Sense screen effect (set) | No: SJK does not draw the Sense ring yet |
+| JA+ | 8 | 8 | Alternate dimension effect (clear) | No: the JA+ plugin's own look |
+| JA+ | 9 | 9 | Staff on the back (clear) | Yes ([holstered_sabers.rs](../crates/sjk-viewer/src/holstered_sabers.rs)); the JA+ server then plays the reach over the shoulder |
+| JA+ | 10 | 10 | Ledge grab (clear) | No: movement |
+| JA+ | 11, 12 | 11, 12 | New DFA, attack and alt attack (clear) | No: movement |
+| JA+ | 13 | 13 | Single-player cartwheel (clear) | No: movement |
+| JA+ | 14 | 14 | Download redirect (clear; name and label disagree, unverified) | No: SJK downloads from the game server only |
+| JA+ | 15 | 29 | Holstered sabers (clear) | Yes ([holstered_sabers.rs](../crates/sjk-viewer/src/holstered_sabers.rs)) |
+| jaPRO | 0 | 3 | Black sabers (clear) | Yes |
+| jaPRO | 1 | 19 | Force jumps (clear; set, held jump bunny hops where the server lets players choose) | No: movement |
+| jaPRO | 2, 3 | 20, 21 | Rolls, Cartwheels (clear) | No: movement |
+| jaPRO | 4 | 22 | Jawa run (set) | No: the run is picked by movement code SJK does not predict |
+| jaPRO | 5 | 23 | Respawn where you fell, after a duel death (clear) | Yes: a server respawn |
+| jaPRO | 6 | 24 | Checkpoints on screen (clear) | Yes: the server's centre print |
+| jaPRO | 7 | 25 | Checkpoints in chat (set) | Yes |
+| jaPRO | 8 | 26 | Damage numbers (clear) | Yes: prints, chat or score plums |
+| jaPRO | 9 | 27 | Shots from the centre (set) | Yes: the server's muzzle point |
+| jaPRO | 10 | 28 | Checkpoints in console (set; in place of the chat) | Yes |
+
+Bits 15 to 18 (ja++'s no kata, butterfly, stab and DFA) are on neither of EternalJK's
+lists and are left out. Several switches sit beside a client setting of their own,
+as in EJK: `cg_blackSabers` (JA+ black sabers), `cg_drawHolsteredSaber` (Holstered
+saber hilts) and `cg_forceAnimFX` (Force animation effects), each of which can turn the
+feature off too, and `cg_duelHideOthers` (Hide others in duel), on whose Auto See
+others in duels decides.
+
+The Settings rows are derived switches named after the command that switches them
+(`japlus.plugin 3`), with the table's help line
+([plugin_rows.rs](../crates/sjk-viewer/src/settings/plugin_rows.rs)). Like a mod's
+settings they show whether the mod is on or not, and exist only in builds with the mod.
+
 ## Verification
 
-Unit tests cover the mod crates (teleport positions, player lookup, plugin bits,
-login matching, JoF detection) and the client's switch, completion and queue
-(`mods::tests`, `console_command::tests`). Nothing has been checked on a JA+
-server yet: the teleports need a server where the tester is a JA+ admin.
+Unit tests cover the mod crates (teleport positions, player lookup, plugin options and
+their polarity, the `plugin` listing and switching, login matching, JoF detection) and
+the client's switch, completion and queue (`mods::tests`, `console_command::tests`),
+the plugin option rows (`settings::plugin_rows::tests`: default and existing masks,
+switching, the userinfo) and `cp_pluginDisable` marking the userinfo for sending
+(`console_session::tests`). Nothing has been checked on a JA+ server yet: the teleports
+need a server where the tester is a JA+ admin, and the plugin options have not been
+switched in a match.

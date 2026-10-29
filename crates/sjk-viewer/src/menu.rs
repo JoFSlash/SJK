@@ -1315,6 +1315,16 @@ impl ClientMenu {
         self.player.attach_catalogue(vfs);
     }
 
+    /// The game files mounted again (`fs_restart`): list the new ones from `vfs`.
+    pub(crate) fn refresh_catalogue(
+        &mut self,
+        vfs: std::sync::Arc<sjk_vfs::VirtualFileSystem>,
+        console: &ViewerConsole,
+    ) {
+        self.attach_catalogue(vfs);
+        self.player.prime(console);
+    }
+
     /// Leave or stay on the player screen after one of its events.
     pub(super) fn player_result(
         &mut self,

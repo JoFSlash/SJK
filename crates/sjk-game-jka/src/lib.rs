@@ -118,6 +118,7 @@ pub mod vehicle;
 pub mod vehicle_auto_board;
 mod vehicle_blast;
 pub mod vehicle_board;
+pub mod vehicle_bounds;
 pub mod vehicle_damage;
 pub mod vehicle_death;
 pub mod vehicle_drive;

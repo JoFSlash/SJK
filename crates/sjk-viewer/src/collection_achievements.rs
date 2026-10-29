@@ -623,7 +623,7 @@ mod tests {
                 ("Journeys", 2, 0, 5),
                 ("Community", 2, 6, 3),
                 ("Collection", 3, 0, 7),
-                ("Toys", 4, 0, 7),
+                ("Toys", 4, 0, 9),
             ]
         );
         let slots: Vec<Slot> = slots(&groups).collect();

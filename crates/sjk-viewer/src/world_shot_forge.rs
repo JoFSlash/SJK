@@ -7,7 +7,9 @@
 //! asking before the last copy and before every duplicate, an older hub that breaks down
 //! duplicates only, nothing held, after every duplicate went), the Forge while the hub
 //! keeps it to staff and on a hub without an economy, the balances' hover card, and the
-//! three sections in a 4:3 and a 4K window. Off-screen renders (no game window), ignored
+//! three sections in a 4:3 and a 4K window; since 29/10/2026 the collection marks
+//! (`duel6_sjk_collection_marks`: Break down and the Shaders tab with favourites, a lock,
+//! New ones and the worn blade). Off-screen renders (no game window), ignored
 //! like the other world shots: they need a GPU adapter and the installed game data named
 //! by `JKA_GAME_DATA` (and the hub's packs in `SJK_TEST_PACKS` for the blades).
 //!
@@ -541,6 +543,92 @@ fn duel6_sjk_forge_windows() {
             let path = shoot(&mut gpu, 4, &format!("duel6-forge-break-ask-last-{name}"));
             println!("{}", path.display());
         }
+    });
+}
+
+/// Collection marks (29/10/2026; Atrosex's and Kushina's ideas, extended by Sol): Break
+/// down as a grid and as a list with the favourites first (Phoenix and Aurora), a locked
+/// duplicate (Tidal), New ones (Sakura, Circuit) and the worn blade (Frost); the locked one
+/// chosen, its button saying Locked; the Favourites chip; the last copy of the worn Frost
+/// asking, which says the player wears it; then the Shaders tab's wall and list with the
+/// same marks, the New count and Mark all seen, the card's star and padlock, and a hover
+/// card saying what each mark means.
+#[test]
+#[ignore = "renders with the GPU and the installed game data named by JKA_GAME_DATA"]
+fn duel6_sjk_collection_marks() {
+    on_big_stack(|| {
+        let Some(mut gpu) = open_forge([1920, 1080], holdings(), data(300, true), Section::Break)
+        else {
+            return;
+        };
+        let marks = crate::shader_marks::Marks::shown(
+            &["saber_phoenix", "saber_aurora"],
+            &["saber_tidal"],
+            &["saber_sakura", "saber_circuit"],
+            Some("saber_frost"),
+        );
+        if let Some(console) = gpu.console.as_mut() {
+            console.collection_marks_for_shot(Some(marks));
+            let _ = console.set_cvar(crate::console::collection_panel::SHADER_VIEW_CVAR, "0");
+        }
+        let keep = |gpu: &mut GpuState, frames: u32, name: &str| {
+            let path = shoot(gpu, frames, &format!("duel6-marks-{name}"));
+            assert!(!overflowed(gpu), "{name}");
+            println!("{}", path.display());
+        };
+        set(
+            &mut gpu,
+            Section::Break,
+            holdings(),
+            data(300, true),
+            0,
+            (false, false, false),
+        );
+        keep(&mut gpu, 4, "forge-break-grid");
+        if let Some(console) = gpu.console.as_mut() {
+            console.forge_want_for_shot("saber_tidal");
+        }
+        keep(&mut gpu, 4, "forge-break-locked");
+        if let Some(console) = gpu.console.as_mut() {
+            let _ = console.set_cvar(crate::console::collection_panel::SHADER_VIEW_CVAR, "1");
+            console.forge_want_for_shot("saber_sakura");
+        }
+        keep(&mut gpu, 4, "forge-break-list");
+        if let Some(console) = gpu.console.as_mut() {
+            console.forge_favourites_for_shot(true);
+        }
+        keep(&mut gpu, 4, "forge-break-favourites");
+        if let Some(console) = gpu.console.as_mut() {
+            console.forge_favourites_for_shot(false);
+            let _ = console.set_cvar(crate::console::collection_panel::SHADER_VIEW_CVAR, "0");
+        }
+        let _ = frame(&mut gpu, 2);
+        if let Some(console) = gpu.console.as_mut() {
+            console.forge_ask_last_for_shot("saber_frost");
+        }
+        keep(&mut gpu, 4, "forge-ask-last-worn");
+        // The Shaders tab: the wall, then the list, a favourite chosen.
+        if let Some(console) = gpu.console.as_mut() {
+            console.preview_forge(None);
+            console.collection_trade_for_shot(true);
+            console.open_profile_hub_page(Tab::Shaders, ReturnTarget::MainMenu);
+        }
+        gpu.profile_hub_show_for_shot(Tab::Shaders);
+        // A frame lists the rows (the favourites first) before the first is chosen.
+        let _ = frame(&mut gpu, 2);
+        if let Some(console) = gpu.console.as_mut() {
+            console.collection_shader_for_shot(1);
+        }
+        keep(&mut gpu, 30, "shaders-wall");
+        if let Some(console) = gpu.console.as_mut() {
+            console.collection_hover_for_shot(Some(1));
+        }
+        keep(&mut gpu, 30, "shaders-hover");
+        if let Some(console) = gpu.console.as_mut() {
+            console.collection_hover_for_shot(None);
+            let _ = console.set_cvar(crate::console::collection_panel::SHADER_VIEW_CVAR, "1");
+        }
+        keep(&mut gpu, 30, "shaders-list");
     });
 }
 

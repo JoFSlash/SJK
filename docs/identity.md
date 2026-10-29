@@ -109,7 +109,7 @@ applies:
 | Tick | Who | Look |
 | --- | --- | --- |
 | SJK creator | Sol | a sun whose twelve rays turn and over which a glint passes every four seconds |
-| SJK staff | the SJK team | a silver seal ringed in the SJK TEAM pill's teal, its tick teal |
+| SJK staff | the SJK team | a silver starburst of sixteen points (since 29/10/2026, the seal before), edged in the SJK TEAM pill's teal, its tick teal |
 | JKR creator | Bishop | the seal rusted, in the JKR CREATOR pill's rust |
 | JoF | verified players of JoF (JoF Academy too) | the seal in cyan |
 | Sith | verified players of the Sith clan `{{S}}` | the seal in deep crimson, its rim dark so it never reads as the chat ban's red disc |
@@ -1010,6 +1010,8 @@ and in the hub (same ids):
 | Well Met | `duel_partners_25` | 25 different players duelled | client |
 | Long Throw | `saber_throw_far` | a player defeated by a saber throw from 512 units or more | client |
 | Return to Sender | `thermal_return` | a player defeated with their own thermal detonator | client |
+| Payback | `monitor_payback` | during the player's Screen Saver, the player whose monitor raised it struck with a monitor | client |
+| Power Surge (hidden) | `monitor_surge` | 3 different players struck with monitors during one Screen Saver | client |
 | Blue, Yellow, Red, Dual, Staff Master | `style_blue_50`, `style_yellow_50`, `style_red_50`, `style_dual_50`, `style_staff_50` | 50 duels won with the saber in that style (`fd.saberAnimLevel` when the kill is made: 1 Fast, 2 Medium, 3 Strong, 6 two sabers, 7 staff; Desann's and Tavion's count towards none), in a private duel (saber only or full Force) or a duel game; kills out of a duel do not count | client |
 | First Bite, Angler | `fish_first`, `fish_50` | 1, 50 fish landed with the Fishing toy ([client.md](client.md#fishing)) | client |
 | Every Fish in the Pond | `fish_kinds` | every kind of fish landed (12, `fishing::FISH_KINDS`) | client |
@@ -1086,7 +1088,13 @@ live snapshot by `achievements_frame.rs`):
   player nearest (within 96 units) to where its flight started when it is first seen,
   provided that start is at most 250 ms old. A thermal detonator first seen later (it
   came into view after leaving the hand, or after a bounce) has no thrower and counts
-  nothing.
+  nothing;
+- Payback and Power Surge (29/10/2026, Sol's Screen Saver for the Monitor,
+  [client.md](client.md#monitor)) are counted by the toy, not the snapshots' tracker
+  (`achievements::note`), from the hits the struck players' own clients tell (their
+  `hit_` event, never a hit only foreseen) on a server not on this machine: during the
+  player's Screen Saver, a hit on the player whose monitor raised it counts Payback,
+  and the third different player hit counts Power Surge, each once a Screen Saver.
 
 The counts are kept in `achievements.json` beside `identity.key` (written at most
 every 20 seconds while they change, through a temporary file, and on the way out),

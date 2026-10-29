@@ -507,6 +507,11 @@ pub(crate) enum CodePalette {
     /// outline instead of its shadow (`cg_nameplateOutline 2`; Lex's idea, 29/10/2026:
     /// names hard to read on some backgrounds).
     Outlined,
+    /// The game's own colours, every glyph edged in a dark outline instead of its
+    /// shadow but a black one, which an outline as dark as it would hide: it keeps the
+    /// faint light halo of [`Self::Haloed`] (`cg_chatBoxOutline`; Creo's idea,
+    /// 29/10/2026: chat hard to read over a bright map).
+    DarkOutlined,
 }
 
 /// Darkest glyph colour drawn without a halo in [`CodePalette::Haloed`], by its
@@ -530,12 +535,23 @@ const HALO_ALPHA_STRONG: f32 = 0.38;
 /// A light glyph's dark outline in [`CodePalette::Outlined`].
 const OUTLINE_TINT: [f32; 3] = [0.04, 0.04, 0.06];
 const OUTLINE_ALPHA: f32 = 0.45;
+/// Darkest glyph colour [`CodePalette::DarkOutlined`] edges in a dark outline, by its
+/// luminance: below it (black, `^0`) the glyph keeps the faint light halo.
+const OUTLINE_BLACK_BELOW: f32 = 0.05;
+
+/// How light `color` looks (Rec. 709 luminance of its display value).
+fn luminance(color: [f32; 4]) -> f32 {
+    0.2126 * color[0] + 0.7152 * color[1] + 0.0722 * color[2]
+}
 
 impl CodePalette {
     /// Whether a glyph of `color` gets a light halo instead of its dark shadow.
     pub(crate) fn halo(self, color: [f32; 4]) -> bool {
-        matches!(self, Self::Haloed | Self::Outlined)
-            && 0.2126 * color[0] + 0.7152 * color[1] + 0.0722 * color[2] < HALO_BELOW
+        match self {
+            Self::Haloed | Self::Outlined => luminance(color) < HALO_BELOW,
+            Self::DarkOutlined => luminance(color) < OUTLINE_BLACK_BELOW,
+            Self::Game | Self::Legible => false,
+        }
     }
 
     /// How a glyph of `color` is set off: a ring of copies or its shadow.
@@ -543,9 +559,9 @@ impl CodePalette {
         let ring =
             |tint: [f32; 3], alpha: f32| Edge::Ring([tint[0], tint[1], tint[2], alpha * color[3]]);
         match (self, self.halo(color)) {
-            (Self::Haloed, true) => ring(HALO_TINT, HALO_ALPHA),
+            (Self::Haloed | Self::DarkOutlined, true) => ring(HALO_TINT, HALO_ALPHA),
             (Self::Outlined, true) => ring(HALO_TINT, HALO_ALPHA_STRONG),
-            (Self::Outlined, false) => ring(OUTLINE_TINT, OUTLINE_ALPHA),
+            (Self::Outlined | Self::DarkOutlined, false) => ring(OUTLINE_TINT, OUTLINE_ALPHA),
             _ => Edge::Shadow,
         }
     }

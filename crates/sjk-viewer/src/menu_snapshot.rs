@@ -1558,6 +1558,9 @@ fn identity_page(shots: &Snapshot, art: ArtSet) {
         kyber: None,
         shop: None,
         trade: None,
+        marks: None,
+        marks_revision: 0,
+        mark_refusal: None,
         trades: None,
         announcements: Vec::new(),
         announcements_revision: 0,
@@ -2080,8 +2083,8 @@ fn save_sjk_shot(
 /// The SJK UI's Settings over the duel6 levelshot: Interface with a changed
 /// slider focused (its dot and reset arrow), Display with a list open, a
 /// search's results, Graphics scrolled to its weather, at 4:3, the weak-PC
-/// rows (Gameplay's stock blades, Display's menu FPS cap, Graphics' render scale)
-/// and Graphics' texture compression.
+/// rows (Gameplay's stock blades, Display's menu FPS cap, Graphics' render scale),
+/// Graphics' texture compression and Mods' plugin options.
 #[test]
 #[ignore = "reads the installed game data named by JKA_GAME_DATA"]
 fn sjk_settings_snapshot() {
@@ -2211,12 +2214,21 @@ fn sjk_settings_snapshot() {
     // Advanced's categories, then Simple's: Display, and Graphics on Vanilla and
     // on the SJK renderer, whose alpha warning the detail column shows.
     SettingsMode::Advanced.store(&mut console);
-    let simple: [Case; 5] = [
+    let simple: [Case; 6] = [
         (
             "sjk-settings-chat",
             VIEWPORT_WIDE,
             9,
             Some("cl_sjkChat"),
+            false,
+            None,
+        ),
+        // Mods, on the JA+ plugin options' Black sabers.
+        (
+            "sjk-settings-plugin-options",
+            VIEWPORT_WIDE,
+            11,
+            Some("japlus.plugin 3"),
             false,
             None,
         ),
@@ -3002,6 +3014,9 @@ fn medals_snapshot() {
         kyber: None,
         shop: None,
         trade: None,
+        marks: None,
+        marks_revision: 0,
+        mark_refusal: None,
         trades: None,
         announcements: Vec::new(),
         announcements_revision: 0,

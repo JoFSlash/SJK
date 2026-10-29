@@ -70,6 +70,14 @@ pub(super) fn register(shell: &mut sjk_shell::Shell) -> Result<(), sjk_shell::Co
             "Throw a monitor the way you look (the Monitor toy on); it sends players who have it on flying",
         ),
         (
+            crate::banana::COMMAND,
+            "Toy: Banana peel on or off (on, you drop peels with banana_drop and slip on the ones you walk onto; only players with it on slip)",
+        ),
+        (
+            crate::banana::DROP_COMMAND,
+            "Drop a banana peel at your feet, or tossed ahead when you move (the Banana peel toy on); players who have it on slip on it",
+        ),
+        (
             crate::box_hunt::COMMAND,
             "Toy: Box hunt on or off (on, you may become the mark (one every 10 minutes), and killing the mark wins you a free mystery box roll; only players with it on take part)",
         ),

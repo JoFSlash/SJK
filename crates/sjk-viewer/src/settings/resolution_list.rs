@@ -57,8 +57,14 @@ impl SettingsMenu {
     /// Rebuild the sizes on offer for the current display mode.
     pub(super) fn build_choices(&mut self, console: &ViewerConsole) {
         let exclusive = self.applied_display(console) == DisplayMode::Exclusive;
+        // A window's size counts points without high DPI; a video mode, pixels.
+        let points = !exclusive && !super::display::high_dpi(console);
+        let monitor = self
+            .monitor
+            .as_ref()
+            .map(|monitor| monitor.counted_in_points(points));
         resolution::build_choices(
-            self.monitor.as_ref(),
+            monitor.as_ref(),
             Self::current_resolution(console),
             exclusive,
             &mut self.choices,

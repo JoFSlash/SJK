@@ -5,6 +5,8 @@
 //! same override-aware definition catalog.
 
 use crate::catalog_tokens::tokenize;
+#[path = "saber_definition_moves.rs"]
+mod moves;
 use crate::player_profile::SaberColor;
 use sjk_game_jka::pmove::saber_base::SaberHands;
 use sjk_protocol::GameState;
@@ -16,6 +18,8 @@ use std::sync::{Arc, Mutex};
 /// Compatibility fields consumed by current presentation and audio adapters.
 #[derive(Clone, Debug, PartialEq)]
 pub struct LegacySaberDefinition {
+    /// Codemp movement restrictions, move overrides and stance animations.
+    pub combat: sjk_game_jka::saber_info::SaberInfo,
     /// Definition token referenced by clientinfo `st`/`st2`.
     pub name: String,
     /// Menu-facing name from the definition's `name` keyword.
@@ -226,6 +230,78 @@ pub fn legacy_saber_hands(
     saber_hands(&names, &definitions)
 }
 
+/// The local saber definitions used by movement prediction (`BG_MySaber`).
+/// Unknown or multiplayer-forbidden names fall back to Kyle. Two-handed hilts
+/// exclude a second saber, following `WP_SetSaber`; lookup runs on clientinfo changes.
+pub fn legacy_saber_combat(
+    vfs: &VirtualFileSystem,
+    game: &GameState,
+    client: u16,
+) -> sjk_game_jka::saber_info::Sabers {
+    let names = crate::player_identity::legacy_client_saber_names(game, client);
+    let definitions = shared_saber_definitions(vfs).unwrap_or_default();
+    combat_sabers(&names, &definitions)
+}
+
+fn combat_sabers(
+    names: &[Option<String>; 2],
+    definitions: &Definitions,
+) -> sjk_game_jka::saber_info::Sabers {
+    use sjk_game_jka::saber_info::{SaberInfo, Sabers};
+    let resolve = |name: &str| {
+        definitions
+            .get(&name.to_ascii_lowercase())
+            .filter(|definition| !definition.not_in_mp)
+            .or_else(|| definitions.get("kyle"))
+    };
+    let primary = names[0]
+        .as_deref()
+        .and_then(resolve)
+        .or_else(|| definitions.get("kyle"));
+    let secondary = names[1].as_deref().and_then(resolve).filter(|definition| {
+        !definition.two_handed && !primary.is_some_and(|primary| primary.two_handed)
+    });
+    Sabers {
+        first: Some(primary.map_or(SaberInfo::STOCK, |definition| definition.combat)),
+        second: secondary.map(|definition| definition.combat),
+    }
+}
+
+#[cfg(test)]
+mod combat_tests {
+    use super::*;
+    #[test]
+    fn prediction_uses_the_equipped_saber_definitions() {
+        let definitions: Definitions = parse("kyle { noWallRuns 1 } custom { noFlips 1 lungeAtkMove LS_NONE } staff { twoHanded 1 noKicks 1 } forbidden { notInMP 1 noCartwheels 1 }")
+            .into_iter().map(|definition| (definition.name.clone(), definition)).collect();
+        let names = |first: &str, second: &str| [Some(first.to_owned()), Some(second.to_owned())];
+        let pair = combat_sabers(&names("CUSTOM", "kyle"), &definitions);
+        assert_eq!(pair.first.unwrap().lunge_move, 0);
+        assert!(pair.any_flag(1 << 17) && pair.any_flag(1 << 13));
+        assert!(
+            combat_sabers(&names("staff", "custom"), &definitions)
+                .second
+                .is_none()
+        );
+        assert!(
+            combat_sabers(&names("custom", "staff"), &definitions)
+                .second
+                .is_none()
+        );
+        assert_eq!(
+            combat_sabers(&names("missing", "forbidden"), &definitions)
+                .second
+                .unwrap()
+                .flags,
+            1 << 13
+        );
+        assert_eq!(
+            combat_sabers(&[None, None], &Definitions::new()),
+            sjk_game_jka::saber_info::Sabers::STOCK
+        );
+    }
+}
+
 fn saber_hands(
     names: &[Option<String>; 2],
     definitions: &BTreeMap<String, LegacySaberDefinition>,
@@ -286,6 +362,7 @@ fn parse(source: &str) -> Vec<LegacySaberDefinition> {
         let mut no_rolls = false;
         let mut move_speed_scale = 1.0;
         let mut anim_speed_scale = 1.0;
+        let mut combat = sjk_game_jka::saber_info::SaberInfo::STOCK;
         while let Some(key) = tokens.get(index) {
             if key == "}" {
                 index += 1;
@@ -294,6 +371,7 @@ fn parse(source: &str) -> Vec<LegacySaberDefinition> {
             let Some(value) = tokens.get(index + 1) else {
                 break;
             };
+            moves::parse(&mut combat, key, value);
             match key.to_ascii_lowercase().as_str() {
                 "name" => display_name.clone_from(value),
                 "sabertype" => saber_type = parse_saber_type(value),
@@ -360,6 +438,7 @@ fn parse(source: &str) -> Vec<LegacySaberDefinition> {
             index += 2;
         }
         definitions.push(LegacySaberDefinition {
+            combat,
             name,
             display_name,
             icon: icon_for_type(&saber_type).to_owned(),

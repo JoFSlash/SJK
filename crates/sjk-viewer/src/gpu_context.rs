@@ -26,6 +26,9 @@ pub(crate) struct Context {
     /// render scale below; `frame_target::scale::requested`), retained across console-free
     /// map installs.
     pub(crate) render_scale: u32,
+    /// Startup `r_highDpi`: whether [`Self::render_scale`] counts the window's pixels or
+    /// its points (`frame_target::scale::in_points`).
+    pub(crate) high_dpi: bool,
     /// Startup FXAA policy, preserved through background map installation.
     pub(crate) fxaa: bool,
 
@@ -124,6 +127,7 @@ impl Context {
             hdr,
             sun_shadows: crate::world_materials::shadows::settings::Settings::sample(console),
             render_scale: crate::frame_target::scale::requested(console),
+            high_dpi: console.map_or(crate::settings::HIGH_DPI_DEFAULT, crate::settings::high_dpi),
             fxaa: crate::frame_target::aa::enabled(console),
 
             post_color: console.map(|c| c.post_color.clone()).unwrap_or_default(),
@@ -176,6 +180,7 @@ impl Context {
             hdr: crate::frame_target::aa::hdr::Settings::sample(console),
             sun_shadows: crate::world_materials::shadows::settings::Settings::sample(console),
             render_scale: crate::frame_target::scale::requested(console),
+            high_dpi: console.map_or(crate::settings::HIGH_DPI_DEFAULT, crate::settings::high_dpi),
             fxaa: crate::frame_target::aa::enabled(console),
             post_color: self.post_color.clone(),
             dynamic_light_settings: self.dynamic_light_settings.clone(),

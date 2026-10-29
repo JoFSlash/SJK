@@ -70,6 +70,8 @@ impl HudOverlay {
         self.hack_left = hack_bar::left(hack_done, hack_length, server_time);
         self.interrupted = interrupted;
         self.lagometer.clone_from(lagometer);
+        self.lagometer_readout
+            .update(&self.lagometer, self.targeting.policy.lagometer_mode());
     }
 }
 

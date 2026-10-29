@@ -131,6 +131,11 @@ pub(super) const VIDEO: &[Setting] = &[
         kind: ValueKind::Resolution,
     },
     Setting {
+        label: "High DPI (reload)",
+        cvar: super::display::HIGH_DPI_CVAR,
+        kind: ValueKind::Bool,
+    },
+    Setting {
         label: "Display mode",
         cvar: "r_fullscreen",
         kind: ValueKind::DisplayMode,
@@ -373,6 +378,11 @@ pub(super) const AUDIO: &[Setting] = &[
     Setting {
         label: "Mystery box sounds",
         cvar: crate::toy_sounds::Toy::MysteryBox.cvar(),
+        kind: ValueKind::Bool,
+    },
+    Setting {
+        label: "Banana peel sounds",
+        cvar: crate::toy_sounds::Toy::Banana.cvar(),
         kind: ValueKind::Bool,
     },
     Setting {
@@ -625,8 +635,8 @@ pub(super) const HUD: &[Setting] = &[
     },
     Setting {
         label: "Player card",
-        cvar: "cg_playerCard",
-        kind: ValueKind::Bool,
+        cvar: crate::hud::player_card::CVAR,
+        kind: ValueKind::Choice(&["0", "1", "2"]),
     },
     Setting {
         label: "Card delay (s)",
@@ -779,8 +789,8 @@ pub(super) const HUD: &[Setting] = &[
     },
     Setting {
         label: "Lagometer",
-        cvar: "cg_lagometer",
-        kind: ValueKind::Bool,
+        cvar: crate::hud::lagometer::CVAR,
+        kind: ValueKind::Choice(&["0", "1", "2", "3"]),
     },
     Setting {
         label: "Lagometer scale",
@@ -869,6 +879,20 @@ pub(super) const HUD: &[Setting] = &[
         },
     },
     Setting {
+        label: "Chat backdrop (%)",
+        cvar: crate::chat::options::BACKDROP_CVAR,
+        kind: ValueKind::Integer {
+            min: 0,
+            max: 100,
+            step: 10,
+        },
+    },
+    Setting {
+        label: "Chat text outline",
+        cvar: crate::chat::options::OUTLINE_CVAR,
+        kind: ValueKind::Bool,
+    },
+    Setting {
         label: "Chat card size",
         cvar: crate::chat::options::CARD_SCALE_CVAR,
         kind: ValueKind::Float {
@@ -942,6 +966,11 @@ pub(super) const CONTROLS: &[Setting] = &[
         cvar: crate::input::force_repeat::CVAR,
         kind: ValueKind::Bool,
     },
+    Setting {
+        label: "Hold mouse 4/5 repeats",
+        cvar: crate::input::mouse_repeat::CVAR,
+        kind: ValueKind::Choice(&["0", "1", "2"]),
+    },
 ];
 pub(super) const GAME: &[Setting] = &[
     Setting {
@@ -994,6 +1023,15 @@ pub(super) const GAME: &[Setting] = &[
         },
     },
     Setting {
+        label: "Saber hit sparks",
+        cvar: crate::impacts::FLESH_SPARKS_CVAR,
+        kind: ValueKind::Integer {
+            min: 0,
+            max: crate::impacts::FLESH_SPARKS_ALL as i64,
+            step: 1,
+        },
+    },
+    Setting {
         label: "Team saber colours",
         cvar: crate::team_sabers::TEAM_COLORS_CVAR,
         kind: ValueKind::Bool,
@@ -1026,6 +1064,11 @@ pub(super) const GAME: &[Setting] = &[
     Setting {
         label: "Show monitors",
         cvar: crate::monitor::SHOW_CVAR,
+        kind: ValueKind::Bool,
+    },
+    Setting {
+        label: "Show banana peels",
+        cvar: crate::banana::SHOW_CVAR,
         kind: ValueKind::Bool,
     },
     Setting {
@@ -1394,6 +1437,80 @@ pub(super) const GAME: &[Setting] = &[
     Setting {
         label: "JoF tools",
         cvar: "mod_jof",
+        kind: ValueKind::Bool,
+    },
+    // JA+ and jaPRO plugin options (`docs/mods.md`): each a bit of `cp_pluginDisable`,
+    // named after the feature (`settings/plugin_rows.rs`, the mods' tables).
+    #[cfg(feature = "mod-japlus")]
+    Setting {
+        label: "See others in duels (JA+)",
+        cvar: "japlus.plugin 1",
+        kind: ValueKind::Bool,
+    },
+    #[cfg(feature = "mod-japlus")]
+    Setting {
+        label: "Black sabers (JA+)",
+        cvar: "japlus.plugin 3",
+        kind: ValueKind::Bool,
+    },
+    #[cfg(feature = "mod-japlus")]
+    Setting {
+        label: "New Force effects (JA+)",
+        cvar: "japlus.plugin 5",
+        kind: ValueKind::Bool,
+    },
+    #[cfg(feature = "mod-japlus")]
+    Setting {
+        label: "Staff on the back (JA+)",
+        cvar: "japlus.plugin 9",
+        kind: ValueKind::Bool,
+    },
+    #[cfg(feature = "mod-japlus")]
+    Setting {
+        label: "Holstered sabers (JA+)",
+        cvar: "japlus.plugin 15",
+        kind: ValueKind::Bool,
+    },
+    #[cfg(feature = "mod-japro")]
+    Setting {
+        label: "Black sabers (jaPRO)",
+        cvar: "japro.plugin 0",
+        kind: ValueKind::Bool,
+    },
+    #[cfg(feature = "mod-japro")]
+    Setting {
+        label: "Respawn where you fell (jaPRO)",
+        cvar: "japro.plugin 5",
+        kind: ValueKind::Bool,
+    },
+    #[cfg(feature = "mod-japro")]
+    Setting {
+        label: "Checkpoints on screen (jaPRO)",
+        cvar: "japro.plugin 6",
+        kind: ValueKind::Bool,
+    },
+    #[cfg(feature = "mod-japro")]
+    Setting {
+        label: "Checkpoints in chat (jaPRO)",
+        cvar: "japro.plugin 7",
+        kind: ValueKind::Bool,
+    },
+    #[cfg(feature = "mod-japro")]
+    Setting {
+        label: "Damage numbers (jaPRO)",
+        cvar: "japro.plugin 8",
+        kind: ValueKind::Bool,
+    },
+    #[cfg(feature = "mod-japro")]
+    Setting {
+        label: "Shots from the centre (jaPRO)",
+        cvar: "japro.plugin 9",
+        kind: ValueKind::Bool,
+    },
+    #[cfg(feature = "mod-japro")]
+    Setting {
+        label: "Checkpoints in console (jaPRO)",
+        cvar: "japro.plugin 10",
         kind: ValueKind::Bool,
     },
     // JoF content (`docs/jof-content.md`): its card, and where it downloads from.

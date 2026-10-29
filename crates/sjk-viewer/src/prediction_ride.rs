@@ -25,6 +25,9 @@
 
 use std::sync::Arc;
 
+#[path = "prediction_vehicle_models.rs"]
+mod collision_models;
+
 use sjk_client::pmove::{MovementCollision, MovementConfig, MovementState, Predictor};
 use sjk_game_jka::vehicle::Vehicle;
 use sjk_game_jka::vehicle_parms::{VehicleCapacity, VehicleFiles, VehicleRegistry, VehicleTable};
@@ -43,6 +46,7 @@ const ES_LEGS_FLIP: usize = 62;
 /// The rides this client can predict and the one it predicts now.
 pub(crate) struct Rides {
     table: VehicleTable,
+    collision_models: collision_models::Models,
     /// Vehicle definitions met, by name: a fresh vehicle of each (`None` for a name the
     /// table does not know).
     templates: Vec<(Vec<u8>, Option<Vehicle>)>,
@@ -67,6 +71,14 @@ pub(crate) struct Rides {
 }
 
 impl Rides {
+    /// Definition geometry cached by model slot; changes only when an encountered
+    /// vehicle's model configstring changes, never during command replay.
+    pub(super) fn collision_bounds(
+        &self,
+    ) -> (u64, &[Option<sjk_game_jka::vehicle_bounds::VehicleBounds>]) {
+        self.collision_models.bounds()
+    }
+
     /// Read the animated seat at cgame time for presentation only. Snapshot-time
     /// offsets remain in command replay; gait bob must not become prediction error.
     pub(super) fn present_pilot(&mut self, pilot: &mut MovementState, time: i32) {
@@ -122,6 +134,7 @@ impl Rides {
         );
         Self {
             table: VehicleTable::new(Arc::new(files), VehicleCapacity::REFERENCE),
+            collision_models: collision_models::Models::new(),
             templates: Vec::new(),
             piloting: None,
             fighter_alt_control: false,
@@ -138,6 +151,8 @@ impl Rides {
     /// Which vehicle, if any, the local player pilots in `snapshot` (`CG_Piloting`), and
     /// its definition from its model's configstring in `game_state`.
     pub(crate) fn resolve(&mut self, snapshot: &Snapshot, game_state: &GameState) {
+        self.collision_models
+            .refresh(snapshot, game_state, &mut self.table);
         self.piloting = None;
         // `CS_SYSTEMINFO` carries `bg_fighterAltControl` (`CVAR_SYSTEMINFO`).
         self.fighter_alt_control = game_state

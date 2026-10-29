@@ -294,6 +294,8 @@ mod fishing_shots;
 #[path = "world_shot_map_edits.rs"]
 mod map_edit_shots;
 
+#[path = "world_shot_banana.rs"]
+mod banana_shots;
 #[path = "world_shot_body_fade.rs"]
 mod body_fade_shots;
 #[path = "world_shot_boombox.rs"]
@@ -326,6 +328,8 @@ mod animation_profile;
 mod card_outline_shots;
 #[path = "world_shot_ctf_flags.rs"]
 mod ctf_flags_shots;
+#[path = "world_shot_lagometer.rs"]
+mod lagometer_shots;
 #[path = "world_shot_rig_model.rs"]
 mod rig_model_shots;
 #[path = "world_shot_team_outline.rs"]
@@ -377,6 +381,9 @@ mod jof_sjk_chat_shots;
 
 #[path = "world_shot_text_sizes.rs"]
 mod text_sizes_shots;
+
+#[path = "world_shot_chat_readability.rs"]
+mod chat_readability_shots;
 
 #[path = "world_shot_map_change.rs"]
 mod map_change;
@@ -969,6 +976,7 @@ mod tests {
             ],
             desktop: Some([3840, 2160]),
             exclusive: true,
+            scale: 1.0,
         }
     }
 
@@ -1313,6 +1321,9 @@ Found the fog bug, ask me about it!"
             kyber: None,
             shop: None,
             trade: None,
+            marks: None,
+            marks_revision: 0,
+            mark_refusal: None,
             trades: None,
             announcements: Vec::new(),
             announcements_revision: 0,

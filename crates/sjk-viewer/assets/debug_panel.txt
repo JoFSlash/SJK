@@ -24,6 +24,167 @@
 
 # ---- Console & chat ----
 
+[banana-peel]
+area: Gameplay
+title: Banana peel toy: drop peels; opted-in players who walk onto one slip (Kushina's idea)
+change: toy_banana (opt-in: drop and slip), banana_drop drops one ahead of you, tossed when running.
+change: Walking onto a peel with the toy on: cartoon slip sound, feet up, you fall as a ragdoll.
+change: 3 peels each, 2 min each, 2 s apart, none by a spawn; cg_toyBananaShow hides them.
+test: Collection > Toys: 10 rows fit, Banana peel last; its card, Drop key, See banana peels.
+test: Toy off, banana_drop: "Turn the Banana peel toy on..."; on: a peel lands ahead, a flop.
+test: Run and drop: tossed ~72 ahead; you do not slip on it at once, but do after 1.5 s.
+test: Drop at a spawn point: "Not so close to a spawn point". Drop a 4th: the 1st goes.
+test: Two SJK clients, both on: B walks onto A's peel: B slips on both screens, peel gone.
+test: B with the toy off walks over it: nothing. B in a duel or carrying a flag: no slip.
+test: A turns the toy off or leaves, or the map changes: A's peels go on B's screen.
+test: Getting up: jump, attack or taunt, or lie still ~2.5 s. Look at the model up close.
+note: Untested in game: checked by unit tests and off-screen world shots only.
+
+[mac-high-dpi]
+area: Menus & settings
+title: High DPI (r_highDpi): window sizes and the world in pixels or in points
+change: Off (Mac default): r_resolution counts points, the world drawn at the points' size.
+change: On (default elsewhere): pixels, as before. Settings > Video and Simple Display: High DPI.
+test: Windows: High DPI is On; window, world and Resolution list are as before.
+test: At 150 % Windows scaling, turn it Off: windowed grows by 1.5; reload: world softer, HUD sharp.
+test: Off, Resolution list: sizes are the desktop's divided by 1.5; back On: pixel sizes again.
+note: Mac side needs Glen after the next release: 1280x720 window full size, better FPS.
+
+[fullscreen-keeps-size]
+area: Menus & settings
+title: Fullscreen keeps the screen's size (Mac: small game in a black screen)
+change: r_resolution sizes the window only while windowed; fullscreen is never resized.
+change: Mac: vid_restart or a picked size shrank the fullscreen game into a black screen.
+test: Borderless fullscreen, console vid_restart: the game still fills the screen.
+test: Borderless, Resolution list: pick 1280 x 720; still full screen. Alt+Enter: 1280x720 window.
+test: Windowed: picking a size resizes the window at once, as before.
+note: Mac side needs Glen (or another Mac player) after the next release.
+
+[staff-starburst]
+area: HUD
+title: SJK staff's tick is a silver starburst (16 points, teal edge and tick)
+change: Staff's tick was the round seal in silver; now a starburst, not round like the others.
+test: A staff member's nameplate, chat line and scoreboard row: the silver starburst.
+test: At chat size, on a bright map: it still reads as a starburst, not a grey blur.
+test: Inspect a staff member (X): the starburst on the emblem's foot, VERIFIED in teal.
+note: Not seen in game yet: checked by unit tests and a preview of the cell only.
+
+[chat-readability]
+area: Console & chat
+title: Chat backdrop and text outline, for chat over bright maps (Creo's idea)
+change: Settings > Chat > Chat backdrop (%): a dark band behind each chat row, as long as it.
+change: Settings > Chat > Chat text outline: a dark edge round each chat letter, not a shadow.
+change: Both are off by default: with them off the chat looks exactly as before.
+test: On a bright map (ffa3's sand), Chat backdrop 50: each chat row gets a round-ended band.
+test: Let a line fade out: its band fades with it; with the chat empty nothing is drawn.
+test: Change chat text size, line and letter spacing: the bands follow and never overlap.
+test: An SJK chat line with a GIF: the band stops above the GIF; the SJK emblem stays on top.
+test: Chat text outline on: the chat and what you type are edged; centre prints keep a shadow.
+note: Not seen in game yet: checked by unit tests and off-screen world shots only.
+
+[player-card-key-only]
+area: HUD
+title: Player card Key only: cg_playerCard 0 Off, 1 On look and key, 2 Key only (Blep's idea)
+change: Settings > HUD+ > Player card is a three-way choice; 2 opens the card from inspect alone.
+change: Old configs (0 or 1) keep their meaning; Card delay matters only with On look and key.
+test: Settings > HUD+ > Player card: Off, On look and key (default), Key only; read the help.
+test: On look and key: look at a player, steady: the card comes; X pins it, as before.
+test: Key only: look at a player for a long time: no card. X: the card pins; X or Escape hides it.
+test: Off: no card from a look or X; Escape opens the game menu.
+
+[collection-marks]
+area: Menus & settings
+title: Collection marks: worn, favourite, locked and New saber shaders (Atrosex, Kushina)
+change: Shaders, the Forge and the trade window mark worn and New shaders, stars and padlocks.
+change: Favourites first, Shift+F shows them alone; a locked shader is never broken down/traded.
+change: New is kept on this PC (shader-seen.txt); stars and locks on the hub (needs its deploy).
+test: Collection > Shaders: "N new" by the headline, New stickers; rest on one a second: it clears.
+test: Sweep the pointer fast across New shaders: their stickers stay; N clears them all.
+test: F stars the chosen shader: it moves under Favourites at the top; Shift+F shows them alone.
+test: L locks a held shader: Forge > Break down shows Locked on its button, B leaves it out.
+test: Break down the last copy of the shader you wear: the card says first that you wear it.
+test: Trade window: a locked duplicate is dimmed with a padlock; the Favourites chip filters.
+note: Stars and locks show only once the hub with collection marks is deployed.
+
+[holocron-day]
+area: Menus & settings
+title: Holocron limit resets at 9:00 Paris time, not 24 h after each drop
+change: The hub's 8-a-day cap (and 1 mythical, 16 per address) starts again at 09:00 in Paris.
+change: Holocrons tab: "n of 8 today"; at the cap "Limit reached: resets in about 3 h 10 min".
+change: A failed progress reading is tried again in 2 minutes, not an hour.
+test: Holocrons tab before the cap: "n of 8 today" and the next holocron in minutes of play.
+test: At 8 of 8: the line counts down to 09:00 Paris; at 09:00 a held holocron drops at once.
+test: Hover a holocron tier, then open the Loot table: both say at most 8 a day, resets at 9:00.
+note: Needs the hub's holocron-day deploy; an old hub shows "Limit reached for today".
+
+[ejk-flesh-sparks]
+area: Rendering & effects
+title: Saber hit sparks, cg_fleshSparks 0-7, as in JoF EJK (Kushina's idea)
+change: Settings > Game options > Saber hit sparks: 7 (default) as before, 0 none on bodies.
+change: Below 2 the special hit (eventParm 16) is silent too; other hits keep their sound.
+test: Duel a bot or friend at 7: the same red sparks as before on every body hit.
+test: cg_fleshSparks 4: plain body hits show no sparks, big and moderate ones still do.
+test: cg_fleshSparks 0: no red sparks on bodies; a hit on a wall still shows its cut.
+
+[ejk-mouse-repeat]
+area: Input
+title: Held mouse 4/5 repeats its bind, in_mouseRepeat (Kushina's idea)
+change: Settings > Controls > Hold mouse 4/5 repeats: Off, Mouse 4 and 5, Mouse 4 only.
+change: 20 presses a second at any frame rate (EJK: every other frame, a server flood).
+test: bind mouse4 "echo hi", in_mouseRepeat 1, hold mouse 4 in game: 20 his a second.
+test: in_mouseRepeat 2: mouse 5 no longer repeats; open the console: the repeat stops.
+test: bind mouse4 +attack and hold it: one swing chain, as a held key.
+
+[ejk-lagometer-modes]
+area: HUD
+title: cg_lagometer 2 and 3: average ping, interpolation and a speed graph (Kushina's idea)
+change: 2: the graph, its averages on a line just above it and a speed graph above with the speed.
+change: 3: the same without backdrops, the speed graph taller, its number only moving.
+change: The numbers are EJK's size (digits about 13 px at 1080p); the graph keeps its size.
+test: cg_lagometer 1: exactly the old graph. Settings > HUD > Lagometer steps 0 to 3.
+test: cg_lagometer 2 on a server: ping left, interpolation right, the speed graph above.
+test: At cg_lagometerScale 1 the numbers read easily, about EJK's size; the graph is as before.
+test: cg_lagometer 3: no backdrops; stand still: the speed number goes.
+test: cg_lagometerScale 2 and cg_lagometerX/Y: the numbers and speed graph follow.
+test: cg_lagometerY 470 (graph at the top): the numbers stand under the graph, on screen.
+
+[plugin-options]
+area: Menus & settings
+title: JA+ and jaPRO plugin options as switches, and the plugin command (Kushina's idea)
+change: Settings > Mods: JA+ plugin options and jaPRO plugin options, each On while it is on.
+change: japlus.plugin and japro.plugin list them with JoF EJK's numbers, or switch one.
+change: Holstered sabers follow cp_pluginDisable bit 29, as in JoF EJK, no longer bit 13.
+test: Settings > Mods: See others in duels Off, Black sabers On, Staff on the back Off.
+test: Black sabers (JA+) Off: cp_pluginDisable reads 1544; on a JA+ server black blades go orange.
+test: On a JA+ server: japlus.plugin lists 5 options, then Not in SJK yet; japlus.plugin 10 says why.
+test: Staff on the back On, then draw a staff in a JA+ match: it goes over the shoulder.
+test: On a jaPRO race map, Checkpoints in chat On: checkpoint times show in the chat.
+note: The options not offered (ledge grab, new DFA, jaPRO rolls...) and why: docs/mods.md.
+
+[slash-fs-restart]
+area: Console & chat
+title: fs_restart mounts the game files again without a restart (Slash, PR #286)
+change: New or changed PK3s and the asset browser's pack choices apply without restarting.
+test: With SJK open, add a model PK3 to base, type fs_restart: the profile lists the model.
+test: assetbrowser, disable a pack, fs_restart, change map: its files are gone.
+test: The console says how many PK3s it mounted; a second fs_restart at once is refused.
+
+[lumaya-japro-styles]
+area: Gameplay
+title: jaPRO movement styles, jumps and new jetpack predicted (Lumaya, PRs #279-#284)
+change: On jaPRO servers: each style's acceleration, friction, jumps and the race jetpack.
+test: Local jaPRO server, /move cpm, qw, tribes, surf: run, strafe, bhop: no snapping back.
+test: cp_pluginDisable with bit 19 where the server allows: only-bhop held jumps.
+test: Race jetpack: lift and steer at once. On a JA+ server: movement as before.
+
+[lumaya-prediction-audit-2]
+area: Gameplay
+title: Prediction audit, second part (Lumaya, PRs #252-#273)
+change: Saber-lock facing, respawn jump latch, dual jump-attack hull, equipped saber definitions,
+change: remote vehicle hulls, and a still view when command history has a gap.
+test: Saber lock on a local server: the view turns to the opponent at once.
+test: Respawn holding jump: no jump until attack and use are let go.
+
 [lumaya-japro-race-slicing]
 area: Gameplay
 title: jaPRO race moves predicted as jaPRO cuts them (Lumaya, PR #277)

@@ -25,7 +25,11 @@
 //! presses the chosen thing's button; V switches the grid and the list, `/` (or Ctrl+F)
 //! types in the search, T steps the tier, A shows the affordable only (Craft), D the
 //! duplicates only and B breaks down all duplicates (Break down); Ctrl+Tab changes tab
-//! and Escape leaves, as on every tab.
+//! and Escape leaves, as on every tab. Since 29/10/2026 (collection marks,
+//! `crate::shader_marks`) F stars the chosen shader and L locks it, on a hub that keeps
+//! them, and Shift+F shows Break down's favourites alone: favourites are listed first, and
+//! a locked shader is never broken down (its button says so) nor counted among all
+//! duplicates.
 
 use super::*;
 use crate::audio::ui_cues::{self, Cue};
@@ -50,6 +54,10 @@ pub(super) const ACTION_TOKEN: u16 = 9_050;
 pub(super) const ALL_TOKEN: u16 = 9_051;
 pub(super) const ASK_YES_TOKEN: u16 = 9_052;
 pub(super) const ASK_NO_TOKEN: u16 = 9_053;
+/// The chosen shader's star and padlock, and Break down's Favourites chip (29/10/2026).
+pub(super) const STAR_TOKEN: u16 = 9_054;
+pub(super) const PADLOCK_TOKEN: u16 = 9_055;
+pub(super) const FAVOURITES_TOKEN: u16 = 9_056;
 pub(super) const TILE_BASE: u16 = 9_100;
 /// The most things a section lists (every blade skin fits).
 pub(super) const TILES_MAX: usize = 400;
@@ -218,6 +226,8 @@ pub(super) struct Craftable {
     pub(super) cost: u64,
     /// That copy's finish and how much it took off, in per cent (`None`: the full cost).
     pub(super) off: Option<(&'static crate::cards::Finish, u64)>,
+    /// A favourite of the player's (a wish: they lack it), listed first.
+    pub(super) favourite: bool,
 }
 
 /// A shader the Break down section lists: the player's own copies of one of the trade.
@@ -228,6 +238,12 @@ pub(super) struct Owned {
     pub(super) count: u32,
     /// The kyber shards breaking one copy down gives.
     pub(super) gives: u64,
+    /// Its collection marks (29/10/2026): a favourite (listed first), locked (never
+    /// broken down until unlocked), New, worn on either saber.
+    pub(super) favourite: bool,
+    pub(super) locked: bool,
+    pub(super) new: bool,
+    pub(super) worn: bool,
 }
 
 impl Owned {
@@ -239,19 +255,20 @@ impl Owned {
 
 /// Every shader the Craft section may list for `holdings`, before the filter: of the trade
 /// and not held at all (a card's or a medal's copy counts as held), the commonest tier
-/// first, so what the player's shards reach comes first (costs rise with the tier). A
-/// copy among `cards` (the player's) of a shader's blade card crafts it for less
-/// ([`crate::economy::craft_price`], 21/10/2026).
+/// first, so what the player's shards reach comes first (costs rise with the tier), the
+/// favourites among `marks` before the rest. A copy among `cards` (the player's) of a
+/// shader's blade card crafts it for less ([`crate::economy::craft_price`], 21/10/2026).
 pub(super) fn craftable(
     holdings: &Holdings<'_>,
     cards: &[sjk_identity::CardStack],
+    marks: &crate::shader_marks::Marks,
 ) -> Vec<Craftable> {
     let blade_cards = if cards.is_empty() {
         Vec::new()
     } else {
         crate::economy::blade_cards(cards, &crate::cards::faces::current())
     };
-    unlockables::blade_skins_by_tier()
+    let mut list: Vec<Craftable> = unlockables::blade_skins_by_tier()
         .iter()
         .rev()
         .copied()
@@ -262,9 +279,16 @@ pub(super) fn craftable(
                 .find(|(id, _)| *id == skin.id)
                 .map(|(_, finish)| *finish);
             let (cost, off) = crate::economy::craft_price(skin, card);
-            Craftable { skin, cost, off }
+            Craftable {
+                skin,
+                cost,
+                off,
+                favourite: marks.favourite(skin.id),
+            }
         })
-        .collect()
+        .collect();
+    crate::shader_marks::favourites_first(&mut list, marks, |item| item.skin.id);
+    list
 }
 
 impl Panel {
@@ -286,10 +310,15 @@ impl Panel {
     }
 }
 
-/// Every shader the Break down section may list for `holdings`, the duplicates first
-/// (each group the rarest first): the player's own copies of shaders of the trade, the
-/// last ones only when the hub breaks them down (`last`).
-pub(super) fn owned(holdings: &Holdings<'_>, last: bool) -> Vec<Owned> {
+/// Every shader the Break down section may list for `holdings`, the favourites among
+/// `marks` first, then in each part the duplicates first (each group the rarest first):
+/// the player's own copies of shaders of the trade, the last ones only when the hub breaks
+/// them down (`last`). A locked one is listed, with its padlock, so it can be unlocked.
+pub(super) fn owned(
+    holdings: &Holdings<'_>,
+    last: bool,
+    marks: &crate::shader_marks::Marks,
+) -> Vec<Owned> {
     let mut list: Vec<Owned> = unlockables::blade_skins_by_tier()
         .iter()
         .copied()
@@ -302,27 +331,31 @@ pub(super) fn owned(holdings: &Holdings<'_>, last: bool) -> Vec<Owned> {
                 skin,
                 count: unlock.count,
                 gives: crate::economy::shatter_yield(skin.tier),
+                favourite: marks.favourite(skin.id),
+                locked: marks.locked(skin.id),
+                new: marks.is_new(skin.id),
+                worn: marks.worn(skin.id),
             })
         })
         .collect();
     list.sort_by_key(|owned| owned.last());
+    crate::shader_marks::favourites_first(&mut list, marks, |item| item.skin.id);
     list
 }
 
-/// The duplicates `list` holds: how many copies would go (one of each kept), of how many
-/// shaders, for how many kyber shards.
+/// The duplicates `list` holds that may go: how many copies would go (one of each kept),
+/// of how many shaders, for how many kyber shards. A locked shader's never go.
 pub(super) fn duplicates(list: &[Owned]) -> (u32, usize, u64) {
-    list.iter().filter(|owned| owned.count > 1).fold(
-        (0, 0, 0),
-        |(copies, shaders, shards), owned| {
+    list.iter()
+        .filter(|owned| owned.count > 1 && !owned.locked)
+        .fold((0, 0, 0), |(copies, shaders, shards), owned| {
             let spare = owned.count - 1;
             (
                 copies + spare,
                 shaders + 1,
                 shards + u64::from(spare) * owned.gives,
             )
-        },
-    )
+        })
 }
 
 /// What a button pressed once waits to send.
@@ -671,11 +704,15 @@ impl Forge {
     }
 
     /// The chosen Break down shader's button: a duplicate asks twice; the last copy asks
-    /// with the card.
+    /// with the card; a locked one does nothing (its button says why).
     fn press_break(&mut self, now: Instant) -> PanelAction {
         let Some(chosen) = self.break_list.get(self.breaks).copied() else {
             return PanelAction::None;
         };
+        if chosen.locked {
+            self.armed = None;
+            return PanelAction::None;
+        }
         if chosen.last() {
             if self.data.last && self.data.can_trade && !self.waiting() {
                 self.armed = None;
@@ -817,6 +854,32 @@ impl Forge {
     pub(super) fn set_tier(&mut self, index: usize) -> PanelAction {
         self.filter_mut().shaders.tier = index.checked_sub(1).map(|index| FILTER_TIERS[index]);
         self.filter_changed()
+    }
+
+    /// Break down's Favourites chip (Shift+F): its favourites alone, or all again.
+    pub(super) fn toggle_favourites(&mut self, kept: bool) -> PanelAction {
+        if self.section != Section::Break || (!kept && !self.break_filter.shaders.favourite) {
+            return PanelAction::None;
+        }
+        let filter = &mut self.break_filter.shaders;
+        filter.favourite = !filter.favourite;
+        self.filter_changed()
+    }
+
+    /// The shader chosen in the section on show, and whether the player holds it (Break
+    /// down's are theirs, Craft's are not): what F and L mark.
+    pub(super) fn chosen_shader(&self) -> Option<(&'static str, bool)> {
+        match self.section {
+            Section::Craft => self
+                .craft_list
+                .get(self.craft)
+                .map(|item| (item.skin.id, false)),
+            Section::Break => self
+                .break_list
+                .get(self.breaks)
+                .map(|item| (item.skin.id, true)),
+            Section::Shop => None,
+        }
     }
 
     /// The section's own chip: Affordable or Duplicates.
@@ -1013,6 +1076,9 @@ impl Forge {
         }
         Some(match token {
             ONLY_TOKEN => self.toggle_only(),
+            // The Panel answers the star, the padlock and the Favourites chip, which need
+            // the marks.
+            STAR_TOKEN | PADLOCK_TOKEN | FAVOURITES_TOKEN => return None,
             SEARCH_TOKEN => self.focus_search(),
             LIST_TOKEN => PanelAction::ShaderView(false),
             GRID_TOKEN => PanelAction::ShaderView(true),
@@ -1068,6 +1134,31 @@ impl Forge {
 }
 
 impl Panel {
+    /// F, Shift+F and L in the Forge (29/10/2026, collection marks): star or lock the
+    /// chosen shader, or show Break down's favourites alone; `None` for another key.
+    pub(super) fn forge_mark_key(&mut self, key: KeyCode, shift: bool) -> Option<PanelAction> {
+        match key {
+            KeyCode::KeyF if shift => Some(self.forge.toggle_favourites(self.marks.kept)),
+            KeyCode::KeyF => Some(self.forge_mark(sjk_identity::Mark::Favourite)),
+            KeyCode::KeyL => Some(self.forge_mark(sjk_identity::Mark::Locked)),
+            _ => None,
+        }
+    }
+
+    /// Star or lock the shader chosen in the Forge (the padlock only for one the player
+    /// holds); it stays chosen wherever the favourites move it.
+    pub(super) fn forge_mark(&mut self, mark: sjk_identity::Mark) -> PanelAction {
+        let Some((id, owned)) = self.forge.chosen_shader() else {
+            return PanelAction::None;
+        };
+        let action = super::mark_action(&self.marks, id, mark, owned);
+        if matches!(action, PanelAction::Mark { .. }) {
+            self.forge.want = Some(id.to_owned());
+            self.forge.armed = None;
+        }
+        action
+    }
+
     /// The Forge's data this frame (the console's, [`ForgeData::read`]).
     pub(crate) fn set_forge(&mut self, data: ForgeData) {
         #[cfg(test)]
@@ -1180,6 +1271,28 @@ impl Panel {
         let filter = self.forge.filter_mut();
         filter.shaders.query = query.to_owned();
         filter.only = only;
+    }
+
+    /// Light Break down's Favourites chip (or not), for a world shot.
+    #[cfg(test)]
+    pub(crate) fn forge_favourites_for_shot(&mut self, on: bool) {
+        self.forge.break_filter.shaders.favourite = on;
+        self.forge.breaks = 0;
+        self.forge.break_first = 0;
+    }
+
+    /// Choose shader `id` on Break down, as the last frame listed it, and ask before its
+    /// last copy goes, for a world shot.
+    #[cfg(test)]
+    pub(crate) fn forge_ask_last_for_shot(&mut self, id: &str) {
+        let forge = &mut self.forge;
+        if let Some(at) = forge.break_list.iter().position(|item| item.skin.id == id) {
+            forge.breaks = at;
+            forge.ask = Some(Ask::Last {
+                skin: forge.break_list[at].skin,
+                yes: false,
+            });
+        }
     }
 }
 
@@ -1313,7 +1426,8 @@ mod tests {
             },
         ];
         let holdings = Holdings::Known(&held);
-        let craft = craftable(&holdings, &[]);
+        let none = crate::shader_marks::Marks::default();
+        let craft = craftable(&holdings, &[], &none);
         assert!(craft.iter().all(|item| crate::economy::in_trade(item.skin)));
         for id in ["saber_aurora", "saber_tidal", "saber_glitch", "saber_sun"] {
             assert!(craft.iter().all(|item| item.skin.id != id), "{id}");
@@ -1324,9 +1438,105 @@ mod tests {
                 .all(|pair| pair[0].skin.tier <= pair[1].skin.tier)
         );
         let ids = |list: Vec<Owned>| list.iter().map(|item| item.skin.id).collect::<Vec<_>>();
-        assert_eq!(ids(owned(&holdings, true)), ["saber_tidal", "saber_aurora"]);
-        assert_eq!(ids(owned(&holdings, false)), ["saber_tidal"]);
-        assert_eq!(duplicates(&owned(&holdings, true)), (2, 1, 10));
+        assert_eq!(
+            ids(owned(&holdings, true, &none)),
+            ["saber_tidal", "saber_aurora"]
+        );
+        assert_eq!(ids(owned(&holdings, false, &none)), ["saber_tidal"]);
+        assert_eq!(duplicates(&owned(&holdings, true, &none)), (2, 1, 10));
+    }
+
+    /// Collection marks (29/10/2026): favourites first, the marks on each item, and a
+    /// locked duplicate never counted among all duplicates.
+    #[test]
+    fn favourites_lead_and_a_locked_duplicate_is_kept() {
+        let held = [
+            copy("saber_tidal", 3),
+            copy("saber_sakura", 2),
+            copy("saber_aurora", 1),
+        ];
+        let holdings = Holdings::Known(&held);
+        let marks = crate::shader_marks::Marks::shown(
+            &["saber_aurora"],
+            &["saber_tidal"],
+            &["saber_sakura"],
+            Some("saber_aurora"),
+        );
+        let list = owned(&holdings, true, &marks);
+        let ids: Vec<_> = list.iter().map(|item| item.skin.id).collect();
+        assert_eq!(ids[0], "saber_aurora", "the favourite first: {ids:?}");
+        let aurora = list[0];
+        assert!(aurora.favourite && aurora.worn && aurora.last() && !aurora.locked);
+        let tidal = list
+            .iter()
+            .find(|item| item.skin.id == "saber_tidal")
+            .unwrap();
+        assert!(tidal.locked && !tidal.new);
+        assert!(
+            list.iter()
+                .any(|item| item.skin.id == "saber_sakura" && item.new)
+        );
+        // Sakura's one spare copy goes; Tidal's two stay.
+        assert_eq!(duplicates(&list).0, 1);
+        let craft = craftable(&holdings, &[], &marks);
+        assert!(craft.iter().all(|item| !item.favourite), "Aurora is held");
+        let wish = crate::shader_marks::Marks::shown(&["saber_phoenix"], &[], &[], None);
+        let craft = craftable(&holdings, &[], &wish);
+        assert_eq!(craft[0].skin.id, "saber_phoenix", "a wish leads Craft");
+        assert!(craft[0].favourite);
+    }
+
+    /// A locked shader's Break down does nothing, nor does B when only locked duplicates
+    /// are left; F and L ask the hub for the chosen shader, on a hub that keeps marks, and
+    /// Shift+F shows the favourites alone.
+    #[test]
+    fn a_locked_shader_is_not_broken_down_and_the_keys_mark() {
+        let held = [copy("saber_tidal", 3)];
+        let mut panel = forge(Section::Break, &held, sample_data(0, 0, 3_600, true));
+        panel.preview_marks = Some(crate::shader_marks::Marks::shown(
+            &[],
+            &["saber_tidal"],
+            &[],
+            None,
+        ));
+        build(&mut panel, &held, [1920.0, 1080.0]);
+        assert!(panel.forge.break_list[0].locked);
+        assert_eq!(key(&mut panel, KeyCode::Enter), PanelAction::None);
+        assert_eq!(panel.forge.armed, None, "nothing arms");
+        assert_eq!(key(&mut panel, KeyCode::Enter), PanelAction::None);
+        assert_eq!(panel.forge.spare.0, 0);
+        let _ = key(&mut panel, KeyCode::KeyB);
+        assert_eq!(panel.forge.ask, None, "no duplicate may go");
+        let press =
+            |panel: &mut Panel, code: KeyCode, shift: bool| panel.forge_mark_key(code, shift);
+        assert_eq!(
+            press(&mut panel, KeyCode::KeyL, false),
+            Some(PanelAction::Mark {
+                id: "saber_tidal",
+                mark: sjk_identity::Mark::Locked,
+                on: false,
+            })
+        );
+        assert_eq!(
+            press(&mut panel, KeyCode::KeyF, false),
+            Some(PanelAction::Mark {
+                id: "saber_tidal",
+                mark: sjk_identity::Mark::Favourite,
+                on: true,
+            })
+        );
+        assert_eq!(
+            press(&mut panel, KeyCode::KeyF, true),
+            Some(PanelAction::None)
+        );
+        assert!(panel.forge.break_filter.shaders.favourite);
+        // Without the hub's marks, nothing to mark.
+        panel.preview_marks = Some(crate::shader_marks::Marks::default());
+        build(&mut panel, &held, [1920.0, 1080.0]);
+        assert_eq!(
+            press(&mut panel, KeyCode::KeyL, false),
+            Some(PanelAction::None)
+        );
     }
 
     /// A purchase, a craft and a duplicate's break down ask twice and wait for the hub; a

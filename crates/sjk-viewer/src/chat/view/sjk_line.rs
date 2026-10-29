@@ -20,6 +20,13 @@ const LOGO_SIDE: f32 = 1.35;
 /// The channel label's size against the text size (10 pixels beside 16, as the name
 /// rows' labels were).
 const LABEL_SIZE: f32 = 0.625;
+/// What a muted sender's line says in place of their message.
+pub(in crate::chat) const MUTED_NOTE: &str = "Messages hidden on this client";
+
+/// The size [`MUTED_NOTE`] is drawn at in geometry `g`.
+pub(in crate::chat) fn muted_size(g: &Geometry) -> f32 {
+    15.0 * g.scale
+}
 
 /// What the first row shows of a line's sender.
 #[derive(Clone, Copy, Default)]
@@ -276,9 +283,9 @@ pub(in crate::chat) fn draw(
     let indent = prefix.width();
     if line.muted {
         ui.text(
-            "Messages hidden on this client",
+            MUTED_NOTE,
             Rect::new(x + indent, y, (g.width - indent).max(1.0), row_box(g)),
-            15.0 * g.scale,
+            muted_size(g),
             Color::new(0.821, 0.854, 0.886, alpha * 0.853),
             FontWeight::Regular,
             0.0,

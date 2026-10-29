@@ -475,8 +475,8 @@ impl SettingsMenu {
         } else if let Some(default) = crate::graphics_quality::row_default(console, setting.cvar) {
             console.set_cvar(setting.cvar, default);
         } else if let Some(switch) = super::derived_switch(setting.cvar) {
-            if (switch.on)(console) {
-                (switch.toggle)(console);
+            if (switch.on)(console, setting.cvar) != (switch.on_by_default)(setting.cvar) {
+                (switch.toggle)(console, setting.cvar);
             }
         } else if let Some(default) = console.cvar_default(setting.cvar).map(CvarValue::as_text) {
             console.set_cvar(setting.cvar, &default);
@@ -1029,9 +1029,10 @@ pub(super) fn row_default(console: &ViewerConsole, setting: &Setting) -> RowDefa
         };
     }
     if let Some(switch) = super::derived_switch(setting.cvar) {
+        let on_by_default = (switch.on_by_default)(setting.cvar);
         return RowDefault {
-            text: Some("Off".to_owned()),
-            changed: (switch.on)(console),
+            text: Some(if on_by_default { "On" } else { "Off" }.to_owned()),
+            changed: (switch.on)(console, setting.cvar) != on_by_default,
         };
     }
     // The HUD row names a HUD that two cvars select together; the quick

@@ -14,6 +14,7 @@ mod force_streams;
 pub(crate) mod force_wheel;
 mod hack_bar;
 mod jetpack_fuel;
+pub(crate) mod lagometer;
 mod monitor_marks;
 pub(crate) use monitor_marks::MonitorMarks;
 pub(crate) mod icons;
@@ -126,7 +127,7 @@ impl HudVisibility {
                     != 0,
             crosshair_names: hud && enabled("cg_drawCrosshairNames", true),
             timer: hud && enabled("cg_drawTimer", true),
-            lagometer: hud && enabled("cg_lagometer", false),
+            lagometer: hud && lagometer::mode(console) != 0,
             ground_hud: false,
             menu_hud: false,
         }
@@ -252,6 +253,8 @@ pub(crate) struct HudOverlay {
     /// The Monitor toy's charge ring and hit marker (`monitor.rs`).
     monitor_marks: MonitorMarks,
     lagometer: sjk_client::LagometerSamples,
+    /// `cg_lagometer` 2 and 3's numbers and speed history ([`lagometer`]).
+    lagometer_readout: lagometer::Readout,
     default_document: HudLayoutDocument,
     classic_document: HudLayoutDocument,
     override_document: Option<HudLayoutDocument>,
@@ -458,6 +461,7 @@ impl HudOverlay {
             toy_hack_left: None,
             monitor_marks: MonitorMarks::default(),
             lagometer: sjk_client::LagometerSamples::new(),
+            lagometer_readout: lagometer::Readout::default(),
             default_document: HudLayoutDocument::from_json(DEFAULT_LAYOUT)
                 .expect("bundled default HUD document is valid"),
             classic_document: HudLayoutDocument::from_json(CLASSIC_LAYOUT)
@@ -693,6 +697,7 @@ impl HudOverlay {
                     crosshair_alpha: self.crosshair_alpha,
                     crosshair_teammate: self.crosshair_teammate,
                     lagometer: &self.lagometer,
+                    lagometer_readout: &self.lagometer_readout,
                 },
                 &mut output,
             );
@@ -798,6 +803,7 @@ impl HudOverlay {
             &self.draw_list,
             |id| self.resolve_text(id),
             |id, _| text_values::retail_font(id),
+            |_| crate::text::CodePalette::Game,
             (vertices, font),
             viewport,
             crate::text::TextStyle::NEUTRAL,

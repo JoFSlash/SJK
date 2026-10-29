@@ -10,10 +10,37 @@
 
 use crate::console::ViewerConsole;
 use std::time::Duration;
+use winit::dpi::{LogicalSize, PhysicalSize, Size};
 use winit::window::Window;
 
 /// Cvar choosing the kind of fullscreen `r_fullscreen 1` gives.
 pub(crate) const EXCLUSIVE_CVAR: &str = "r_exclusiveFullscreen";
+
+/// Cvar: whether the window's size (`r_resolution`) and the world's resolution count the
+/// screen's pixels (1) or its points (0), the units its display scaling sizes things in.
+pub(crate) const HIGH_DPI_CVAR: &str = "r_highDpi";
+
+/// [`HIGH_DPI_CVAR`]'s default: points on a Mac, pixels elsewhere. Mac apps size their
+/// windows in points, EternalJK's too (SDL without high DPI), so `1280x720` is the same
+/// window on a Retina screen as on any other, not a quarter of it; and the world drawn at
+/// the points' resolution costs a quarter of a Retina screen's pixels, as in EternalJK
+/// (Glen's frame rate in fullscreen, 29/10/2026). JA's sizes on Windows count pixels.
+pub(crate) const HIGH_DPI_DEFAULT: bool = !cfg!(target_os = "macos");
+
+/// Whether the window and the world count the screen's pixels ([`HIGH_DPI_CVAR`]).
+pub(crate) fn high_dpi(console: &ViewerConsole) -> bool {
+    console.bool_cvar(HIGH_DPI_CVAR).unwrap_or(HIGH_DPI_DEFAULT)
+}
+
+/// The window size `r_resolution`'s `size` asks winit for: pixels with high DPI, else
+/// points.
+pub(crate) fn window_size([width, height]: [u32; 2], high_dpi: bool) -> Size {
+    if high_dpi {
+        PhysicalSize::new(width, height).into()
+    } else {
+        LogicalSize::new(f64::from(width), f64::from(height)).into()
+    }
+}
 
 /// How the client window covers the screen.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -143,6 +170,31 @@ pub(crate) fn minimise_after_focus(suspended: bool, focused: bool) -> bool {
     suspended && !focused
 }
 
+/// The size to ask the window for, if any: `r_resolution` (`resolution`, counted in
+/// pixels when `high_dpi`) while the window is windowed and not already at the size last
+/// asked for (`applied`, with how it was counted). A
+/// fullscreen window keeps the screen's size: borderless covers the monitor and an
+/// exclusive mode is the resolution. Asking a fullscreen window for another size shrank
+/// it on a Mac, a small game in the middle of a black screen (Glen's report, 29/10/2026).
+/// `fullscreen` is the window's own state, which the Mac's green button changes without
+/// the cvars, and still set while a Mac fullscreen animation runs; suspended exclusive
+/// fullscreen keeps its size for the return.
+pub(crate) fn window_size_request(
+    display: DisplayMode,
+    fullscreen: bool,
+    suspended: bool,
+    resolution: Option<[u32; 2]>,
+    high_dpi: bool,
+    applied: ([u32; 2], bool),
+) -> Option<[u32; 2]> {
+    resolution.filter(|size| {
+        display == DisplayMode::Windowed
+            && !fullscreen
+            && !suspended
+            && (*size, high_dpi) != applied
+    })
+}
+
 /// What the window's monitor offers, gathered when the settings screen opens.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub(crate) struct MonitorModes {
@@ -152,6 +204,8 @@ pub(crate) struct MonitorModes {
     pub(crate) desktop: Option<[u32; 2]>,
     /// Whether exclusive fullscreen can be used on this window.
     pub(crate) exclusive: bool,
+    /// The monitor's pixels per point (2 on a Retina screen); 0 or 1 when unscaled.
+    pub(crate) scale: f64,
 }
 
 impl MonitorModes {
@@ -174,6 +228,25 @@ impl MonitorModes {
             sizes,
             desktop,
             exclusive,
+            scale: monitor.scale_factor(),
+        }
+    }
+
+    /// The sizes counted in points when `points`, for a window measured in points
+    /// ([`HIGH_DPI_CVAR`] off): each divided by the monitor's scale, so a 3024x1964
+    /// Retina desktop is 1512x982. Exclusive video modes always count pixels.
+    pub(crate) fn counted_in_points(&self, points: bool) -> Self {
+        if !points || self.scale <= 1.0 {
+            return self.clone();
+        }
+        let to_points = |size: [u32; 2]| size.map(|n| (f64::from(n) / self.scale).round() as u32);
+        let mut sizes: Vec<[u32; 2]> = self.sizes.iter().map(|size| to_points(*size)).collect();
+        sizes.sort_unstable_by(|a, b| b.cmp(a));
+        sizes.dedup();
+        Self {
+            sizes,
+            desktop: self.desktop.map(to_points),
+            ..self.clone()
         }
     }
 }
@@ -285,6 +358,76 @@ mod tests {
     #[test]
     fn repeated_focus_loss_stays_suspended() {
         assert!(suspended_after_focus(true, false, Duration::ZERO, false));
+    }
+
+    #[test]
+    fn only_a_windowed_window_takes_r_resolution() {
+        let size = Some([1280, 720]);
+        assert_eq!(
+            window_size_request(
+                DisplayMode::Windowed,
+                false,
+                false,
+                size,
+                true,
+                ([0; 2], true)
+            ),
+            size
+        );
+        assert_eq!(
+            window_size_request(
+                DisplayMode::Windowed,
+                false,
+                false,
+                size,
+                true,
+                ([1280, 720], true)
+            ),
+            None
+        );
+        // The same numbers in points are another size.
+        assert_eq!(
+            window_size_request(
+                DisplayMode::Windowed,
+                false,
+                false,
+                size,
+                false,
+                ([1280, 720], true)
+            ),
+            size
+        );
+        // Borderless, exclusive, the Mac's green button and suspended exclusive.
+        for (display, fullscreen, suspended) in [
+            (DisplayMode::Borderless, true, false),
+            (DisplayMode::Exclusive, true, false),
+            (DisplayMode::Windowed, true, false),
+            (DisplayMode::Windowed, false, true),
+        ] {
+            assert_eq!(
+                window_size_request(display, fullscreen, suspended, size, true, ([0; 2], true)),
+                None
+            );
+        }
+    }
+
+    #[test]
+    fn a_retina_monitor_counts_its_sizes_in_points() {
+        let retina = MonitorModes {
+            sizes: vec![[3024, 1964], [2560, 1600], [1512, 982]],
+            desktop: Some([3024, 1964]),
+            exclusive: false,
+            scale: 2.0,
+        };
+        let points = retina.counted_in_points(true);
+        assert_eq!(points.sizes, [[1512, 982], [1280, 800], [756, 491]]);
+        assert_eq!(points.desktop, Some([1512, 982]));
+        assert_eq!(retina.counted_in_points(false), retina);
+        let unscaled = MonitorModes {
+            scale: 1.0,
+            ..retina.clone()
+        };
+        assert_eq!(unscaled.counted_in_points(true), unscaled);
     }
 
     #[test]

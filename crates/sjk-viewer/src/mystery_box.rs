@@ -89,6 +89,8 @@ struct Item {
     model: &'static str,
     scale: f32,
     form: Option<usize>,
+    /// How many copies are drawn, gathered round the centre (a pile of shards).
+    copies: u8,
 }
 
 const fn item(model: &'static str, scale: f32) -> Item {
@@ -96,6 +98,17 @@ const fn item(model: &'static str, scale: f32) -> Item {
         model,
         scale,
         form: None,
+        copies: 1,
+    }
+}
+
+/// `copies` of `model`, grown by `scale`, gathered round the centre.
+const fn pile(model: &'static str, scale: f32, copies: u8) -> Item {
+    Item {
+        model,
+        scale,
+        form: None,
+        copies,
     }
 }
 
@@ -105,6 +118,7 @@ const fn holocron(slot: usize, scale: f32) -> Item {
         model: FORMS[slot].parts[0].model,
         scale,
         form: Some(slot),
+        copies: 1,
     }
 }
 
@@ -129,42 +143,49 @@ const HOLOCRONS: [Item; 4] = [
     holocron(3, 1.8),
 ];
 
+/// The kyber crystal a pile of shards is drawn with: the Rare kyber's, the shards' cyan.
+const SHARD_MODEL: &str = "models/sjk/holocron_kyber_rare_crystal.md3";
+
 /// What the roll stops on, by outcome: bolts (empty), a blue crystal (refund), a green
-/// one (double), a red one (jackpot), a thermal detonator (it blows up) and SJK's
-/// holocron (a holocron of a tier not told: another player's; the opener's stops on its
-/// tier's, [`HOLOCRONS`]).
-const PRIZES: [Item; 6] = [
+/// one (double), a red one (jackpot), a thermal detonator (it blows up), SJK's holocron
+/// (a holocron of a tier not told: another player's; the opener's stops on its tier's,
+/// [`HOLOCRONS`]), and since 29/10/2026 a pile of kyber shards (shards; [`BIG_PILE`] for
+/// a big one), a little mystery box (a free opening) and a saber hilt (the boxes' blade).
+const PRIZES: [Item; 9] = [
     item("models/items/metallic_bolts.md3", 1.5),
     item("models/map_objects/mp/crystal_blue.md3", 0.8),
     item("models/map_objects/mp/crystal_green.md3", 0.8),
     item("models/map_objects/mp/crystal_red.md3", 1.0),
     item("models/weapons2/thermal/thermal.md3", 3.0),
     item(crate::illuminate::MODEL, 3.0),
+    pile(SHARD_MODEL, 1.5, 3),
+    item(MODEL, 0.45),
+    item("models/weapons2/saber/saber_w.md3", 2.6),
 ];
 
-/// What rolls over an opened box before it stops: the game's weapons and the prizes
-/// (the thermal detonator is among the weapons), the four tiers' holocrons among them.
-const REEL: [Item; 20] = [
-    item("models/weapons2/blaster_pistol/blaster_pistol.md3", 2.0),
-    item("models/weapons2/blaster_r/blaster.md3", 0.9),
-    item("models/weapons2/bowcaster/bowcaster.md3", 1.2),
-    item("models/weapons2/briar_pistol/briar_pistol.md3", 1.8),
-    item("models/weapons2/concussion/c_rifle.md3", 0.9),
-    item("models/weapons2/disruptor/disruptor.md3", 1.0),
-    item("models/weapons2/golan_arms/golan_arms.md3", 0.9),
-    item("models/weapons2/heavy_repeater/heavy_repeater.md3", 1.0),
-    item("models/weapons2/detpack/det_pack.md3", 2.2),
-    item("models/weapons2/saber/saber_w.md3", 1.4),
-    item("models/weapons2/thermal/thermal.md3", 3.0),
-    item("models/weapons2/tusken_rifle/tusken_rifle.md3", 0.35),
+/// A big pile of shards: more than [`BIG_PILE_FROM`] (the boxes' blade for a player who
+/// holds it pays 60).
+const BIG_PILE: Item = pile(SHARD_MODEL, 1.7, 7);
+const BIG_PILE_FROM: u64 = 15;
+
+/// What rolls over an opened box before it stops: only what a box can give (Sol,
+/// 29/10/2026: the game's weapons rolled before, which no box gave), the four tiers'
+/// holocrons and both piles of shards among them.
+const REEL: [Item; 14] = [
     PRIZES[0],
     PRIZES[1],
     PRIZES[2],
     PRIZES[3],
+    PRIZES[4],
+    PRIZES[6],
+    PRIZES[7],
+    PRIZES[8],
+    BIG_PILE,
     HOLOCRONS[0],
     HOLOCRONS[1],
     HOLOCRONS[2],
     HOLOCRONS[3],
+    PRIZES[5],
 ];
 
 /// The prize the roll stops on for `outcome` (a holocron of `tier`, when the player
@@ -176,6 +197,9 @@ fn prize(outcome: &str, pays: bool, tier: Option<&str>) -> Item {
         "double" => PRIZES[2],
         "jackpot" => PRIZES[3],
         wire::EXPLODE => PRIZES[4],
+        wire::SHARD_PILE => PRIZES[6],
+        wire::AGAIN => PRIZES[7],
+        wire::BLADE => PRIZES[8],
         wire::HOLOCRON => tier
             .and_then(|tier| {
                 FORMS[..HOLOCRONS.len()]
@@ -271,6 +295,10 @@ struct Prize {
     gift: Option<wire::Gift>,
     /// The tier of the holocron it gave.
     holocron: Option<String>,
+    /// The kyber shards it gave.
+    shards: Option<u64>,
+    /// The saber shader it gave.
+    blade: Option<String>,
 }
 
 /// A box's opening under way: the roll, then what came out waiting to be taken.
@@ -545,10 +573,20 @@ impl MysteryBoxes {
         };
         let pays = outcome != "empty" && mine.as_ref().is_none_or(|prize| prize.won > 0);
         let tier = mine.as_ref().and_then(|prize| prize.holocron.as_deref());
+        let mut stops = prize(outcome, pays, tier);
+        // The opener's pile of shards as big as it is (the boxes' blade, held already,
+        // pays a pile too).
+        if let Some(shards) = mine.as_ref().and_then(|prize| prize.shards) {
+            stops = if shards > BIG_PILE_FROM {
+                BIG_PILE
+            } else {
+                PRIZES[6]
+            };
+        }
         here.opening = Some(Opening {
             started: now,
             outcome: outcome.to_owned(),
-            prize: prize(outcome, pays, tier),
+            prize: stops,
             seed,
             mine,
             opener,
@@ -577,7 +615,7 @@ impl MysteryBoxes {
             if !opening.revealed && elapsed >= ROLL {
                 opening.revealed = true;
                 let path = match opening.outcome.as_str() {
-                    "jackpot" => JACKPOT,
+                    "jackpot" | wire::BLADE => JACKPOT,
                     wire::EXPLODE => {
                         moments.push(Moment::Blast {
                             opener: opening.opener,
@@ -683,6 +721,17 @@ fn prize_text(outcome: &str, prize: &Prize) -> String {
             let name = crate::holocrons::name(tier).unwrap_or("A holocron");
             format!("{name}! In your Collection")
         }
+        (wire::BLADE, ..) if prize.blade.is_some() => {
+            "The Mystery blade! In your Collection".to_owned()
+        }
+        (wire::BLADE, ..) if prize.shards.is_some() => format!(
+            "The Mystery blade, again: +{} kyber shards",
+            prize.shards.unwrap_or(0)
+        ),
+        (wire::SHARD_PILE, ..) if prize.shards.is_some() => {
+            format!("+{} kyber shards", prize.shards.unwrap_or(0))
+        }
+        (wire::AGAIN, ..) => "A box in the box: your next roll is free".to_owned(),
         _ => result_text(outcome, prize.price, prize.won),
     }
 }
@@ -720,6 +769,26 @@ fn float(elapsed: Duration, yaw: f32) -> (f32, f32) {
     let held = seconds - ROLL.as_secs_f32();
     let turn = if held > 0.0 { held * 60.0 } else { 0.0 };
     (height, yaw + 90.0 + turn)
+}
+
+/// Where each of `copies` stands round the centre (units, before the item's scale) and
+/// how it leans: one alone stands upright at the centre; more stand in a ring, leaning
+/// out, every other one lower and smaller-looking.
+fn pile_spots(copies: u8) -> impl Iterator<Item = (Vec3, Quat)> {
+    let count = copies.max(1);
+    (0..count).map(move |index| {
+        if count == 1 {
+            return (Vec3::ZERO, Quat::IDENTITY);
+        }
+        let around = index as f32 / count as f32 * std::f32::consts::TAU + 0.4;
+        let (sin, cos) = around.sin_cos();
+        let low = if index % 2 == 1 { -2.0 } else { 1.0 };
+        let reach = if count > 4 { 6.0 } else { 4.0 };
+        let at = Vec3::new(cos * reach, sin * reach, low);
+        let lean =
+            Quat::from_axis_angle(Vec3::new(-sin, cos, 0.0), 0.35) * Quat::from_rotation_z(around);
+        (at, lean)
+    })
 }
 
 /// `pmtype_t`: the player plays (not dead, spectating or in intermission).
@@ -971,8 +1040,14 @@ impl GpuState {
         let asked = self.mystery_boxes.asked.take();
         match outcome {
             Ok(BoxDone::Opened(opened)) => {
-                if opened.price == 0 {
-                    self.mystery_boxes.free = self.mystery_boxes.free.saturating_sub(1);
+                // The hub says the free openings left (a box may give one); an older hub
+                // does not, and a free opening was spent.
+                match opened.free {
+                    Some(free) => self.mystery_boxes.free = free,
+                    None if opened.price == 0 => {
+                        self.mystery_boxes.free = self.mystery_boxes.free.saturating_sub(1);
+                    }
+                    None => {}
                 }
                 let mine = Prize {
                     price: opened.price,
@@ -983,6 +1058,8 @@ impl GpuState {
                         .holocron
                         .as_ref()
                         .map(|holocron| holocron.tier.clone()),
+                    shards: opened.shards,
+                    blade: opened.blade.clone(),
                 };
                 let own = self
                     .live_session
@@ -1212,14 +1289,20 @@ Press Use to take it"
             let Some(mesh) = boxes.mesh_of(item.model) else {
                 continue;
             };
-            // The model's own centre over the box, whatever its origin.
+            // The model's own centre over the box, whatever its origin; a pile's copies
+            // round it, each leaning its own way.
             let centre = Vec3::from_array(self.object_meshes[mesh].center) * item.scale;
-            let origin = here.origin + Vec3::Z * height - Quat::from_array(rotation) * centre;
-            self.object_groups[mesh].push(ActorInstance::new(
-                origin.to_array(),
-                rotation,
-                [item.scale; 3],
-            ));
+            let turn = Quat::from_array(rotation);
+            for (at, lean) in pile_spots(item.copies) {
+                let turned = turn * lean;
+                let origin =
+                    here.origin + Vec3::Z * height + turn * (at * item.scale) - turned * centre;
+                self.object_groups[mesh].push(ActorInstance::new(
+                    origin.to_array(),
+                    turned.to_array(),
+                    [item.scale; 3],
+                ));
+            }
         }
     }
 
@@ -1299,6 +1382,21 @@ impl GpuState {
     /// on a holocron of tier `n % 4` for the `n`th: the roll shows its tier's holocron once
     /// `since` passes the roll.
     pub(crate) fn shot_mystery_boxes(&mut self, boxes: &[([f32; 3], f32)], since: Duration) {
+        self.shot_mystery_box_prizes(boxes, since, &HOLOCRONS);
+    }
+
+    /// [`Self::shot_mystery_boxes`], stopped on the prizes of 29/10/2026: a pile of
+    /// shards, a big one, a free opening and the boxes' blade.
+    pub(crate) fn shot_mystery_box_loot(&mut self, boxes: &[([f32; 3], f32)], since: Duration) {
+        self.shot_mystery_box_prizes(boxes, since, &[PRIZES[6], BIG_PILE, PRIZES[7], PRIZES[8]]);
+    }
+
+    fn shot_mystery_box_prizes(
+        &mut self,
+        boxes: &[([f32; 3], f32)],
+        since: Duration,
+        prizes: &[Item],
+    ) {
         let started = Instant::now() - since;
         self.mystery_boxes.shot = true;
         self.mystery_boxes.here = boxes
@@ -1311,7 +1409,7 @@ impl GpuState {
                 opening: Some(Opening {
                     started,
                     outcome: wire::HOLOCRON.to_owned(),
-                    prize: HOLOCRONS[index % HOLOCRONS.len()],
+                    prize: prizes[index % prizes.len()],
                     seed: index as u32,
                     mine: None,
                     opener: None,
@@ -1438,6 +1536,19 @@ mod tests {
         }
         assert_eq!(prize("empty", false, None), PRIZES[0]);
         assert_eq!(prize("newer_thing", true, None), PRIZES[2]);
+        // The prizes of 29/10/2026; the roll shows nothing a box cannot give.
+        assert_eq!(prize(wire::SHARD_PILE, false, None), PRIZES[6]);
+        assert_eq!(prize(wire::AGAIN, false, None), PRIZES[7]);
+        assert_eq!(prize(wire::BLADE, false, None), PRIZES[8]);
+        for item in REEL {
+            assert!(
+                PRIZES.contains(&item) || HOLOCRONS.contains(&item) || item == BIG_PILE,
+                "{}",
+                item.model
+            );
+        }
+        assert_eq!(pile_spots(1).count(), 1);
+        assert_eq!(pile_spots(BIG_PILE.copies).count(), 7);
         // A holocron stops on its tier's own, the plain one when the tier is not told.
         assert_eq!(
             prize(wire::HOLOCRON, false, Some("legendary")),
@@ -1547,6 +1658,32 @@ mod tests {
         assert_eq!(
             result_text("newer_thing", 100, 0),
             "Nothing inside: -100 credits"
+        );
+    }
+
+    #[test]
+    fn shards_a_free_roll_and_the_blade_say_what_they_gave() {
+        let got = |shards: Option<u64>, blade: Option<&str>| Prize {
+            price: 100,
+            shards,
+            blade: blade.map(str::to_owned),
+            ..Prize::default()
+        };
+        assert_eq!(
+            prize_text(wire::SHARD_PILE, &got(Some(18), None)),
+            "+18 kyber shards"
+        );
+        assert_eq!(
+            prize_text(wire::AGAIN, &got(None, None)),
+            "A box in the box: your next roll is free"
+        );
+        assert_eq!(
+            prize_text(wire::BLADE, &got(None, Some(wire::BLADE_ID))),
+            "The Mystery blade! In your Collection"
+        );
+        assert_eq!(
+            prize_text(wire::BLADE, &got(Some(60), None)),
+            "The Mystery blade, again: +60 kyber shards"
         );
     }
 

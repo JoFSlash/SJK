@@ -78,6 +78,11 @@ includes:
 - the Tag toy: premade tags stuck on walls and floors, TF2 style, seen by every SJK
   player on the map, three free and the rest dropped by holocrons, with a Collection tab
   to choose them (27/10/2026);
+- the Banana peel toy (29/10/2026, after Kushina's idea): banana peels dropped on the
+  floor, or tossed ahead while running, that a player who has the toy on and walks onto
+  slips on, feet up, as a ragdoll; three a player, two minutes each, none by a spawn
+  point; the peel modelled and the slip sound synthesized by a script, nothing taken from
+  another game;
 - mystery boxes: boxes placed on maps through the hub, chests of SJK's own with glowing
   question marks, opened by players for credits to a music box tune of SJK's own while
   the roll slows to a stop on what came out, with a roll the hub makes and every SJK
@@ -106,7 +111,8 @@ includes:
   the name since 22/10/2026); the {{S}} clan's tag with its red Sith emblem and
   JoF's green logo (22/10/2026);
 - holocron drops, loot boxes earned by playing: four tiers, drops announced in
-  the SJK chat and a Holocrons tab on the Profile screen with a 3D holocron;
+  the SJK chat and a Holocrons tab on the Profile screen with a 3D holocron; since
+  29/10/2026 the daily limit resets for everyone at 9:00, Paris time (Sol's decision);
 - opening holocrons: sealed cards (Normal, Holo and Solar finishes, the Alpha
   Edition) and credits, the ceremony and the Collection's Cards tab, and a loot
   table with every chance; credits will buy droppable cosmetics as a fix for bad
@@ -382,6 +388,18 @@ includes:
   compiled with q3map2's `-external` load their `lm_NNNN.tga` pages instead of failing;
 - chat name actions (23/10/2026, after Bishop's and Sanjisan's ideas): a click on a
   player's name in the chat pins their card, to Whisper or Block them;
+- collection marks (29/10/2026, after Atrosex's and Kushina's ideas): the shader worn
+  marked in the Forge's Break down, on the Shaders tab and in the trade window, and said
+  first on the last copy's card; favourite shaders starred and listed first with a
+  Favourites filter, and locked ones the SJK hub never breaks down or trades until
+  unlocked, both kept at the hub; a New sticker on shaders gained since the player last
+  looked, kept on the PC;
+- the player card's Key only (29/10/2026, after Blep's idea): `cg_playerCard 2` opens
+  the card from the `inspect` key alone, never from a look;
+- three JoF EJK options (29/10/2026, after Kushina's idea): saber hit sparks
+  (`cg_fleshSparks`), a held mouse 4 or 5 repeating its bind (`in_mouseRepeat`, 20 times
+  a second at any frame rate) and the lagometer's numbers and speed graph
+  (`cg_lagometer` 2 and 3);
 - SJK Alpha (19/10/2026), the first collection of cards: the Mythical rarity, the
   Credits and Meme kinds, and card 1, "Bishop", honouring the author of JKR (art by
   Sol, AI-assisted: a rusted helmet portrait).
@@ -501,7 +519,7 @@ pull requests merged into SJK, most of them bringing SJK in line with EternalJK
   its next seven the Sketch, Hourglass, Fiber Optic, Serpent, Monarch, Phoenix and Quantum
   blades, and its last three the Comic, Quicksilver and Obsidian Edge blades.
 
-Lumaya ([lumayaa](https://github.com/lumayaa)), contributor, has 66 pull requests
+Lumaya ([lumayaa](https://github.com/lumayaa)), contributor, has 75 pull requests
 merged into SJK
 ([all of them](https://github.com/Sol-Vulpes/SJK/pulls?q=is%3Apr+author%3Alumayaa)):
 
@@ -618,6 +636,11 @@ merged into SJK
   a predicted vehicle (#276), and the audit's record in networking.md (#271).
 - #277 the first jaPRO prediction layer: race-mode command slicing and velocity precision
   from TaystJK, only on servers that advertise jaPRO.
+- #252-#273 the rest of the prediction audit: frozen view on a command-history gap (#252),
+  saber-lock facing (#253), the respawn jump latch (#260), the dual jump-attack hull (#266),
+  the equipped saber definitions (#267) and remote vehicle hulls (#273).
+- #279, #282, #284 jaPRO prediction from TaystJK: movement-style acceleration and friction,
+  style jumps and only-bhop, and the new jetpack, only on servers that advertise jaPRO.
 
 Lukas ([LukasMoudry](https://github.com/LukasMoudry)), contributor, has 18 pull requests
 merged into SJK
@@ -660,7 +683,7 @@ merged into SJK
 - #198 "Too many open files" after a long session: the Profile menu's model icons, cosmetics and
   Force templates let go of the previous map's game files (its PK3 reopening part held back).
 
-Slash ([JoFSlash](https://github.com/JoFSlash)), contributor, has 66 pull requests merged
+Slash ([JoFSlash](https://github.com/JoFSlash)), contributor, has 67 pull requests merged
 into SJK ([all of them](https://github.com/Sol-Vulpes/SJK/pulls?q=is%3Apr+author%3AJoFSlash)):
 
 - #114 Tab completes the cfg file argument of `exec`, `execq`, `writeconfig` and `write`
@@ -787,6 +810,8 @@ into SJK ([all of them](https://github.com/Sol-Vulpes/SJK/pulls?q=is%3Apr+author
   move the radial HUD's meters apart and up or down, after Lex's idea.
 - #283 laptops with two graphics cards: sjk.exe asks NVIDIA and AMD drivers for the fast
   card, tries the other cards when one cannot open, and says why when none starts.
+- #286 `fs_restart` mounts the game files again without restarting SJK: new PK3s and the
+  asset browser's pack choices reach the menus and the next map, after Blep's idea.
 
 His Peek work in #199 (closed 24/10/2026, not merged) shaped the Drone toy: a player is
 asked before being peeked, told who watches, and can end it. His #206 (closed 25/10/2026,
@@ -822,6 +847,14 @@ palette with pink as its main colour, light purple and white mist, afterimages m
 falling blossoms like the Spectral's, and a branch with a flower where the blade starts
 (and one day a wooden hilt). Sol built it as the Varykino Blossom, a Mythical saber shader
 (blade 166, 21/10/2026), with all of it but the hilt, which waits for custom hilts.
+Kushina also asked for JA+ and jaPRO plugin options she would not have to type as a
+`cp_pluginDisable` number: Sol built them as Settings switches named after each feature,
+with JoF EJK's `plugin` command (29/10/2026). She asked too for three JoF EJK options that
+players coming from EJK rely on: Sol built them as `cg_fleshSparks`, `in_mouseRepeat` (at
+20 presses a second rather than with the frame rate) and `cg_lagometer` 2 and 3
+(29/10/2026). Her idea of a banana peel toy, peels that players slip on, Sol approved and
+built as the Banana peel (29/10/2026): opted-in players who walk onto a peel slip and fall
+as ragdolls.
 
 Turin, a player, asked for private messages to be heard with the public chat sounds off:
 Sol built chat sounds by kind, each with its own sound (23/10/2026).
@@ -835,12 +868,32 @@ built it as the pinned chat card's Whisper button (23/10/2026).
 Nib, a player, asked to choose the saber sounds apart from the saber shader (18/10/2026,
 and hub report #109): Sol built it as the Saber tab's Sounds row (23/10/2026).
 
+Blep, a player, asked for the player card to come only from the `inspect` key, not from
+looking at a player: Sol built it as Key only, `cg_playerCard 2` (29/10/2026).
+
+Atrosex, a player, asked for the Forge's Break down to mark the saber shader the player
+wears, and its last copy's card to say plainly that it is worn; Kushina asked for favourite
+shaders and a lock against breaking one down by mistake. Sol built both as collection marks
+(29/10/2026): Worn, a star and a padlock on every listed shader, the lock held by the SJK
+hub (breaking down and trading refused), and a New sticker on what was gained since the
+player last looked.
+
+Creo, a player, found the chat often hard to read over bright maps, with vanilla graphics
+too: Sol built two Settings > Chat options for it (29/10/2026), Chat backdrop
+(`cg_chatBoxBackdrop`), a dark band behind each row of the chat as long as its words, and
+Chat text outline (`cg_chatBoxOutline`), a dark edge round every letter instead of its
+shadow.
+
 ## Testing
 
 Glen, a player, was the first to play SJK on a Mac (25/10/2026), on a MacBook Pro
 with Apple Silicon, and reported that the game aborted on choosing fullscreen, its
 frame rate on Metal and that Cmd+Tab did not work. Sol kept macOS to borderless
-fullscreen after that crash report (25/10/2026).
+fullscreen after that crash report (25/10/2026). Glen then reported fullscreen
+showing the game as a small window in the middle of a black screen (29/10/2026):
+the client asked the fullscreen window for the `r_resolution` size. Glen's frame
+rate once fullscreen worked led to `r_highDpi` (29/10/2026): on a Mac, window sizes
+and the world's resolution count the screen's points, as in EternalJK.
 
 Blep, a player, reported that a whisper ending with a backslash left unencrypted
 through the game server; Sol fixed it (26/10/2026).

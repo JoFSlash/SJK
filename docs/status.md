@@ -1,3 +1,251 @@
+## Monitor Screen Saver
+
+29/10/2026, `personal/monitor-screen-saver`, based on `main` `9f40fded` (Sol's idea),
+with the hub's `screen-saver` branch (the two achievement ids): a player struck by 5
+monitors of others within 20 seconds is untouchable by monitors for 30 seconds and
+still throws, in Force Absorb's shell tinted gold that pulses and flickers before it
+ends, with a CRT degauss and power-off synthesized by `scripts/monitor_assets.py`
+([client.md](client.md#monitor)). Others learn of it through a feed toy event
+(`saver_<until>`, `saver_off`). Two achievements: Payback and the hidden Power Surge
+(42 in all, [identity.md](identity.md#achievements)). Verified: fmt, workspace build,
+Clippy (no warnings in the changed code), `cargo test --locked --workspace` (new unit
+tests for the count, the achievements once a Screen Saver, the feed events and the
+shell's glow), the hub's tests and Clippy. Not verified: anything in game, the gold
+shell's look, two clients seeing the same Screen Saver. The hub's `screen-saver` was merged and
+deployed the same day.
+
+## Banana peel toy
+
+29/10/2026, `personal/banana-peel`, based on `main` `99904a8e` (the player Kushina's idea,
+which Sol approved): `toy_banana` (opt-in, `cl_toyBanana`, both the right to drop peels and
+the consent to slip on them) and `banana_drop` drop a banana peel at the feet, or tossed
+72 units ahead while moving, onto the floor under it ([client.md](client.md#banana-peel)).
+Three peels a player, two minutes each, one drop every 2 seconds, none within 96 units of a
+spawn point; all go with the map, the server, the toy turned off or the dropper leaving.
+The slipping player's client decides the slip against its own predicted player (on the
+ground, moving, feet on a peel it came at) and falls as the Ragdoll does, with a blow at a
+foot (`ragdoll::UNTHROWN` names no monitor) that throws the feet over the head and lays the
+body on its back. Peels, slips and clears go through the toy relay as `drop_...`,
+`slip_<dropper>_<number>` and `clear`; nothing in the looks, which hold eight toy ids at
+most and are full. No hub change (the relay checks no toy ids: `relay.rs`, "The hub knows
+no toys"). Collection > Toys has ten rows (64 high, was 68), `cg_toyBananaShow` hides the
+peels, `s_toyBananaSound` silences them; the key bindings' icons have four more atlas
+cells (the atlas keeps its height). Model, picture, icon, slip and drop sounds are SJK's own
+(`scripts/banana_assets.py`). Verified: fmt, workspace build, Clippy and tests (events
+read back and fit the relay, three peels a player, expiry and the dropper leaving, a used-up
+peel heard late, the slip's radius, ground, speed, arming and the dropper's grace, the
+toy and the Ragdoll's exclusions, placement ahead of the feet or tossed and short of a
+wall, the spawn table, the flight's arc and landing flat, the body thrown on its back at four
+speeds); world shots of peels on duel6 and ffa3, the Toys card and hover card, and a player
+of Sol's 21/03 demo slipping. Not verified: anything in game, two clients seeing the same
+peel and slip, the slip against real movement and latency, how the peel reads at a
+distance, the sounds' mix.
+
+## Player card: Key only
+
+29/10/2026, `personal/ideas-followups`, based on `main` `45921ca1`, the player Blep's idea:
+`cg_playerCard` becomes three-way, 0 Off, 1 On look and key (the default, as before), 2 Key
+only: the card opens from `inspect` alone, never from a steady look
+([client.md](client.md#player-card)). Settings > HUD+ > Player card is a three-way choice;
+Card delay's help says it counts only with On look and key. Old configs saved the on/off
+setting as 0 or 1, which keep their meaning. Verified by
+`hud::player_card::tests::the_setting_reads_three_ways_and_old_configs_keep_their_meaning`
+and `each_mode_opens_the_card_its_own_way` (the card's choice of frame by frame, with a
+console for the setting), the settings' help and row tests; not tried in a game.
+
+## Collection marks: worn, favourite, locked and New saber shaders
+
+29/10/2026, `personal/collection-marks`, based on `main` `0fd6a5e1`, the ideas of the players
+Atrosex (the worn shader marked in the Forge's Break down, and said on the last copy's card)
+and Kushina (favourites and a lock), extended by Sol ([sjk-ui.md](sjk-ui.md#marks)). The
+Shaders tab, the Forge and the trade window mark each saber shader worn (either saber or
+staff half), New (gained since the player last looked: `shader-seen.txt` on the PC, the
+first holdings seen whole when there is no file) and, on a hub that keeps them, favourite
+(listed first, a Favourites chip) and locked; F, L, Shift+F and N, and the chosen shader's
+two toggles. The hub holds the lock: its branch `collection-marks` (not deployed) refuses to
+shatter or trade a locked shader and keeps the marks per person (merges and their undo move
+them); against the hub deployed today the client shows no star or padlock and asks nothing
+(`economy.abilities` without `marks`). The last copy's card says first, in ember, that the
+player wears it, and its answer also takes it off a second saber that wore it by its own
+choice. Since then the Shaders tab says "Not owned" where it said "Locked" for a shader not
+held: the padlock is the player's lock now. Verified: unit tests (`shader_marks::tests`, the
+Forge's `favourites_lead_and_a_locked_duplicate_is_kept` and
+`a_locked_shader_is_not_broken_down_and_the_keys_mark`, the Shaders tab's
+`favourites_are_listed_first_under_their_heading`, the trade window's
+`a_locked_shader_waits_and_the_favourites_chip_filters`, `player_trades`'
+`marked_shaders_are_ordered_and_a_locked_one_waits`, the hover cards',
+`sjk_identity`'s `collection_marks_come_with_the_progress_and_change_at_once`), the hub's
+store, trade and API tests, the world shot `duel6_sjk_collection_marks` (Windows, the
+installed game data and the hub's packs), fmt, the workspace's build, tests and Clippy (no
+new warning in the files changed). Not tried in a game, nor against a hub serving marks.
+The same day (`personal/ideas-followups`, Sol's decision) a New shader is seen once it has
+stayed chosen a second, rather than as soon as the choice leaves it: hovering chooses, so a
+sweep of the pointer across the wall cleared every New mark it crossed. Closing the page or
+turning to another tab sees it only after its second. Verified by
+`shader_marks::tests::a_new_shader_is_seen_after_a_second_chosen`,
+`a_sweep_across_new_shaders_sees_none` and
+`leaving_sees_only_a_shader_looked_at_for_a_second`; not tried in a game.
+## `cg_fleshSparks`, `in_mouseRepeat` and `cg_lagometer` 2 and 3 from JoF EJK
+
+29/10/2026, `personal/ejk-commands`, based on `main` `0fd6a5e1`, after Kushina's ask
+(players coming from JoF EJK rely on them; Sol approved the three). Three EternalJK client
+options in the core client, as EJK has them for every server
+([client.md](client.md#bright-flashes), [client.md](client.md#lagometer)):
+`cg_fleshSparks` (0 to 7, default 7, Settings > Game options) gates each red spark of a
+saber hit on a body, and the special hit's sound below 2, as JoF EJK's `EV_SABER_HIT`
+(7 is stock and SJK until now); `in_mouseRepeat` (0, 1, 2, Settings > Controls) presses a
+held mouse 4, and mouse 5 unless 2, again into the binds, at 20 presses a second at any
+frame rate instead of EJK's every other frame (Sol's decision: EJK's 125 a second at
+250 FPS floods servers that cap commands); `cg_lagometer` becomes 0 to 3, 2 adding the
+average ping and interpolation and a speed graph above the graph, 3 the same without
+backdrops (EJK ties the speed graph to a `cg_speedometer` bit SJK has not; here the modes
+draw it), 1 unchanged. Verified: unit tests `flesh_sparks_gate_each_saber_hit_on_a_body`,
+`flesh_sparks_read_clamped_and_default_to_every_spark`,
+`flesh_sparks_below_two_silence_only_the_special_saber_hit`,
+`twenty_presses_a_second_at_any_frame_rate`, `the_setting_picks_the_buttons`,
+`only_mouse_4_and_5_held_repeat`,
+`a_held_mouse_4_or_5_presses_its_bind_again_twenty_times_a_second`,
+`a_held_keys_repeated_press_changes_nothing`, `mode_1_is_the_graph_alone`,
+`mode_2_adds_the_numbers_and_the_speed_graph_on_backdrops`,
+`mode_3_has_no_backdrop_a_tall_speed_graph_and_a_number_only_while_moving`,
+`the_averages_follow_ejk`, `the_mode_reads_clamped_and_old_configs_keep_the_graph`, fmt,
+build, Clippy and the workspace's tests; the world shot `lagometer_modes_on_a_demo` (a demo
+frozen on its first snapshot, a made-up steady connection) draws modes 1 to 3 at
+`cg_lagometerScale` 1 and 2 as described. The same day (`personal/ideas-followups`, Sol's
+decision) the numbers, which at EJK's proportion of SJK's smaller graph (45 px at 1080p
+with the default `cg_hudScale` 0.7, EJK's 108) were tiny at scale 1, moved to a line of
+their own just above the graph (below it at the screen's top), the speed graph rising to
+make room; the graph keeps its size. A first size (the HUD's 21 px text line before
+`cg_hudScale`) left the digits about 8 px tall in the world shot; at Sol's request they
+are now EJK's size, a 34 px line before `cg_hudScale` (23.8 px with the default, EJK's
+23.6), the digits about 13 px tall at 1080p and scale 1 (measured in the shot), the line
+at least 4.7 lines wide and centred on the graph. Verified by
+`the_numbers_are_readable_above_the_graph_at_every_scale`,
+`the_digits_are_about_13_pixels_and_both_numbers_fit_their_line` (SJK Chat's own
+metrics), `at_the_screen_edges_the_numbers_stay_inside` and the same world shot again.
+Not tried in a game or compared with EJK side by side; the shots' recorder stands still,
+so they show no speed graph.
+
+## JA+ and jaPRO plugin options
+
+29/10/2026, `personal/plugin-options`, based on `main` `0fd6a5e1`, Kushina's idea:
+`cp_pluginDisable` had to be typed as a number. Settings > Mods now shows JA+ plugin options
+(See others in duels, Black sabers, New Force effects, Staff on the back, Holstered sabers)
+and jaPRO plugin options (Black sabers, Respawn where you fell, Checkpoints on screen, in
+chat and in console, Damage numbers, Shots from the centre), each named after the feature
+and On while it is on, whichever way its bit works; `japlus.plugin` and `japro.plugin` are
+JoF EJK's `plugin` with its numbers ([mods.md](mods.md#plugin-options)). The tables are in
+the mods with each bit's polarity and where JoF EJK reads it. Hidden, with the reason kept:
+the bits that change how the server moves the player (JA+ ledge grab, new DFAs and
+single-player cartwheel; jaPRO force jumps, rolls, cartwheels, and the Jawa run, which the
+movement code picks), since SJK's prediction does not follow them, and the JA+ plugin's own
+looks SJK does not draw (new Drain, end-of-duel camera, auto replier, death messages, Sense
+ring, alternate dimension, download redirect). Holstered hilts now follow bit 29, EJK's
+`JAPRO_PLUGIN_HOLSTEREDSABERS`, instead of bit 13 (JA+'s single-player cartwheel).
+Verified on Windows x86_64: the tables' tests in both mods (`the_polarity_follows_the_reference`,
+the EJK order, listings and switching), `sjk_mod::plugin_options`'s (the command saving the mask),
+`settings::plugin_rows::tests` (rows, default and existing masks, the userinfo),
+`plugin_mask_changes_mark_userinfo_dirty`, `contract_detection_overrides_and_plugin_bits`, fmt,
+the workspace build, tests and Clippy (no new warning), and the Mods page in
+`menu_snapshot::sjk_settings_snapshot` (`sjk-settings-plugin-options.png`).
+Not verified: switching them in a match on a JA+ or jaPRO server.
+
+## Prediction: incomplete command history
+
+29/10/2026, `fix/prediction-command-overflow`, based on `main` `e702b0b1`:
+a discarded unacknowledged command freezes local prediction and previews until
+snapshots cover the missing interval, retaining the last displayed mover offset.
+Network commands continue normally; a teleport remains pending until recovery,
+so it cannot become a delayed smoothed correction.
+Reference: OpenJK multiplayer `cg_predict.c:1020-1033`, revision `4d0dfaf1`.
+Windows x64 unit tests exercise ACK boundaries and explicit resets at 8/7/4/3 ms.
+Recovery under actual packet loss remains unverified.
+## Prediction: saber-lock facing
+
+29/10/2026, `fix/prediction-saber-lock-facing`, based on `main` `e702b0b1`:
+a saber lock faces its opponent during movement prediction and display-only
+frames, using the snapshot player origin and the presented opponent origin.
+Reference: OpenJK multiplayer `cg_predict.c:1252-1263`, revision `4d0dfaf1`.
+Windows x64 synthetic tests cover 8/7/4/3 ms endpoints, repeated frames,
+pitch/yaw, expiry and missing opponents. Live locks remain unverified.
+## Respawn jump restriction
+
+29/10/2026, `fix/prediction-respawn-jump`, based on `main` `e702b0b1`:
+movement now refuses jumps while `PMF_RESPAWNED` remains set. Reference:
+OpenJK `4d0dfaf1`, multiplayer `PM_CheckJump` and `PmoveSingle`. Synthetic
+tests cover holding attack/use and releasing them at 8/7/4/3 ms on Windows
+x64. Live respawn behavior against an OpenJK server remains unverified.
+## Dual jump-attack collision hull
+
+29/10/2026, `fix/prediction-dual-jump-hull`, based on `main` `e702b0b1`:
+ported local-player dual jump-attack hull resizing/restoration from OpenJK
+`4d0dfaf1`, codemp `PM_CheckDualForwardJumpDuck` and `PM_CheckFixMins`.
+Windows x64 synthetic tests cover both timing windows and clearance/crouch
+restoration around 8/7/4/3 ms boundaries. Live head/ceiling/ledge contacts
+and community animation tables remain unverified.
+## Equipped saber definitions in client prediction
+
+29/10/2026, `fix/prediction-saber-definitions`, based on `main` `e702b0b1`:
+the cached `.sab` parser supplies movement flags, move overrides and stance
+animations to local prediction. Reference: OpenJK `4d0dfaf1`, codemp
+`BG_MySaber`, `WP_SetSaber` and `saberMoveTable`/`WP_SaberParseParms`.
+Windows x64 synthetic tests cover parsing/fallbacks and prediction configuration
+at 8/7/4/3 ms. Live custom-hilt behavior and full combat parity remain unverified.
+## Remote vehicle prediction hulls
+
+29/10/2026, `fix/prediction-remote-vehicle-box`, based on `main` `e702b0b1`:
+remote vehicle collision now applies definition-owned dimensions at the
+presented pose. Local movement shares the geometry and retains its clearance
+check. Reference: OpenJK `4d0dfaf1`, multiplayer `CG_ClipMoveToEntities` and
+`BG_VehicleAdjustBBoxForOrientation`. On Windows x64, 36 bounds fixtures emitted
+by MSVC-compiled OpenJK cover fighters, fliers, static vehicles, large origins
+and 8/7/4/3 ms orientation samples. Synthetic trace, interpolation, model-change
+and warmed-allocation tests accompany the change. Live vehicle contacts,
+community vehicle coverage and rendered FPS remain unverified.
+## jaPRO new-jetpack prediction
+
+29/10/2026, `feat/prediction-japro-jetpack`, based on `main` `0fd6a5e1` with
+PRs #277/#279/#282: this change implements jaPRO's separate new-jetpack activation,
+eligibility, fuel/Force-resource checks, thrust, air control and pose behavior
+from TaystJK `2d60c0fa5` multiplayer `codemp`. Windows x64 checks match 280
+MSVC-emitted activation/thrust results and 25 knockdown animation ordinals
+(extracted source branches with deterministic distance/shared eligibility stubs).
+Full command tests cover 8/7/4/3 ms and switches between jaPRO/TaystJK, BaseJKA,
+JA+ and Lugormod using identical capability/stat slots. The new flag and stat
+semantics apply only on the current jaPRO/TaystJK profile; changing profiles
+immediately relinquishes prediction ownership of the active flag. Fuel remains
+snapshot-authoritative. Stock equipped-jetpack tests pass. Full Pmove, live-server
+and GPU/presentation parity remain unverified; see
+[networking](networking.md#server-dialect-movement-rules).
+
+## jaPRO jump prediction
+
+29/10/2026, `feat/prediction-japro-jumps`, based on `main` `0fd6a5e1` with
+the adapters in PRs #277 and #279: this change claims style-specific jump
+impulses, held-jump behavior, ramp/double-jump impulses, superjump scaling and
+the jump timer from TaystJK `2d60c0fa5` multiplayer `codemp`. Windows x64 tests
+match 323 results emitted by MSVC-compiled source branches, gates, curves and
+timers (valid-state power/animation stubs, not a full Pmove simulation). Held
+jump integration runs at 8/7/4/3 ms, including release-only OCPM and non-jaPRO
+isolation. Server/player only-bhop policy honors the existing plugin preference
+and advertised capabilities; a foreign profile cannot enable it, including
+after a server switch. Ramp/step collision, further restrictions, new jetpack
+and grapples remain outside this change. Full and live-server parity remain
+unverified; see [networking](networking.md#server-dialect-movement-rules).
+
+## jaPRO movement-style acceleration
+
+29/10/2026, `feat/prediction-japro-styles`, based on `main` `c7089264` and
+the shared command adapter in PR #277: the next jaPRO prediction change covers
+movement-style acceleration, air control, ground friction and crouch speed.
+Reference: TaystJK `2d60c0fa5` multiplayer `codemp`. Windows x64 focused tests
+match 329 MSVC-emitted kernel/parameter results (152 air, 120 friction, 19 ground
+parameter pairs and 38 command scales) across 8/7/4/3 ms, with velocity tolerance
+0.0001 units/s. Server-switch tests reuse identical race/style metadata on
+jaPRO/TaystJK, BaseJKA, JA+ and Lugormod and confirm that only the current jaPRO
+dialect enables the rules. Jumps, ramps/steps, restrictions, new jetpack and
+grapples remain separate; full and live-server parity remain unverified.
+
 ## Passenger movement prediction
 
 29/10/2026, `fix/prediction-passenger-movement`, based on `main` `9e48ff6d`:
@@ -5242,7 +5490,7 @@ Branch `feat/lagometer-scale` (11/10/2026, based on `3654f5b2`, Windows 11 Pro,
 Rust 1.99.0) adds archived `cg_lagometerScale`, default `1`, range 0.25–4, in both
 settings interfaces. It scales the graph around its existing bottom-right corner
 and preserves the displayed sample count and millisecond ranges; X/Y positioning
-still applies. See [client.md](client.md#lagometer-size).
+still applies. See [client.md](client.md#lagometer).
 
 Verified: formatting, locked workspace build/tests and all-target clippy pass
 (existing warnings remain). Unit checks cover default size, scaling and anchoring

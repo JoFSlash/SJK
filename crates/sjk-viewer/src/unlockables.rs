@@ -86,6 +86,9 @@ pub(crate) const CREYON: &str = "Creyon";
 pub(crate) const FROM_HOLOCRONS: &str = "Found in holocrons.";
 /// How to get a Unique one ([`Rarity::Unique`]): Sol gives it by hand.
 pub(crate) const PERSONAL_THANKS: &str = "A personal thank-you from Sol.";
+/// How to get the mystery boxes' own blade (`mystery_box`, 29/10/2026).
+pub(crate) const FROM_MYSTERY_BOXES: &str =
+    "Found only in mystery boxes: never in holocrons, the shop or a trade.";
 
 /// The blades a card brings, `(blade id, card id)`: a key holding a copy of the card holds
 /// the blade with it, and loses that copy of it with its last one, as a medal's blade goes with
@@ -176,7 +179,7 @@ pub(crate) fn blade_skin_named(word: &str) -> Option<&'static Unlockable> {
 }
 
 /// Every unlockable, in the hub's catalogue order (the order profiles list them in).
-pub(crate) static ALL: [Unlockable; 168] = [
+pub(crate) static ALL: [Unlockable; 169] = [
     Unlockable {
         id: "saber_sun",
         number: 1,
@@ -2366,6 +2369,20 @@ pub(crate) static ALL: [Unlockable; 168] = [
         description: "A home fire: a warm amber blade of glowing coals with embers rising off it and flames licking up its edges, the air shimmering over it. A ring of hearthstones stands round its emitter, and ash drifts off its swings.",
         how_to_get: PERSONAL_THANKS,
     },
+    // 29/10/2026: the mystery boxes' own blade, which only a box gives.
+    Unlockable {
+        id: "saber_mystery",
+        number: 169,
+        name: "Mystery blade",
+        kind: Kind::BladeSkin,
+        tier: Rarity::Legendary,
+        chroma: false,
+        droppable: false,
+        edition: crate::editions::ALPHA,
+        smith: SOL,
+        description: "A blade that never settles on a colour, rolling through them all like a mystery box: gold confetti drifts round it, it flickers as if still deciding, and afterimages trail its swings.",
+        how_to_get: FROM_MYSTERY_BOXES,
+    },
 ];
 
 /// The unlockable `id` names (spaces round it and case ignored), if this client knows it.
@@ -2806,6 +2823,7 @@ mod tests {
                 "saber_jedi_spirits",
                 "saber_ord_mantell_storm",
                 "saber_hyperlane",
+                "saber_mystery",
             ]
         );
         assert_eq!(
@@ -3000,12 +3018,14 @@ mod tests {
                 .any(|medal| medal.blade() == Some(skin.id));
             let card = card_bringing(skin.id).is_some();
             let unique = skin.tier == Rarity::Unique;
+            // The mystery boxes' own blade (29/10/2026) comes from boxes alone.
+            let boxed = skin.id == sjk_identity::mystery_box::BLADE_ID;
             assert!(!(medal && card), "{}: brought twice", skin.id);
             assert!(!(unique && (medal || card)), "{}: given by hand", skin.id);
             assert_eq!(
                 skin.droppable,
-                !medal && !unique,
-                "{}: a medal's or a Unique shader never drops, every other one does (a card's too)",
+                !medal && !unique && !boxed,
+                "{}: a medal's, a Unique or the boxes' shader never drops, every other one does (a card's too)",
                 skin.id
             );
             assert_eq!(skin.hidden_unless_held(), unique, "{}", skin.id);
@@ -3015,6 +3035,10 @@ mod tests {
             }
             if card {
                 assert!(skin.how_to_get.contains("card"), "{}", skin.id);
+            }
+            if boxed {
+                assert_eq!(skin.how_to_get, FROM_MYSTERY_BOXES);
+                assert!(!crate::economy::in_trade(skin), "{}: never traded", skin.id);
             }
             assert_eq!(
                 skin.how_to_get
@@ -3139,6 +3163,9 @@ mod tests {
             kyber: None,
             shop: None,
             trade: None,
+            marks: None,
+            marks_revision: 0,
+            mark_refusal: None,
             trades: None,
             announcements: Vec::new(),
             announcements_revision: 0,
@@ -3433,6 +3460,7 @@ mod tests {
                 ("saber_varykino_blossom", "Varykino Blossom blade"),
                 ("saber_thousand_cranes", "Thousand Cranes blade"),
                 ("saber_hearth", "Hearth blade"),
+                ("saber_mystery", "Mystery blade"),
             ]
         );
         assert!(ALL.iter().all(Unlockable::is_blade_skin));

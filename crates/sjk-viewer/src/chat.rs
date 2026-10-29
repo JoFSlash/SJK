@@ -120,6 +120,10 @@ pub(crate) struct ChatOverlay {
     /// Text ids of this frame's centre-print rows, which retail drew with the
     /// medium font rather than the chat box's small one.
     center_text: (u32, u32),
+    /// Text ids of this frame's feed and composer, which `cg_chatBoxOutline` edges in a
+    /// dark outline ([`Self::palette_of`]); the centre prints and the sender card keep
+    /// their shadow.
+    chat_text: [(u32, u32); 2],
     combat: combat::Combat,
     input: Option<Editor>,
     modifiers: winit::keyboard::ModifiersState,
@@ -256,6 +260,7 @@ impl ChatOverlay {
             lines: VecDeque::with_capacity(HISTORY_LIMIT),
             center: None,
             center_text: (0, 0),
+            chat_text: [(0, 0); 2],
             combat: combat::Combat::default(),
             input: None,
             modifiers: winit::keyboard::ModifiersState::empty(),
@@ -734,7 +739,19 @@ impl ChatOverlay {
             viewport,
             ms,
         );
+        self.append_built(fonts, vertices, font, viewport);
+    }
+
+    /// Append the text [`Self::build`] laid out, each run in its font and palette.
+    fn append_built(
+        &self,
+        fonts: &mut GameFonts,
+        vertices: &mut Vec<TextVertex>,
+        font: &UiFont,
+        viewport: [f32; 2],
+    ) {
         let (start, end) = self.center_text;
+        let palette_of = self.palette_of();
         self.ui.append_text_routed(
             fonts,
             |id, _| {
@@ -744,10 +761,26 @@ impl ChatOverlay {
                     RetailFont::Small
                 })
             },
+            |id| palette_of(id.0),
             vertices,
             font,
             viewport,
         );
+    }
+
+    /// The palette each text run of this frame draws in, by its id: with
+    /// `cg_chatBoxOutline` on, the feed's and the composer's in a dark outline
+    /// ([`crate::text::CodePalette::DarkOutlined`]), the rest as the game draws it.
+    fn palette_of(&self) -> impl Fn(u32) -> crate::text::CodePalette + Copy + use<> {
+        let outline = self.options.outline;
+        let chat = self.chat_text;
+        move |id| {
+            if outline && chat.iter().any(|(start, end)| (*start..*end).contains(&id)) {
+                crate::text::CodePalette::DarkOutlined
+            } else {
+                crate::text::CodePalette::Game
+            }
+        }
     }
 }
 

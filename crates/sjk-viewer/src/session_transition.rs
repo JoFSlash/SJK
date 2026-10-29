@@ -515,6 +515,7 @@ impl GpuState {
         to.display_suspended = self.display_suspended;
         to.display_changed_at = self.display_changed_at;
         to.applied_resolution = self.applied_resolution;
+        to.applied_high_dpi = self.applied_high_dpi;
         // Preserve a remote connection's command floor across world installs.
         // A local authority has an independent timeline that must never stamp
         // the destination server's commands.

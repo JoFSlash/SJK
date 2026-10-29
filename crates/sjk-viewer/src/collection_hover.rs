@@ -65,7 +65,22 @@ impl Panel {
             if skin.is_some_and(|skin| !inputs.holdings.shows(skin)) {
                 return None;
             }
-            return Some(shader_card(skin, &inputs.holdings));
+            return Some(shader_card(skin, &inputs.holdings, &self.marks));
+        }
+        if self.tab == Tab::Shaders {
+            let chosen = self
+                .skin_at(self.shader)
+                .map(|skin| (skin.id, self.shader_list_owned(skin.id)));
+            let which = match token {
+                FAVOURITE_TOKEN => Some(MarkToken::Favourite),
+                LOCK_TOKEN => Some(MarkToken::Lock),
+                FILTER_FAVOURITE_TOKEN => Some(MarkToken::Favourites),
+                SEEN_ALL_TOKEN => Some(MarkToken::SeenAll),
+                _ => None,
+            };
+            if let Some(which) = which {
+                return mark_card(which, &self.marks, chosen);
+            }
         }
         if token == TOY_TOKEN {
             return Some(Card {
@@ -154,6 +169,21 @@ impl Panel {
                 ],
             });
         }
+        if token == BANANA_TOKEN {
+            return Some(Card {
+                title: "Banana peel".to_owned(),
+                colour: color::GOLD_BRIGHT,
+                lines: vec![
+                    Line::how(
+                        "Every SJK player has it. Turn it on here or with a key bound to \
+                         toy_banana, then drop peels with your drop key. Players who have it \
+                         on slip on the ones they walk onto.",
+                    ),
+                    Line::status(crate::editions::name(crate::editions::ALPHA)),
+                    Line::held("Yours"),
+                ],
+            });
+        }
         if token == FISHING_TOKEN {
             return Some(Card {
                 title: "Fishing".to_owned(),
@@ -175,7 +205,9 @@ impl Panel {
                 colour: color::GOLD_BRIGHT,
                 lines: vec![
                     Line::how(
-                        "Every SJK player has it. Turn it on here, from the quick wheel's Toys                          page or with a key bound to toy_monitor, then throw (hold the throw key to charge)                          at players who have it on too.",
+                        "Every SJK player has it. Turn it on here, from the quick wheel's Toys \
+                         page or with a key bound to toy_monitor, then throw (hold the throw key \
+                         to charge) at players who have it on too.",
                     ),
                     Line::status(crate::editions::name(crate::editions::ALPHA)),
                     Line::held("Yours"),
@@ -313,6 +345,7 @@ fn held_count(words: &str, count: u32) -> String {
 pub(super) fn shader_card(
     skin: Option<&'static crate::unlockables::Unlockable>,
     holdings: &crate::unlockables::Holdings<'_>,
+    marks: &crate::shader_marks::Marks,
 ) -> Card {
     let Some(skin) = skin else {
         return Card {
@@ -333,8 +366,13 @@ pub(super) fn shader_card(
             date => Line::held(held_count(&format!("Yours since {date}"), unlock.count)),
         },
         (None, Some(reason)) => Line::status(reason),
-        (None, None) => Line::status("Locked: you can still try it on here."),
+        (None, None) => Line::status("Not yours yet: you can still try it on here."),
     };
+    // Its marks after (29/10/2026): worn, New, the star, the padlock, each with what it
+    // means.
+    let marked = crate::shader_marks::hover_lines(marks, skin.id)
+        .into_iter()
+        .map(Line::held);
     Card {
         title: skin.name.to_owned(),
         colour: skin.tier.colour(),
@@ -357,8 +395,100 @@ pub(super) fn shader_card(
             }),
             Line::status(format!("Saber smith: {}", skin.smith)),
             status,
-        ],
+        ]
+        .into_iter()
+        .chain(marked)
+        .collect(),
     }
+}
+
+/// Which of the marks' controls a hover card is for (29/10/2026).
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(super) enum MarkToken {
+    /// The chosen shader's star.
+    Favourite,
+    /// The chosen shader's padlock.
+    Lock,
+    /// The favourites-only chip.
+    Favourites,
+    /// Mark all seen.
+    SeenAll,
+}
+
+/// The hover card of a marks' control: what the star, the padlock, the chip or Mark all
+/// seen does, for the shader `chosen` (its id, and whether the player holds it); `None`
+/// while the hub keeps no marks (the controls do not show), but for Mark all seen.
+pub(super) fn mark_card(
+    which: MarkToken,
+    marks: &crate::shader_marks::Marks,
+    chosen: Option<(&str, bool)>,
+) -> Option<Card> {
+    if !marks.kept && which != MarkToken::SeenAll {
+        return None;
+    }
+    let card = match which {
+        MarkToken::Favourite => {
+            let on = chosen.is_some_and(|(id, _)| marks.favourite(id));
+            Card {
+                title: format!("{}  Favourite", crate::symbols::EDITION),
+                colour: color::GOLD_BRIGHT,
+                lines: vec![
+                    Line::how(
+                        "A star: your favourites are listed first, and the Favourites chip \
+                         (Shift+F) shows them alone. Kept on the SJK hub, on every PC you \
+                         play on.",
+                    ),
+                    Line::held(if on {
+                        "A favourite: F or a click unstars it."
+                    } else {
+                        "F or a click stars it."
+                    }),
+                ],
+            }
+        }
+        MarkToken::Lock => {
+            let (on, owned) =
+                chosen.map_or((false, false), |(id, owned)| (marks.locked(id), owned));
+            Card {
+                title: format!("{}  Lock", crate::symbols::LOCK),
+                colour: color::GOLD_BRIGHT,
+                lines: vec![
+                    Line::how(
+                        "A padlock: a locked shader is never broken down in the Forge (not \
+                         one copy, not with all duplicates) nor offered in a trade until you \
+                         unlock it. The SJK hub holds the lock.",
+                    ),
+                    if on {
+                        Line::held("Locked: L or a click unlocks it.")
+                    } else if owned {
+                        Line::held("L or a click locks it.")
+                    } else {
+                        Line::status("Only a shader you hold can be locked.")
+                    },
+                ],
+            }
+        }
+        MarkToken::Favourites => Card {
+            title: "Favourites".to_owned(),
+            colour: color::GOLD_BRIGHT,
+            lines: vec![
+                Line::how("Shows your starred shaders alone (Shift+F); again shows them all."),
+                Line::status("Star a shader with F, or its star beside the chosen one."),
+            ],
+        },
+        MarkToken::SeenAll => Card {
+            title: "New".to_owned(),
+            colour: color::GOLD_BRIGHT,
+            lines: vec![
+                Line::how(
+                    "Shaders you got since you last looked (holocrons, gifts, trades, \
+                     crafts) carry a New sticker until you choose one, here or in the Forge.",
+                ),
+                Line::status("Kept on this PC only. Mark all seen (N) clears them all."),
+            ],
+        },
+    };
+    Some(card)
 }
 
 /// A tile's card on the Cards tab: what the card is, how it is obtained and the odds,
@@ -508,13 +638,15 @@ mod tests {
 
     #[test]
     fn every_shader_says_how_to_get_it() {
-        let card = shader_card(None, &crate::unlockables::Holdings::Known(&[]));
+        let none = crate::shader_marks::Marks::default();
+        let card = shader_card(None, &crate::unlockables::Holdings::Known(&[]), &none);
         assert_eq!(card.title, "Stock blade");
         for skin in crate::unlockables::blade_skins_by_tier() {
-            let card = shader_card(Some(skin), &crate::unlockables::Holdings::Known(&[]));
+            let card = shader_card(Some(skin), &crate::unlockables::Holdings::Known(&[]), &none);
             assert_eq!(card.lines[0].words, skin.how_to_get);
             assert_eq!(card.lines[2].words, format!("Saber smith: {}", skin.smith));
-            assert!(card.lines[3].words.starts_with("Locked"));
+            assert!(card.lines[3].words.starts_with("Not yours yet"));
+            assert_eq!(card.lines.len(), 4, "no marks");
         }
         let held = [sjk_identity::Unlock {
             id: "saber_sun".into(),
@@ -525,19 +657,62 @@ mod tests {
             card: None,
         }];
         let sun = crate::unlockables::find("saber_sun").unwrap();
-        let card = shader_card(Some(sun), &crate::unlockables::Holdings::Known(&held));
+        let card = shader_card(
+            Some(sun),
+            &crate::unlockables::Holdings::Known(&held),
+            &none,
+        );
         assert!(card.lines[3].words.starts_with("Yours since "), "{card:?}");
         assert_eq!(card.lines[1].words, "Mythical blade skin. Alpha Edition.");
+        // Its marks follow, each saying what it means.
+        let marks = crate::shader_marks::Marks::shown(
+            &["saber_sun"],
+            &["saber_sun"],
+            &["saber_sun"],
+            Some("saber_sun"),
+        );
+        let card = shader_card(
+            Some(sun),
+            &crate::unlockables::Holdings::Known(&held),
+            &marks,
+        );
+        let words: Vec<_> = card.lines[4..]
+            .iter()
+            .map(|line| line.words.as_str())
+            .collect();
+        assert_eq!(words.len(), 4, "{words:?}");
+        assert!(words[0].contains("Worn") && words[1].starts_with("New"));
+        assert!(words[2].contains("Favourite") && words[3].contains("Locked"));
         // Debug collectibles on: the blade number shows as well.
         let held = [sjk_identity::Unlock {
             note: crate::debug_collectibles::NOTE.to_owned(),
             ..held[0].clone()
         }];
-        let card = shader_card(Some(sun), &crate::unlockables::Holdings::Known(&held));
+        let card = shader_card(
+            Some(sun),
+            &crate::unlockables::Holdings::Known(&held),
+            &none,
+        );
         assert_eq!(
             card.lines[1].words,
             "Blade 001. Mythical blade skin. Alpha Edition."
         );
+    }
+
+    /// The marks' controls explain themselves; without the hub's marks only Mark all seen
+    /// has a card, and the padlock says a shader not held cannot be locked.
+    #[test]
+    fn the_marks_controls_say_what_they_do() {
+        let marks = crate::shader_marks::Marks::shown(&["saber_sun"], &[], &[], None);
+        let star = mark_card(MarkToken::Favourite, &marks, Some(("saber_sun", true))).unwrap();
+        assert!(star.lines[1].words.contains("unstars"));
+        let lock = mark_card(MarkToken::Lock, &marks, Some(("saber_storm", false))).unwrap();
+        assert!(lock.lines[0].words.contains("never broken down"));
+        assert_eq!(lock.lines[1].words, "Only a shader you hold can be locked.");
+        let none = crate::shader_marks::Marks::default();
+        assert!(mark_card(MarkToken::Favourite, &none, None).is_none());
+        assert!(mark_card(MarkToken::Favourites, &none, None).is_none());
+        assert!(mark_card(MarkToken::SeenAll, &none, None).is_some());
     }
 
     #[test]

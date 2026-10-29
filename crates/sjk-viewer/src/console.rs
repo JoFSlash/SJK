@@ -195,6 +195,8 @@ pub(crate) struct ViewerConsole {
     bind_state: sjk_shell::BindState,
     /// Held keys whose bind repeats push or pull (`cl_forceRepeat`).
     force_repeat: crate::input::force_repeat::ForceRepeat,
+    /// Held mouse 4 and 5, pressed again while `in_mouseRepeat` is on.
+    mouse_repeat: crate::input::mouse_repeat::MouseRepeat,
     input: String,
     history: Vec<String>,
     history_index: Option<usize>,
@@ -278,6 +280,10 @@ pub(crate) struct ViewerConsole {
     box_hunt_on: bool,
     /// The Toys tab asked to turn Box hunt on (`true`) or off, not yet taken.
     pending_box_hunt: Option<bool>,
+    /// The Banana peel toy is on, mirrored as [`Self::order66_on`] is.
+    banana_on: bool,
+    /// The Toys tab asked to turn the Banana peel on (`true`) or off, not yet taken.
+    pending_banana: Option<bool>,
     /// A chip naming a setting was clicked (`console_changelog.rs`): the cvar to search
     /// Settings for, not yet taken.
     pending_settings_search: Option<String>,
@@ -415,6 +421,11 @@ impl ViewerConsole {
             plugin_disable: u32::try_from(self.plugin_disable.value())
                 .unwrap_or(sjk_client::PLUGIN_DISABLE_DEFAULT),
         }
+    }
+
+    /// The existing USERINFO plugin mask, cached for movement/presentation policy.
+    pub(crate) fn plugin_disable_bits(&self) -> u32 {
+        u32::try_from(self.plugin_disable.value()).unwrap_or(sjk_client::PLUGIN_DISABLE_DEFAULT)
     }
 
     /// Cached `cl_showtimedelta` state for the allocation-free runtime read.
@@ -617,15 +628,30 @@ impl ViewerConsole {
         }
     }
 
-    /// A mouse button bound under `key` went up, wherever the release was routed.
+    /// A mouse button bound under `key` went up, wherever the release was routed: it
+    /// stops repeating push or pull, and its own presses (`in_mouseRepeat`).
     pub(crate) fn force_repeat_button_up(&mut self, key: &str) {
         self.force_repeat.release(key);
+        self.mouse_repeat.release(key);
     }
 
     /// Every key was let go of: the window lost the keyboard.
     pub(crate) fn clear_force_repeat(&mut self) {
         self.force_repeat.clear();
+        self.mouse_repeat.clear();
         self.bind_state.clear();
+    }
+
+    /// Press the held mouse 4 and 5 again when their repeat is due (`in_mouseRepeat`,
+    /// [`crate::input::mouse_repeat`]); called once a frame while the keys are the game's.
+    pub(crate) fn repeat_held_mouse_buttons(&mut self) {
+        let mode = self
+            .integer_cvar(crate::input::mouse_repeat::CVAR)
+            .unwrap_or(0);
+        let now = self.input_millis();
+        for key in self.mouse_repeat.due(mode, now).into_iter().flatten() {
+            self.queue_bound_script(key, true);
+        }
     }
 
     /// The `generic_cmd` a held push or pull key repeats in the next user command.
@@ -651,8 +677,11 @@ impl ViewerConsole {
         let id = key
             .bytes()
             .fold(0_u64, |hash, byte| hash.wrapping_mul(31) + u64::from(byte));
-        if !pressed {
+        if pressed {
+            self.mouse_repeat.press(key, time);
+        } else {
             self.force_repeat.release(key);
+            self.mouse_repeat.release(key);
         }
         let repeat = pressed && self.bool_cvar(crate::input::force_repeat::CVAR) != Some(false);
         match self

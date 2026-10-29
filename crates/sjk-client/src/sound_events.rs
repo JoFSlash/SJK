@@ -659,6 +659,8 @@ pub struct LegacySoundAdapter {
     player_external_client: Option<u16>,
     pain_deadline: Box<[i32]>,
     local_health_pain: bool,
+    /// EternalJK's `cg_fleshSparks` ([`Self::set_flesh_sparks`]), 7 when unset.
+    flesh_sparks: u8,
     /// The client the event being resolved names as its cause ([`event_cause`]).
     cause: Option<u16>,
     client_config_hash: [u64; MAX_CLIENTS],
@@ -681,6 +683,14 @@ impl LegacySoundAdapter {
     /// Filter non-private chat notifications without suppressing other local sounds.
     pub fn set_pm_only_chat(&mut self, enabled: bool) {
         self.local.pm_only = enabled;
+    }
+
+    /// EternalJK's `cg_fleshSparks` (0 to 7, default 7): JoF EJK's `EV_SABER_HIT` plays
+    /// the special saber hit's sound (`eventParm` 16) only above 1, with its sparks
+    /// (`cg_event.c`, `if (cg_fleshSparks.integer > 1) trap->S_StartSound(...)`); every
+    /// other saber hit keeps its sound at any level.
+    pub fn set_flesh_sparks(&mut self, level: u8) {
+        self.flesh_sparks = level;
     }
 
     /// Resolve and decode all static tables, CS_SOUNDS, and model custom sounds.
@@ -907,6 +917,7 @@ impl LegacySoundAdapter {
             player_external_client: None,
             pain_deadline: vec![i32::MIN; MAX_ENTITIES].into_boxed_slice(),
             local_health_pain: false,
+            flesh_sparks: 7,
             cause: None,
             client_config_hash,
             ledger: LegacySoundLedger::default(),
@@ -1445,6 +1456,7 @@ impl LegacySoundAdapter {
                     false,
                 ))
             }
+            30 if parameter == 16 && self.flesh_sparks < 2 => None,
             30 => Some((
                 LegacySoundEvent::SaberHit,
                 self.saber_hit[variant % 3],
@@ -2265,3 +2277,7 @@ mod tests {
 #[cfg(test)]
 #[path = "sound_voice_tests.rs"]
 mod voice_tests;
+
+#[cfg(test)]
+#[path = "sound_flesh_sparks_tests.rs"]
+mod flesh_sparks_tests;

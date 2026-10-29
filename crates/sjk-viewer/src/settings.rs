@@ -16,6 +16,7 @@ mod help;
 mod hud_picker;
 pub(crate) mod mode;
 mod numeric;
+mod plugin_rows;
 mod pointer;
 pub(crate) mod quick;
 mod resolution;
@@ -33,8 +34,9 @@ pub(crate) use catalog::IMPORT_ROW;
 use catalog::*;
 pub(crate) use catalog::{FIRST_SETUP_CAPTION, RESOLUTIONS};
 pub(crate) use display::{
-    DisplayMode, EXCLUSIVE_CVAR, MonitorModes, exclusive_supported, exclusive_video_mode,
-    minimise_after_focus, suspended_after_focus,
+    DisplayMode, EXCLUSIVE_CVAR, HIGH_DPI_CVAR, HIGH_DPI_DEFAULT, MonitorModes,
+    exclusive_supported, exclusive_video_mode, high_dpi, minimise_after_focus,
+    suspended_after_focus, window_size, window_size_request,
 };
 pub(crate) use groups::{Advanced, Group, Simple};
 use resolution::{PickResult, ResolutionChoice, ResolutionPicker};
@@ -766,7 +768,7 @@ impl SettingsMenu {
             return;
         }
         if let Some(switch) = derived_switch(setting.cvar) {
-            (switch.toggle)(console);
+            (switch.toggle)(console, setting.cvar);
             self.refresh(console);
             return;
         }
@@ -923,8 +925,8 @@ impl SettingsMenu {
                 ValueKind::SoundPreview => PREVIEW_TEXT.to_owned(),
                 ValueKind::Quality => crate::graphics_quality::shown(console).to_owned(),
                 ValueKind::Bool if derived_switch(setting.cvar).is_some() => {
-                    let on =
-                        derived_switch(setting.cvar).is_some_and(|switch| (switch.on)(console));
+                    let on = derived_switch(setting.cvar)
+                        .is_some_and(|switch| (switch.on)(console, setting.cvar));
                     if on { "ON" } else { "OFF" }.to_owned()
                 }
                 ValueKind::Bool => toggle_text(console, setting.cvar),
@@ -1069,13 +1071,16 @@ fn settings(tab: usize) -> &'static [Setting] {
 /// shown as AUTO (`com_maxfps -1`). Stepping moves between it and zero, then
 /// along the row's step.
 /// A switch row whose state other cvars hold, not a cvar of its own (its name is
-/// the row's stand-in): reading and flipping it go through these.
+/// the row's stand-in, handed to each function): reading and flipping it go through
+/// these.
 #[derive(Clone, Copy)]
 pub(super) struct DerivedSwitch {
     /// Whether the switch shows on.
-    pub(super) on: fn(&ViewerConsole) -> bool,
+    pub(super) on: fn(&ViewerConsole, &str) -> bool,
     /// Flip it.
-    pub(super) toggle: fn(&mut ViewerConsole),
+    pub(super) toggle: fn(&mut ViewerConsole, &str),
+    /// Whether it is on by default.
+    pub(super) on_by_default: fn(&str) -> bool,
 }
 
 /// The value choice row `cvar` holds: its cvar's text.
@@ -1115,7 +1120,6 @@ fn renderer_setting(cvar: &str) -> bool {
         .any(|setting| setting.cvar.eq_ignore_ascii_case(cvar))
 }
 
-/// The derived switch row `cvar` names, if it is one: the strafe lines.
 /// Rows that work only on some systems, each with whether this build is one: shown
 /// everywhere (their help says where they work), but elsewhere their switch stays off.
 const PLATFORM_ROWS: &[(&str, bool)] = &[
@@ -1131,11 +1135,19 @@ pub(super) fn available_here(cvar: &str) -> bool {
         .is_none_or(|(_, available)| *available)
 }
 
+/// The derived switch row `cvar` names, if it is one: the strafe lines, and the JA+
+/// and jaPRO plugin options, bits of `cp_pluginDisable` ([`plugin_rows`]).
 pub(super) fn derived_switch(cvar: &str) -> Option<DerivedSwitch> {
     match cvar {
         crate::hud::movement::LINES_ROW => Some(DerivedSwitch {
-            on: crate::hud::movement::lines_on,
-            toggle: crate::hud::movement::toggle_lines,
+            on: |console, _| crate::hud::movement::lines_on(console),
+            toggle: |console, _| crate::hud::movement::toggle_lines(console),
+            on_by_default: |_| false,
+        }),
+        row if plugin_rows::option(row).is_some() => Some(DerivedSwitch {
+            on: plugin_rows::on,
+            toggle: plugin_rows::switch,
+            on_by_default: plugin_rows::on_by_default,
         }),
         _ => None,
     }

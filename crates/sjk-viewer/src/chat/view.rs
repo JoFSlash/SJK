@@ -1,5 +1,6 @@
 //! Floating message typography and deterministic motion on the shared canvas.
 
+mod backdrop;
 mod composer;
 mod draft;
 mod name;
@@ -80,9 +81,11 @@ impl ChatOverlay {
             self.scoreboard_layout,
             crate::scoreboard::behavior::ChatLayout::Classic { hide_feed: true }
         );
+        let feed_start = self.ui.next_text_id();
         if !hide_feed && (self.is_typing() || (draw_feed && self.options.lifetime != 0)) {
             self.build_feed(font, &g, ms);
         }
+        let feed_text = (feed_start, self.ui.next_text_id());
         let center_start = self.ui.next_text_id();
         if let Some((text, received)) = &self.center {
             let age = ms.saturating_sub(*received);
@@ -125,6 +128,7 @@ impl ChatOverlay {
         if !self.scoreboard_layout.active() {
             self.draw_plums();
         }
+        let composer_start = self.ui.next_text_id();
         if self.is_typing() {
             // JoF's message input is independent of its chat feed. Keep SJK's
             // composer inside the window when the feed sits at virtual y=475.
@@ -141,6 +145,7 @@ impl ChatOverlay {
             self.build_composer(font, &g, ms);
             g.scale = feed_scale;
         }
+        self.chat_text = [feed_text, (composer_start, self.ui.next_text_id())];
         // A name under the pointer shows its profile card, over everything.
         self.follow_card(self.is_typing(), ms);
         self.build_card(font, &g, viewport);
@@ -200,18 +205,38 @@ impl ChatOverlay {
             count += 1;
             bottom = top;
         }
-        for (token, (index, top, alpha, gif)) in visible[..count].iter().copied().enumerate().rev()
-        {
+        // Where each shown line is drawn this frame, as it slides in and moves up.
+        let mut origins = [[0.0_f32; 2]; MAX_VISIBLE];
+        for (origin, &(index, top, ..)) in origins.iter_mut().zip(&visible[..count]) {
             let line = &mut self.lines[index];
             let age = ms.saturating_sub(line.received_ms);
             let y = line.y.get_or_insert_with(|| Tween::settled(top));
             if (y.target() - top).abs() > 0.1 {
                 y.retarget(top, ms, ENTER_MS, Easing::EaseOutCubic);
             }
-            let y = y.sample(ms);
             let slide =
                 Tween::new(14.0 * g.scale, 0.0, 0, ENTER_MS, Easing::EaseOutCubic).sample(age);
-            let x = g.left + slide;
+            *origin = [g.left + slide, y.sample(ms)];
+        }
+        // Every band before any line, under the pictures of the rows next to it.
+        if self.options.backdrop > 0.0 {
+            for (&origin, &(index, _, alpha, _)) in origins.iter().zip(&visible[..count]) {
+                let line = &self.lines[index];
+                let prefix = line_marks(line, &self.slot_marks)
+                    .map(|(name, marks)| sjk_line::Prefix::new(name, marks, font, g));
+                backdrop::draw(
+                    &mut self.ui,
+                    line,
+                    prefix.as_ref(),
+                    font,
+                    g,
+                    origin,
+                    self.options.backdrop * alpha,
+                );
+            }
+        }
+        for (token, (index, _, alpha, gif)) in visible[..count].iter().copied().enumerate().rev() {
+            let [x, y] = origins[token];
             let line = &self.lines[index];
             let Some((name, marks)) = line_marks(line, &self.slot_marks) else {
                 // No sender: the server's own words, as one text.
@@ -702,6 +727,77 @@ mod tests {
         let first = glyphs[0];
         assert_ne!(first, [0.0, 1.0, 0.0]);
         assert!(glyphs.iter().all(|colour| *colour == first));
+    }
+
+    /// `cg_chatBoxOutline` edges the feed's and the field's letters in a dark outline,
+    /// eight copies round each in place of its shadow; the centre print keeps its
+    /// shadow, and with the setting off (the default) every letter keeps it.
+    #[test]
+    fn the_outline_replaces_the_shadow_in_the_feed_and_the_field_only() {
+        use crate::text::CodePalette;
+        let font = crate::text::test_font();
+        let viewport = [1920.0, 1080.0];
+        let built = |outline: bool| {
+            let mut chat = ChatOverlay::new();
+            chat.options.outline = outline;
+            let now = Instant::now();
+            chat.receive(ServerEventKind::Chat, "plain words".to_owned(), None, now);
+            chat.receive(ServerEventKind::CenterPrint, "centre".to_owned(), None, now);
+            chat.draft_for_shot("hi");
+            chat.build(true, &font, viewport, 1_000);
+            let palette_of = chat.palette_of();
+            let palettes: Vec<(String, CodePalette)> = chat
+                .ui
+                .draw_list()
+                .commands()
+                .iter()
+                .filter_map(|command| match command {
+                    DrawCommand::Text { text, .. } => {
+                        Some((chat.ui.stored_text(*text).to_owned(), palette_of(text.0)))
+                    }
+                    _ => None,
+                })
+                .collect();
+            let mut vertices = Vec::new();
+            chat.append_built(
+                &mut crate::game_font::GameFonts::default(),
+                &mut vertices,
+                &font,
+                viewport,
+            );
+            // Quads of each colour: six vertices a quad.
+            let quads = |rgb: [f32; 3]| {
+                vertices
+                    .iter()
+                    .filter(|vertex| vertex.colour()[..3] == rgb)
+                    .count()
+                    / 6
+            };
+            let shadows = quads([0.0, 0.0, 0.0]);
+            let rings = quads([0.04, 0.04, 0.06]);
+            (palettes, vertices.len() / 6, shadows, rings)
+        };
+        let palette = |palettes: &[(String, CodePalette)], text: &str| {
+            palettes
+                .iter()
+                .find(|(run, _)| run == text)
+                .unwrap_or_else(|| panic!("{text:?} in {palettes:?}"))
+                .1
+        };
+        let (palettes, all, shadows, rings) = built(false);
+        assert!(palettes.iter().all(|(_, p)| *p == CodePalette::Game));
+        assert_eq!((shadows * 2, rings), (all, 0), "a shadow a letter");
+        let (palettes, _, outlined_shadows, rings) = built(true);
+        for run in ["plain words", "hi"] {
+            assert_eq!(palette(&palettes, run), CodePalette::DarkOutlined, "{run}");
+        }
+        assert_eq!(palette(&palettes, "centre"), CodePalette::Game);
+        // Each outlined letter traded its shadow for eight ring copies.
+        assert_eq!(rings % 8, 0);
+        let outlined = rings / 8;
+        assert!(outlined >= "plainwordshi".len(), "{outlined}");
+        assert_eq!(outlined_shadows + outlined, shadows);
+        assert!(outlined_shadows >= "centre".len(), "the centre print's");
     }
 
     #[test]

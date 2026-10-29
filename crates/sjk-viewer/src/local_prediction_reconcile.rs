@@ -13,6 +13,7 @@ impl LocalPrediction {
     ) -> Vec3 {
         let player = &snapshot.player;
         self.entities.update(&snapshot.entities);
+        self.saber_lock_view.update(snapshot);
         let current = (
             player.entity_flags(),
             player.client_num(),
@@ -51,6 +52,23 @@ impl LocalPrediction {
                 || Vec3::from_array(player.origin()) + Vec3::Z * self.view_height,
                 |predictor| Vec3::from_array(predictor.state().origin) + Vec3::Z * self.view_height,
             );
+        }
+        self.history_gap.acknowledge(acknowledged);
+        if self.history_gap.incomplete() {
+            // CG_PredictPlayerState returns before consuming thisFrameTeleport.
+            // Retain the discontinuity until a usable snapshot can reseed us.
+            self.snap_back |= teleported;
+            // codemp cg_predict.c:1020-1033: never replay a truncated history.
+            self.pending
+                .retain(|command| command.server_time > acknowledged);
+            self.last_acknowledged = acknowledged;
+            self.last_sample = PredictionSample {
+                pending: self.pending.len(),
+                ..PredictionSample::default()
+            };
+            return self
+                .frozen_eye()
+                .unwrap_or_else(|| Vec3::from_array(player.origin()) + Vec3::Z * self.view_height);
         }
         let status = CommandStatus::classify(
             acknowledged,
@@ -146,6 +164,12 @@ impl LocalPrediction {
         ));
         for command in &self.pending {
             let deferred = predictor.state().saber_special_deferred;
+            self.saber_lock_view.face(
+                predictor.state_mut(),
+                self.presentation_time,
+                self.physics_movers
+                    .entity_origin(self.saber_lock_view.enemy()),
+            );
             self.entities.predict(
                 &mut predictor,
                 self.rides.committed.as_mut(),
@@ -202,6 +226,10 @@ impl LocalPrediction {
         self.render_movers.update(snapshot, time);
         self.physics_movers.set_angle_time(time);
         self.physics_movers.present_boxes(&self.render_movers, time);
+        self.saber_lock_view.update(snapshot);
+        if !self.fake_noclip && self.history_gap.incomplete() {
+            return self.frozen_eye();
+        }
         let raw = self.preview.as_ref().or(self.predictor.as_ref())?.state();
         let mut presented = raw.clone();
         if raw.team != 3 && raw.movement_type != 4 {
@@ -216,6 +244,12 @@ impl LocalPrediction {
         // frame), not once per network snapshot. Keep the raw replay state intact.
         self.rides.present_pilot(&mut presented, time);
         if !self.fake_noclip {
+            self.saber_lock_view.face(
+                &mut presented,
+                time,
+                self.physics_movers
+                    .entity_origin(self.saber_lock_view.enemy()),
+            );
             let collision =
                 BspMovementCollision::with_movers(bsp, scratch, &self.physics_movers.colliders);
             wall_grab_view::align(

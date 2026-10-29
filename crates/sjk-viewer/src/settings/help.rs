@@ -147,6 +147,16 @@ const CHOICE_NAMES: &[(&str, &str, &str)] = &[
     (crate::input::idrive::CVAR, "0", "Off"),
     (crate::input::idrive::CVAR, "1", "All keys"),
     (crate::input::idrive::CVAR, "2", "Jump, crouch"),
+    (crate::input::mouse_repeat::CVAR, "0", "Off"),
+    (crate::input::mouse_repeat::CVAR, "1", "Mouse 4 and 5"),
+    (crate::input::mouse_repeat::CVAR, "2", "Mouse 4 only"),
+    (crate::hud::player_card::CVAR, "0", "Off"),
+    (crate::hud::player_card::CVAR, "1", "On look and key"),
+    (crate::hud::player_card::CVAR, "2", "Key only"),
+    (crate::hud::lagometer::CVAR, "0", "Off"),
+    (crate::hud::lagometer::CVAR, "1", "Graph"),
+    (crate::hud::lagometer::CVAR, "2", "Graph + speed"),
+    (crate::hud::lagometer::CVAR, "3", "No backdrop"),
     (crate::audio::SKIN_SOUNDS_CVAR, "0", "Off"),
     (crate::audio::SKIN_SOUNDS_CVAR, "1", "With normal"),
     (crate::audio::SKIN_SOUNDS_CVAR, "2", "Only skin"),
@@ -227,6 +237,8 @@ const SJK_TERMS: &[&str] = &[
 ];
 
 /// The description of setting `cvar`.
+/// The plugin options' rows are described by their mods' tables
+/// ([`super::plugin_rows`]).
 pub(super) fn help(cvar: &str) -> Option<&'static str> {
     HELP.iter()
         .find(|(name, _)| name.eq_ignore_ascii_case(cvar))
@@ -237,6 +249,7 @@ pub(super) fn help(cvar: &str) -> Option<&'static str> {
                 text
             }
         })
+        .or_else(|| super::plugin_rows::help(cvar))
 }
 
 /// `text` cut into at most [`HELP_LINES`] lines of [`HELP_LINE_CHARS`]
@@ -310,6 +323,11 @@ const HELP: &[(&str, &str)] = &[
     (
         "r_resolution",
         "The window's size, or the screen mode in exclusive fullscreen. Enter opens the list of sizes.",
+    ),
+    (
+        super::display::HIGH_DPI_CVAR,
+        "On: sizes and the world in the screen's pixels, sharpest on Retina. \
+         Off: in points, as EternalJK on a Mac, much faster.",
     ),
     (
         "r_fullscreen",
@@ -468,6 +486,10 @@ const HELP: &[(&str, &str)] = &[
         "Off: mystery boxes open silently on this PC, yours and other players'.",
     ),
     (
+        crate::toy_sounds::Toy::Banana.cvar(),
+        "Off: Banana peel sounds are not played on this PC, yours or other players'. The toy still works and is still seen.",
+    ),
+    (
         crate::toy_sounds::Toy::Fishing.cvar(),
         "Off: your casts, bites and catches are silent. The toy still works.",
     ),
@@ -535,12 +557,12 @@ const HELP: &[(&str, &str)] = &[
         "Size of the plain names above players.",
     ),
     (
-        "cg_playerCard",
-        "Look at a player without moving and a card shows their model, sabers and SJK profile.",
+        crate::hud::player_card::CVAR,
+        "A card with a player's model, sabers and SJK profile: on a steady look or the Inspect player key, or Key only: that key alone.",
     ),
     (
         "cg_playerCardDelay",
-        "Seconds you must keep looking at a player, steady, before the card shows.",
+        "With Player card On look and key: seconds you keep looking at a player, steady, before it shows.",
     ),
     (
         "cg_playerCardOutline",
@@ -633,8 +655,8 @@ const HELP: &[(&str, &str)] = &[
         "Shows SJK's version, build date and commit at the top, so screenshots say which build.",
     ),
     (
-        "cg_lagometer",
-        "A small graph of interpolation and snapshot delay, for spotting network trouble.",
+        crate::hud::lagometer::CVAR,
+        "Network delay graph. Graph + speed adds the average ping and interpolation and a speed graph (JoF EJK); No backdrop, bare.",
     ),
     (
         "cg_lagometerScale",
@@ -686,6 +708,14 @@ const HELP: &[(&str, &str)] = &[
         "Adds space between the letters of chat messages; below zero packs them closer.",
     ),
     (
+        crate::chat::options::BACKDROP_CVAR,
+        "A dark band behind each chat line, so it reads over bright maps: how dark, in per cent. 0 shows none.",
+    ),
+    (
+        crate::chat::options::OUTLINE_CVAR,
+        "Edges chat letters and what you type in a dark outline instead of a shadow, so they read over bright maps.",
+    ),
+    (
         crate::chat::options::CARD_SCALE_CVAR,
         "Size of the player card a chat name shows, over the chat's own size: 0.5 half, 2 double.",
     ),
@@ -731,6 +761,10 @@ const HELP: &[(&str, &str)] = &[
         crate::input::force_repeat::CVAR,
         "Keep a push or pull key held to use the power again the moment its cooldown ends, as in JoF EJK.",
     ),
+    (
+        crate::input::mouse_repeat::CVAR,
+        "Hold mouse 4 or 5 to run its bind again 20 times a second, like a held key (JoF EJK, there at the frame rate).",
+    ),
     // GAME
     (
         "cg_simpleItems",
@@ -755,6 +789,10 @@ const HELP: &[(&str, &str)] = &[
     (
         crate::saber_clash_flare::SIZE_CVAR,
         "Size of the saber clash flare: 1 as in the original game, 0 to 2.",
+    ),
+    (
+        crate::impacts::FLESH_SPARKS_CVAR,
+        "Red sparks when a saber hits a body: 7 all, as in the original game, down to 0 none (JoF EJK).",
     ),
     (
         crate::team_sabers::TEAM_COLORS_CVAR,
@@ -783,6 +821,10 @@ const HELP: &[(&str, &str)] = &[
     (
         crate::monitor::SHOW_CVAR,
         "Off: no Monitor toy monitor is drawn, yours or other players', nor their sounds heard. You can still be hit while the toy is on.",
+    ),
+    (
+        crate::banana::SHOW_CVAR,
+        "Off: no Banana peel toy peel is drawn, yours or other players', nor their sounds heard. You can still slip while the toy is on.",
     ),
     (
         crate::toy_sight::ILLUMINATE,

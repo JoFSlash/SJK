@@ -273,6 +273,7 @@ pub(super) const COMMANDS: &[(&str, &str)] = &[
         "Recreate audio output and reload sound assets",
     ),
     ("in_restart", "Reset held input and pointer capture"),
+    (crate::fs_restart::COMMAND, crate::fs_restart::HELP),
 ];
 
 /// Queue and worker replies exist only for explicitly requested commands.
@@ -289,6 +290,8 @@ pub(super) struct Commands {
     pub timeout_frames: u8,
     /// Name-edit cooldown shared with the userinfo callback.
     pub name_clock: identity::NameClock,
+    /// `fs_restart`'s mount in flight.
+    pub fs_restart: crate::fs_restart::Task,
 }
 
 /// JoF content's and the Sith cloud's commands (`jof.downloads`, `sith.downloads`),
@@ -932,6 +935,7 @@ impl crate::GpuState {
                 }
             }
         }
+        self.poll_fs_restart();
     }
 
     fn client_command(
@@ -1260,6 +1264,7 @@ impl crate::GpuState {
                 return Ok(Vec::new());
             }
             crate::gameplay_fps::COMMAND => return self.gameplay_fps_command(args),
+            crate::fs_restart::COMMAND => return self.fs_restart_command(),
             "freecam" => return self.free_camera_command(args),
             "peek" => return self.peek_command(args),
             "cosmetics" => return self.cosmetics_command(args),

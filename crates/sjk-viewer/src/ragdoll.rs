@@ -31,7 +31,9 @@
 //! the monitor (its thrower's slot, its number and its step, so that every client bounces
 //! it off the body alike). A client that hears of a blow after its step ran the body on
 //! runs it again from its start with it ([`body::Body::rerun`]). A fall a monitor began
-//! ends by itself once the body has lain still a while ([`REST_UP`]).
+//! ends by itself once the body has lain still a while ([`REST_UP`]). A slip on a banana
+//! peel ([`crate::banana`], 29/10/2026) is such a blow too, at a foot, naming the peel's
+//! dropper and no monitor ([`UNTHROWN`]).
 
 mod body;
 mod scene;
@@ -41,7 +43,9 @@ mod sounds;
 use crate::GpuState;
 use crate::ghost_replay::Drive;
 use body::{Body, PELVIS};
-pub(crate) use body::{JOINTS, MAX_PUSH, STEP_MS, Start, Strike, World, friction, unbounced, unit};
+pub(crate) use body::{
+    JOINTS, L_FOOT, MAX_PUSH, R_FOOT, STEP_MS, Start, Strike, World, friction, unbounced, unit,
+};
 use glam::Vec3;
 pub(crate) use scene::{Movers, Scene};
 use sjk_protocol::UserCommand;
@@ -135,13 +139,18 @@ pub(crate) fn mount(vfs: &mut sjk_vfs::VirtualFileSystem) -> Result<(), sjk_vfs:
 }
 
 /// What struck a body: a monitor, by its thrower's slot, its number among theirs and
-/// the step of its flight it struck at.
+/// the step of its flight it struck at; or a banana peel the body slipped on
+/// ([`crate::banana`]), by its dropper's slot, its number [`UNTHROWN`] and step 0.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) struct By {
     pub(crate) thrower: u8,
     pub(crate) number: u8,
     pub(crate) step: u16,
 }
+
+/// [`By::number`] of a blow no monitor dealt: a slip on a banana peel. Past every
+/// monitor's number, so no client bounces a monitor off the body for it.
+pub(crate) const UNTHROWN: u8 = u8::MAX;
 
 /// A blow to the fall that began at `fall` (its moment), and what dealt it.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -954,10 +963,11 @@ impl GpuState {
         true
     }
 
-    /// The player is struck by monitor `by` at `time` (game server milliseconds) at
-    /// point `joint` of their body, pushed by `push` (units a second): they fall if they
-    /// stand (and may: [`Ragdoll::strikable`]), the body takes the blow, and everyone is
-    /// told. False when it did not land.
+    /// The player is struck by monitor `by` (or slips on a banana peel, `by`'s number
+    /// [`UNTHROWN`]) at `time` (game server milliseconds) at point `joint` of their body,
+    /// pushed by `push` (units a second): they fall if they stand (and may:
+    /// [`Ragdoll::strikable`]), the body takes the blow, and everyone is told. False when
+    /// it did not land.
     pub(crate) fn ragdoll_struck(&mut self, time: i64, joint: u8, push: [i32; 3], by: By) -> bool {
         if self.ragdoll.mine.is_none() {
             let Some(session) = self.live_session.as_ref() else {
@@ -1308,6 +1318,66 @@ impl GpuState {
         self.ragdoll.shot_frozen = true;
         shown_lock()[usize::from(slot)] = Some(*body.points());
     }
+}
+
+#[cfg(test)]
+impl Ragdoll {
+    /// For tests: on a game server as slot 0 (`in_game`), spared from falls (dead,
+    /// spectating, in a duel, with the flag, hacked, held: `spared`), limp (`limp`).
+    pub(crate) fn for_tests(in_game: bool, spared: bool, limp: bool) -> Self {
+        let mut ragdoll = Self::default();
+        if in_game {
+            ragdoll.server = Some(std::net::SocketAddr::from(([127, 0, 0, 1], 29_070)));
+            ragdoll.own = Some(0);
+        }
+        ragdoll.spared = spared;
+        if limp {
+            ragdoll.mine = Some(Mine {
+                moment: 0,
+                told: [0; SLOTS],
+                tell_at: Instant::now(),
+                hits: Vec::new(),
+                auto: true,
+                rest: None,
+                damage_event: 0,
+                camera: (0.0, 0.0),
+                fell: Instant::now(),
+            });
+        }
+        ragdoll
+    }
+}
+
+/// For tests: a body falling from `start` onto a floor at height 0, struck at its first
+/// step by `strike` if given; its points after each step up to `steps`.
+#[cfg(test)]
+pub(crate) fn fall_on_a_floor(
+    start: &Start,
+    strike: Option<Strike>,
+    steps: u32,
+) -> Vec<[Vec3; JOINTS]> {
+    let mut floor = |from: Vec3, to: Vec3, half: f32| {
+        (to.z < half).then(|| {
+            let t = if from.z > half {
+                ((from.z - half) / (from.z - to.z)).clamp(0.0, 1.0)
+            } else {
+                0.0
+            };
+            let mut at = from + (to - from) * t;
+            at.z = at.z.max(half);
+            (at, Vec3::Z)
+        })
+    };
+    let mut body = Body::new(start);
+    if let Some(strike) = strike {
+        body.strike(strike);
+    }
+    (1..=steps)
+        .map(|step| {
+            body.run_to(step, &mut floor);
+            *body.points()
+        })
+        .collect()
 }
 
 /// Whether the player was hurt since their fall began: the server's damage feedback

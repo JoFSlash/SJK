@@ -62,6 +62,17 @@ impl Predictor {
 
     /// PM_Friction (:970-1090), normal player branch including wading.
     pub(super) fn friction(&mut self, seconds: f32, ground: &GroundState) {
+        self.friction_for_command(seconds, ground, &UserCommand::default());
+    }
+
+    /// Friction with jaPRO's explicit walk/ski input, before air/ground acceleration.
+    pub(super) fn friction_for_command(
+        &mut self,
+        seconds: f32,
+        ground: &GroundState,
+        command: &UserCommand,
+    ) {
+        let style = self.japro_style();
         let mut velocity = Vec3::from_array(self.state.velocity);
         let mut measured = velocity;
         if ground.walking {
@@ -87,7 +98,9 @@ impl Predictor {
             && ground.trace.surface_flags & SURF_SLICK == 0
             && self.state.movement_flags & PMF_TIME_KNOCKBACK == 0
         {
-            drop += speed.max(STOP_SPEED) * FRICTION * seconds;
+            drop += speed.max(STOP_SPEED)
+                * style.map_or(FRICTION, |rules| rules.ground_friction(command))
+                * seconds;
         }
         if flying_vehicle && self.state.movement_flags & PMF_TIME_KNOCKBACK == 0 {
             // A fighter's friction, anywhere (`bg_pmove.c:1053-1060`).
@@ -95,7 +108,13 @@ impl Predictor {
         }
         if self.state.water_level != 0 {
             drop += speed * f32::from(self.state.water_level) * seconds;
-        } else if self.state.ground_entity_number < 32 && self.config.ja_plus.slides_on_players() {
+        } else if self.state.ground_entity_number < 32
+            && if self.config.ja_pro.enabled {
+                self.config.ja_pro.head_slide
+            } else {
+                self.config.ja_plus.slides_on_players()
+            }
+        {
             // Standing on a player is frictionless, unless a JA+ server turns the slide
             // off (`jp_slideOnPlayer` 0, [`crate::pmove_japlus`]).
             drop = 0.0;
@@ -156,7 +175,7 @@ impl Predictor {
             self.water_jump_move(seconds, bounds, ground, collision);
             return;
         }
-        self.friction(seconds, ground);
+        self.friction_for_command(seconds, ground, command);
         let scale = self.command_scale(command);
         let wish = if scale == 0.0 {
             Vec3::new(0.0, 0.0, -60.0)

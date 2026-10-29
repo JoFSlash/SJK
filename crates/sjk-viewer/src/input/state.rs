@@ -117,6 +117,20 @@ mod tests {
         assert!(!state.active);
     }
 
+    /// `IN_KeyDown`'s "repeating key": a held key pressed again (`in_mouseRepeat`)
+    /// changes nothing, and one release lets go.
+    #[test]
+    fn a_held_keys_repeated_press_changes_nothing() {
+        let mut state = KeyState::default();
+        assert!(state.event(true, Some(4), 10));
+        for time in [60, 110, 160] {
+            assert!(!state.event(true, Some(4), time));
+        }
+        assert!(state.active);
+        assert!(state.event(false, Some(4), 200));
+        assert!(!state.active);
+    }
+
     #[test]
     fn released_keys_drop_a_key_hold() {
         let mut state = KeyState::default();

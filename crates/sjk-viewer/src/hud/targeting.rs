@@ -92,6 +92,8 @@ pub(crate) struct Policy {
     showpos: bool,
     lagometer: [f32; 2],
     lagometer_scale: f32,
+    /// `cg_lagometer`, 0 to 3 ([`super::lagometer::mode`]).
+    lagometer_mode: u8,
     color: [f32; 4],
     /// `cg_crosshairColor` is a colour of its own, ahead of the target colours.
     own_color: bool,
@@ -122,6 +124,7 @@ impl Policy {
             showpos: b("cg_showpos", false),
             lagometer: [f("cg_lagometerx", 48.0), f("cg_lagometery", 144.0)],
             lagometer_scale: f("cg_lagometerscale", 1.0).clamp(0.25, 4.0),
+            lagometer_mode: super::lagometer::mode(console),
             color: crate::cgame_options::crosshair_color(console),
             own_color: crate::cgame_options::crosshair_color_set(console),
             look: super::crosshair::Look::new(
@@ -148,6 +151,16 @@ impl Policy {
             dimensions[0],
             dimensions[1],
         ]
+    }
+
+    /// `cg_lagometer`: 0 off, 1 the graph, 2 and 3 JoF EJK's ([`super::lagometer`]).
+    pub(super) fn lagometer_mode(self) -> u8 {
+        self.lagometer_mode
+    }
+
+    /// `cg_lagometerScale`, 0.25 to 4.
+    pub(super) fn lagometer_scale(self) -> f32 {
+        self.lagometer_scale
     }
 
     /// Scale the graph around its existing bottom-right corner, retaining X/Y offsets.

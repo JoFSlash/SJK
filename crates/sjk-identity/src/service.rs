@@ -64,7 +64,7 @@ fn unix_now() -> i64 {
 /// Shortest time between two readings of it brought forward (a drop of the player's
 /// own key, or the viewer asking), and the profile's early reading for a drop.
 const HOLOCRONS_SOON: Duration = Duration::from_secs(30);
-/// How long a hub that refused the reading (from before holocrons) is left alone.
+/// How long a hub without the reading (from before holocrons) is left alone.
 const HOLOCRONS_AGAIN: Duration = Duration::from_secs(3_600);
 /// Shortest time between two sendings of the achievement counts.
 const ACHIEVEMENTS_EVERY: Duration = Duration::from_secs(60);
@@ -298,6 +298,16 @@ pub struct Snapshot {
     /// What became of the last shatter, craft or purchase ([`Service::shatter`],
     /// [`Service::craft`], [`Service::buy`]).
     pub trade: Option<TradeOutcome>,
+    /// The player's collection marks (favourite and locked saber shaders, 29/10/2026), as
+    /// the hub last sent them with the progress or answered a change, a change asked with
+    /// [`Service::set_mark`] shown at once; `None` before, or from a hub that keeps none
+    /// (its economy does not say [`crate::wire::MARKS_ABILITY`]).
+    pub marks: Option<crate::wire::UnlockMarks>,
+    /// Counts changes to [`Snapshot::marks`].
+    pub marks_revision: u64,
+    /// Why the last change of a mark failed (in the player's words), by its count: the
+    /// marks are read again from the hub then.
+    pub mark_refusal: Option<(u64, String)>,
     /// The player's trades with other players, as the hub last listed them
     /// ([`Service::trade_with`], 22/10/2026); `None` before the first read.
     pub trades: Option<TradesState>,
@@ -518,10 +528,12 @@ pub struct HolocronProgress {
     pub progress_secs: u64,
     /// Seconds of active play for one holocron.
     pub every_secs: u64,
-    /// Holocrons dropped in the 24 hours before it was read.
+    /// Holocrons dropped since the caps' day began when it was read (09:00 in Paris).
     pub today: u32,
-    /// The most a key can earn in 24 hours.
+    /// The most a key can earn in a day.
     pub daily_cap: u32,
+    /// When the caps' next day begins, unix seconds; `None` from a hub before 29/10/2026.
+    pub resets_at: Option<i64>,
     /// The hub's clock when it answered, unix seconds.
     pub server_time: i64,
     /// Whether the person may open holocrons now (only staff while opening is tested).
@@ -537,6 +549,7 @@ impl HolocronProgress {
             every_secs: state.every_secs,
             today: state.today,
             daily_cap: state.daily_cap,
+            resets_at: state.resets_at,
             server_time: state.server_time,
             can_open: state.can_open,
             read_at,
@@ -550,7 +563,7 @@ impl HolocronProgress {
         self.every_secs.saturating_sub(self.progress_secs)
     }
 
-    /// Whether the day's cap is reached, so no holocron drops until one is a day old.
+    /// Whether the day's cap is reached, so no holocron drops until the next day begins.
     pub fn capped(&self) -> bool {
         self.daily_cap > 0 && self.today >= self.daily_cap
     }
@@ -611,6 +624,9 @@ impl Snapshot {
             kyber: None,
             shop: None,
             trade: None,
+            marks: None,
+            marks_revision: 0,
+            mark_refusal: None,
             trades: None,
             announcements: Vec::new(),
             announcements_revision: 0,
@@ -636,6 +652,10 @@ impl Snapshot {
     fn clear_me(&mut self) {
         self.me = None;
         self.me_revision += 1;
+        // The marks are the person's: another person's (or none) come with the next read.
+        if self.marks.take().is_some() {
+            self.marks_revision += 1;
+        }
         if self.key_id != self.local_key_id {
             self.key_id.clone_from(&self.local_key_id);
         }
@@ -747,6 +767,8 @@ enum Command {
     ShatterDuplicates,
     /// Craft this shader with shards.
     Craft(String),
+    /// Set or clear a collection mark on this shader.
+    Mark(String, crate::wire::Mark, bool),
     /// Read the shop's day.
     ReadShop,
     /// Buy this offer of the day.
@@ -990,6 +1012,7 @@ fn trade_refusal(error: &HubError) -> String {
             "comes_with_card" => "That shader comes with your card: it stays with the card.",
             "not_held" => "You hold no copy of that shader any more.",
             "no_duplicates" => "You hold no duplicates to break down.",
+            "locked" => "That shader is locked: unlock it first.",
             "not_shatterable" => "That shader cannot be shattered.",
             "not_craftable" => "That shader cannot be crafted.",
             "not_enough_shards" => "Not enough kyber shards.",
@@ -1007,6 +1030,38 @@ fn trade_refusal(error: &HubError) -> String {
             if why.starts_with("status 404") || why.starts_with("status 405") =>
         {
             "This SJK hub has no shop yet."
+        }
+        other => return other.to_string(),
+    };
+    words.to_owned()
+}
+
+/// Show `mark` set (`on`) or cleared on shader `id` in `snapshot` before the hub answers;
+/// whether the hub is to be asked (its marks are known and this changes them).
+fn mark_at_once(snapshot: &mut Snapshot, id: &str, mark: crate::wire::Mark, on: bool) -> bool {
+    let Some(marks) = snapshot.marks.as_mut() else {
+        return false;
+    };
+    if !marks.set(id, mark, on) {
+        return false;
+    }
+    snapshot.marks_revision += 1;
+    true
+}
+
+/// Why a change of a collection mark failed, in the player's words.
+fn mark_refusal(error: &HubError) -> String {
+    let words = match error {
+        HubError::Rejected { code, message, .. } => match code.as_str() {
+            "not_held" => "Only a shader you hold can be locked.",
+            "bad_unlock" => "The hub does not know that shader yet.",
+            "not_registered" => "Your identity is not registered at the hub yet.",
+            _ => return message.clone(),
+        },
+        HubError::Protocol(why)
+            if why.starts_with("status 404") || why.starts_with("status 405") =>
+        {
+            "This SJK hub keeps no favourites or locks yet."
         }
         other => return other.to_string(),
     };
@@ -1582,6 +1637,7 @@ impl Worker {
             Command::ShatterLast(id) => self.trade(Trade::ShatterLast, &id),
             Command::ShatterDuplicates => self.trade(Trade::ShatterAll, ""),
             Command::Craft(id) => self.trade(Trade::Craft, &id),
+            Command::Mark(id, mark, on) => self.set_mark(&id, mark, on, now),
             Command::ReadShop => self.read_shop(now),
             Command::Buy(id) => self.trade(Trade::Buy, &id),
             Command::BuyHolocron(tier) => self.trade(Trade::Holocron, &tier),
@@ -1911,6 +1967,33 @@ impl Worker {
         });
         if reread {
             self.read_shop(Instant::now());
+        }
+    }
+
+    /// Set or clear `mark` on shader `id` at the hub (the snapshot shows the change
+    /// already, [`Service::set_mark`]): the hub's answer replaces the marks; a refusal is
+    /// told in [`Snapshot::mark_refusal`] and the marks are read again with the progress
+    /// soon, so the change shown before goes back.
+    fn set_mark(&mut self, id: &str, mark: crate::wire::Mark, on: bool, now: Instant) {
+        let outcome = match (self.hub.as_mut(), self.registered) {
+            (Some(hub), true) => hub.set_mark(&self.identity, id, mark, on),
+            _ => Err(self.not_connected()),
+        };
+        match outcome {
+            Ok(marks) => self.update(|snapshot| {
+                if snapshot.marks.as_ref() != Some(&marks) {
+                    snapshot.marks = Some(marks);
+                    snapshot.marks_revision += 1;
+                }
+            }),
+            Err(error) => {
+                let words = mark_refusal(&error);
+                self.update(|snapshot| {
+                    let serial = snapshot.mark_refusal.as_ref().map_or(1, |(n, _)| n + 1);
+                    snapshot.mark_refusal = Some((serial, words));
+                });
+                self.holocrons_soon(now);
+            }
         }
     }
 
@@ -2538,8 +2621,11 @@ impl Worker {
     }
 
     /// Read the progress toward the next holocron if it is due. Cosmetic, like the asset
-    /// packs: the status stays. A hub that refuses (from before holocrons) is asked
-    /// again in an hour, one that cannot be reached after [`RETRY_MAX`].
+    /// packs: the status stays. A hub without the reading (404, from before holocrons) is
+    /// asked again in an hour; any other failure (unreachable, too many requests, a
+    /// restart) after [`RETRY_MAX`], so one failed reading does not leave the progress an
+    /// hour old (the Esc menu's reading, which waits for a due one, could not bring it
+    /// forward).
     fn keep_holocrons(&mut self, now: Instant) {
         if now < self.due_holocrons {
             return;
@@ -2560,12 +2646,20 @@ impl Worker {
                     if state.kyber.is_some() {
                         snapshot.kyber.clone_from(&state.kyber);
                     }
+                    // A hub that keeps marks sends them every time (none: an empty list);
+                    // one that keeps none leaves them out.
+                    if snapshot.marks != state.marks {
+                        snapshot.marks.clone_from(&state.marks);
+                        snapshot.marks_revision += 1;
+                    }
                     snapshot.min_client.clone_from(&state.min_client);
                     snapshot.holocrons = Some(HolocronProgress::new(state, now));
                 });
             }
-            Err(HubError::Network(_)) => self.due_holocrons = now + RETRY_MAX,
-            Err(_) => self.due_holocrons = now + HOLOCRONS_AGAIN,
+            Err(HubError::Rejected { status: 404, .. } | HubError::Protocol(_)) => {
+                self.due_holocrons = now + HOLOCRONS_AGAIN;
+            }
+            Err(_) => self.due_holocrons = now + RETRY_MAX,
         }
     }
 
@@ -3576,6 +3670,16 @@ impl Service {
         let _ = self.commands.send(Command::Craft(id.to_owned()));
     }
 
+    /// Set (`on`) or clear collection mark `mark` on shader `id` (a hub whose economy says
+    /// [`crate::wire::MARKS_ABILITY`], 29/10/2026). [`Snapshot::marks`] shows the change at
+    /// once; the hub's answer replaces it, and a refusal puts the hub's marks back
+    /// ([`Snapshot::mark_refusal`] says why). Nothing while the hub's marks are not known.
+    pub fn set_mark(&self, id: &str, mark: crate::wire::Mark, on: bool) {
+        if mark_at_once(&mut lock(&self.snapshot), id, mark, on) {
+            let _ = self.commands.send(Command::Mark(id.to_owned(), mark, on));
+        }
+    }
+
     /// Ask for the player's rewards and the newest rounds again ([`Snapshot::rewards`]);
     /// read at most once every 30 seconds, for a window that shows them as it opens.
     pub fn refresh_rewards(&self) {
@@ -4002,6 +4106,8 @@ mod tests {
         /// The holocron progress the fake hub reports; none is a hub from before
         /// holocrons, which refuses the reading.
         progress: Arc<Mutex<Option<HolocronState>>>,
+        /// Refusals the next readings of the holocron progress get, in order.
+        progress_refusals: Arc<Mutex<VecDeque<HubError>>>,
         /// How many times the holocron progress was asked for.
         holocron_reads: Arc<Mutex<usize>>,
         /// The open log requests the fake hub lists; none is a hub from before log
@@ -4020,6 +4126,9 @@ mod tests {
         news: Arc<Mutex<Option<News>>>,
         /// How many times the announcements and the rewards were read.
         news_reads: Arc<Mutex<(usize, usize)>>,
+        /// The collection marks the fake hub keeps; none is a hub from before them, which
+        /// sends none with the progress and answers a change with 404.
+        marks: Arc<Mutex<Option<crate::wire::UnlockMarks>>>,
     }
 
     impl Fake {
@@ -4385,8 +4494,33 @@ mod tests {
             if self.fail.load(Ordering::SeqCst) {
                 return Err(HubError::Network("down".to_owned()));
             }
+            if let Some(refusal) = self.progress_refusals.lock().unwrap().pop_front() {
+                return Err(refusal);
+            }
             let state = self.progress.lock().unwrap().clone();
-            state.ok_or_else(|| refused(404, "not_found"))
+            let marks = self.marks.lock().unwrap().clone();
+            state
+                .map(|state| HolocronState { marks, ..state })
+                .ok_or_else(|| refused(404, "not_found"))
+        }
+        fn set_mark(
+            &mut self,
+            _: &Identity,
+            id: &str,
+            mark: crate::wire::Mark,
+            on: bool,
+        ) -> Result<crate::wire::UnlockMarks, HubError> {
+            self.record(format!("mark {id} {} {on}", mark.id()))?;
+            let owned = self.owned.lock().unwrap().iter().any(|held| held == id);
+            let mut marks = self.marks.lock().unwrap();
+            let Some(marks) = marks.as_mut() else {
+                return Err(refused(404, "not_found"));
+            };
+            if on && mark == crate::wire::Mark::Locked && !owned {
+                return Err(refused(409, "not_held"));
+            }
+            marks.set(id, mark, on);
+            Ok(marks.clone())
         }
         fn announcements(&mut self, _: &Identity) -> Result<Vec<Announcement>, HubError> {
             self.news_reads.lock().unwrap().0 += 1;
@@ -4866,12 +5000,14 @@ mod tests {
             every_secs: 1_800,
             today: 2,
             daily_cap: 8,
+            resets_at: Some(1_791_010_800),
             server_time: 1_791_000_000,
             can_open: true,
             min_client: None,
             loot: Vec::new(),
             economy: None,
             kyber: None,
+            marks: None,
         }
     }
 
@@ -5044,6 +5180,33 @@ mod tests {
         worker.tick(t0 + HOLOCRONS_EVERY + RETRY_MAX);
         assert_eq!(holocron_reads(&fake), reads + 1);
         assert!(lock(&snapshot).holocrons.is_some());
+    }
+
+    #[test]
+    fn a_refused_reading_of_a_hub_with_holocrons_is_tried_again_soon() {
+        // Too many requests or a hub restarting is no hub without holocrons: the
+        // progress is read again after the short retry, not in an hour, and the Esc
+        // menu's reading can bring it forward again.
+        let fake = Fake::default();
+        *fake.progress.lock().unwrap() = Some(progress(0));
+        let t0 = Instant::now();
+        let (mut worker, snapshot) = worker(&fake, t0);
+        worker.handle(Command::Configure(on("https://hub")), t0);
+        worker.tick(t0);
+        assert_eq!(holocron_reads(&fake), 1);
+        for refusal in [refused(429, "rate_limited"), refused(502, "error")] {
+            fake.progress_refusals.lock().unwrap().push_back(refusal);
+        }
+        worker.tick(t0 + HOLOCRONS_EVERY);
+        assert_eq!(holocron_reads(&fake), 2);
+        worker.tick(t0 + HOLOCRONS_EVERY + RETRY_MAX);
+        assert_eq!(holocron_reads(&fake), 3);
+        *fake.progress.lock().unwrap() = Some(progress(1_500));
+        let menu = t0 + HOLOCRONS_EVERY + RETRY_MAX + Duration::from_secs(20);
+        worker.handle(Command::MenuOpened, menu);
+        worker.tick(menu);
+        assert_eq!(holocron_reads(&fake), 4);
+        assert_eq!(lock(&snapshot).holocrons.unwrap().remaining_secs(), 300);
     }
 
     #[test]
@@ -5401,6 +5564,95 @@ mod tests {
         worker.handle(Command::ReadTrades, t0 + TRADES_OFF);
         worker.tick(t0 + TRADES_OFF);
         assert_eq!(reads(&fake), 3);
+    }
+
+    /// Collection marks (29/10/2026): an older hub sends none, so nothing changes; a hub
+    /// that keeps them sends them with the progress, a change shows at once and the hub's
+    /// answer replaces it, and a refusal says why and reads the hub's marks back.
+    #[test]
+    fn collection_marks_come_with_the_progress_and_change_at_once() {
+        use crate::wire::{Mark, UnlockMarks};
+        let fake = Fake::default();
+        *fake.progress.lock().unwrap() = Some(progress(0));
+        fake.owned.lock().unwrap().push("saber_frost".to_owned());
+        let t0 = Instant::now();
+        let (mut worker, snapshot) = worker(&fake, t0);
+        worker.handle(Command::Configure(on("https://hub")), t0);
+        worker.tick(t0);
+        assert_eq!(lock(&snapshot).marks, None, "an older hub keeps none");
+        assert!(
+            !mark_at_once(&mut lock(&snapshot), "saber_frost", Mark::Favourite, true),
+            "nothing to ask an older hub"
+        );
+        assert!(fake.log().iter().all(|line| !line.starts_with("mark")));
+        // The hub keeps marks: read with the progress.
+        *fake.marks.lock().unwrap() = Some(UnlockMarks {
+            favourite: vec!["saber_storm".to_owned()],
+            locked: Vec::new(),
+        });
+        let t1 = t0 + HOLOCRONS_EVERY;
+        worker.tick(t1);
+        let revision = lock(&snapshot).marks_revision;
+        assert!(
+            lock(&snapshot)
+                .marks
+                .as_ref()
+                .unwrap()
+                .favourite("saber_storm")
+        );
+        // A lock shows at once, then the hub's answer stands.
+        assert!(mark_at_once(
+            &mut lock(&snapshot),
+            "saber_frost",
+            Mark::Locked,
+            true
+        ));
+        assert!(
+            lock(&snapshot)
+                .marks
+                .as_ref()
+                .unwrap()
+                .locked("saber_frost")
+        );
+        assert!(lock(&snapshot).marks_revision > revision);
+        assert!(
+            !mark_at_once(&mut lock(&snapshot), "saber_frost", Mark::Locked, true),
+            "set already: nothing to ask"
+        );
+        worker.handle(
+            Command::Mark("saber_frost".to_owned(), Mark::Locked, true),
+            t1,
+        );
+        assert!(
+            fake.log()
+                .contains(&"mark saber_frost locked true".to_owned())
+        );
+        assert_eq!(
+            fake.marks.lock().unwrap().clone().unwrap().locked,
+            ["saber_frost"]
+        );
+        assert_eq!(lock(&snapshot).mark_refusal, None);
+        // The hub refuses a lock on a shader not held: why, and its marks again soon.
+        assert!(mark_at_once(
+            &mut lock(&snapshot),
+            "saber_void",
+            Mark::Locked,
+            true
+        ));
+        let reads = holocron_reads(&fake);
+        worker.handle(
+            Command::Mark("saber_void".to_owned(), Mark::Locked, true),
+            t1,
+        );
+        let refusal = lock(&snapshot).mark_refusal.clone().unwrap();
+        assert_eq!(
+            refusal,
+            (1, "Only a shader you hold can be locked.".to_owned())
+        );
+        worker.tick(t1 + HOLOCRONS_SOON);
+        assert!(holocron_reads(&fake) > reads, "read again");
+        let marks = lock(&snapshot).marks.clone().unwrap();
+        assert!(!marks.locked("saber_void") && marks.locked("saber_frost"));
     }
 
     #[test]

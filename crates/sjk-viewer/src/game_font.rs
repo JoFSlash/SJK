@@ -429,13 +429,15 @@ impl GameFonts {
     /// for it when that font is on and loaded, and everything else to
     /// `fallback`. With the option off this is the single pass it replaces.
     /// Under a card (`cover`, [`crate::menu_widgets::MenuCanvas::cover`]): the
-    /// runs before it less what the card covers, then the card's own.
+    /// runs before it less what the card covers, then the card's own. Each command's
+    /// colour codes draw in the palette `palette_of` gives for it.
     #[allow(clippy::too_many_arguments)]
     pub(crate) fn append_routed<'s>(
         &mut self,
         draw_list: &DrawList,
         resolve: impl Fn(TextId) -> &'s str + Copy,
         font_of: impl Fn(TextId, &str) -> Option<RetailFont> + Copy,
+        palette_of: impl Fn(TextId) -> text::CodePalette + Copy,
         fallback: (&mut Vec<TextVertex>, &UiFont),
         viewport: [f32; 2],
         style: text::TextStyle,
@@ -463,7 +465,7 @@ impl GameFonts {
                 }
                 if let Some(layer) = self.slot_mut(font) {
                     let start = layer.vertices.len();
-                    crate::ui_renderer::append_text_commands_where(
+                    crate::ui_renderer::append_text_commands_paletted(
                         draw_list,
                         resolve,
                         |id, text| in_pass(id) && font_of(id, text) == Some(font),
@@ -471,13 +473,13 @@ impl GameFonts {
                         &layer.font,
                         viewport,
                         style,
-                        text::CodePalette::Game,
+                        palette_of,
                     );
                     drop_under(&mut layer.vertices, start);
                 }
             }
             let start = vertices.len();
-            crate::ui_renderer::append_text_commands_where(
+            crate::ui_renderer::append_text_commands_paletted(
                 draw_list,
                 resolve,
                 |id, text| {
@@ -487,7 +489,7 @@ impl GameFonts {
                 fallback_font,
                 viewport,
                 style,
-                text::CodePalette::Game,
+                palette_of,
             );
             drop_under(vertices, start);
         }
@@ -677,6 +679,7 @@ mod tests {
             &list,
             |_| "ab",
             |id, _| (id.0 == 1).then_some(RetailFont::Medium),
+            |_| text::CodePalette::Game,
             (&mut vertices, &inter),
             [640.0, 480.0],
             text::TextStyle::NEUTRAL,
@@ -691,6 +694,7 @@ mod tests {
             &list,
             |_| "ab",
             |id, _| (id.0 == 1).then_some(RetailFont::Medium),
+            |_| text::CodePalette::Game,
             (&mut vertices, &inter),
             [640.0, 480.0],
             text::TextStyle::NEUTRAL,

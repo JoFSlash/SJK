@@ -95,6 +95,8 @@ const CHAT_ROWS: &[&str] = &[
     crate::chat::tabs::PM_CVAR,
     crate::chat::options::LINE_SPACING_CVAR,
     "cg_chatBoxLetterSpacing",
+    crate::chat::options::BACKDROP_CVAR,
+    crate::chat::options::OUTLINE_CVAR,
     crate::chat::options::CARD_SCALE_CVAR,
     crate::text::charset::CVAR,
     "cl_sjkChat",
@@ -107,6 +109,11 @@ const CHAT_ROWS: &[&str] = &[
     crate::e2e_whispers::CVAR,
     crate::map_blocks::CVAR,
 ];
+
+/// The first row of the JA+ plugin options, under their heading.
+const JAPLUS_PLUGIN_ROW: &str = "japlus.plugin 1";
+/// The first row of the jaPRO plugin options, under their heading.
+const JAPRO_PLUGIN_ROW: &str = "japro.plugin 0";
 
 /// The rows Mods gathers from the classic Game options.
 const MODS_ROWS: &[&str] = &[
@@ -128,6 +135,30 @@ const MODS_ROWS: &[&str] = &[
     sjk_mod_jof::ABILITY_SOUNDS,
     #[cfg(feature = "mod-jof")]
     sjk_mod_jof::HONOR_NAMES,
+    #[cfg(feature = "mod-japlus")]
+    "japlus.plugin 1",
+    #[cfg(feature = "mod-japlus")]
+    "japlus.plugin 3",
+    #[cfg(feature = "mod-japlus")]
+    "japlus.plugin 5",
+    #[cfg(feature = "mod-japlus")]
+    "japlus.plugin 9",
+    #[cfg(feature = "mod-japlus")]
+    "japlus.plugin 15",
+    #[cfg(feature = "mod-japro")]
+    "japro.plugin 0",
+    #[cfg(feature = "mod-japro")]
+    "japro.plugin 5",
+    #[cfg(feature = "mod-japro")]
+    "japro.plugin 6",
+    #[cfg(feature = "mod-japro")]
+    "japro.plugin 7",
+    #[cfg(feature = "mod-japro")]
+    "japro.plugin 8",
+    #[cfg(feature = "mod-japro")]
+    "japro.plugin 9",
+    #[cfg(feature = "mod-japro")]
+    "japro.plugin 10",
     "jof.downloads",
     "jof.contentSource",
     "sith.downloads",
@@ -331,6 +362,7 @@ impl Group {
                 crate::effect_flash::REDUCE_CVAR,
                 crate::saber_clash_flare::CVAR,
                 crate::saber_clash_flare::SIZE_CVAR,
+                crate::impacts::FLESH_SPARKS_CVAR,
                 crate::team_sabers::TEAM_COLORS_CVAR,
                 crate::team_sabers::CVAR,
                 crate::saber_rgb::black::CVAR,
@@ -361,6 +393,7 @@ impl Group {
                 crate::hax::TRAP_CVAR,
                 crate::hax::AWAY_CVAR,
                 crate::monitor::SHOW_CVAR,
+                crate::banana::SHOW_CVAR,
                 crate::toy_sight::ILLUMINATE,
                 crate::toy_sight::CARDBOARD_BOX,
                 crate::toy_sight::RAGDOLL,
@@ -401,6 +434,30 @@ impl Group {
                 "jof.downloads",
                 "jof.contentSource",
                 "sith.downloads",
+                #[cfg(feature = "mod-japlus")]
+                "japlus.plugin 1",
+                #[cfg(feature = "mod-japlus")]
+                "japlus.plugin 3",
+                #[cfg(feature = "mod-japlus")]
+                "japlus.plugin 5",
+                #[cfg(feature = "mod-japlus")]
+                "japlus.plugin 9",
+                #[cfg(feature = "mod-japlus")]
+                "japlus.plugin 15",
+                #[cfg(feature = "mod-japro")]
+                "japro.plugin 0",
+                #[cfg(feature = "mod-japro")]
+                "japro.plugin 5",
+                #[cfg(feature = "mod-japro")]
+                "japro.plugin 6",
+                #[cfg(feature = "mod-japro")]
+                "japro.plugin 7",
+                #[cfg(feature = "mod-japro")]
+                "japro.plugin 8",
+                #[cfg(feature = "mod-japro")]
+                "japro.plugin 9",
+                #[cfg(feature = "mod-japro")]
+                "japro.plugin 10",
                 crate::brush_view::CVAR,
                 crate::entity_view::CVAR,
                 crate::ghost_replay::SHOWCASE_CVAR,
@@ -443,7 +500,7 @@ impl Group {
                 "cg_drawPlayerNames",
                 "cg_drawPlayerNamesScale",
                 "cg_drawFriend",
-                "cg_playerCard",
+                crate::hud::player_card::CVAR,
                 "cg_playerCardDelay",
                 "cg_playerCardOutline",
                 crate::hud::team_outline::CVAR,
@@ -474,7 +531,7 @@ impl Group {
                 crate::hud::movement::LINES_ROW,
                 crate::hud::movement::AURA_CVAR,
                 crate::hud::movement::AURA_GROUND_CVAR,
-                "cg_lagometer",
+                crate::hud::lagometer::CVAR,
                 "cg_lagometerScale",
                 "cg_killfeed",
                 crate::ground_hud::CVAR,
@@ -490,6 +547,8 @@ impl Group {
                 crate::chat::tabs::PM_CVAR,
                 crate::chat::options::LINE_SPACING_CVAR,
                 "cg_chatBoxLetterSpacing",
+                crate::chat::options::BACKDROP_CVAR,
+                crate::chat::options::OUTLINE_CVAR,
                 crate::chat::options::CARD_SCALE_CVAR,
             ],
             Self::Scoreboard => &[
@@ -504,6 +563,7 @@ impl Group {
             ],
             Self::Display => &[
                 "r_resolution",
+                super::display::HIGH_DPI_CVAR,
                 "r_fullscreen",
                 "r_vsync",
                 "com_maxfps",
@@ -532,6 +592,7 @@ impl Group {
             Self::Simple(Simple::Display) => &[
                 "r_resolution",
                 crate::frame_target::scale::CVAR,
+                super::display::HIGH_DPI_CVAR,
                 "r_fullscreen",
                 "r_vsync",
                 "com_maxfps",
@@ -611,6 +672,8 @@ impl Group {
                 ("cg_saberTrail", "Effects"),
                 (crate::hax::TRAP_CVAR, "Toys"),
                 (crate::camera::STYLE_CVAR, "Camera and prediction"),
+                (JAPLUS_PLUGIN_ROW, "JA+ plugin options"),
+                (JAPRO_PLUGIN_ROW, "jaPRO plugin options"),
                 (crate::brush_view::CVAR, "Map tools"),
             ],
             Self::Interface => &[
@@ -665,6 +728,8 @@ impl Group {
             Self::Advanced(Advanced::Mods) => &[
                 ("assetbrowser", "Packs"),
                 ("mod_japlus", "Server mods"),
+                (JAPLUS_PLUGIN_ROW, "JA+ plugin options"),
+                (JAPRO_PLUGIN_ROW, "jaPRO plugin options"),
                 ("jof.downloads", "JoF content"),
                 ("sith.downloads", "Sith cloud"),
                 (crate::brush_view::CVAR, "Map tools"),

@@ -38,11 +38,14 @@
 //!   the server's word: their own client's word (the `hit_` event) comes a ping or more
 //!   later and takes its place, and without it the guess is undone
 //!   ([`crate::ragdoll::GUESS_WAIT`]). The thrower's hit marker shows at the guess.
+//! - **Screen Saver:** struck by [`saver::HITS`] monitors of others within
+//!   [`saver::WINDOW_MS`], the player is untouchable by monitors for
+//!   [`saver::LASTS_MS`] and still throws, wrapped in a gold shell ([`saver`]).
 //! - **Unseen:** in a duel (the player's own or the one they follow, and on Duel and
 //!   Power Duel servers) no monitor is drawn or heard, nor any mark shown; and
 //!   [`SHOW_CVAR`] at 0 hides every monitor and its sounds in the world, everywhere (the
-//!   player's own throw ring and hit marker stay). Neither changes who may be hit: the
-//!   switch does.
+//!   player's own throw ring and hit marker stay), nor any Screen Saver's shell. Neither
+//!   changes who may be hit: the switch does.
 //!
 //! No game server knows of it: the player's real body stays where it was and walks to
 //! the ragdoll, as for the Ragdoll. Every SJK client on the server sees the same throw:
@@ -54,6 +57,7 @@
 //! stock clients see nothing.
 
 mod flight;
+pub(crate) mod saver;
 
 use crate::GpuState;
 use crate::actor_instance::ActorInstance;
@@ -92,6 +96,9 @@ pub(crate) const KNOCK_SOUND: &str = "sound/sjk/monitor/knock.wav";
 pub(crate) const CHARGE_SOUND: &str = "sound/sjk/monitor/charge.wav";
 pub(crate) const THROW_HARD_SOUND: &str = "sound/sjk/monitor/throw_hard.wav";
 pub(crate) const HIT_SOUND: &str = "sound/sjk/monitor/hit.wav";
+/// Heard as a Screen Saver rises (a CRT's degauss) and as it ends (its power-off).
+pub(crate) const SAVER_ON_SOUND: &str = "sound/sjk/monitor/saver_on.wav";
+pub(crate) const SAVER_OFF_SOUND: &str = "sound/sjk/monitor/saver_off.wav";
 /// The throw event: this, then [`Event::text`]'s numbers.
 const THROW_PREFIX: &str = "throw_";
 /// How fast a monitor leaves the hand, units a second (the thrower's speed added).
@@ -176,6 +183,8 @@ const CHARGE_SOURCE: sjk_audio::SourceId = sjk_audio::SourceId(0x5100_0001);
 const CHARGE_CHANNEL: sjk_audio::ChannelId = sjk_audio::ChannelId(1);
 /// The numbers of a player's monitors go round this many.
 const NUMBERS: u8 = 100;
+// A banana peel's slip names no monitor by a number past them all.
+const _: () = assert!(NUMBERS < crate::ragdoll::UNTHROWN);
 const SLOTS: usize = crate::looks::SLOTS;
 
 /// A bundled file's bytes, by its name in `assets/monitor`.
@@ -186,7 +195,7 @@ macro_rules! bundled {
 }
 
 /// The bundled files at their game paths (made by `scripts/monitor_assets.py`).
-const FILES: [(&str, &[u8]); 10] = [
+const FILES: [(&str, &[u8]); 12] = [
     (MODEL, bundled!("monitor.md3")),
     ("models/sjk/monitor.jpg", bundled!("monitor.jpg")),
     ("shaders/sjk_monitor.shader", bundled!("monitor.shader")),
@@ -197,6 +206,8 @@ const FILES: [(&str, &[u8]); 10] = [
     (CHARGE_SOUND, bundled!("charge.wav")),
     (THROW_HARD_SOUND, bundled!("throw_hard.wav")),
     (HIT_SOUND, bundled!("hit.wav")),
+    (SAVER_ON_SOUND, bundled!("saver_on.wav")),
+    (SAVER_OFF_SOUND, bundled!("saver_off.wav")),
 ];
 
 /// Mount the bundled files.
@@ -312,6 +323,16 @@ struct Cue {
     volume: f32,
 }
 
+/// How bright each player's Screen Saver shell is this frame (0: none), by slot.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) struct Glows(pub(crate) [u8; SLOTS]);
+
+impl Default for Glows {
+    fn default() -> Self {
+        Self([0; SLOTS])
+    }
+}
+
 /// The toy's state.
 #[derive(Default)]
 pub(crate) struct Monitor {
@@ -346,6 +367,13 @@ pub(crate) struct Monitor {
     movers: crate::ragdoll::Movers,
     /// The game server time last stepped to (the presentation's).
     time: i64,
+    /// The hits counting towards the player's Screen Saver, and the Screen Saver.
+    saver_count: saver::Count,
+    saver: Option<saver::Own>,
+    /// Other players' Screen Savers, from the feed: since and until when.
+    others_saver: std::collections::HashMap<u8, (i64, i64)>,
+    /// The shells to draw this frame.
+    glows: Glows,
 }
 
 impl Monitor {
@@ -406,6 +434,32 @@ impl Monitor {
         self.guesses.clear();
         self.others_struck.clear();
         self.put_down();
+        self.forget_savers();
+    }
+
+    /// Forget every Screen Saver (another server, or a new map's clock).
+    fn forget_savers(&mut self) {
+        self.saver = None;
+        self.saver_count.clear();
+        self.others_saver.clear();
+        self.glows = Glows::default();
+    }
+
+    /// Whether the player's own Screen Saver holds at `at`.
+    fn saver_holds(&self, at: i64) -> bool {
+        self.saver.is_some_and(|saver| saver.holds(at))
+    }
+
+    /// Whether the Screen Saver of the player in `slot` (another) holds at `at`.
+    fn other_saver_holds(&self, slot: u8, at: i64) -> bool {
+        self.others_saver
+            .get(&slot)
+            .is_some_and(|(since, until)| (*since..*until).contains(&at))
+    }
+
+    /// The shells to draw this frame.
+    pub(crate) fn glows(&self) -> Glows {
+        self.glows
     }
 
     /// The monitor `thrower`'s number `number`, if out.
@@ -640,9 +694,13 @@ impl GpuState {
     }
 
     /// The frame's toy logic, from the relay's events: throws heard, the player's own
-    /// throw, and those to tell of it. After the Ragdoll's, whose blows bounce the
-    /// monitors.
-    pub(crate) fn update_monitor(&mut self, relay_events: &[sjk_identity::ToyEvent]) {
+    /// throw, and those to tell of it; and from the feed's, the Screen Savers of others.
+    /// After the Ragdoll's, whose blows bounce the monitors.
+    pub(crate) fn update_monitor(
+        &mut self,
+        relay_events: &[sjk_identity::ToyEvent],
+        toy_events: &[sjk_identity::ToyEvent],
+    ) {
         let Some(session) = self
             .live_session
             .as_ref()
@@ -737,6 +795,11 @@ impl GpuState {
                     .others_struck
                     .insert(hit.struck, (when, hit.by.thrower, hit.by.number));
             }
+            // The player's own monitor struck someone, by their word: during the
+            // player's Screen Saver, that may earn its achievements.
+            if Some(hit.by.thrower) == own && Some(hit.struck) != own {
+                self.monitor_saver_struck(hit.struck, when);
+            }
             // Foreseen, it was heard and marked already.
             if guess.is_some() {
                 continue;
@@ -754,12 +817,156 @@ impl GpuState {
             }
         }
         self.monitor_expire_guesses();
+        self.monitor_savers(toy_events, own);
         self.monitor_charging();
         if let Some(charge) = self.monitor.throw_asked.take() {
             self.monitor_throw_now(own, charge);
         }
         self.monitor_tell(own);
         self.hud.set_monitor_marks(self.monitor.marks());
+    }
+
+    /// The Screen Savers of the frame: others' begun or ended by the feed, at their time
+    /// or with their death; the player's own ended at its time or with their death; and
+    /// the shells to draw.
+    fn monitor_savers(&mut self, toy_events: &[sjk_identity::ToyEvent], own: Option<u8>) {
+        let Some(session) = self.live_session.as_ref() else {
+            return;
+        };
+        let now = self.monitor.time;
+        let game_state = session.game_state();
+        let heard: Vec<(u8, Option<i64>)> = toy_events
+            .iter()
+            .filter(|event| {
+                event.toy == TOY
+                    && Some(event.slot) != own
+                    && usize::from(event.slot) < SLOTS
+                    && !self.muted_players.contains(u16::from(event.slot))
+                    && crate::player_identity::shown_name(game_state, usize::from(event.slot))
+                        .is_some_and(|shown| sjk_identity::names_match(&event.claimed_name, &shown))
+            })
+            .filter_map(|event| Some((event.slot, saver::parse(&event.event)?)))
+            .collect();
+        let snapshot = session.latest_snapshot();
+        let own_dead = snapshot.player.entity_flags() & EF_DEAD != 0;
+        let dead = snapshot
+            .entities
+            .iter()
+            .filter(|entity| {
+                entity.number() < MAX_CLIENTS
+                    && entity.entity_type() == ET_PLAYER
+                    && entity.e_flags() & EF_DEAD != 0
+            })
+            .fold(0_u64, |dead, entity| dead | 1 << entity.number());
+        for (slot, until) in heard {
+            let held = self.monitor.other_saver_holds(slot, now);
+            match until {
+                Some(until) if until > now && until <= now + saver::LASTS_MS + 1_000 => {
+                    let since = self
+                        .monitor
+                        .others_saver
+                        .get(&slot)
+                        .filter(|_| held)
+                        .map_or(now, |(since, _)| *since);
+                    self.monitor.others_saver.insert(slot, (since, until));
+                    if !held {
+                        self.monitor_saver_cue(SAVER_ON_SOUND, Some(slot));
+                    }
+                }
+                None if held => {
+                    self.monitor.others_saver.remove(&slot);
+                    self.monitor_saver_cue(SAVER_OFF_SOUND, Some(slot));
+                }
+                _ => {}
+            }
+        }
+        let ended: Vec<u8> = self
+            .monitor
+            .others_saver
+            .iter()
+            .filter(|(slot, (_, until))| *until <= now || dead & (1 << **slot) != 0)
+            .map(|(slot, _)| *slot)
+            .collect();
+        for slot in ended {
+            self.monitor.others_saver.remove(&slot);
+            self.monitor_saver_cue(SAVER_OFF_SOUND, Some(slot));
+        }
+        if let Some(own_saver) = self.monitor.saver {
+            if own_dead && own_saver.holds(now) {
+                crate::player_identity::toy_event(TOY, &saver::event(None), own_saver.by);
+            }
+            if own_dead || now >= own_saver.until {
+                self.monitor.saver = None;
+                self.monitor_saver_cue(SAVER_OFF_SOUND, None);
+            }
+        }
+        let mut glows = Glows::default();
+        if !self.monitor.duel && !self.monitor.unseen {
+            let level = |since, until| (saver::glow(now, since, until) * 255.0).round() as u8;
+            if let (Some(own), Some(own_saver)) = (own, self.monitor.saver) {
+                glows.0[usize::from(own)] = level(own_saver.since, own_saver.until);
+            }
+            for (slot, (since, until)) in &self.monitor.others_saver {
+                glows.0[usize::from(*slot)] = level(*since, *until);
+            }
+        }
+        self.monitor.glows = glows;
+    }
+
+    /// The player's Screen Saver rises at `at`, raised by the monitor of the player in
+    /// `by`: everyone else is told through the feed (the hub wants a target other than
+    /// the sender: them).
+    fn monitor_saver_rise(&mut self, by: u8, at: i64) {
+        let own = saver::Own::new(at, by);
+        self.monitor.saver = Some(own);
+        crate::player_identity::toy_event(TOY, &saver::event(Some(own.until)), by);
+        self.monitor_saver_cue(SAVER_ON_SOUND, None);
+        self.monitor_centre("^3SCREEN SAVER^7: monitors pass through you for 30 seconds");
+    }
+
+    /// The player's monitor struck the player in `slot` at `at`, by their word: during
+    /// the player's Screen Saver, Payback and Power Surge count (not on a server of this
+    /// machine, as the tracker's achievements).
+    fn monitor_saver_struck(&mut self, slot: u8, at: i64) {
+        let Some(own) = self.monitor.saver.as_mut() else {
+            return;
+        };
+        let earned = own.struck(slot, at);
+        if self
+            .live_session
+            .as_ref()
+            .is_none_or(|session| session.server().ip().is_loopback())
+        {
+            return;
+        }
+        if earned.payback {
+            crate::achievements::note(crate::achievements::Counter::MonitorPayback);
+        }
+        if earned.surge {
+            crate::achievements::note(crate::achievements::Counter::MonitorSurge);
+        }
+    }
+
+    /// A Screen Saver's sound: the player's own in both ears (`None`), another's where
+    /// they are.
+    fn monitor_saver_cue(&mut self, path: &'static str, slot: Option<u8>) {
+        let at = match slot {
+            None => None,
+            Some(slot) => {
+                let Some(entity) = self.live_world.entity(EntityId::new(u64::from(slot) + 1))
+                else {
+                    return;
+                };
+                Some(Vec3::from_array(
+                    entity.sample(self.monitor.time).translation,
+                ))
+            }
+        };
+        self.monitor.cues.push(Cue {
+            path,
+            at,
+            volume: 0.9,
+        });
     }
 
     /// The bounces foreseen whose word did not come in time are undone (the Ragdoll
@@ -818,6 +1025,7 @@ impl GpuState {
                 || entity.e_flags() & (EF_DEAD | EF_TALK) != 0
                 || entity.bolt1()
                 || self.ragdoll.guessing(slot)
+                || self.monitor.other_saver_holds(slot, time)
                 || crate::player_identity::shown_name(session.game_state(), usize::from(slot))
                     .is_some_and(|name| self.scoreboard.seen_away(slot, &name))
             {
@@ -977,9 +1185,10 @@ impl GpuState {
     }
 
     /// The player's own body as a monitor may strike it, if it may be struck: not while
-    /// typing (or in a menu) nor away.
+    /// typing (or in a menu), away, nor under their Screen Saver.
     fn monitor_target(&self) -> Option<Target> {
         if !self.monitor.on
+            || self.monitor.saver_holds(self.monitor.time)
             || !self.ragdoll.strikable()
             || self.talk_button()
             || self.hax_own_away()
@@ -1005,6 +1214,10 @@ impl GpuState {
     /// strike the player with one that reaches them, and let rested ones go. Before the
     /// Ragdoll's bodies are stepped, so a blow lands this frame.
     pub(crate) fn step_monitors(&mut self, time: i64) {
+        // The clock went back: a new map, whose Screen Savers start afresh.
+        if time + 1_000 < self.monitor.time {
+            self.monitor.forget_savers();
+        }
         self.monitor.time = time;
         let Some(session) = self
             .live_session
@@ -1160,8 +1373,13 @@ impl GpuState {
             };
             // Struck or not (a fall takes so many blows), it is immune a while, so the
             // monitor flies on.
-            self.ragdoll_struck(at, joint, push, by);
+            let landed = self.ragdoll_struck(at, joint, push, by);
             self.monitor.struck = Some((at, by.thrower, by.number));
+            // Another's monitor (never the player's own) counts towards the Screen Saver.
+            if landed && Some(thrower) != own && self.monitor.saver_count.hit(at, (thrower, number))
+            {
+                self.monitor_saver_rise(thrower, at);
+            }
         }
     }
 
@@ -1211,6 +1429,8 @@ impl GpuState {
                     CHARGE_SOUND,
                     THROW_HARD_SOUND,
                     HIT_SOUND,
+                    SAVER_ON_SOUND,
+                    SAVER_OFF_SOUND,
                 ],
             );
             self.monitor.sounds_registered = Some(audio.generation());

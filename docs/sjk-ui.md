@@ -851,7 +851,8 @@ that mode for the visit and leaves the player's choice as it was.
     emojis, remembered channel, letter spacing and sender card size) and the SJK chat (SJK
     chat, its game-feed and console visibility, its GIFs, its video clips opt-in and
     the GIPHY key); Mods the asset browser (Packs), JA+ and
-    JoF tools (Server mods), JoF content's card and host (JoF content),
+    JoF tools (Server mods), the JA+ and jaPRO plugin options under a heading each
+    ([mods.md](mods.md#plugin-options)), JoF content's card and host (JoF content),
     invisible brushes (Map tools) and the showcase tools (Experimental); Interface's
     Console rows include retaining colour codes when console scrollback is copied;
     Network SJK online and Connection. A test checks that
@@ -962,7 +963,7 @@ Gameplay's first row, under Asset packs, is Asset browser ("Browse packs";
 `assetbrowser` in the console, `asset_pack_browser.rs`): Enter opens the
 installed-pack browser, an SJK UI card in every menu style. It lists ten pack
 rows at a time, with keyboard, wheel and click controls; each row says what the
-pack will be at the next start (Enabled, Disabled, Required). The console owns
+pack will be at `fs_restart` or the next start (Enabled, Disabled, Required). The console owns
 input while it is open, and closing it restores the previous console state. See
 [installed PK3 choices](client.md#launch).
 
@@ -1608,7 +1609,12 @@ for the run.
   (Mythical, Legendary, Rare, Uncommon, Common, the holocrons' tiers and colours; a
   Unique shader is never listed, found by the search, counted in "N of M owned", the
   Saber pill, the tab's count or the tally for a player who does not hold one,
-  [unlockables.md](unlockables.md#unique-shaders)). Two views, V or the switches, kept
+  [unlockables.md](unlockables.md#unique-shaders)). Since 29/10/2026 the player's
+  favourites stand first after the stock blade, under a gold "Favourites" heading of their
+  own on the wall and in the list by tier (simply first in the list's other orders), a
+  Favourites chip (Shift+F, after Chroma, only on a hub that keeps marks) shows them alone,
+  and the headline is followed by the New count ("2 new" after a New sticker) and Mark all
+  seen (N) while a shader is New ([Marks](#marks)). Two views, V or the switches, kept
   in `ui_shaderList` (0 the wall, everyone's start; 1 the list; it replaced
   `ui_shaderView`, whose 0 was the old rack, dropped from saved profiles):
   - **The wall** (from y 400): a heading to each tier ("Mythical" in its colour, "2 of
@@ -1616,18 +1622,21 @@ for the run.
     (135 wide, 100 tall at the ordinary text size, taller at a larger one), up to thirty
     shown. A tile: its tier's band along the top and frame, the blade as a strip
     (`swatch::strip`: the live picture when owned, else a still blade in the skin's own
-    colours, dimmed when not held, so locked ones are told apart; grey while its pack
-    has not come), the name without "blade" on two lines at most, its state (Worn,
-    Yours, "Yours x3", Locked) and the chroma's wheel; the chosen tile lifted over a
-    shadow in a white outline. Left and Right step a tile (on into the next tier's), Up
+    colours, dimmed when not held, so the ones not held are told apart; grey while its
+    pack has not come), the name without "blade" on two lines at most, its state (Worn,
+    Yours, "Yours x3", Not owned: "Locked" until 29/10/2026, when the padlock became the
+    player's own lock) and the chroma's wheel; its marks: the New sticker on its top edge,
+    the star and the padlock on a dark pill over the blade's right end; the chosen tile
+    lifted over a shadow in a white outline. Left and Right step a tile (on into the next tier's), Up
     and Down a line of tiles, to the same column or the nearest, past the headings.
   - **The list** (from y 400): column heads (Shader, Tier and Yours sort it; "#", the
     blade's number, only while `debug_collectibles` shows numbers; Look, Smith and,
     while the hub's economy is known, Forge), then a row of 40 to each: the strip, the
     chroma's wheel and the name, the tier's mark and name in its colour, the smith, what
     the player holds and the Forge's word (what a copy breaks down for, or what crafting
-    costs, a blade card's lower price, quiet past the player's kyber shards). By tier a
-    heading leads each tier's rows; by name or by what is held, none. S steps the order
+    costs, a blade card's lower price, quiet past the player's kyber shards), the New
+    sticker and the star and padlock at the name column's end. By tier a heading leads
+    each tier's rows (and the favourites'); by name or by what is held, none. S steps the order
     (Tier, Name, Yours, then Number while numbers show), a click on a head sets it, the
     order on show gold with three bars; the shader chosen stays chosen whatever the
     order or the view.
@@ -1642,21 +1651,25 @@ for the run.
   foot of the right (x 1000 to 1824, its foot at y 990, as tall as its words, its top
   no higher than 436, the lone saber's room above it and "Drag to turn" just over it):
   the tier's mark and name, the edition, the name (gold when owned) with its state as
-  a tag, its facts, what it is in full, "Yours since dd/mm/yyyy, from the SJK team"
-  with the note (", with your Bug Hunter medal" when a medal brings it) or "How to get
-  it: ...", and Equip (gold), Unequip or "Wear the stock blade". It opens on what is
-  worn; Enter equips or unequips (`cg_saberSkin`). Under an owned skin whose file
+  a tag (a New sticker after the tier while it is New), its facts, what it is in full,
+  "Yours since dd/mm/yyyy, from the SJK team" with the note (", with your Bug Hunter
+  medal" when a medal brings it) or "How to get it: ...", and Equip (gold), Unequip or
+  "Wear the stock blade"; at the foot's right end, on a hub that keeps marks, the star and
+  the padlock as two square toggles (44 wide, lit gold while set; the padlock dimmed for a
+  shader not held, which cannot be locked). F stars or unstars the shader chosen, L locks
+  or unlocks it. It opens on what is worn; Enter equips or unequips (`cg_saberSkin`). Under an owned skin whose file
   offers parts (11/10/2026): "Parts" and a tick for each in two columns (three past
   four); a click or the number keys 1 to 6 switch one (`cg_saberSkinOptions`), the
   model's blade following at once and, worn, every SJK player's view of it
   ([unlockables.md](unlockables.md#options)).
 - **Toys** (rows since 25/10/2026,
-  [collection_toys.rs](../crates/sjk-viewer/src/collection_toys.rs)): "8 toys", things
+  [collection_toys.rs](../crates/sjk-viewer/src/collection_toys.rs)): "10 toys", things
   to use in a match, and how many are on now. Illuminate's holocron, the cardboard box
   (since 16/10/2026), Order 66 (since 17/10/2026), the Hax (since 21/10/2026), the
   Ragdoll (since 23/10/2026), the Drone (since 24/10/2026), the Boombox (since
-  25/10/2026, verified players) and the Monitor (since 26/10/2026), a row of 76 to each
-  under column heads (Toy, Your key, On; eight rows fit over the keys): its icon, its
+  25/10/2026, verified players), the Monitor (since 26/10/2026), Box hunt (since
+  27/10/2026) and the Banana peel (since 29/10/2026), a row of 64 to each under column
+  heads (Toy, Your key, On; ten rows fit over the keys, 3 apart): its icon, its
   name and a line of what it does, the key bound to its command ("Not bound" when none)
   and its own switch, which runs that toy in place and chooses it; the chosen row framed
   gold on a soft gold ground. The arrows and Tab choose; a click on a row chooses it.
@@ -1668,19 +1681,21 @@ for the run.
   1360 to 1824, its foot at y 990, as tall as its words): "Toy · everyone's", its name,
   what it is in full, its keys (Order 66 two: the join key, `toy_order66`, and the order
   key, `order66`; the Monitor two: its key, `toy_monitor`, and the throw key,
-  `+monitor_throw`, held to charge), each a button: a click (or K for the first) waits for a key ("Press
+  `+monitor_throw`, held to charge; the Banana peel two: its key, `toy_banana`, and the
+  drop key, `banana_drop`), each a button: a click (or K for the first) waits for a key ("Press
   a key...", Escape lets go, Backspace clears), which binds it to the command in place
   of its first key as the key-binding editor does (`rebind_action`, never a locked key);
   "Quick wheel: On its Toys page", a line more for some (the Hax: hold Use on a player
   who has it on; the Ragdoll: its key again gets up), then its switch, "Holocron lit",
-  "In the box", "In the order", "Hacker", "Limp", "Peek me", "Play" or "Hit me": on while
+  "In the box", "In the order", "Hacker", "Limp", "Peek me", "Play", "Hit me", "Hunt" or
+  "Slip on peels": on while
   the toy is on, Enter or a click runs it (the `toy_illuminate`, `toy_box`,
-  `toy_order66`, `toy_hax`, `toy_ragdoll`, `toy_drone`, `toy_boombox` or `toy_monitor`
-  toggle, set to the state wanted;
+  `toy_order66`, `toy_hax`, `toy_ragdoll`, `toy_drone`, `toy_boombox`, `toy_monitor`,
+  `toy_boxhunt` or `toy_banana` toggle, set to the state wanted;
   the viewer owns the state, the console mirrors it each frame). Under it, for a toy other
   players are seen with, a second, smaller switch, "See others' holocrons", "See others'
-  boxes", "See others fall limp", "See others' drones", "See and hear others' boomboxes"
-  or "See monitors" (29/10/2026): off, theirs are hidden on this PC
+  boxes", "See others fall limp", "See others' drones", "See and hear others' boomboxes",
+  "See monitors" or "See banana peels" (29/10/2026): off, theirs are hidden on this PC
   ([client.md](client.md#illuminate), the toys' table). The keys line says
   "Enter: light" or "Enter: put out", "Enter: hide" or "Enter: come out", "Enter: turn
   on" or "Enter: turn off", "Enter: play" or "Enter: put away", and "K: bind a key" (while a key waits: "Esc: cancel", "Backspace: clear the
@@ -1762,7 +1777,9 @@ for the run.
     many credits are missing), its price and Buy. Showing the Shop reads the hub's day
     ("Reading the shop..." until it answers).
   - **Craft:** every saber shader of the trade the player does not hold at all (a card's
-    or a medal's copy counts as held), the commonest first so what the shards reach leads,
+    or a medal's copy counts as held), its favourites first (a wish list, since
+    29/10/2026: F stars the one chosen), then the commonest first so what the shards reach
+    leads,
     as a grid of cards (five by three) or a list (six rows), switched by V or the two marks
     at the chips' right (`ui_shaderList`, as on Shaders: the grid first); chips for All and each tier (T
     steps them), Affordable (A) and a search field ("Search shaders", `/` or Ctrl+F; Ctrl+A,
@@ -1777,19 +1794,28 @@ for the run.
     and Break down are the Collection's (`collection_swatch.rs`): with the menu pictures on
     they show each shader's drawing instead of the live blade.
   - **Break down:** the player's own copies of shaders of the trade (by grant, drops,
-    crafts or purchases; a medal's or a card's copy is never listed), duplicates first with
-    an "x3" badge, last copies after with a "Last" one; chips, Duplicates (D) and the search
-    as on Craft. On the right the one chosen: its copies ("3 copies", "Your only copy",
-    Worn), "A copy gives" and "You will hold", and **Break down a copy +10**; beside it
-    **Break down all duplicates (7) +100** (B), keeping one of each. A hub that says
-    `shatter_last` (21/10/2026) lists last copies too: their button reads "Break down your
-    last copy" and opens a card in ember, "This is your only copy", the blade, what it
-    gives, that it leaves the collection (and the saber, when worn: the client sets
-    `cg_saberSkin` back to the stock blade once the hub answers) and what crafting it back
-    would cost, Keep it (focused) and Break it down. All duplicates ask with a card too,
-    "Break down all duplicates?", the shaders that give copies up with how many, the total,
-    Cancel and Break them down (focused). A hub without the abilities lists duplicates
-    only and offers no Break down all.
+    crafts or purchases; a medal's or a card's copy is never listed), its favourites first,
+    then duplicates with an "x3" badge, last copies after with a "Last" one; chips,
+    Duplicates (D), Favourites (Shift+F, on a hub that keeps marks) and the search as on
+    Craft. Each card or row carries its marks: the New sticker, the star and the padlock
+    over the blade, and "Worn" for a blade either saber (or staff half) wears. On the right
+    the one chosen: its name with the star and the padlock beside it (F, L), its copies
+    ("3 copies", "Your only copy", Worn, New), "A copy gives" and "You will hold", and
+    **Break down a copy +10**; beside it **Break down all duplicates (7) +100** (B), keeping
+    one of each. A locked shader (29/10/2026) is listed with its padlock, its button reads
+    "Locked", dimmed, with "Locked: you keep it until you unlock it (L)." over it, and all
+    duplicates leave its copies out (the chip's count too). A hub that says `shatter_last`
+    (21/10/2026) lists last copies too: their button reads "Break down your last copy" and
+    opens a card in ember, "This is your only copy", the blade, what it gives, that it
+    leaves the collection, and what crafting it back would cost, Keep it (focused) and
+    Break it down. When the player wears it, on either saber, the card says so first, in
+    ember ("You wear this shader now: breaking it down puts your saber back to the stock
+    blade."), with a "You wear it" pill by the title; once the hub answers, the client sets
+    `cg_saberSkin` back to the stock blade, and `cg_saberSkin2` to `stock` when the second
+    saber wore it by its own choice. All duplicates ask with a card too, "Break down all
+    duplicates?", the shaders that give copies up with how many (a locked one left out, and
+    a line saying how many are kept), the total, Cancel and Break them down (focused). A
+    hub without the abilities lists duplicates only and offers no Break down all.
   - **Asking twice:** Buy, Craft and Break down a copy turn into "Confirm: ..." on the
     first press; a second within five seconds sends it ("Buying...", "Crafting...",
     "Breaking down..." until the hub answers), and the hub's answer reads beside the button
@@ -1836,6 +1862,50 @@ for the run.
   on the Profile screen; a click on a tab shows it; hovering a thing chooses it; a
   click on Equip, Unequip, the toy or its switch acts.
 
+### Marks
+
+[shader_marks.rs](../crates/sjk-viewer/src/shader_marks.rs) and
+[collection_marks_view.rs](../crates/sjk-viewer/src/collection_marks_view.rs),
+29/10/2026: the ideas of the players Atrosex (mark the shader worn in Break down, and say
+so on the last copy's card) and Kushina (favourites and a lock), extended by Sol. Every
+saber shader the Shaders tab, the Forge and the trade window list carries its marks:
+
+- **Worn:** a blade the player wears: the first saber's (`cg_saberSkin`) or the second
+  saber's (or the staff's other half's) own choice (`cg_saberSkin2`). The Shaders tab
+  keeps its Worn and "2nd blade" states; the Forge and the trade window say Worn.
+- **Favourite** (the star, U+E029) and **Locked** (the padlock, U+E022): the player's,
+  kept at the SJK hub (its `PROTOCOL.md`, "Collection marks": `GET /v1/holocrons`' `marks`,
+  `POST /v1/unlocks/marks`), so they follow the player to any PC and every key of theirs.
+  F and L (or the chosen shader's two toggles) set and clear them on Shaders and in the
+  Forge; a favourite may be any shader (a wish list), a lock only one the player holds.
+  Favourites are listed first everywhere and a Favourites chip (Shift+F) shows them alone.
+  The hub holds the lock: it refuses to break a locked shader down (one copy, the last
+  one) and to let it go in a trade, and skips it when every duplicate goes; the client
+  shows those buttons dimmed with "Locked" rather than failing. A change shows at once
+  (`Service::set_mark`) and the hub's answer replaces it; a refusal is said in the console
+  and the hub's marks come back with its next answer. The star and the padlock show only on a hub
+  whose economy says `marks` (`sjk_identity::MARKS_ABILITY`), detected as `shatter_last`
+  is, so against an older hub nothing of them shows and nothing is asked.
+- **New:** a shader the player holds and has not looked at since they got it
+  (holocrons, gifts, trades, crafts): a gold "New" sticker, and the Shaders tab's "2 new"
+  after the headline. Local, on this PC: `shader-seen.txt` beside `config.cfg`, one shader
+  id a line (`shader_marks::FILE`), read at start and written at each change. With no file
+  yet, everything held the first time the hub says what the player holds is seen, so a
+  player never finds every shader New; a shader no longer held leaves the list (New again
+  when it comes back). A New one chosen on Shaders or in the Forge, by the pointer or the
+  keys, is seen once it has stayed chosen a second (`shader_marks::Look`, `LOOK_MS`):
+  hovering chooses, so a sweep of the pointer across the wall passes over shaders without
+  seeing them (Sol's decision, 29/10/2026). Turning to another tab or closing the page
+  sees the shader chosen only if it had already stayed its second; Mark all seen (N) sees
+  them all. Nothing is New
+  while the debug collectibles show.
+
+The marks are read again only when what they come from changes (the hub's marks, the
+own profile, the seen-list, the blades worn), never every frame. World shots:
+`world_shot_forge::duel6_sjk_collection_marks` (Break down as a grid and a list, a locked
+shader chosen, the Favourites chip, the last copy of the worn blade asking, the Shaders
+tab's wall, hover card and list). Not tried in a game.
+
 ### Hover cards
 
 [menu/sjk/hover.rs](../crates/sjk-viewer/src/menu/sjk/hover.rs) and
@@ -1851,7 +1921,8 @@ takes no input.
 | --- | --- | --- |
 | Medal | `Medal::how_to_get` (given by the SJK team, and for what) | the blade it brings while held; "Yours: given dd/mm/yyyy" or "Not given to you yet" |
 | Achievement | its goal | who counts it (SJK in matches, or the hub); "Unlocked dd/mm/yyyy" or "n of goal so far" |
-| Shader | the stock blade is everyone's; a blade skin's `how_to_get` | its tier; "Yours since dd/mm/yyyy", or locked (try it on here), or why holdings are not known (never a Unique one the player lacks) |
+| Shader | the stock blade is everyone's; a blade skin's `how_to_get` | its tier; "Yours since dd/mm/yyyy", or "Not yours yet" (try it on here), or why holdings are not known (never a Unique one the player lacks); then a line for each of its marks, what it means ([Marks](#marks)) |
+| Star, padlock, Favourites chip, Mark all seen | what a favourite, a lock, the chip and New are, kept where | whether the shader chosen is starred or locked and the key that changes it; a padlock on a shader not held says it cannot be locked |
 | Toy | everyone's, and where to light it | "Yours" |
 | Card (a binder tile) | from opening holocrons: how many holocrons found hold a card of its rarity ([loot table](holocrons.md#loot-table)), one of how many of that rarity | its rarity, kind and set, no number (a sealed tile: picked when revealed); the copies by finish and edition and when the first was found, or "Not found yet" |
 | Holocron tier (Holocrons tab) | found by playing, the pace and the daily cap | the tier's share of drops and staff gifts; how many held |
@@ -2328,8 +2399,14 @@ every menu style, on the 16:9 frame:
   badge between them. Under a hairline, "Your holocrons and duplicates" ("Your duplicates"
   while the hub trades no holocrons yet, `rules.holocrons` false: duplicates come first, and
   the toast then says "Duplicate shaders."): up to 18 tiles,
-  those that may go in first, most worth first (a click puts one in; a click on an offered
-  one takes it out). A holocron received in a trade within the hub's resale lock is shown
+  those that may go in first, the favourites first among them, most worth first (a click
+  puts one in; a click on an offered one takes it out). Since 29/10/2026 a shader's tile
+  carries its marks ([Marks](#marks)), drawn from shapes and plain words as the window's
+  font draws bytes: a star and a padlock at its top left, "Worn" at its top right, a New
+  sticker over its top edge; a locked shader is dimmed with the ones that wait and takes
+  no click, a gold line under the items saying "Locked shaders stay out of trades: unlock
+  them in the Collection.", and a Favourites chip at the heading's right (on a hub that
+  keeps marks) shows the favourites alone. A holocron received in a trade within the hub's resale lock is shown
   dimmed with a gold timer pill in place of its name, counting down ("6d 23h", "5h 12m"),
   and a gold warning card under the items says "Holocrons received in a trade wait before
   they can be traded again: each shows how long."; one the day's limits hold back is
@@ -2470,14 +2547,14 @@ group in the script (`SYMBOLS`) and gets its name in `symbols.rs`.
 | U+E012 | a card with a sun at its heart | Solar finish |
 | U+E020 | a cube seen from above a corner | a holocron: found in one |
 | U+E021 | a medallion on a ribbon's V | a medal: comes with one |
-| U+E022 | a padlock | locked |
+| U+E022 | a padlock | locked: since 29/10/2026 the player's own lock on a saber shader ([Marks](#marks)); a part an extra card unlocks |
 | U+E023 | a tick | yours |
 | U+E024 | a card with a second behind it | held more than once |
 | U+E025 | a smith's hammer | its saber smith |
 | U+E026 | a turning arrow | drag to turn |
 | U+E027 | a lightsaber held up | worn |
 | U+E028 | a gift box with a bow | from the SJK team (also a reward round's chat line and the claim window, 25/10/2026) |
-| U+E029 | a five-pointed star | its edition |
+| U+E029 | a five-pointed star | its edition; a favourite (29/10/2026, [Marks](#marks)) |
 | U+E030 | a long crystal, a ridge down its middle | Kyber shards (17/10/2026) |
 
 - **Drawn from strokes:** the script draws every symbol from lines with round ends,

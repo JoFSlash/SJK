@@ -22,6 +22,13 @@ pub(crate) const CENTER_SIZE_MAX: f32 = 2.0;
 pub(crate) const CARD_SCALE_CVAR: &str = "cg_chatCardScale";
 /// Range of [`CARD_SCALE_CVAR`].
 pub(crate) const CARD_SCALE: (f32, f32) = (0.5, 2.0);
+/// `cg_chatBoxBackdrop`: how opaque, in per cent, the dark band behind each row of a
+/// chat message is (`chat/view/backdrop.rs`); 0, the default, draws none. Creo's idea
+/// (29/10/2026): the chat is hard to read over a bright map.
+pub(crate) const BACKDROP_CVAR: &str = "cg_chatBoxBackdrop";
+/// `cg_chatBoxOutline`: chat text edged in a dark outline instead of its drop shadow
+/// ([`crate::text::CodePalette::DarkOutlined`]); off by default.
+pub(crate) const OUTLINE_CVAR: &str = "cg_chatBoxOutline";
 
 /// `cg_centerSize` as drawn: zero, which would hide the text, is 1 as in
 /// EternalJK's `CG_DrawCenterString`.
@@ -73,6 +80,10 @@ pub(super) struct Options {
     pub(super) remember: bool,
     /// The channels kept in the composer's row ([`super::tabs`]).
     pub(super) tabs: super::tabs::Tabs,
+    /// Opacity of the band behind each chat row, 0 (none) to 1 ([`BACKDROP_CVAR`]).
+    pub(super) backdrop: f32,
+    /// Chat text in a dark outline instead of its shadow ([`OUTLINE_CVAR`]).
+    pub(super) outline: bool,
 }
 
 impl Default for Options {
@@ -115,6 +126,8 @@ impl Options {
             // turning it off kept the last channel (a player's bug report, 12/10/2026).
             remember: integer(super::reply::REMEMBER_CVAR, 0) != 0,
             tabs: super::tabs::Tabs::read(console),
+            backdrop: integer(BACKDROP_CVAR, 0).clamp(0, 100) as f32 / 100.0,
+            outline: integer(OUTLINE_CVAR, 0) != 0,
         }
     }
 
@@ -150,6 +163,29 @@ mod remember_tests {
         assert!(Options::read(Some(&console)).remember);
         assert!(console.set_cvar(super::super::reply::REMEMBER_CVAR, "0"));
         assert!(!Options::read(Some(&console)).remember);
+    }
+
+    /// `cg_chatBoxBackdrop` is a share of full opacity, held to 0-100 per cent;
+    /// `cg_chatBoxOutline` a switch. Both off in a new profile.
+    #[test]
+    fn backdrop_and_outline_are_off_by_default_and_follow_the_console() {
+        let directory = tempfile::tempdir().unwrap();
+        let mut console = ViewerConsole::new(directory.path().join("config.cfg")).unwrap();
+        let read = |console: &ViewerConsole| {
+            let options = Options::read(Some(console));
+            (options.backdrop, options.outline)
+        };
+        assert_eq!(read(&console), (0.0, false));
+        assert_eq!(
+            (Options::default().backdrop, Options::default().outline),
+            (0.0, false)
+        );
+        for (value, share) in [("50", 0.5), ("100", 1.0), ("250", 1.0), ("-5", 0.0)] {
+            assert!(console.set_cvar(BACKDROP_CVAR, value));
+            assert_eq!(read(&console).0, share, "{value}");
+        }
+        assert!(console.set_cvar(OUTLINE_CVAR, "1"));
+        assert!(read(&console).1);
     }
 }
 

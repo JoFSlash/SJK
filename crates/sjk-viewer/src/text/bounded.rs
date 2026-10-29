@@ -198,6 +198,49 @@ mod tests {
         assert_eq!(outlined[17 * 6].color, [1.0; 4]);
     }
 
+    /// The chat's outline (`cg_chatBoxOutline`): a dark ring round every letter, red
+    /// and blue ones too, in place of its shadow; a black letter keeps the faint light
+    /// halo, as a ring as dark as it would hide it.
+    #[test]
+    fn the_dark_outline_rings_every_letter_but_black() {
+        let font = test_font();
+        let rect = Rect::new(0.0, 0.0, 200.0, 20.0);
+        let mut vertices = Vec::new();
+        append_bounded(
+            &mut vertices,
+            &font,
+            "^0a^1b^4c^7d",
+            [0.0, 0.0],
+            rect,
+            rect,
+            1.0,
+            [640.0, 480.0],
+            TextFace::Regular,
+            [1.0; 4],
+            0.0,
+            TextOverflow::Clip,
+            CodePalette::DarkOutlined,
+        );
+        assert_eq!(
+            vertices.len(),
+            4 * 9 * 6,
+            "eight copies and the letter each"
+        );
+        let ring = |letter: usize| &vertices[letter * 9 * 6..(letter * 9 + 8) * 6];
+        assert!(ring(0).iter().all(|vertex| vertex.color[0] > 0.8));
+        assert!(ring(0).iter().all(|vertex| vertex.color[3] < 0.2), "faint");
+        for letter in 1..4 {
+            assert!(
+                ring(letter)
+                    .iter()
+                    .all(|vertex| vertex.color[..3] == [0.04, 0.04, 0.06]),
+                "letter {letter}"
+            );
+        }
+        assert!(!CodePalette::DarkOutlined.halo(quake_color(1)));
+        assert!(CodePalette::DarkOutlined.halo(quake_color(0)));
+    }
+
     #[test]
     fn the_outline_setting_picks_the_palette() {
         assert_eq!(CodePalette::nameplate(0), CodePalette::Game);

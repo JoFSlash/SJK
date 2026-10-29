@@ -94,7 +94,15 @@ impl Predictor {
     /// gravity; past an ordinary jump's height the Force jump proper begins, with its
     /// animation. Whether it ran (`PM_ForceJumpingUp`): then `PM_CheckJump` clears the
     /// command's jump and looks no further.
-    pub(super) fn check_force_jump(&mut self, command: &UserCommand, allow_flips: bool) -> bool {
+    pub(super) fn check_force_jump(
+        &mut self,
+        command: &mut UserCommand,
+        allow_flips: bool,
+    ) -> bool {
+        let ja_pro_jump = self.japro_jump_rules();
+        if ja_pro_jump.is_some_and(|rules| !rules.force_rise) {
+            return false;
+        }
         if self.state.water_level >= 2 || self.state.gravity <= 0.0 {
             return false;
         }
@@ -122,20 +130,41 @@ impl Predictor {
         }
         let level = usize::from(self.state.levitation_level.min(3));
         let height = self.state.origin[2] - self.state.force_jump_start_height;
+        let ramp_curve = ja_pro_jump.is_some_and(|rules| rules.ramp_curve);
+        let maximum = if ramp_curve {
+            HEIGHTS[level] * (self.state.ja_pro.last_jump_speed as f32 / JUMP_VELOCITY)
+        } else {
+            HEIGHTS[level]
+        };
         let pushing = self.state.force_power > 0 && command.up_move >= 10;
         if (height <= HEIGHTS[0] || pushing)
-            && height < HEIGHTS[level]
+            && height < maximum
             && self.state.force_jump_start_height != 0.0
         {
             if height > HEIGHTS[0] {
+                if self.state.force_powers_active & FORCE_LEVITATION_BIT == 0
+                    && self.config.ja_pro.only_bhop(self.state.ja_pro)
+                {
+                    command.up_move = 0;
+                    return true;
+                }
                 self.force_jump_animation(command, allow_flips);
             }
-            self.state.velocity[2] = (HEIGHTS[level] - height) / HEIGHTS[level] * STRENGTHS[level]
-                / 10.0
-                + JUMP_VELOCITY;
+            self.state.velocity[2] = (maximum - height) / maximum * STRENGTHS[level] / 10.0
+                + if ramp_curve {
+                    self.state.ja_pro.last_jump_speed as f32
+                } else {
+                    JUMP_VELOCITY
+                };
             self.state.movement_flags |= PMF_JUMP_HELD;
         } else if self.state.velocity[2] > JUMP_VELOCITY {
             self.state.velocity[2] = JUMP_VELOCITY;
+        }
+        if self.config.ja_pro.only_bhop(self.state.ja_pro)
+            && self.state.ja_pro.restrictions & crate::pmove_japro::RESTRICT_CROUCHJUMP != 0
+        {
+            command.up_move = 0;
+            self.state.movement_flags &= !PMF_JUMP_HELD;
         }
         true
     }

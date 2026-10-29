@@ -1185,6 +1185,12 @@ ahead) and 30 seconds or more after the last one it took on that server; the hub
 quota (one toy event a second, ten a minute per key) still applies. The client takes
 the hub's toy events once a frame and hands them to every toy (`identity_frame.rs`).
 
+The Monitor's Screen Saver (since 29/10/2026, no hub change,
+[client.md](client.md#monitor)) is told the same way: toy `monitor`, event
+`saver_<until>` (the game server time it ends, at most 31 seconds ahead of the reader's)
+when it rises, and `saver_off` if the player dies before, to the player whose monitor
+raised it (any other slot would do; the readers ignore the target).
+
 ## Toy relay
 
 The toy relay (since 21/10/2026, Sol-Vulpes/SJK-hub, `PROTOCOL.md`, "Toy relay")
@@ -1195,7 +1201,8 @@ cannot: the [Hax](client.md#hax)'s hacker steering the hacked player, the
 [Drone](client.md#drone)'s place, told to each in turn, the
 [Boombox](client.md#boombox)'s track, told to each player within reach, and the
 [Monitor](client.md#monitor)'s throws, told to every SJK player, the nearest first (its
-hits ride the Ragdoll's falls). Two threads of
+hits ride the Ragdoll's falls), and the [Banana peel](client.md#banana-peel)'s peels, told
+the same way, and their slips (since 29/10/2026). Two threads of
 the identity service of their own ([relay.rs](../crates/sjk-identity/src/relay.rs),
 `sjk-hub-relay-send` and `sjk-hub-relay-read`), each with its own HTTP client, read the
 hub and the game server as the feed does:

@@ -140,9 +140,17 @@ pub(crate) struct GameAudio {
     hax_loop: Option<(SourceId, Option<[f32; 3]>)>,
     /// The toys' volume and per-toy switches (`toy_sounds.rs`), read each frame.
     toy_sounds: crate::toy_sounds::Options,
+    /// `cg_fleshSparks` ([`crate::impacts::flesh_sparks`]): below 2 the special saber
+    /// hit is silent, as in JoF EJK.
+    flesh_sparks: u8,
 }
 
 impl GameAudio {
+    /// Set `cg_fleshSparks` for the snapshots observed next.
+    pub(crate) fn set_flesh_sparks(&mut self, level: u8) {
+        self.flesh_sparks = level;
+    }
+
     /// Feed immediate local movement through the snapshot sound resolver and mixer.
     pub(crate) fn observe_predicted_event(
         &mut self,
@@ -256,6 +264,7 @@ impl GameAudio {
             box_music: Vec::with_capacity(8),
             hax_loop: None,
             toy_sounds: Default::default(),
+            flesh_sparks: crate::impacts::FLESH_SPARKS_ALL,
             map_music: None,
             music_tracks: Vec::with_capacity(8),
             duel_music: None,
@@ -376,6 +385,7 @@ impl GameAudio {
                 Some(handle)
             });
             adapter.set_local_health_pain(self.transitions.old_pain);
+            adapter.set_flesh_sparks(self.flesh_sparks);
             adapter.observe_snapshot(snapshot);
             self.voice_throttle.observe_time(snapshot.server_time);
             self.voice_throttle.observe_clients(game_state);
@@ -444,6 +454,7 @@ impl GameAudio {
                 return;
             };
             adapter.set_local_health_pain(self.transitions.old_pain);
+            adapter.set_flesh_sparks(self.flesh_sparks);
             adapter.observe_snapshot(&snapshot);
             self.last_server_time = Some(snapshot.server_time);
             self.voice_throttle.observe_time(snapshot.server_time);

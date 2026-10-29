@@ -133,10 +133,27 @@ impl Plan {
     }
 }
 
+/// EternalJK's `cg_fleshSparks` (JoF EJK `cg_xcvar.h`, archived): how many of stock's
+/// red sparks a saber hit on a body plays, 0 to 7 ([`saber_hit`]).
+pub(crate) const FLESH_SPARKS_CVAR: &str = "cg_fleshSparks";
+/// Every spark stock plays; the setting's default, and what a larger value means.
+pub(crate) const FLESH_SPARKS_ALL: u8 = 7;
+
+/// `cg_fleshSparks` as [`plan`] takes it: clamped to 0..=7, 7 when unset.
+pub(crate) fn flesh_sparks(console: Option<&crate::console::ViewerConsole>) -> u8 {
+    console
+        .and_then(|console| console.integer_cvar(FLESH_SPARKS_CVAR))
+        .map_or(FLESH_SPARKS_ALL, |level| {
+            level.clamp(0, i64::from(FLESH_SPARKS_ALL)) as u8
+        })
+}
+
 /// Fixed-capacity decoded impact pool reused for every received snapshot.
 pub(crate) struct Pool {
     tracker: LegacyImpactTracker,
     events: Vec<LegacyImpactEvent>,
+    /// `cg_fleshSparks`, sampled as each snapshot is observed.
+    flesh_sparks: u8,
 }
 
 impl Pool {
@@ -144,7 +161,18 @@ impl Pool {
         Self {
             tracker: LegacyImpactTracker::new(),
             events: Vec::with_capacity(MAX_SNAPSHOT_IMPACTS),
+            flesh_sparks: FLESH_SPARKS_ALL,
         }
+    }
+
+    /// Set the `cg_fleshSparks` level the next impacts are planned at.
+    pub(crate) fn set_flesh_sparks(&mut self, level: u8) {
+        self.flesh_sparks = level.min(FLESH_SPARKS_ALL);
+    }
+
+    /// The `cg_fleshSparks` level impacts are planned at.
+    pub(crate) fn flesh_sparks(&self) -> u8 {
+        self.flesh_sparks
     }
 
     pub(crate) fn observe(&mut self, snapshot: &Snapshot) -> usize {
@@ -158,17 +186,12 @@ impl Pool {
 }
 
 /// Select the exact stock EFX graph(s) used by codemp. A zero-length plan is
-/// intentional where codemp has no wall visual (Flechette alt-fire).
-pub(crate) fn plan(event: LegacyImpactEvent) -> Plan {
+/// intentional where codemp has no wall visual (Flechette alt-fire). `flesh_sparks` is
+/// `cg_fleshSparks` ([`saber_hit`]); [`FLESH_SPARKS_ALL`] plays what stock does.
+pub(crate) fn plan(event: LegacyImpactEvent, flesh_sparks: u8) -> Plan {
     let direction = event.direction;
     match event.kind {
-        LegacyImpactKind::SaberHit => match event.event_parameter {
-            0 => Plan::new().effect("saber/saber_cut", direction),
-            2 => Plan::new().effect("saber/blood_sparks_50_mp", direction),
-            3 => Plan::new().effect("saber/blood_sparks_25_mp", direction),
-            16 => Plan::new().repeated("saber/blood_sparks_mp", direction, 6),
-            _ => Plan::new().repeated("saber/blood_sparks_mp", direction, 3),
-        },
+        LegacyImpactKind::SaberHit => saber_hit(event.event_parameter, flesh_sparks, direction),
         LegacyImpactKind::SaberBlock => Plan::new().effect(
             if event.event_parameter == 0 {
                 "blaster/deflect"
@@ -206,6 +229,30 @@ pub(crate) fn plan(event: LegacyImpactEvent) -> Plan {
         LegacyImpactKind::MissileHitWall | LegacyImpactKind::MissileHitMetal => {
             missile_wall(event, direction)
         }
+    }
+}
+
+/// `EV_SABER_HIT` (`cg_event.c:2147-2379`): `eventParm` 0 is a hit on something else,
+/// 16 "something special happened", 2 a really big hit, 3 a moderate one, any other a
+/// hit on a body. Stock plays six sparks, one, one and three; EternalJK's
+/// `cg_fleshSparks` (JoF EJK `cg_event.c`, `cg_fleshSparks.integer > N` before each
+/// `FX_PlayEffectID`) plays fewer on a body as it goes down from 7: the special hit's
+/// five extra at 2 and over and its first at 1, the big hit's at 3, the moderate hit's
+/// at 4, a body hit's three at 5, 6 and 7. A hit on something else is not a body hit
+/// and keeps its cut. The special hit's sound, also below 2 in EJK, is
+/// [`sjk_client::LegacySoundAdapter::set_flesh_sparks`]'s.
+fn saber_hit(parameter: u8, flesh_sparks: u8, direction: [f32; 3]) -> Plan {
+    let above = |threshold: u8| usize::from(flesh_sparks > threshold);
+    match parameter {
+        0 => Plan::new().effect("saber/saber_cut", direction),
+        2 => Plan::new().repeated("saber/blood_sparks_50_mp", direction, above(2)),
+        3 => Plan::new().repeated("saber/blood_sparks_25_mp", direction, above(3)),
+        16 => Plan::new().repeated("saber/blood_sparks_mp", direction, 5 * above(1) + above(0)),
+        _ => Plan::new().repeated(
+            "saber/blood_sparks_mp",
+            direction,
+            above(4) + above(5) + above(6),
+        ),
     }
 }
 
@@ -359,6 +406,11 @@ fn missile_wall(event: LegacyImpactEvent, direction: [f32; 3]) -> Plan {
 mod tests {
     use super::*;
 
+    /// Every impact as stock plays it (`cg_fleshSparks 7`).
+    fn plan(event: LegacyImpactEvent) -> Plan {
+        super::plan(event, FLESH_SPARKS_ALL)
+    }
+
     fn event(kind: LegacyImpactKind, weapon: u8) -> LegacyImpactEvent {
         LegacyImpactEvent {
             entity_number: 1,
@@ -407,6 +459,63 @@ mod tests {
             along += 64.0;
         }
         spots
+    }
+
+    /// `cg_fleshSparks` 0 to 7 gates each spark as JoF EJK's `EV_SABER_HIT` does, and 7
+    /// plays exactly what stock (and SJK before the setting) plays.
+    #[test]
+    fn flesh_sparks_gate_each_saber_hit_on_a_body() {
+        let hit = |parameter: u8, level: u8| {
+            let mut event = event(LegacyImpactKind::SaberHit, 0);
+            event.event_parameter = parameter;
+            super::plan(event, level)
+                .iter()
+                .map(|visual| match visual {
+                    Visual::Effect { name, .. } => name,
+                    other => panic!("a saber hit plays effects only: {other:?}"),
+                })
+                .collect::<Vec<_>>()
+        };
+        // Per level 0..=7: the special hit (16), a really big hit (2), a moderate
+        // hit (3) and a plain body hit (1).
+        let expected: [(u8, &str, [usize; 8]); 4] = [
+            (16, "saber/blood_sparks_mp", [0, 1, 6, 6, 6, 6, 6, 6]),
+            (2, "saber/blood_sparks_50_mp", [0, 0, 0, 1, 1, 1, 1, 1]),
+            (3, "saber/blood_sparks_25_mp", [0, 0, 0, 0, 1, 1, 1, 1]),
+            (1, "saber/blood_sparks_mp", [0, 0, 0, 0, 0, 1, 2, 3]),
+        ];
+        for (parameter, name, counts) in expected {
+            for (level, count) in counts.into_iter().enumerate() {
+                let names = hit(parameter, level as u8);
+                assert_eq!(names.len(), count, "eventParm {parameter} at {level}");
+                assert!(names.iter().all(|effect| *effect == name), "{names:?}");
+            }
+        }
+        // A hit on something else is no body hit: its cut stays at every level.
+        for level in 0..=FLESH_SPARKS_ALL {
+            assert_eq!(hit(0, level), ["saber/saber_cut"]);
+        }
+        // 7, the default, is stock's: six, one, one and three sparks.
+        assert_eq!(hit(16, 7).len(), 6);
+        assert_eq!(hit(1, 7).len(), 3);
+        assert_eq!(hit(5, 7).len(), 3, "any other eventParm is a body hit");
+    }
+
+    #[test]
+    fn flesh_sparks_read_clamped_and_default_to_every_spark() {
+        let directory = tempfile::tempdir().unwrap();
+        let mut console =
+            crate::console::ViewerConsole::new(directory.path().join("config.cfg")).unwrap();
+        assert_eq!(flesh_sparks(None), FLESH_SPARKS_ALL);
+        assert_eq!(flesh_sparks(Some(&console)), FLESH_SPARKS_ALL);
+        for (value, level) in [("0", 0), ("3", 3), ("7", 7), ("12", 7), ("-2", 0)] {
+            assert!(console.set_cvar(FLESH_SPARKS_CVAR, value));
+            assert_eq!(flesh_sparks(Some(&console)), level, "{value}");
+        }
+        let mut pool = Pool::new();
+        assert_eq!(pool.flesh_sparks(), FLESH_SPARKS_ALL);
+        pool.set_flesh_sparks(2);
+        assert_eq!(pool.flesh_sparks(), 2);
     }
 
     #[test]

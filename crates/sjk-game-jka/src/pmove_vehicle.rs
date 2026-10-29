@@ -19,8 +19,6 @@ use crate::vehicle_fields::kind;
 
 /// `pm_vehicleaccelerate`.
 pub(super) const VEHICLE_ACCELERATION: f32 = 36.0;
-/// `DEFAULT_MINS_2`.
-const DEFAULT_MINS_2: f32 = -24.0;
 /// `MASK_SOLID`; `CONTENTS_WATER | CONTENTS_SLIME | CONTENTS_LAVA`.
 const MASK_SOLID: u32 = 1;
 const MASK_LIQUID: u32 = 0x0002_0006;
@@ -160,52 +158,14 @@ impl Predictor {
         let Some(vehicle) = self.vehicle.as_ref().filter(|_| self.vehicle_move()) else {
             return bounds;
         };
-        let info = &vehicle.info;
-        if info.length == 0.0 || info.width == 0.0 || info.height == 0.0 {
+        let Some(shape) = crate::vehicle_bounds::VehicleBounds::from_info(&vehicle.info) else {
             return bounds;
-        }
-        if !matches!(info.kind, kind::FIGHTER | kind::FLIER) {
-            return Bounds {
-                minimums: [info.width / -2.0, info.width / -2.0, DEFAULT_MINS_2],
-                maximums: [
-                    info.width / 2.0,
-                    info.width / 2.0,
-                    info.height + DEFAULT_MINS_2,
-                ],
-            };
-        }
-        let axis = flight::angles_to_axis(vehicle.orientation);
-        let origin = self.state.origin;
-        let along = |from: [f32; 3], scale: f32, direction: [f32; 3]| -> [f32; 3] {
-            std::array::from_fn(|at| from[at] + direction[at] * scale)
         };
-        let nose = along(origin, info.length / 2.0, axis[0]);
-        let tail = along(origin, -info.length / 2.0, axis[0]);
-        let left = along(origin, info.width / 2.0, axis[1]);
-        let right = along(origin, -info.width / 2.0, axis[1]);
-        let mut points = [[0.0f32; 3]; 8];
-        for (index, side) in [nose, tail, left, right].into_iter().enumerate() {
-            let top = along(side, info.height / 2.0, axis[2]);
-            let (first, second) = if index < 2 {
-                (index, index + 2)
-            } else {
-                (index + 2, index + 4)
-            };
-            points[first] = top;
-            points[second] = along(top, -info.height, axis[2]);
+        let origin = self.state.origin;
+        let (minimums, maximums) = shape.at(origin, vehicle.orientation);
+        if !shape.dynamic() {
+            return Bounds { minimums, maximums };
         }
-        let (mut low, mut high) = (origin, origin);
-        for at in 0..3 {
-            for point in &points {
-                if point[at] > high[at] {
-                    high[at] = point[at];
-                } else if point[at] < low[at] {
-                    low[at] = point[at];
-                }
-            }
-        }
-        let minimums = std::array::from_fn(|at| low[at] - origin[at]);
-        let maximums = std::array::from_fn(|at| high[at] - origin[at]);
         let found = collision.trace(origin, minimums, maximums, origin, PLAYER_CONTENT_MASK);
         if found.start_solid || found.all_solid {
             bounds

@@ -535,6 +535,7 @@ pub fn refusal(error: &HubError) -> String {
             "trade_not_ready" => "Both players must be ready first.",
             "trade_too_soon" => "Wait a moment: the offer must settle first.",
             "not_tradable" => "That item cannot be traded.",
+            "locked" => "That shader is locked: unlock it in the Collection to trade it.",
             "trade_full" => "That is the most items one side can offer.",
             "trade_empty" => "Put something in the trade first: one of you must give.",
             "holocrons_off" => "Holocrons cannot be traded yet: duplicates only for now.",

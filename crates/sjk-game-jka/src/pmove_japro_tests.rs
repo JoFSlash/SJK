@@ -17,6 +17,8 @@ fn measure_japro_prediction_commands() {
                 ja_pro: JaProRules {
                     enabled,
                     high_fps_fix: false,
+                    head_slide: false,
+                    ..Default::default()
                 },
                 ..Default::default()
             },
@@ -53,11 +55,14 @@ fn japro_policy_matches_compiled_taystjk() {
         let rules = JaProRules {
             enabled: enabled != 0,
             high_fps_fix: false,
+            head_slide: false,
+            ..Default::default()
         };
         let state = MovementState {
             ja_pro: JaProState {
                 race: race != 0,
                 style: style as u32,
+                ..Default::default()
             },
             legs_anim: 1167,
             legs_timer: rolling,
@@ -74,11 +79,14 @@ fn japro_policy_matches_compiled_taystjk() {
         let rules = JaProRules {
             enabled: true,
             high_fps_fix: high != 0,
+            head_slide: false,
+            ..Default::default()
         };
         let state = MovementState {
             ja_pro: JaProState {
                 race: race != 0,
                 style: style as u32,
+                ..Default::default()
             },
             team: team as u8,
             ..Default::default()
@@ -118,6 +126,8 @@ fn japro_fractional_velocity_survives_prediction_and_reseed() {
                 ja_pro: JaProRules {
                     enabled,
                     high_fps_fix: high,
+                    head_slide: false,
+                    ..Default::default()
                 },
                 ..Default::default()
             };
@@ -145,7 +155,9 @@ fn japro_fractional_velocity_survives_prediction_and_reseed() {
                 predictor.state().ja_pro,
                 JaProState {
                     race: false,
-                    style: 16
+                    style: 16,
+                    predicts_jetpack_flag: enabled,
+                    ..Default::default()
                 }
             );
         }
@@ -163,6 +175,8 @@ fn japro_long_commands_clamp_simulated_time_without_chopping_race_moves() {
                 ja_pro: JaProRules {
                     enabled: true,
                     high_fps_fix: false,
+                    head_slide: false,
+                    ..Default::default()
                 },
                 ..Default::default()
             },
@@ -195,9 +209,15 @@ fn japro_wallbug_cleanup_is_race_only() {
         let rules = JaProRules {
             enabled,
             high_fps_fix: false,
+            head_slide: false,
+            ..Default::default()
         };
         let mut state = MovementState {
-            ja_pro: JaProState { race, style: 1 },
+            ja_pro: JaProState {
+                race,
+                style: 1,
+                ..Default::default()
+            },
             team,
             velocity: [10.0; 3],
             ..Default::default()

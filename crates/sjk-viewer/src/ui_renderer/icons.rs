@@ -30,8 +30,9 @@ pub(crate) const PART_ICON_CELLS: u32 = 4 * COLUMNS;
 /// First of the key-binding panel's cells (weapon, item and Force icons),
 /// after character creation's.
 pub(crate) const BIND_ICON_FIRST: u32 = PART_ICON_FIRST + PART_ICON_CELLS;
-/// Key-binding panel cells: three atlas rows.
-pub(crate) const BIND_ICON_CELLS: u32 = 3 * COLUMNS;
+/// Key-binding panel cells: three atlas rows and four cells (the toys' pictures filled
+/// the three rows; the four fit in the atlas's last row, so it keeps its height).
+pub(crate) const BIND_ICON_CELLS: u32 = 3 * COLUMNS + 4;
 /// First of the HUD Force wheel's cells (the selection bar's power icons and
 /// JoF's), after the key-binding panel's.
 pub(crate) const FORCE_WHEEL_ICON_FIRST: u32 = BIND_ICON_FIRST + BIND_ICON_CELLS;

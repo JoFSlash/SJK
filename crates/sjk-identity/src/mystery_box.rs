@@ -15,6 +15,15 @@ pub const TOY: &str = "mystery_box";
 pub const EXPLODE: &str = "explode";
 /// The outcome that gives a holocron (since 28/10/2026).
 pub const HOLOCRON: &str = "holocron";
+/// The outcome that gives a pile of kyber shards (since 29/10/2026).
+pub const SHARD_PILE: &str = "shards";
+/// The outcome that gives a free opening, spent on the next one (since 29/10/2026).
+pub const AGAIN: &str = "again";
+/// The outcome that gives the boxes' own saber shader, [`BLADE_ID`], or shards for a
+/// player who holds it (since 29/10/2026).
+pub const BLADE: &str = "blade";
+/// The boxes' own saber shader, found nowhere else.
+pub const BLADE_ID: &str = "saber_mystery";
 
 /// One placed box.
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
@@ -99,6 +108,16 @@ pub struct Opened {
     /// The holocron the box gave.
     #[serde(default)]
     pub holocron: Option<BoxHolocron>,
+    /// The kyber shards the box gave (since 29/10/2026).
+    #[serde(default)]
+    pub shards: Option<u64>,
+    /// The saber shader the box gave, its unlock id (since 29/10/2026).
+    #[serde(default)]
+    pub blade: Option<String>,
+    /// The free openings left after this one (since 29/10/2026; an older hub leaves it
+    /// out).
+    #[serde(default)]
+    pub free: Option<u64>,
 }
 
 /// Where a blown up box's price went.

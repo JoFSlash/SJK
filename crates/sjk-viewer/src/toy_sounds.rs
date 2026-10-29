@@ -22,11 +22,12 @@ pub(crate) enum Toy {
     Boombox,
     Monitor,
     MysteryBox,
+    Banana,
     Fishing,
 }
 
 impl Toy {
-    pub(crate) const ALL: [Self; 9] = [
+    pub(crate) const ALL: [Self; 10] = [
         Self::Box,
         Self::Order66,
         Self::Hax,
@@ -35,6 +36,7 @@ impl Toy {
         Self::Boombox,
         Self::Monitor,
         Self::MysteryBox,
+        Self::Banana,
         Self::Fishing,
     ];
 
@@ -49,6 +51,7 @@ impl Toy {
             Self::Boombox => "s_toyBoomboxSound",
             Self::Monitor => "s_toyMonitorSound",
             Self::MysteryBox => "s_toyMysteryBoxSound",
+            Self::Banana => "s_toyBananaSound",
             Self::Fishing => "s_toyFishingSound",
         }
     }

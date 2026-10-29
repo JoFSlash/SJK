@@ -97,7 +97,7 @@ impl ViewerConsole {
                 "cp_pluginDisable",
                 i64::from(sjk_client::PLUGIN_DISABLE_DEFAULT),
                 user,
-                "JA+ plugin features this client disables (bits; see japlus.plugin)",
+                "JA+/jaPRO plugin mask; jaPRO bit 19 selects only-bhop when the server allows it",
             ),
             CvarDefinition::new("handicap", 100_i64, user, "Starting health percentage"),
             CvarDefinition::new("sex", "male", user, "Player voice sex token"),
@@ -599,6 +599,7 @@ impl ViewerConsole {
             held_keys: Default::default(),
             bind_state: Default::default(),
             force_repeat: Default::default(),
+            mouse_repeat: Default::default(),
             input: String::with_capacity(INPUT_LIMIT),
             history: Vec::new(),
             history_index: None,
@@ -646,6 +647,8 @@ impl ViewerConsole {
             pending_monitor: None,
             box_hunt_on: false,
             pending_box_hunt: None,
+            banana_on: false,
+            pending_banana: None,
             pending_settings_search: None,
             sjk_chat_panel: super::sjk_chat_panel::Panel::new(),
             config_import: super::config_import_panel::Panel::new(),
@@ -1270,6 +1273,22 @@ mod tests {
         assert!(console.shell.cvars.get("jofejk").is_none());
     }
 
+    /// Settings' plugin options and the `japlus.plugin`/`japro.plugin` commands write
+    /// `cp_pluginDisable`; like every userinfo cvar, a change goes to the server.
+    #[test]
+    fn plugin_mask_changes_mark_userinfo_dirty() {
+        use std::sync::atomic::Ordering;
+        let dir = tempfile::tempdir().unwrap();
+        let mut console = super::ViewerConsole::new(dir.path().join("config.cfg")).unwrap();
+        console.userinfo_dirty.store(false, Ordering::Release);
+        console.set_cvar("cp_pluginDisable", "1544");
+        assert!(console.userinfo_dirty.load(Ordering::Acquire));
+        console.userinfo_dirty.store(false, Ordering::Release);
+        console.try_set_cvar("cp_pluginDisable", "1536").unwrap();
+        assert!(console.userinfo_dirty.load(Ordering::Acquire));
+        assert_eq!(console.userinfo().unwrap().plugin_disable, Some(1_536));
+    }
+
     /// A new profile keeps the default 5; a profile saved before the stock units
     /// is rescaled once, and only once.
     #[test]
@@ -1394,6 +1413,72 @@ mod tests {
         assert!(console.set_cvar(crate::input::force_repeat::CVAR, "0"));
         console.queue_bound_script("MOUSE4", true);
         assert_eq!(console.force_repeat_command(), None, "turned off");
+    }
+
+    /// A held mouse 4 runs its bind again 20 times a second with `in_mouseRepeat 1`,
+    /// on the console's clock, until let go; mouse 5 too unless it is 2, and a `+`
+    /// bind's repeated press changes nothing.
+    #[test]
+    fn a_held_mouse_4_or_5_presses_its_bind_again_twenty_times_a_second() {
+        use crate::input::mouse_repeat::CVAR;
+        let directory = tempfile::tempdir().unwrap();
+        let mut console = ViewerConsole::new(directory.path().join("config.cfg")).unwrap();
+        console.execute_console_line("bind mouse4 echo four", None);
+        console.execute_console_line("bind mouse5 echo five", None);
+        console.execute_console_line("bind mouse3 echo three", None);
+        // Frames 4 ms apart for `millis`, the commands they ran by name.
+        let run = |console: &mut ViewerConsole, start: u64, millis: u64| {
+            let mut seen = Vec::new();
+            let mut now = start;
+            while now < start + millis {
+                now += 4;
+                console.shell.set_command_clock_millis(now);
+                console.repeat_held_mouse_buttons();
+                console.execute_buffered_frame(None, |command, _| {
+                    seen.push(command.to_owned());
+                    true
+                });
+            }
+            seen
+        };
+        let count = |seen: &[String], command: &str| seen.iter().filter(|c| *c == command).count();
+        console.shell.set_command_clock_millis(0);
+        console.queue_bound_script("MOUSE4", true);
+        console.queue_bound_script("MOUSE5", true);
+        console.queue_bound_script("MOUSE3", true);
+        let seen = run(&mut console, 0, 1_000);
+        assert_eq!(
+            count(&seen, "echo four"),
+            1,
+            "off by default: the press alone"
+        );
+        assert_eq!(count(&seen, "echo five"), 1);
+        assert!(console.set_cvar(CVAR, "1"));
+        let seen = run(&mut console, 1_000, 1_000);
+        assert_eq!(count(&seen, "echo four"), 20);
+        assert_eq!(count(&seen, "echo five"), 20);
+        assert_eq!(count(&seen, "echo three"), 0, "only mouse 4 and 5");
+        assert!(console.set_cvar(CVAR, "2"));
+        let seen = run(&mut console, 2_000, 1_000);
+        assert_eq!(
+            (count(&seen, "echo four"), count(&seen, "echo five")),
+            (20, 0)
+        );
+        // Let go, wherever the release went: no more presses.
+        console.force_repeat_button_up("MOUSE4");
+        assert!(run(&mut console, 3_000, 1_000).is_empty());
+        // A `+` bind held runs again too; the button ignores a held key's press
+        // (`input::state`, `a_held_keys_repeated_press_changes_nothing`).
+        console.execute_console_line("bind mouse4 +attack", None);
+        console.queue_bound_script("MOUSE4", true);
+        let seen = run(&mut console, 4_000, 1_000);
+        assert_eq!(
+            seen.iter().filter(|c| c.starts_with("+attack")).count(),
+            21,
+            "the press and 20 repeats: {seen:?}"
+        );
+        console.clear_force_repeat();
+        assert!(run(&mut console, 5_000, 1_000).is_empty(), "window lost");
     }
 
     #[test]

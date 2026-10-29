@@ -708,7 +708,7 @@ impl Panel {
         });
     }
 
-    /// How long to the next holocron, how many dropped in 24 hours, and a bar of how far along.
+    /// How long to the next holocron, how many dropped today, and a bar of how far along.
     fn progress(&mut self, frame: &Frame) {
         let s = frame.s;
         let next: &str = if self.data.next.is_empty() {
@@ -734,7 +734,7 @@ impl Panel {
             text(
                 &mut self.ui,
                 TextFamily::Body,
-                format_args!("{today} of {cap} in 24 h"),
+                format_args!("{today} of {cap} today"),
                 frame.rect(RIGHT_X + RIGHT_WIDTH - 190.0, NEXT_Y, 190.0, 30.0),
                 17.0 * s,
                 color::MUTED,
@@ -1086,7 +1086,7 @@ pub(super) fn tier_card(index: usize, data: &Data) -> crate::menu::sjk::hover::C
     let cap = data.today.map_or(8, |(_, cap)| cap);
     let mut lines = vec![
         Line::how(crate::terms::say_owned(format!(
-            "Found by playing on a server: one holocron every {minutes} minutes of active play, at most {cap} in 24 hours."
+            "Found by playing on a server: one holocron every {minutes} minutes of active play, at most {cap} a day (it resets at 9:00, Paris time)."
         ))),
         Line::status(format!(
             "{} of drops are {}. The SJK team can also give one.",
@@ -1144,7 +1144,7 @@ mod tests {
         assert_eq!(card.title, "Rare Holocron");
         assert_eq!(
             card.lines[0].words,
-            "Found by playing on a server: one holocron every 30 minutes of active play, at most 8 in 24 hours."
+            "Found by playing on a server: one holocron every 30 minutes of active play, at most 8 a day (it resets at 9:00, Paris time)."
         );
         assert_eq!(
             card.lines[1].words,

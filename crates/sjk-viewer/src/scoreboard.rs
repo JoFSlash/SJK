@@ -322,6 +322,7 @@ impl Scoreboard {
         self.ui.append_text_routed(
             fonts,
             |_, text| Some(retail_font(text)),
+            |_| crate::text::CodePalette::Game,
             vertices,
             font,
             viewport,

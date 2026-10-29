@@ -213,6 +213,9 @@ pub struct MovementConfig {
     /// What a client knows of the sabers it holds, to work out `fd.saberAnimLevelBase` for each
     /// command ([`saber_base`]); `None` leaves the state's base alone, as a server does.
     pub saber_hands: Option<saber_base::SaberHands>,
+    /// Locally loaded saber movement definitions, refreshed with clientinfo.
+    /// `None` leaves the caller's context alone; authoritative moves always use it.
+    pub saber_definitions: Option<crate::saber_info::Sabers>,
     /// Whose `Pmove` this is. A client's prediction (`false`, the default) also does
     /// what `CG_PredictPlayerState` does around it; a server's simulation (`true`) is
     /// the bare `Pmove` that `ClientThink_real` calls.
@@ -243,6 +246,7 @@ impl Default for MovementConfig {
             saber_speed_scales: [1.0; 2],
             saber_anim_speed_scales: [1.0; 2],
             saber_hands: None,
+            saber_definitions: None,
             authoritative: false,
             // The reference server's cvar defaults: every fix on.
             legacy_fixes: 0b111,
@@ -498,6 +502,12 @@ impl MovementState {
         player.set_view_height(self.view_height);
         // What `Pmove` decides besides motion, by protocol-26 field index: a legacy
         // client draws and hears these.
+        let predicted_flags = PMOVE_ENTITY_FLAGS
+            | if self.ja_pro.predicts_jetpack_flag {
+                japro_jetpack::ACTIVE
+            } else {
+                0
+            };
         for (index, value) in [
             (9, u32::from(self.bob_cycle)),
             (10, self.weapon_time as u32),
@@ -552,8 +562,8 @@ impl MovementState {
             // flags and leaves the game's alone — the two share one field on the wire.
             (
                 17,
-                (player.raw_field(17).unwrap_or(0) & !PMOVE_ENTITY_FLAGS)
-                    | (self.entity_flags & PMOVE_ENTITY_FLAGS),
+                (player.raw_field(17).unwrap_or(0) & !predicted_flags)
+                    | (self.entity_flags & predicted_flags),
             ),
             // What a Force jump costs while it lasts: the pool, when it next pays, and
             // that it is on (`fd.forcePower`, `fd.forcePowerDebounce[FP_LEVITATION]`,
@@ -797,6 +807,8 @@ pub struct Predictor {
 impl Predictor {
     pub fn from_player_state(player: &PlayerState, config: MovementConfig) -> Self {
         let mut state = MovementState::from_player_state(player);
+        state.ja_pro.predicts_jetpack_flag =
+            config.ja_pro.enabled && state.client_num < MAX_CLIENTS;
         state.saber_anim_speed_scales = HiltSpeedScales(config.saber_anim_speed_scales);
         // A fully acknowledged queue may render this seed without running Pmove.
         // OpenJK renders the seed's viewangles too (cg_predict.c:1043-1051,1401;
@@ -829,6 +841,8 @@ impl Predictor {
     }
 
     pub fn from_state(mut state: MovementState, config: MovementConfig) -> Self {
+        state.ja_pro.predicts_jetpack_flag =
+            config.ja_pro.enabled && state.client_num < MAX_CLIENTS;
         // Synthetic callers historically supplied only speed. Network seeds
         // use from_player_state and must preserve authoritative zero basespeed.
         if state.base_speed == 0.0 {
@@ -873,6 +887,8 @@ impl Predictor {
     /// Refresh movement policy without discarding the replay state.
     pub fn set_config(&mut self, config: MovementConfig) {
         self.config = config;
+        self.state.ja_pro.predicts_jetpack_flag =
+            config.ja_pro.enabled && self.state.client_num < MAX_CLIENTS;
         self.state.saber_anim_speed_scales = HiltSpeedScales(config.saber_anim_speed_scales);
     }
 
@@ -1169,6 +1185,11 @@ impl Predictor {
             } else {
                 i32::from(self.config.roll_rules.gametype)
             },
+            sabers: if self.config.authoritative {
+                context.sabers
+            } else {
+                self.config.saber_definitions.unwrap_or(context.sabers)
+            },
             ..*context
         };
         self.gametype = context.gametype;
@@ -1462,9 +1483,12 @@ impl Predictor {
         self.box_bounds = (bounds.minimums, bounds.maximums);
         // A wall run falls at half gravity (`bg_pmove.c:10726-10730`), until the slice ends.
         let gravity = self.state.gravity;
+        let pack_distance = self.activate_new_jetpack(&command, bounds, collision);
         let jetpacking = self.state.movement_type == 1;
         if jetpacking {
             self.jetpack_move(&command, bounds, collision);
+        } else if self.new_jetpack_active() {
+            self.new_jetpack_thrust(&command, bounds, collision, seconds, pack_distance);
         } else if self.slow_fall {
             self.state.gravity = wall_moves::halved_gravity(gravity);
         }
@@ -1667,7 +1691,7 @@ impl Predictor {
             millis,
             self.config.snap_velocity,
         );
-        if jetpacking || self.slow_fall {
+        if jetpacking || self.slow_fall || self.new_jetpack_active() {
             self.state.gravity = gravity;
         }
         // `AttachRiders` (`bg_pmove.c:11138-11154`).
@@ -1718,6 +1742,9 @@ impl Predictor {
     /// the torso's animation timers — after the first ground trace, whose leg animations
     /// still see this command's timers (a choked player falling keeps its legs).
     fn drop_timers(&mut self, millis: i32) {
+        if self.config.ja_pro.enabled && self.state.ja_pro.jump_time > 0 {
+            self.state.ja_pro.jump_time = (self.state.ja_pro.jump_time - millis).max(0);
+        }
         if self.state.movement_time > 0 {
             if millis >= self.state.movement_time {
                 self.state.movement_flags &= !PMF_ALL_TIMES;
@@ -1752,7 +1779,7 @@ impl Predictor {
         if let Some(npc) = self.npc {
             return self.npc_check_duck(npc, command, collision);
         }
-        let minimums = [-15.0, -15.0, -24.0];
+        let minimums = [-15.0, -15.0, self.dual_jump_minimum(collision)];
         if self.state.movement_type == PM_DEAD {
             // `bg_pmove.c:4484-4489`: a corpse is a low box with a dead view.
             self.state.view_height = DEAD_VIEW_HEIGHT;
@@ -1839,8 +1866,17 @@ impl Predictor {
         );
         // PM_FLOAT always takes PM_GroundTraceMissed, even above a floor
         // (bg_pmove.c:4137-4143); it must not acquire walking friction/land timers.
-        if trace.all_solid || trace.fraction == 1.0 || matches!(self.state.movement_type, 1 | 2) {
+        let new_jetpack = self.new_jetpack_active();
+        if trace.all_solid
+            || trace.fraction == 1.0
+            || matches!(self.state.movement_type, 1 | 2)
+            || new_jetpack
+        {
+            if new_jetpack && !trace.all_solid {
+                self.new_jetpack_pose(command);
+            }
             if !trace.all_solid
+                && !new_jetpack
                 && let Some(lengths) = self.animation_lengths.as_deref()
             {
                 // `PM_GroundTraceMissed`: the legs react to leaving the ground.
@@ -1909,6 +1945,9 @@ impl Predictor {
         acceleration: f32,
         seconds: f32,
     ) {
+        if self.japro_siege_accelerate(wish_direction, wish_speed, acceleration, seconds) {
+            return;
+        }
         let mut velocity = Vec3::from_array(self.state.velocity);
         let add_speed = wish_speed - velocity.dot(wish_direction);
         let npc = self.state.client_num >= MAX_CLIENTS;
@@ -1926,11 +1965,16 @@ impl Predictor {
     fn command_scale(&self, command: &UserCommand) -> f32 {
         let forward = i32::from(command.forward_move);
         let right = i32::from(command.right_move);
-        let maximum = forward.abs().max(right.abs());
+        let up = if self.japro_style().is_some_and(|rules| rules.scale_upmove) {
+            i32::from(command.up_move)
+        } else {
+            0
+        };
+        let maximum = forward.abs().max(right.abs()).max(up.abs());
         if maximum == 0 {
             return 0.0;
         }
-        let total = ((forward * forward + right * right) as f32).sqrt();
+        let total = ((forward * forward + right * right + up * up) as f32).sqrt();
         // `PM_CmdScale` (`bg_pmove.c:1188`) divides by `127.0 * total`, a double, and
         // rounds to float once. Dividing in single precision rounds twice and is one
         // ulp off for mixed forward/strafe input, which shows in the position's bits.
@@ -1953,7 +1997,8 @@ impl Predictor {
             self.air_move(command, seconds, bounds, ground, collision, context);
             return;
         }
-        self.friction(seconds, ground);
+        self.friction_for_command(seconds, ground, command);
+        let style = self.japro_style();
         crate::pmove_dir::set_movement_direction(&mut self.state, command);
         // A vehicle's `Update` turned its view since the axes were taken.
         let view = if self.vehicle_move() {
@@ -1963,8 +2008,17 @@ impl Predictor {
         };
         let (forward, right) = flattened_axes(view);
         let normal = Vec3::from_array(ground.trace.plane_normal);
-        let forward = vector_normalize(self.clip_velocity(forward, normal, OVERCLIP));
-        let right = vector_normalize(self.clip_velocity(right, normal, OVERCLIP));
+        let surf = style.is_some_and(|rules| rules.style == japro_movement::Style::Surf);
+        let forward = vector_normalize(if surf {
+            forward
+        } else {
+            self.clip_velocity(forward, normal, OVERCLIP)
+        });
+        let right = vector_normalize(if surf {
+            right
+        } else {
+            self.clip_velocity(right, normal, OVERCLIP)
+        });
         // A vehicle goes along its `moveDir` at its own speed (`bg_pmove.c:3330-3375`).
         let (wish_direction, mut wish_speed) = self.vehicle_walk_wish().unwrap_or_else(|| {
             let wish_velocity =
@@ -1974,8 +2028,17 @@ impl Predictor {
                 wish_velocity.length() * self.command_scale(command),
             )
         });
-        if self.state.movement_flags & PMF_DUCKED != 0 {
-            wish_speed = wish_speed.min(self.state.speed * DUCK_SCALE);
+        if surf {
+            wish_speed = wish_speed.min(250.0);
+        }
+        if self.state.movement_flags & PMF_DUCKED != 0
+            || style.is_some()
+                && self.state.movement_flags & crate::pmove_roll::PMF_ROLLING != 0
+                && !crate::pmove_roll::in_roll(&self.state)
+                && !crate::pmove_roll::in_roll_complete(&self.state)
+        {
+            wish_speed =
+                wish_speed.min(self.state.speed * style.map_or(DUCK_SCALE, |rules| rules.duck));
         }
         // PM_WalkMove :3391-3399; level >= 2 is dispatched to swimming first.
         if self.state.water_level != 0 {
@@ -1984,20 +2047,38 @@ impl Predictor {
         }
         let slick = ground.trace.surface_flags & SURF_SLICK != 0;
         let knockback = self.state.movement_flags & PMF_TIME_KNOCKBACK != 0;
-        self.accelerate(
-            wish_direction,
-            wish_speed,
-            if self.hovering() {
-                vehicle::VEHICLE_ACCELERATION
-            } else if slick || knockback {
-                AIR_ACCELERATION
+        let skiing = style.is_some_and(|rules| rules.skiing(command));
+        let style_slick = style.is_some_and(|rules| rules.style == japro_movement::Style::Slick);
+        if skiing {
+            japro_movement::ski_accelerate(&mut self.state, wish_direction, wish_speed, seconds);
+        } else {
+            self.accelerate(
+                wish_direction,
+                wish_speed,
+                if self.hovering() {
+                    vehicle::VEHICLE_ACCELERATION
+                } else if slick && !style_slick || knockback {
+                    if style.is_some_and(|rules| rules.style == japro_movement::Style::Ocpm) {
+                        15.0
+                    } else {
+                        AIR_ACCELERATION
+                    }
+                } else {
+                    style.map_or(GROUND_ACCELERATION, |rules| rules.ground_acceleration)
+                },
+                seconds,
+            );
+        }
+        if surf {
+            self.state.velocity[2] -= self.state.gravity * 0.5 * seconds;
+        }
+        if slick || knockback || skiing || style_slick {
+            let change = if style.is_some() && self.state.ja_pro.race {
+                800.0 * seconds.min(0.008)
             } else {
-                GROUND_ACCELERATION
-            },
-            seconds,
-        );
-        if slick || knockback {
-            self.state.velocity[2] -= self.state.gravity * seconds;
+                self.state.gravity * seconds
+            };
+            self.state.velocity[2] -= change;
         }
         let old_speed = Vec3::from_array(self.state.velocity).length();
         // `VectorNormalize` leaves a zero vector as it is, its signed zeros included: a
@@ -2027,7 +2108,12 @@ impl Predictor {
         context: &MoveContext,
     ) {
         self.check_jump(command, bounds, ground, collision, context);
-        self.friction(seconds, ground);
+        self.friction_for_command(seconds, ground, command);
+        let style = self.japro_style();
+        let surf = style.is_some_and(|rules| rules.style == japro_movement::Style::Surf);
+        if surf && command.forward_move != 0 && command.right_move != 0 {
+            command.right_move = 0;
+        }
         crate::pmove_dir::set_movement_direction(&mut self.state, command);
         // A vehicle's `Update` turned its view since the axes were taken.
         let view = if self.vehicle_move() {
@@ -2046,16 +2132,26 @@ impl Predictor {
             };
             if self.state.movement_type == 1 && !self.slow_fall {
                 wish_velocity *= if command.up_move <= 0 { 0.8 } else { 2.0 };
+            } else if self.new_jetpack_active() && !self.slow_fall {
+                wish_velocity *= 1.75;
             }
             (
                 vector_normalize(wish_velocity),
-                wish_velocity.length() * self.command_scale(command),
+                if surf {
+                    wish_velocity.length().min(250.0)
+                } else {
+                    wish_velocity.length() * self.command_scale(command)
+                },
             )
         });
         let acceleration = self
             .vehicle_air_acceleration(ground)
             .unwrap_or(AIR_ACCELERATION);
-        self.accelerate(wish_direction, wish_speed, acceleration, seconds);
+        if let Some(style) = style.filter(|rules| rules.style != japro_movement::Style::Siege) {
+            style.air_accelerate(&mut self.state, wish_direction, wish_speed, seconds);
+        } else {
+            self.accelerate(wish_direction, wish_speed, acceleration, seconds);
+        }
         let stuck = self.state.movement_flags & PMF_STUCK_TO_WALL != 0;
         if ground.ground_plane
             && !stuck
@@ -2094,6 +2190,12 @@ impl Predictor {
                     dot / overbounce
                 };
         if self.config.step_slide_fix
+            && !self.japro_style().is_some_and(|rules| {
+                matches!(
+                    rules.style,
+                    japro_movement::Style::Tribes | japro_movement::Style::Slick
+                )
+            })
             && self.state.client_num < MAX_CLIENTS
             && self.state.ground_entity_number != ENTITY_NUMBER_NONE
             && normal.z < MIN_WALK_NORMAL
@@ -2356,6 +2458,10 @@ impl Predictor {
 mod events;
 #[path = "pmove_grapple.rs"]
 pub mod grapple;
+#[path = "pmove_japro_jump.rs"]
+mod japro_jump;
+#[path = "pmove_japro_movement.rs"]
+mod japro_movement;
 #[path = "pmove_water.rs"]
 mod water;
 #[path = "pmove_weapon_history.rs"]
@@ -2363,6 +2469,8 @@ mod weapon_history;
 
 #[path = "pmove_flight.rs"]
 pub mod flight;
+#[path = "pmove_japro_jetpack.rs"]
+mod japro_jetpack;
 #[path = "pmove_jetpack.rs"]
 mod jetpack;
 
@@ -2383,6 +2491,9 @@ mod jump;
 
 #[path = "pmove_gesture.rs"]
 mod gesture;
+
+#[path = "pmove_dual_jump_hull.rs"]
+mod dual_jump_hull;
 
 #[path = "pmove_wall_moves.rs"]
 mod wall_moves;

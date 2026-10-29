@@ -420,12 +420,17 @@ pub struct HolocronState {
     pub progress_secs: u64,
     /// Seconds of active play for one holocron.
     pub every_secs: u64,
-    /// Holocrons dropped in the last 24 hours.
+    /// Holocrons dropped since the caps' day began (09:00 in Paris; hubs before 29/10/2026:
+    /// in the last 24 hours).
     #[serde(default)]
     pub today: u32,
-    /// The most holocrons a key can earn in 24 hours.
+    /// The most holocrons a key can earn in a day.
     #[serde(default)]
     pub daily_cap: u32,
+    /// When the caps' next day begins and `today` starts again from 0, unix seconds
+    /// (29/10/2026); `None` from hubs before, whose caps looked back a rolling 24 hours.
+    #[serde(default)]
+    pub resets_at: Option<i64>,
     /// The hub's clock, unix seconds.
     #[serde(default)]
     pub server_time: i64,
@@ -448,6 +453,87 @@ pub struct HolocronState {
     /// `PROTOCOL.md`, "Kyber crystals"); `None` from hubs before.
     #[serde(default)]
     pub kyber: Option<KyberTables>,
+    /// The person's collection marks (29/10/2026; the hub's `PROTOCOL.md`, "Collection
+    /// marks"): their favourite and locked saber shaders. `None` from hubs before, which
+    /// keep none (their economy does not say [`MARKS_ABILITY`]).
+    #[serde(default)]
+    pub marks: Option<UnlockMarks>,
+}
+
+/// The economy's ability that says the hub keeps collection marks ([`UnlockMarks`]).
+pub const MARKS_ABILITY: &str = "marks";
+
+/// A person's collection marks as the hub keeps them (`PROTOCOL.md`, "Collection marks",
+/// 29/10/2026): their favourite saber shaders (listed first) and the ones they locked,
+/// which the hub never shatters or lets go in a trade until they are unlocked. Each list
+/// in the catalogue's order.
+#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq)]
+pub struct UnlockMarks {
+    /// The favourite shaders' ids.
+    #[serde(default)]
+    pub favourite: Vec<String>,
+    /// The locked shaders' ids.
+    #[serde(default)]
+    pub locked: Vec<String>,
+}
+
+impl UnlockMarks {
+    /// Whether shader `id` is a favourite.
+    pub fn favourite(&self, id: &str) -> bool {
+        self.favourite.iter().any(|known| known == id)
+    }
+
+    /// Whether shader `id` is locked.
+    pub fn locked(&self, id: &str) -> bool {
+        self.locked.iter().any(|known| known == id)
+    }
+
+    /// `mark` set (`on`) or cleared on shader `id`, as the hub will answer it (the
+    /// client shows a change before the hub's answer); whether anything changed.
+    pub fn set(&mut self, id: &str, mark: Mark, on: bool) -> bool {
+        let list = match mark {
+            Mark::Favourite => &mut self.favourite,
+            Mark::Locked => &mut self.locked,
+        };
+        let at = list.iter().position(|known| known == id);
+        match (at, on) {
+            (Some(_), true) | (None, false) => false,
+            (Some(at), false) => {
+                list.remove(at);
+                true
+            }
+            (None, true) => {
+                list.push(id.to_owned());
+                true
+            }
+        }
+    }
+}
+
+/// A collection mark (`PROTOCOL.md`, "Collection marks").
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+pub enum Mark {
+    /// A star: the shader is listed first.
+    Favourite,
+    /// A padlock: the shader is never broken down or traded until unlocked.
+    Locked,
+}
+
+impl Mark {
+    /// Its wire id.
+    pub const fn id(self) -> &'static str {
+        match self {
+            Self::Favourite => "favourite",
+            Self::Locked => "locked",
+        }
+    }
+}
+
+/// The hub's answer to `POST /v1/unlocks/marks`: every mark after.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
+pub struct MarksAnswer {
+    /// The person's marks after the change.
+    pub marks: UnlockMarks,
 }
 
 /// The kyber crystals' tables as the hub sends them with the progress (`PROTOCOL.md`,
@@ -1842,14 +1928,23 @@ mod tests {
                 every_secs: 1800,
                 today: 3,
                 daily_cap: 8,
+                resets_at: None,
                 server_time: 1_791_000_000,
                 can_open: false,
                 min_client: None,
                 loot: Vec::new(),
                 economy: None,
                 kyber: None,
+                marks: None,
             }
         );
+        // Since 29/10/2026 the hub says when its caps' day ends (09:00 in Paris).
+        let day: HolocronState = serde_json::from_str(
+            r#"{"progress_secs":0,"every_secs":1800,"today":8,"daily_cap":8,
+                "resets_at":1793260800,"server_time":1793250000}"#,
+        )
+        .unwrap();
+        assert_eq!(day.resets_at, Some(1_793_260_800));
         let odds: HolocronState = serde_json::from_str(
             r#"{"progress_secs":0,"every_secs":1800,"server_time":1,"loot":[{"tier":"uncommon",
                 "drop":600,"rarity":[700,240,55,5],"finish":[970,30,0],"credits":[10,20],
@@ -1902,6 +1997,28 @@ mod tests {
         )
         .unwrap();
         assert!(forge.can("shatter_last") && forge.can("shatter_duplicates"));
+        // A hub before collection marks (29/10/2026) neither says the ability nor sends
+        // them; a later one does both.
+        assert!(!forge.can(MARKS_ABILITY));
+        assert_eq!(economy.marks, None);
+        let marked: HolocronState = serde_json::from_str(
+            r#"{"progress_secs":0,"every_secs":1800,
+                "economy":{"abilities":["shatter_last","marks"]},
+                "marks":{"favourite":["saber_storm"],"locked":["saber_frost"]}}"#,
+        )
+        .unwrap();
+        assert!(marked.economy.unwrap().can(MARKS_ABILITY));
+        let mut marks = marked.marks.unwrap();
+        assert!(marks.favourite("saber_storm") && !marks.locked("saber_storm"));
+        assert!(marks.locked("saber_frost"));
+        assert!(!marks.set("saber_frost", Mark::Locked, true), "set already");
+        assert!(marks.set("saber_frost", Mark::Locked, false));
+        assert!(marks.set("saber_tidal", Mark::Favourite, true));
+        assert_eq!(marks.favourite, ["saber_storm", "saber_tidal"]);
+        assert!(!marks.locked("saber_frost"));
+        let answer: MarksAnswer =
+            serde_json::from_str(r#"{"marks":{"favourite":[],"locked":["saber_frost"]}}"#).unwrap();
+        assert!(answer.marks.locked("saber_frost"));
         let all: ShatterAllAnswer = serde_json::from_str(
             r#"{"shattered":[{"id":"saber_tidal","copies":2,"shards":10}],"copies":2,
                 "shards":10,"balance":45,

@@ -32,6 +32,9 @@ impl HudOverlay {
             318 => &self.enemy_info.name,
             319 => &self.enemy_info.detail,
             324 => &self.followed_name,
+            325 => &self.lagometer_readout.ping,
+            326 => &self.lagometer_readout.interpolation,
+            327 => &self.lagometer_readout.speed,
             value @ vehicle::TEXT_FIRST..=vehicle::TEXT_LAST => self.vehicle.text(value),
             value @ crate::scope::binoculars::TEXT_FIRST..=crate::scope::binoculars::TEXT_LAST => {
                 crate::scope::binoculars::DIGIT_TEXT
@@ -52,7 +55,8 @@ impl HudOverlay {
 ///
 /// OpenJK `codemp` `cg_draw.c`: `CG_DrawCrosshairNames`, `CG_DrawWarmup`,
 /// `CG_DrawTimer`, `CG_DrawEnemyInfo` and JoF EternalJK's `CG_DrawFollow` paint with
-/// `FONT_MEDIUM`; the Force and inventory selection names use `UI_SMALLFONT` (`FONT_SMALL`); vote,
+/// `FONT_MEDIUM`; the Force and inventory selection names, and JoF EJK's lagometer
+/// numbers (`CG_DrawLagometer`, `CG_DrawSpeedGraph`), use `UI_SMALLFONT` (`FONT_SMALL`); vote,
 /// snapshot and `CG_DrawDisconnect` draw console characters
 /// (`CG_DrawSmallString`, `CG_DrawStringExt`, `CG_DrawBigString`). Retail has no
 /// kill feed (obituaries are console prints, `CG_Obituary`): SJK's
@@ -60,7 +64,7 @@ impl HudOverlay {
 pub(super) fn retail_font(id: TextId) -> Option<RetailFont> {
     match id.0 {
         310..=312 | 318 | 319 | 324 => Some(RetailFont::Medium),
-        1000..=1022 | 1100..=1111 => Some(RetailFont::Small),
+        325..=327 | 1000..=1022 | 1100..=1111 => Some(RetailFont::Small),
         200..=204 | 313 | 316 => Some(RetailFont::Console),
         _ => None,
     }

@@ -83,6 +83,16 @@ pub(crate) fn register(cvars: &mut CvarRegistry) -> Result<(), sjk_shell::CvarEr
             "Show emoji pictures (gfx/emoji) in place of their names in chat; listEmojis lists them",
         ),
         (
+            crate::chat::options::BACKDROP_CVAR,
+            0,
+            "Dark band behind each chat row, its opacity in per cent (0 off to 100)",
+        ),
+        (
+            crate::chat::options::OUTLINE_CVAR,
+            0,
+            "Dark outline round each letter of the chat and the chat field instead of its drop shadow",
+        ),
+        (
             "cg_fovViewmodelAdjust",
             1,
             "Lower the first-person weapon when cg_fovViewmodel is over 90",

@@ -18,7 +18,10 @@ writes, into the output folder:
   plastic thunk and the ring of its glass; `knock.wav`: a monitor knocking on the
   floor; `charge.wav`: a throw held to charge, a tube's hum rising to a ready ping;
   `throw_hard.wav`: a charged throw, a thump and a deep whoosh; `hit.wav`: the tick the
-  thrower hears when their monitor strikes someone; all 22050 Hz mono 16-bit.
+  thrower hears when their monitor strikes someone; `saver_on.wav`: the Screen Saver
+  rising, a CRT's degauss boing under a gold shimmer; `saver_off.wav`: the Screen
+  Saver ending, a CRT switched off, its whine falling to a pop; all 22050 Hz mono
+  16-bit.
 
     python scripts/monitor_assets.py crates/sjk-viewer/assets/monitor
 
@@ -397,6 +400,37 @@ def charged_sounds(output: Path) -> None:
             * np.exp(-t * 28))
     click = lowpass(rng.standard_normal(n), 7000) * np.exp(-t * 400)
     write_wav(output / "hit.wav", tick + click * 0.8)
+    saver_sounds(output)
+
+
+def saver_sounds(output: Path) -> None:
+    """The Screen Saver's sounds (their own seed, so the sounds above stay as they
+    were)."""
+    rng = np.random.default_rng(13)
+    # Rising: a CRT's degauss, a heavy 60 Hz boing whose wobble dies away, a click, and
+    # a shimmer of bright notes climbing over it.
+    n = int(RATE * 1.3)
+    t = np.arange(n) / RATE
+    wobble = 1 + 0.08 * np.sin(2 * np.pi * 9 * t) * np.exp(-t * 3)
+    phase = 2 * np.pi * np.cumsum(60 * wobble) / RATE
+    boing = (np.sin(phase) + 0.5 * np.sin(2 * phase) + 0.3 * np.sin(3 * phase)) * np.exp(-t * 3.2)
+    click = lowpass(rng.standard_normal(n), 5000) * np.exp(-t * 300) * 1.2
+    shimmer = np.zeros(n)
+    for index, note in enumerate((880, 1109, 1319, 1760, 2217)):
+        start = 0.12 + index * 0.07
+        at = np.clip(t - start, 0, None)
+        shimmer += (np.sin(2 * np.pi * note * at) * np.exp(-at * 4.5)
+                    * (t >= start) * (0.35 - index * 0.03))
+    write_wav(output / "saver_on.wav", boing * 1.3 + click + shimmer)
+    # Ending: a CRT switched off, its high whine falling fast to a low hum and a pop.
+    n = int(RATE * 0.7)
+    t = np.arange(n) / RATE
+    pitch = 200 + 6000 * np.exp(-t * 9)
+    phase = 2 * np.pi * np.cumsum(pitch) / RATE
+    whine = np.sin(phase) * np.exp(-t * 4) * 0.5
+    hum = np.sin(2 * np.pi * 60 * t) * np.exp(-t * 6) * 0.6
+    pop = lowpass(rng.standard_normal(n), 1500) * np.exp(-np.clip(t - 0.04, 0, None) * 80) * (t >= 0.04)
+    write_wav(output / "saver_off.wav", whine + hum + pop * 0.8)
 
 
 def main() -> None:

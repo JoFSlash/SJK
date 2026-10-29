@@ -18,10 +18,20 @@ It does not change damage camera kick, hit sounds or damage-event timing.
 
 Settings > Mods > Asset browser or `assetbrowser` opens SJK's installed PK3 browser (also discoverable through F3
 in the console's command browser). Select a pack with the arrow keys or wheel;
-Enter, Space or a click toggles it. Choices save immediately and apply at the
-next client start. The page lists configured game directories and supplemental
+Enter, Space or a click toggles it. Choices save immediately and apply at
+`fs_restart` or the next client start. The page lists configured game directories and supplemental
 `EternalJK` packs, including disabled packs, and protects retail
 `base/assets0.pk3` through `assets3.pk3` from disabling.
+
+`fs_restart` mounts the installed game files again without restarting SJK
+([fs_restart.rs](../crates/sjk-viewer/src/fs_restart.rs)), as the original game's
+`FS_Restart` searched its paths again: PK3s added or changed since the start, and the
+pack choices above, reach the lists of installed content (the profile's models and
+sabers, Create game's maps, the key bindings' pictures) and the scripts `exec` reads
+from packs. The mount runs on a worker; the console says how many PK3s it found. The
+map on show keeps the files it was built from, as each map load mounts the files afresh
+anyway, so the next map has them. `fs_game`, `fs_basegame`, `fs_homepath` and the other
+search settings whose help says so still apply at the next start.
 
 The archived `fs_disabledPaks` setting stores a JSON list of portable
 `directory/filename.pk3` names. Names are case-insensitive, and identical names
@@ -1035,8 +1045,9 @@ blade with an alpha-blended trail and no blade light or bloom. It works for
 both hands and thrown sabers. The archived `cg_blackSabers` setting is on by
 default, under classic Settings > Game Options and SJK Advanced > Gameplay.
 Turning it off uses orange. The existing `cp_pluginDisable` bit 3 also disables
-black blades when set: `japlus.plugin 3` toggles it, and a clear bit means allowed.
-The normal plugin-mask default (1536) allows black blades.
+black blades when set: Settings > Mods, Black sabers (JA+ or jaPRO plugin options), or
+`japlus.plugin 3` switches it ([plugin options](mods.md#plugin-options)). The normal
+plugin-mask default (1536) allows black blades.
 The SJK UI's Profile > Saber offers black as a chip of its own, the last, after the
 custom chip, which writes colour 11 (hub report #130, 27/10/2026): before, the
 page had no black, and a saved 11 read and was written back as the custom colour. A
@@ -1962,6 +1973,22 @@ The clash flare also follows EternalJK's switches (JoF EJK `CG_SaberClashFlare`)
 EternalJK's). Reduce bright flashes wins over both. The viewer reads them once a frame
 ([saber_clash_flare.rs](../crates/sjk-viewer/src/saber_clash_flare.rs)); the effect
 spawner and submission read the reduce switch from an atomic the frame sets.
+
+**Saber hit sparks** (`cg_fleshSparks`, archived, 0 to 7, default 7; Settings > Game
+options, Effects) is EternalJK's count of the red sparks a saber hit on a body plays
+(JoF EJK `cg_event.c`, `EV_SABER_HIT`, each `FX_PlayEffectID` behind
+`cg_fleshSparks.integer > N`). At 7 every hit plays what the original game plays: six
+`saber/blood_sparks_mp` for the special hit (`eventParm` 16), one
+`saber/blood_sparks_50_mp` for a really big hit (2), one `saber/blood_sparks_25_mp`
+for a moderate hit (3) and three `saber/blood_sparks_mp` for any other body hit.
+Lower, a plain body hit plays two sparks at 6, one at 5 and none from 4; the moderate
+hit's spark goes from 3, the big hit's from 2; the special hit keeps one spark at 1,
+without its sound (every other hit keeps its sound), and none at 0. A saber hit on something else
+than a body keeps its `saber/saber_cut`. Read once a snapshot
+([impacts.rs](../crates/sjk-viewer/src/impacts.rs) `saber_hit`, the sound in
+`LegacySoundAdapter::set_flesh_sparks`). Unit tests:
+`flesh_sparks_gate_each_saber_hit_on_a_body`,
+`flesh_sparks_below_two_silence_only_the_special_saber_hit`. Not tried in a game.
 
 Compared with retail: the flare's timing, size, the behind-the-view and wall tests
 follow `CG_SaberClashFlare` exactly ([sjk-client saber_clash_flare.rs](../crates/sjk-client/src/saber_clash_flare.rs)),
@@ -2947,13 +2974,55 @@ strafe guides on jaPRO servers either), and the guess's floor trace sees only th
 map, not movers or players under the followed player. Riding a vehicle hides them,
 where JoF keeps them when the vehicle has no HUD menu of its own.
 
-## Lagometer size
+## Lagometer
+
+`cg_lagometer` (archived, default 0, Settings > HUD > **Lagometer**) draws the
+network graph: frame interpolation in its top third (yellow above the middle line
+while the view runs ahead of the latest snapshot, blue below while it interpolates)
+and snapshot latency at its bottom (green, yellow when the server held a snapshot
+back for rate, red for a dropped one). It takes JoF EJK's values (`cg_draw.c`,
+`CG_DrawLagometer` and `CG_DrawSpeedGraph`):
+
+- `1` (**Graph**): the graph on its backdrop, as SJK always drew it; an old config's
+  `cg_lagometer 1` looks the same;
+- `2` (**Graph + speed**): the same, with the average ping and the average
+  interpolation of its 48 newest columns written on a line just above it (ping at the
+  left, interpolation at the right, `%.0f` and `%04.1f` as EJK writes them; a dropped
+  snapshot counts as the highest ping seen so far), and a speed graph on a backdrop of
+  its own 56 of the graph's 48 units above it, higher by as much as that line needs: a
+  green column per frame for the horizontal speed, the height worth 3000 units a
+  second, the current speed at its top left;
+- `3` (**No backdrop**): the same without either backdrop, the speed graph three times
+  as tall (its bottom where mode 2's is), its number only while moving.
+
+EJK draws the speed graph only with its `cg_speedometer` speed graph bit; SJK has no
+such bit and draws it with modes 2 and 3 (Sol's decision, 29/10/2026).
+
+The numbers do not keep EJK's proportion of the graph (`ocr_a` at half size, 10.5 of
+its 48 units): SJK's graph is 45 pixels at 1080 lines with the default `cg_hudScale`
+(0.7) where EJK's is 108, so they were tiny at `cg_lagometerScale 1`. They are drawn at
+EJK's own size instead (Sol's decision and request, 29/10/2026): a 34-pixel line at 1080
+lines before `cg_hudScale`, so 23.8 pixels with the default HUD scale (EJK's is 23.6),
+where SJK Chat's digits (`ui_gameFont`) stand about 13 pixels tall, as the HUD's
+"Score" capitals. They grow with the HUD (the screen's height, `cg_hudScale`) and
+`cg_lagometerScale`, mode 3's speed number alike. The ping and interpolation stand on
+their own line just above the graph, so the graph keeps its size in every mode. The line
+is at least 4.7 lines wide (a three-digit ping and "-99.9" side by side), wider than the
+graph and centred on it, and stays inside the screen: shifted in at the sides, and just
+below the graph when the graph sits too near the top for it (the speed graph, above the
+screen's top then, as in EJK, is not moved). See
+[hud/lagometer.rs](../crates/sjk-viewer/src/hud/lagometer.rs) and its tests
+(`mode_1_is_the_graph_alone`, `the_averages_follow_ejk`,
+`the_numbers_are_readable_above_the_graph_at_every_scale`,
+`the_digits_are_about_13_pixels_and_both_numbers_fit_their_line`,
+`at_the_screen_edges_the_numbers_stay_inside`). Not compared side by side with EJK in
+game.
 
 `cg_lagometerScale` changes the lagometer's width and height: `1` (default) is
 normal size, `0.5` half size, `2` double size. Settings > HUD > **Lagometer scale**
 offers 0.25–4 in both menu interfaces; values outside that range are clamped when
-drawn. The setting is archived and takes effect immediately. Enable the graph with
-`cg_lagometer 1`.
+drawn. The setting is archived and takes effect immediately; it scales the numbers
+(from their own base size) and the speed graph with the graph.
 
 Scaling keeps the graph's existing bottom-right corner fixed, including custom
 `cg_lagometerX` and `cg_lagometerY` offsets. It applies to every built-in HUD and
@@ -3490,8 +3559,9 @@ command new for them (`DrawCommand::Polygon`, [rendering.md](rendering.md#submis
   follow, are in a private duel, as JoF EJK does (EternalJK `CG_Player`,
   `cg_players.c:11983-11990`). The rule is per server family, in the table
   `DUEL_HIDE_SERVERS` ([duel_hide.rs](../crates/sjk-client/src/duel_hide.rs)): JA+
-  hides unless your `cp_pluginDisable` sets bit 1 ("duel see others", `japlus.plugin
-  1`; SJK's default 1536 leaves it clear), since a JA+ server sends bystanders to a
+  hides unless your `cp_pluginDisable` sets bit 1 (Settings > Mods, See others in
+  duels, or `japlus.plugin 1`; SJK's default 1536 leaves it clear, Off), since a JA+
+  server sends bystanders to a
   plugin client and expects it to hide them; jaPRO (TaystJK) always hides; other
   servers do not. Other players' [drones](#drone) are hidden in a duel on every
   server, unless the setting is 0. `2` (Always) hides on every server, `0` (Off) never, and they are
@@ -4229,8 +4299,15 @@ for a player, at most every ten minutes a player and never per frame; until it c
 and from a hub that does not send a field, that line is left out (10/10/2026). It adds
 nothing a glance at the scoreboard would not: no health, Force or position.
 
-- `cg_playerCard` (default 1; Settings > HUD+ > Player card) turns it on.
-- `cg_playerCardDelay` (default 1.5; Settings > HUD+ > Card delay) is the seconds
+- `cg_playerCard` (default 1; Settings > HUD+ > Player card) says what opens it: `0`
+  (**Off**) nothing, neither a look nor `inspect`; `1` (**On look and key**) a steady
+  look or `inspect`; `2` (**Key only**, Blep's idea, 29/10/2026) `inspect` alone, so
+  looking at a player never brings their card up. The setting was on/off until then:
+  configs saved it as 0 or 1, which keep their meaning (`player_card::Opens`, tests
+  `the_setting_reads_three_ways_and_old_configs_keep_their_meaning` and
+  `each_mode_opens_the_card_its_own_way`).
+- `cg_playerCardDelay` (default 1.5; Settings > HUD+ > Card delay; only with
+  `cg_playerCard 1`, as its help says) is the seconds
   the crosshair must stay on the player before the card fades in. Turning the view
   more than 6 degrees, or losing the player for over 0.3 seconds, starts the wait
   again and the card fades out.
@@ -4241,7 +4318,7 @@ nothing a glance at the scoreboard would not: no health, Force or position.
   has no list of theirs or you wear a retail model.
 - `inspect` (Settings > Key bindings > Interaction > Inspect player; bound to X by default,
   or `bind <key> inspect`) pins the card to the player under the crosshair at once, with
-  no wait. It stays when you look away or the player moves, follows them (kept inside the
+  no wait, with `cg_playerCard` 1 or 2. It stays when you look away or the player moves, follows them (kept inside the
   screen), and a second press or Escape hides it (Escape then does not open the game
   menu); it also drops when the player leaves or the map changes. After hiding it, the
   card does not return until the crosshair leaves that player. Behind you, the card is not drawn but stays pinned.
@@ -4463,6 +4540,7 @@ The player's own toy still shows, and nothing changes for the toys' rules.
 | Drone | See others' drones | `cg_toyDroneShow` | their drones, names and sounds (who peeks at you is still told) |
 | Boombox | See and hear others' boomboxes | `cg_toyBoomboxShow` | their stereo and its music |
 | Monitor | See monitors | `cg_toyMonitorShow` | every monitor and its sounds, yours too ([Monitor](#monitor)) |
+| Banana peel | See banana peels | `cg_toyBananaShow` | every peel and its sounds, yours too ([Banana peel](#banana-peel)) |
 
 Order 66, the Hax and Box hunt act only on players who have them on, so they have none.
 The holocron, the box and the boombox are hidden as if those players had them off here
@@ -5095,6 +5173,27 @@ sends them flying, the way the monitor struck them.
   monitor and its sounds in the world on this PC, the player's own too; their charge ring,
   charge hum, hit marker and tick stay. Neither changes who may be hit: a player with the
   toy on and monitors hidden can still be struck.
+- **The Screen Saver** (Sol's idea, 29/10/2026): a player struck by 5 monitors of other
+  players within 20 seconds is untouchable by monitors for 30 seconds, and may still
+  throw their own ([saver.rs](../crates/sjk-viewer/src/monitor/saver.rs)). A monitor counts
+  once however often it strikes (one juggling a body), the player's own never, and the
+  count starts afresh once it rises. The fifth hit still lands; from then every monitor
+  passes through the player, standing or limp, as through a player without the toy. The
+  centre of the screen says "SCREEN SAVER: monitors pass through you for 30 seconds".
+  A gold shell wraps the body: Force Absorb's (`gfx/misc/personalshield`) tinted gold,
+  as many passes as `cg_shieldBrightness`, fading in, pulsing gently, and flickering
+  over its last 3 seconds. A CRT's degauss is heard as it rises (`saver_on.wav`) and its
+  power-off as it ends (`saver_off.wav`), the player's own in both ears, another's where
+  they are. It ends at its time, or sooner with the player's death or a new map (the
+  game clock going back). Others learn of it through a feed
+  [toy event](hub-chat.md#toy-events) the player sends to the one who raised it
+  (`monitor` `saver_<until>`, the game server time it ends; `saver_off` if the player
+  dies first): their clients draw the shell and foresee no hit on the player meanwhile,
+  and drop it at its time or the player's death. Clients from before it see no shell
+  and may foresee a hit that the player's own client refuses, which they undo as any
+  hit whose word does not come. No shell shows in a duel or with `cg_toyMonitorShow` 0.
+  It brings two achievements ([identity.md](identity.md#achievements)): Payback and
+  the hidden Power Surge.
 - **Getting up:** a fall a monitor began ends by itself 2.5 seconds after the body came
   to rest, once the real body has walked to it (or 6 seconds later whatever it did);
   `toy_ragdoll` gets up at once, and being hurt does as for the Ragdoll.
@@ -5126,6 +5225,85 @@ sounds are bundled, made by the script from shapes, noise and synthesized tones 
 taken from another game), and mounted below all game data, so a PK3 with the same paths
 replaces them. World shots: `world_shot::monitor_shots::monitor_on_a_demo` (with
 `SJK_TEST_DEMO`). See [monitor.rs](../crates/sjk-viewer/src/monitor.rs).
+
+## Banana peel
+
+The Banana peel (Kushina's idea, 29/10/2026, which Sol took up) is a toy for every SJK
+player: drop a banana peel on the floor, and a player who has the toy on too and walks
+onto it slips, cartoon style, and falls as a [ragdoll](#ragdoll).
+
+- **`toy_banana`** (a bind, Settings > Key bindings > Interaction > Toy: Banana peel, the
+  quick wheel's Toys group, Collection > Toys, "Slip on peels") is the switch, both the
+  right to drop peels and the consent to slip on them (the Monitor's rule: always opt
+  in). It stays as last switched, across maps, servers and restarts (`cl_toyBanana`,
+  archived), and says so on the centre of the screen. A player without it walks over
+  peels.
+- **`banana_drop`** (Interaction > Drop banana peel, the Collection's Drop key, the quick
+  wheel's Drop banana peel) drops one: standing (slower than 80 units a second along the
+  floor) 20 units ahead of the feet the way the player looks, moving 72 units ahead the
+  way they move, short of a wall. It leaves the hand 32 units over the floor, tumbles
+  through a short arc for 0.4 seconds and lands with a soft flop (`drop.wav`) on the floor
+  under that spot, lying along it (a floor steeper than about 45 degrees takes none, nor
+  the sky: "Nowhere to drop a peel here"). Without the toy on it says "Turn the Banana
+  peel toy on to drop one"; nobody drops while limp, dead, spectating, in a duel, with the
+  flag, hacked, held by the server or in a vehicle ("No banana peel right now"), the
+  Ragdoll's own rules.
+- **Limits** (anti-spam, named in [banana.rs](../crates/sjk-viewer/src/banana.rs)): one
+  drop every 2 seconds; three peels down a player, a fourth taking the oldest's place;
+  each lies 2 minutes, then shrinks away; none within 96 units of a spawn point (the map's
+  `info_player_deathmatch`, `info_player_start`, duel, Siege and CTF team spawns, read
+  from its entities: "Not so close to a spawn point"). Every peel goes with a new map or
+  another server, and a player's go when they turn the toy off or leave.
+- **The slip** is decided by the slipping player's client alone, as the Monitor's hit is,
+  against its own predicted player: on the ground, moving at least 40 units a second along
+  it (a crouched walk still slips), their feet within 14 units of a peel that has landed
+  (no more than 12 units over it nor 8 under it). The peel must be one they came at: a
+  peel that lands under someone waits until they have been more than 26 units from it,
+  and the dropper's own cannot trip them for 1.5 seconds after it lands (a peel tossed
+  ahead while running would trip its dropper at once). The rules that keep a player from
+  dropping keep them from slipping. They hear a cartoon slip, a squeaky skid and a slide
+  whistle zipping up and dropping (`slip.wav`, in both ears; at the peel for everyone
+  else), and their body goes limp as the Ragdoll's, taking a blow at a foot along the way
+  they walked and upwards (40 and 110 units a second), which throws the feet up over the
+  head and lays the body on its back, sliding on a little with the speed they had. The
+  peel is gone for everyone. They get up as from a monitor's hit: a new jump, attack or
+  taunt, `toy_ragdoll`, being hurt, or by themselves 2.5 seconds after the body comes to
+  rest.
+- **Unseen in duels, or on request:** while the player, or the player they follow, is in a
+  private duel, and on Duel and Power Duel servers, no peel is drawn or heard. Settings >
+  Game options > Toys, "Show banana peels", and the toy's card in the Collection's Toys
+  tab, "See banana peels" (`cg_toyBananaShow`, archived, default 1), at 0 hides every peel
+  and its sounds in the world on this PC, the player's own too. Neither changes who may
+  slip: a player with the toy on and peels hidden still slips on the ones they walk onto.
+  Settings > Sound > Toys, "Banana peel sounds" (`s_toyBananaSound`), silences them.
+
+No game server knows of it, and nothing goes in the hub's looks (they hold eight toy ids
+at most, all taken): every SJK client on the server learns of a peel through the
+[toy relay](hub-chat.md#toy-relay). The dropper's client tells each SJK player in turn,
+the nearest first, one event every 50 ms, and the ones who come later while it lies:
+`drop_<number>_<moment>_<x>_<y>_<z>_<dx>_<dy>_<dz>_<yaw>` (the peel's number among the
+dropper's, 0 to 99; the game server time it left the hand; where it lands, whole units;
+the hand's offset from there, 128 at most; its turn in degrees). Each client finds the
+floor under that spot itself and lays the peel on it, and ignores a peel by a spawn
+point. The slipping player's client tells every SJK player `slip_<dropper>_<number>`, and
+a client that hears it plays the slip at the peel and takes it away (a drop heard after
+its slip stays away); the dropper's client tells `clear` to everyone it told of a peel
+when the toy goes off, and every client takes a dropper's peels away once the hub's
+presence no longer shows them on the server. The fall travels as the Ragdoll's, its blow
+(`hit_...`) naming the peel's dropper and no monitor (`ragdoll::UNTHROWN`), so clients
+from before the toy see the same fall. A sender counts only when the game shows the name
+they claimed, and never one blocked here. Players on stock clients see nothing. The peel
+(about 19 units long and 12 wide: its closed end with the stem's stub, four strips
+fanning out, two curling up),
+its picture, shader, icon and sounds are SJK's own, made by
+[banana_assets.py](../scripts/banana_assets.py) from parametric strips, noise and
+synthesized tones (nothing taken from another game), and mounted below all game data, so
+a PK3 with the same paths replaces them
+([assets/banana](../crates/sjk-viewer/assets/banana/README.md)). World shots:
+`world_shot::banana_shots::banana_peels_ahead_of_the_first_spawn` (`SJK_BANANA_MAPS`),
+`banana_peel_toys_card`, and `banana_slip_on_a_demo` (with `SJK_TEST_DEMO`). See
+[banana.rs](../crates/sjk-viewer/src/banana.rs) and
+[banana_frame.rs](../crates/sjk-viewer/src/banana_frame.rs).
 
 ## Tag
 
@@ -5227,8 +5405,9 @@ Settings > Sound > Toys (Sol's request, 25/10/2026) sets how the toys sound on t
 toy's sounds, and a switch per toy silences that toy's sounds alone, the player's own
 and everyone else's (`s_toyBoxSound`, `s_toyOrder66Sound`, `s_toyHaxSound`,
 `s_toyRagdollSound`, `s_toyDroneSound`, `s_toyBoomboxSound`, `s_toyMonitorSound`,
-`s_toyFishingSound`,
-`s_toyMysteryBoxSound` (the [mystery boxes](mystery-boxes.md)), all
+`s_toyMysteryBoxSound` (the [mystery boxes](mystery-boxes.md)), `s_toyBananaSound` (the
+[Banana peel](#banana-peel), 29/10/2026), `s_toyFishingSound` (the [Fishing](#fishing)
+toy), all
 on by default,
 archived). The toy still
 runs and is still seen; nothing is sent to anyone. The Illuminate holocron makes no
@@ -5248,9 +5427,12 @@ it on an unrelated server can misinterpret that server's ownership flags.
 Stowed single hilts sit at the right hip; dual hilts use both hips. A single
 staff goes across the back when JA+ plugin 9 is enabled, with a hip fallback
 for models without a back tag. `cp_pluginDisable` is a disable mask: bit 9
-(`512`) disables the staff back reach, and bit 13 (`8192`) disables holstered
-hilts altogether. SJK preserves its existing default mask `1536`, so the
-default staff placement remains at the hip. This feature does not enable
+(`512`) disables the staff back reach, and bit 29 (`536870912`, EJK's
+`JAPRO_PLUGIN_HOLSTEREDSABERS`; bit 13 until 29/10/2026, which is JA+'s single-player
+cartwheel) disables holstered hilts altogether. Settings > Mods switches both as Staff
+on the back and Holstered sabers ([plugin options](mods.md#plugin-options)). SJK
+preserves its existing default mask `1536`, so the default staff placement remains
+at the hip. This feature does not enable
 JA+ animation plugins or install their animation assets.
 
 With plugin 9 enabled and usable JA+ reach animations installed, the staff
@@ -5447,7 +5629,12 @@ Execute Order 66, `order66`), since 21/10/2026 the [Hax](#hax) (`toy_hax`, marke
 while it is on), since 23/10/2026 the [Ragdoll](#ragdoll) (`toy_ragdoll`, marked
 while the player is limp), and since 26/10/2026 the [Monitor](#monitor) (`toy_monitor`,
 marked while it is on, then Throw monitor, `monitor_throw`); a wheel saved before keeps
-its Toys page as it was, and gains them from Add a choice, Toys.
+its Toys page as it was, and gains them from Add a choice, Toys. The page holds ten, so
+later toys are in the catalogue's Toys group only, to add from there: Box hunt
+(`toy_boxhunt`), the Tag (`toy_tag`) and since 29/10/2026 the
+[Banana peel](#banana-peel) (Banana peel, `toy_banana`, marked while it is on, and Drop
+banana peel, `banana_drop`) and [Fishing](#fishing) (`toy_fishing`, marked while the rod
+is out).
 
 ### GIF wheel
 
@@ -5764,7 +5951,25 @@ groups by how close their shape is to it (on a 16:9 monitor 16:10, then 3:2,
 4:3, 5:4; since 10/10/2026, before which they ran narrow to wide), largest first
 in each, and the size in use highlighted. Windowed and borderless also list the classic presets that fit the
 monitor and a custom `r_resolution`; borderless fullscreen always fills the
-desktop and uses the size only when windowed. Left and Right step the row within
+desktop and uses the size only when windowed. `apply_display` asks the window for
+`r_resolution` only while it is windowed and winit reports it not fullscreen
+(`window_size_request` in [display.rs](../crates/sjk-viewer/src/settings/display.rs)),
+so a size picked in fullscreen waits for the return to a window. It asked a
+fullscreen window for the size too, after `vid_restart` or a pick: winit's macOS
+`request_inner_size` sets the content size inside the fullscreen Space, which left
+the game a small window in the middle of a black screen (Glen's report,
+29/10/2026); the Mac's green button, which does not change `r_fullscreen`, counts
+as fullscreen too. `r_highDpi` (Video tab and Simple Display, "High DPI") says what
+`r_resolution` counts: the screen's pixels (1, the default except on a Mac) or its points
+(0, the Mac's default, as EternalJK's window there, SDL without high DPI): `window_size`
+asks winit for a `LogicalSize` then, so 1280x720 is a 1280x720-point window on a Retina
+screen rather than a quarter of one. The window was made at 1280x720 pixels before
+(29/10/2026), 640x360 points on a Mac. The Resolution list divides the monitor's sizes by
+its scale in points (`MonitorModes::counted_in_points`: a 3024x1964 desktop is 1512x982);
+exclusive video modes always count pixels. A change resizes a windowed window at once
+(`window_size_request` compares the size with how it was counted); the world's resolution
+follows on the graphics reload ([rendering](rendering.md#render-scale-and-supersampling)).
+Left and Right step the row within
 its aspect-ratio group. See [display.rs](../crates/sjk-viewer/src/settings/display.rs)
 and [resolution.rs](../crates/sjk-viewer/src/settings/resolution.rs).
 
@@ -6343,6 +6548,22 @@ keyboard. `+useforce` does not repeat (the server waits for its release). An ali
 that runs push is not followed. The table of repeated commands, with why each is safe,
 is in [force_repeat.rs](../crates/sjk-viewer/src/input/force_repeat.rs).
 
+`in_mouseRepeat` (archived, default 0, Settings > Controls > **Hold mouse 4/5
+repeats**) is EternalJK's `in_mouserepeat` (JoF EJK `sdl_input.cpp`,
+`IN_ProcessEvents`): while mouse 4 is held, and mouse 5 unless the value is 2, its key
+goes down again and again, as a held keyboard key's system repeats do in EJK. A bind to
+a plain command runs it again; a `+` command ignores the repeated press, as
+`IN_KeyDown` ignores a repeating key. `1` repeats both buttons, `2` mouse 4 only (EJK:
+"don't spam mouse5"). One deliberate difference (Sol's decision, 29/10/2026): EJK
+repeats once every other frame, 125 presses a second at 250 FPS and more above, each
+possibly a command to the server, which servers that cap commands (JoF's) see as a
+flood; SJK repeats 20 times a second at any frame rate, at most once a frame, on the
+console's clock. Only a press that went to the binds repeats, only while the pointer is
+the game's and no console, chat or menu has the keys; a release stops it wherever it
+went, and losing the window stops both. See
+[mouse_repeat.rs](../crates/sjk-viewer/src/input/mouse_repeat.rs) and its tests
+(`twenty_presses_a_second_at_any_frame_rate`, `the_setting_picks_the_buttons`).
+
 `+duck` is JoF EJK's crouch without a roll (`CG_NorollDown_f`). Its press lets go
 of jump and walks for one user command, then it crouches like `+movedown`, sharing
 its key state. Crouching while moving rolls only from a running legs animation
@@ -6376,12 +6597,14 @@ It changes no Grip damage, timing, targeting or movement. See
 [rendering](rendering.md) for the reference and effect details.
 
 `cp_pluginDisable` is the archived userinfo cvar a JA+ server reads to switch its
-client-plugin features off for this client (a set bit disables one). Its default,
-1536, disables the holstered saber and ledge grab, which need JA+ animations SJK
-does not have. JA+ and TaystJK/jaPRO servers receive it from the connect packet
-on, and a change sends a userinfo update ([networking.md](networking.md)). The
-JA+ tools mod lists and toggles its bits (`japlus.plugin`) and lists a JA+
-server's options (`japlus.serverconfig`); see [mods.md](mods.md).
+client-plugin features off for this client (most set bits disable one, a few enable
+one). Its default, 1536, disables the holstered saber and ledge grab, which need JA+
+animations SJK does not have. JA+ and TaystJK/jaPRO servers receive it from the
+connect packet on, and a change sends a userinfo update ([networking.md](networking.md)).
+Settings > Mods shows the options SJK honours as switches named after their feature
+(JA+ and jaPRO plugin options), and `japlus.plugin` and `japro.plugin` list and switch
+them as JoF EJK's `plugin` does; the JA+ tools mod also lists a JA+ server's options
+(`japlus.serverconfig`). See [plugin options](mods.md#plugin-options).
 
 The console input line has a caret, drawn as stock's underscore: Left and Right
 move it, Ctrl+Left and Ctrl+Right by word, Home and End to either end, and Shift
@@ -6584,6 +6807,34 @@ shows while the composer is open, on top of the chat's own scale (the viewport a
 `cg_chatBoxFontSize`): 0.8 draws it a fifth smaller, 1.5 half as big again. The card
 stays 0.4 s after the pointer leaves the name and the card, so the way to its buttons
 never loses it.
+
+Two settings help the chat read over a bright map (Creo's idea, 29/10/2026: the chat
+is often hard to read over light ground, vanilla graphics too). Both are off by
+default, so the chat looks as it did until a player turns them on.
+
+`cg_chatBoxBackdrop` (default 0, archived; Settings > Chat > **Chat backdrop (%)**, and
+HUD in the classic views, 0 to 100 in steps of 10) puts a dark band behind each drawn
+row of a chat message, that many per cent opaque, in the SJK UI's navy
+(`menu::sjk::color::SPACE`). A band is as long as what its row shows (on a line's
+first row the sender's emblems, name, tick and label, then the text and emoji
+pictures, and the ellipsis of a cut last row) plus half its height at each end, which
+is round; it is nine tenths of the row pitch high and centred on the row's letters, so
+two rows' bands never overlap and nothing is darkened beside a short row. Its opacity is
+the setting's times its line's, so it slides in, moves and fades out with its line and
+goes with it; a GIF under an SJK line gets none, and every band is drawn before the
+lines, so the emblem and other pictures stay over the bands. It follows the chat's size,
+spacing, position, the scoreboard's chat column and the composer's history. See
+[chat/view/backdrop.rs](../crates/sjk-viewer/src/chat/view/backdrop.rs).
+
+`cg_chatBoxOutline` (default 0, archived; Settings > Chat > **Chat text outline**, and
+HUD in the classic views) draws every letter of the chat feed and of the chat field
+(the channel row and what you type) inside a dark outline instead of the 1 px drop
+shadow: the text renderer's ring of eight copies a step out all round, as the
+nameplates' Strong outline draws (`text::CodePalette::DarkOutlined`, per text run in
+`ChatOverlay::palette_of`). A black letter (`^0`) keeps the faint light halo the
+nameplates give dark names instead, as an outline as dark as it would hide it. It costs
+nine glyph quads a letter instead of two. Centre prints, the sender card and the
+combat numbers keep their shadow.
 
 A message too long for one row wraps onto up to four, each drawn as its own text,
 and every row after the first starts in the colour code in force where the row

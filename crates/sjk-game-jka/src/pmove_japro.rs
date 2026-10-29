@@ -8,6 +8,14 @@ use crate::pmove_roll::{BOTH_ROLL_F, BOTH_ROLL_R};
 /// TaystJK `codemp/game/bg_public.h` stat and movement-style ordinals.
 const STAT_RACEMODE: usize = 11;
 const STAT_MOVEMENTSTYLE: usize = 13;
+const STAT_RESTRICTIONS: usize = 12;
+const STAT_JUMPTIME: usize = 14;
+const STAT_LASTJUMPSPEED: usize = 10;
+pub(crate) const RESTRICT_BHOP: u32 = 1;
+pub(crate) const RESTRICT_CROUCHJUMP: u32 = 1 << 1;
+pub(crate) const RESTRICT_SUPERJUMP: u32 = 1 << 4;
+/// jaPRO's existing `cp_pluginDisable` only-bhop preference bit.
+pub const PLUGIN_BHOP: u32 = 1 << 19;
 const MV_OCPM: u32 = 16;
 const TEAM_SPECTATOR: u8 = 3;
 /// `JAPRO_CINFO_HIGHFPSFIX` in that header's advertised capability table.
@@ -21,6 +29,17 @@ pub struct JaProState {
     pub race: bool,
     /// `STAT_MOVEMENTSTYLE`, stat slot 13; `MV_OCPM` is 16.
     pub style: u32,
+    /// `STAT_RESTRICTIONS`, stat slot 12; interpreted only for jaPRO.
+    pub restrictions: u32,
+    /// `STAT_JUMPTIME`, stat slot 14, in milliseconds.
+    pub jump_time: i32,
+    /// `STAT_LASTJUMPSPEED`, stat slot 10: integer takeoff speed before superjump.
+    pub last_jump_speed: i32,
+    /// Existing protocol-26 jetpackFuel field (39), read only from snapshots.
+    pub jetpack_fuel: i32,
+    /// Runtime ownership of the new active flag, selected by current server policy.
+    /// This is never inferred from the snapshot's flags or stat-slot contents.
+    pub predicts_jetpack_flag: bool,
 }
 
 impl JaProState {
@@ -29,6 +48,11 @@ impl JaProState {
         Self {
             race: player.stats[STAT_RACEMODE] != 0,
             style: player.stats[STAT_MOVEMENTSTYLE],
+            restrictions: player.stats[STAT_RESTRICTIONS],
+            jump_time: player.stats[STAT_JUMPTIME] as i32,
+            last_jump_speed: player.stats[STAT_LASTJUMPSPEED] as i32,
+            jetpack_fuel: player.raw_field(39).unwrap_or(0) as i32,
+            predicts_jetpack_flag: false,
         }
     }
 }
@@ -40,9 +64,28 @@ pub struct JaProRules {
     pub enabled: bool,
     /// `JAPRO_CINFO_HIGHFPSFIX`, `jcinfo` bit 21.
     pub high_fps_fix: bool,
+    /// `JAPRO_CINFO_HEADSLIDE`, `jcinfo` bit 5: standing on a player has no friction.
+    pub head_slide: bool,
+    /// `JAPRO_CINFO_BHOP1`, bit 10: the server forces ordinary-height bunnyhops.
+    pub forced_bhop: bool,
+    /// `JAPRO_CINFO_BHOP2`, bit 26: the server supports the player's opt-in.
+    pub optional_bhop: bool,
+    /// Existing `cp_pluginDisable` bit 19; refreshed from the player's setting.
+    pub player_bhop: bool,
+    /// `JAPRO_CINFO_JETPACK`, bit 12, enables the new pack outside race mode.
+    pub jetpack: bool,
 }
 
 impl JaProRules {
+    /// Server-forced or player-selected only-bhop policy; foreign stat slots
+    /// and player settings never activate it without the current jaPRO dialect.
+    pub(crate) fn only_bhop(self, state: JaProState) -> bool {
+        self.enabled
+            && (self.forced_bhop
+                || self.optional_bhop && self.player_bhop
+                || state.restrictions & RESTRICT_BHOP != 0)
+    }
+
     /// Resolve the existing server dialect once when serverinfo changes.
     pub fn from_game_state(game: &GameState) -> Self {
         let Some(info) = game
@@ -59,6 +102,11 @@ impl JaProRules {
             } => Self {
                 enabled: true,
                 high_fps_fix: ja_pro_capabilities.contains(HIGH_FPS_FIX),
+                head_slide: ja_pro_capabilities.contains(1 << 5),
+                forced_bhop: ja_pro_capabilities.contains(1 << 10),
+                optional_bhop: ja_pro_capabilities.contains(1 << 26),
+                player_bhop: false,
+                jetpack: ja_pro_capabilities.contains(1 << 12),
             },
             _ => Self::default(),
         }

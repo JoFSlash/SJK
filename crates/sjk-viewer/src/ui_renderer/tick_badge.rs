@@ -1,9 +1,10 @@
 //! The ticks beside the gold one (`PROTOCOL.md` of the hub, "Ticks"), drawn once at start
 //! into icon cells ([`super::tick_texture`]): the verified seal's scalloped shape in a
-//! group's colours (JoF cyan, Sith crimson, Jawa leather), rusted for JKR's creator,
-//! silver ringed in the team's teal for SJK staff, and a sun for SJK's creator whose rays
-//! turn and over which a glint passes, in [`CREATOR_FRAMES`] cells the renderer steps
-//! through ([`super::animated`]), so it costs no more to draw than any icon.
+//! group's colours (JoF cyan, Sith crimson, Jawa leather), rusted for JKR's creator, a
+//! silver starburst edged in the team's teal for SJK staff, and a sun for SJK's creator
+//! whose rays turn and over which a glint passes, in [`CREATOR_FRAMES`] cells the
+//! renderer steps through ([`super::animated`]), so it costs no more to draw than any
+//! icon.
 //!
 //! Computed like the seal ([`super::verified_badge`]): signed distances blended over
 //! one pixel.
@@ -15,6 +16,14 @@ use sjk_identity::Tick;
 const LOBES: f32 = 8.0;
 const LOBE_DEPTH: f32 = 0.075;
 const RADIUS: f32 = 0.43;
+
+/// The staff's starburst: its points, how far their tips and the valleys between them
+/// reach, and the radius the face's shading and the tick are drawn to, as shares of the
+/// cell.
+const STAR_POINTS: f32 = 16.0;
+const STAR_REACH: f32 = 0.49;
+const STAR_VALLEY: f32 = 0.36;
+const STAR_FACE: f32 = 0.35;
 
 /// The creator's sun: cells in its loop, and how many the renderer shows a second.
 pub(crate) const CREATOR_FRAMES: u32 = 40;
@@ -60,14 +69,16 @@ const JKR: Palette = Palette {
     rim: [0.33, 0.12, 0.04],
     tick: [1.0, 0.93, 0.84],
 };
-/// Silver with the SJK TEAM pill's teal (`hud/player_card.rs`) as rim and tick: the
-/// tick coloured on a light face, where every other seal has a white tick.
+/// Silver with the SJK TEAM pill's teal (`hud/player_card.rs`), darkened, as edge and
+/// tick: the tick coloured on a light face, where every seal has a white tick.
 const STAFF: Palette = Palette {
-    top: [0.95, 0.97, 0.98],
-    bottom: [0.66, 0.71, 0.76],
-    rim: [0.13, 0.66, 0.6],
+    top: [0.97, 0.98, 0.99],
+    bottom: [0.62, 0.67, 0.73],
+    rim: [0.06, 0.42, 0.38],
     tick: [0.08, 0.55, 0.5],
 };
+/// The shaded side of the starburst's points.
+const STAFF_SHADE: [f32; 3] = [0.5, 0.56, 0.63];
 
 /// The colour a word about tick `tick` is written in beside it (the player card's
 /// VERIFIED): its face's, the gold seal's for gold; `None` for no tick.
@@ -88,11 +99,11 @@ pub(crate) fn accent(tick: Tick) -> Option<[f32; 3]> {
 /// loop; empty for a tick without a cell of its own (gold and none).
 pub(crate) fn pixels(size: u32, tick: Tick, frame: u32) -> Vec<u8> {
     match tick {
-        Tick::Jof => seal(size, &JOF, false, false),
-        Tick::Sith => seal(size, &SITH, false, false),
-        Tick::Jawa => seal(size, &JAWA, false, false),
-        Tick::Jkr => seal(size, &JKR, true, false),
-        Tick::Staff => seal(size, &STAFF, false, true),
+        Tick::Jof => seal(size, &JOF, false),
+        Tick::Sith => seal(size, &SITH, false),
+        Tick::Jawa => seal(size, &JAWA, false),
+        Tick::Jkr => seal(size, &JKR, true),
+        Tick::Staff => starburst(size, &STAFF),
         Tick::Creator => sun(size, frame),
         Tick::None | Tick::Gold | Tick::Other => Vec::new(),
     }
@@ -105,9 +116,8 @@ fn tick_distance(unit: [f32; 2]) -> f32 {
         .fold(f32::INFINITY, f32::min)
 }
 
-/// The scalloped seal in `palette`, `rusted` with patches of patina, `ringed` with a
-/// thin inner ring in the rim's colour.
-fn seal(size: u32, palette: &Palette, rusted: bool, ringed: bool) -> Vec<u8> {
+/// The scalloped seal in `palette`, `rusted` with patches of patina.
+fn seal(size: u32, palette: &Palette, rusted: bool) -> Vec<u8> {
     let side = size as f32;
     let radius = RADIUS * side;
     let centre = side * 0.5;
@@ -134,16 +144,59 @@ fn seal(size: u32, palette: &Palette, rusted: bool, ringed: bool) -> Vec<u8> {
                 );
                 face = mix(face, [1.0, 0.66, 0.38], (0.3 - stain).clamp(0.0, 0.3));
             }
-            let rim = (1.0
-                - (-outside / (side * if ringed { 0.05 } else { 0.03 })).clamp(0.0, 1.0))
-                * if ringed { 1.0 } else { 0.8 };
-            let mut colour = mix(face, palette.rim, rim);
-            if ringed {
-                let ring = ((length - radius * 0.8).abs() - side * 0.012) * 1.0;
-                colour = mix(colour, palette.rim, coverage(ring) * 0.85);
-            }
+            let rim = (1.0 - (-outside / (side * 0.03)).clamp(0.0, 1.0)) * 0.8;
+            let colour = mix(face, palette.rim, rim);
             let tick = coverage((tick_distance(unit) - TICK_HALF) * radius);
             let colour = mix(colour, palette.tick, tick);
+            push(&mut out, colour, coverage(outside));
+        }
+    }
+    out
+}
+
+/// The staff's starburst in `palette`: [`STAR_POINTS`] straight points, one up, each
+/// with its clockwise side in shade, a bright band slanting across the silver, the
+/// edge in the rim's colour and a tick a little bolder than the seals'.
+fn starburst(size: u32, palette: &Palette) -> Vec<u8> {
+    let side = size as f32;
+    let centre = side * 0.5;
+    let face = STAR_FACE * side;
+    let spoke = std::f32::consts::TAU / STAR_POINTS;
+    // The edge of a point lying along +x, from its tip to the valley on its +y side.
+    let tip = [STAR_REACH * side, 0.0];
+    let valley = [
+        STAR_VALLEY * side * (spoke * 0.5).cos(),
+        STAR_VALLEY * side * (spoke * 0.5).sin(),
+    ];
+    let along = [valley[0] - tip[0], valley[1] - tip[1]];
+    let mut out = Vec::with_capacity((size * size * 4) as usize);
+    for y in 0..size {
+        for x in 0..size {
+            let p = [x as f32 + 0.5 - centre, y as f32 + 0.5 - centre];
+            let length = (p[0] * p[0] + p[1] * p[1]).sqrt();
+            // The angle off the nearest point's middle line, the first point straight up.
+            let angle = p[1].atan2(p[0]) + std::f32::consts::FRAC_PI_2;
+            let off = angle - (angle / spoke).round() * spoke;
+            // Folded onto that edge: the distance to it in pixels, negative inside.
+            let folded = [length * off.cos(), length * off.abs().sin()];
+            let inside = along[0] * (folded[1] - tip[1]) - along[1] * (folded[0] - tip[0]);
+            let outside = segment(folded, tip, valley).copysign(-inside);
+            let unit = [p[0] / face, p[1] / face];
+            let mut colour = mix(
+                palette.top,
+                palette.bottom,
+                ((unit[1] + 1.0) * 0.5).clamp(0.0, 1.0),
+            );
+            let band = (1.0 - (unit[0] * 0.4 + unit[1] + 0.35).abs() / 0.18).clamp(0.0, 1.0);
+            colour = mix(colour, [1.0; 3], band * 0.5);
+            // From where the points leave the face, each one's far side in shade.
+            let points = ((length - 0.3 * side) / (0.08 * side)).clamp(0.0, 1.0);
+            let shaded = (off * length + 0.5).clamp(0.0, 1.0);
+            colour = mix(colour, STAFF_SHADE, shaded * points * 0.5);
+            let rim = (1.0 - (-outside / (side * 0.05)).clamp(0.0, 1.0)) * 0.9;
+            colour = mix(colour, palette.rim, rim);
+            let tick = coverage((tick_distance(unit) - TICK_HALF * 1.1) * face);
+            colour = mix(colour, palette.tick, tick);
             push(&mut out, colour, coverage(outside));
         }
     }
@@ -262,6 +315,25 @@ mod tests {
             assert!(check(face), "{tick:?}: {face:?}");
         }
         assert!(pixels(size, Tick::Gold, 0).is_empty());
+    }
+
+    #[test]
+    fn the_staff_tick_is_a_starburst() {
+        let size = 128;
+        let star = pixels(size, Tick::Staff, 0);
+        let spoke = std::f32::consts::TAU / STAR_POINTS;
+        // Alpha at `turn` radians clockwise from straight up, past the valleys' reach.
+        let alpha = |turn: f32| {
+            let reach = 0.44 * size as f32;
+            let x = 64.0 + reach * turn.sin();
+            let y = 64.0 - reach * turn.cos();
+            at(&star, size, x as u32, y as u32)[3]
+        };
+        for point in 0..STAR_POINTS as u32 {
+            let turn = point as f32 * spoke;
+            assert!(alpha(turn) > 200, "point {point}: {}", alpha(turn));
+            assert_eq!(alpha(turn + spoke * 0.5), 0, "between points {point}");
+        }
     }
 
     #[test]

@@ -5,9 +5,11 @@ use sjk_vfs::VirtualFileSystem;
 use std::error::Error;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{OnceLock, RwLock};
+use std::sync::{Arc, RwLock};
 
-static STARTUP: OnceLock<Options> = OnceLock::new();
+/// The settings every mount reads: frozen at startup ([`initialize`]), save for the
+/// pack choices, which `fs_restart` takes again ([`reload_pack_choices`]).
+static STARTUP: RwLock<Option<Arc<Options>>> = RwLock::new(None);
 
 /// Further content roots that stand in for files installed in the game's own
 /// folders, by owner: SJK's JoF content folder while its switch is on
@@ -69,7 +71,8 @@ const COSMETIC_FOLDERS: [&str; 2] = ["models/cosmetics/hats", "models/cosmetics/
 /// servers play, such as `sound/jof/repulse.mp3`.
 const JOF_CLIENT_FOLDER: &str = "gfx/jof";
 
-/// Immutable startup settings shared by world-loading workers.
+/// Startup settings shared by world-loading workers.
+#[derive(Clone)]
 pub(crate) struct Options {
     game: String,
     basegame: String,
@@ -104,7 +107,7 @@ pub(crate) fn register(cvars: &mut CvarRegistry) -> Result<(), sjk_shell::CvarEr
             pack_policy::CVAR,
             "[]",
             CvarFlags::ARCHIVE,
-            "Disabled installed PK3 packs (JSON list); edit in assetbrowser; client restart required",
+            "Disabled installed PK3 packs (JSON list); edit in assetbrowser; applies at fs_restart",
         ),
         CvarDefinition::new(
             "fs_game",
@@ -156,18 +159,44 @@ pub(crate) fn register(cvars: &mut CvarRegistry) -> Result<(), sjk_shell::CvarEr
 
 /// Freeze settings once before the first native world load; evidence defaults stay isolated.
 pub(crate) fn initialize(console: &ViewerConsole) -> Result<(), Box<dyn Error>> {
-    STARTUP
-        .set(Options::from_console(console)?)
-        .map_err(|_| "asset startup settings already initialized")?;
+    let options = Options::from_console(console)?;
+    let mut startup = STARTUP.write().unwrap_or_else(|error| error.into_inner());
+    if startup.is_some() {
+        return Err("asset startup settings already initialized".into());
+    }
+    *startup = Some(Arc::new(options));
     Ok(())
 }
 
-/// Snapshot shared by all subsequent mounts without locks or config reads.
-pub(crate) fn startup() -> &'static Options {
-    STARTUP.get_or_init(Options::default)
+/// Snapshot shared by all subsequent mounts without config reads.
+pub(crate) fn startup() -> Arc<Options> {
+    if let Some(options) = &*STARTUP.read().unwrap_or_else(|error| error.into_inner()) {
+        return Arc::clone(options);
+    }
+    let mut startup = STARTUP.write().unwrap_or_else(|error| error.into_inner());
+    Arc::clone(startup.get_or_insert_with(|| Arc::new(Options::default())))
+}
+
+/// `fs_restart`: take the pack choices (`fs_disabledPaks`) again for the mounts from
+/// now on. The other settings keep their startup values, as their help says.
+pub(crate) fn reload_pack_choices(console: &ViewerConsole) -> Result<(), Box<dyn Error>> {
+    let disabled =
+        pack_policy::Disabled::parse(console.text_value(pack_policy::CVAR).unwrap_or("[]"))?;
+    let current = startup();
+    let mut startup = STARTUP.write().unwrap_or_else(|error| error.into_inner());
+    *startup = Some(Arc::new(current.with_pack_choices(disabled)));
+    Ok(())
 }
 
 impl Options {
+    /// These settings with `disabled` as the pack choices.
+    fn with_pack_choices(&self, disabled: pack_policy::Disabled) -> Self {
+        Self {
+            disabled,
+            ..self.clone()
+        }
+    }
+
     pub(crate) fn from_console(console: &ViewerConsole) -> Result<Self, Box<dyn Error>> {
         let game = console.text_value("fs_game").unwrap_or("").to_owned();
         let basegame = console.text_value("fs_basegame").unwrap_or("").to_owned();
@@ -447,6 +476,7 @@ impl Options {
         crate::boombox::mount(&mut vfs)?;
         crate::monitor::mount(&mut vfs)?;
         crate::box_hunt::mount(&mut vfs)?;
+        crate::banana::mount(&mut vfs)?;
         crate::tags::mount(&mut vfs)?;
         crate::mystery_box::mount(&mut vfs)?;
         crate::saber_petals::mount(&mut vfs)?;
@@ -752,6 +782,26 @@ mod tests {
         assert!(source(&options).ends_with("a.pk3"));
         options.disabled.toggle("base/zzz.pk3");
         assert!(source(&options).ends_with("zzz.pk3"));
+    }
+
+    #[test]
+    fn fs_restart_takes_new_pack_choices_and_keeps_the_rest() {
+        let install = tempfile::tempdir().unwrap();
+        let base = install.path().join("base");
+        std::fs::create_dir_all(&base).unwrap();
+        pk3(&base.join("zzz.pk3"), &["models/fixture.md3"]);
+        let started = Options {
+            game: "mymod".into(),
+            protect_shaders: false,
+            ..Options::default()
+        };
+        let mut disabled = pack_policy::Disabled::default();
+        disabled.toggle("base/zzz.pk3");
+        let restarted = started.with_pack_choices(disabled);
+        assert_eq!(restarted.game, "mymod");
+        assert!(!restarted.protect_shaders);
+        assert!(!restarted.disabled.allows(&base.join("zzz.pk3")));
+        assert!(started.disabled.allows(&base.join("zzz.pk3")));
     }
 
     #[test]

@@ -65,6 +65,7 @@ pub(crate) fn observe_snapshot(
     now: Instant,
 ) -> Observation {
     let count = pool.observe(snapshot);
+    let flesh_sparks = pool.flesh_sparks();
     let mut visual_requests = 0;
     let mut flare_latches = 0;
     for index in 0..count {
@@ -72,7 +73,7 @@ pub(crate) fn observe_snapshot(
             continue;
         };
         flare_latches += usize::from(latch_clash_flare(clash_flare, impact, snapshot.server_time));
-        visual_requests += spawn_impact(impact, local, &mut sinks, now);
+        visual_requests += spawn_impact(impact, local, flesh_sparks, &mut sinks, now);
     }
     Observation {
         events: count,
@@ -102,16 +103,18 @@ pub(crate) fn latch_clash_flare(
     latches
 }
 
-/// Spawn every visual `CG_EntityEvent` selects for one impact.
+/// Spawn every visual `CG_EntityEvent` selects for one impact, a saber hit's sparks
+/// at `cg_fleshSparks` `flesh_sparks` ([`impacts::plan`]).
 pub(crate) fn spawn_impact(
     mut impact: sjk_client::LegacyImpactEvent,
     local: LocalView,
+    flesh_sparks: u8,
     sinks: &mut Sinks<'_>,
     now: Instant,
 ) -> usize {
     impact.start = local.beam_start(impact);
     let mut spawned = 0;
-    for visual in impacts::plan(impact).iter() {
+    for visual in impacts::plan(impact, flesh_sparks).iter() {
         // Each effect of a run has its own seed, as if it were its own visual.
         let seed = |visual_index: usize| {
             u32::from(impact.entity_number)
