@@ -10,14 +10,59 @@ models/sjk/fishing
 	}
 }
 
-// The pond's water: ripples that drift and sway, lit as the rest.
+// The pond, drawn with the installed game's own swamp textures (only their names are
+// here: they come from the player's base assets, as a map's do). Its water is the
+// stock dark water under two of Hidden Evil's lake layers, drifting as on that map.
 models/sjk/fishing_pond_water
 {
 	cull none
 	{
-		map models/sjk/fishing_pond
+		map textures/common/water_1
 		rgbGen lightingDiffuse
-		tcMod turb 0 0.02 0 0.15
-		tcMod scroll 0.03 0.015
+		tcMod turb 0.5 0.04 0 0.3
+	}
+	{
+		map textures/h_evil/wf3
+		blendFunc GL_SRC_ALPHA GL_ONE_MINUS_SRC_ALPHA
+		rgbGen lightingDiffuse
+		alphaGen const 0.16
+		tcMod scroll 0.03 -0.13
+	}
+	{
+		map textures/h_evil/wfn2
+		blendFunc GL_SRC_ALPHA GL_ONE_MINUS_SRC_ALPHA
+		rgbGen lightingDiffuse
+		alphaGen const 0.12
+		tcMod turb 1 0.02 0 0.15
+		tcMod scroll -0.03 -0.1
+	}
+}
+
+// The bank: Yavin's mossy mud.
+models/sjk/fishing_pond_bank
+{
+	{
+		map textures/yavin/s_mud2
+		rgbGen lightingDiffuse
+	}
+}
+
+// The stones: Yavin's mossy rock.
+models/sjk/fishing_pond_stone
+{
+	{
+		map textures/yavin/s_rock4
+		rgbGen lightingDiffuse
+	}
+}
+
+// Leaves floating on the water and lying on the bank: Yavin's ground plants.
+models/sjk/fishing_pond_leaves
+{
+	cull none
+	{
+		map textures/yavin/groundplants
+		alphaFunc GE128
+		rgbGen lightingDiffuse
 	}
 }

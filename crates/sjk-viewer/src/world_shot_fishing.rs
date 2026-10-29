@@ -12,8 +12,8 @@ const VIEWS: [(Vec3, Vec3); 4] = [
     // The camera from the first fisher in its yaw frame, and where it looks at.
     (Vec3::new(-110.0, -40.0, 50.0), Vec3::new(50.0, 0.0, -10.0)),
     (Vec3::new(30.0, -150.0, 30.0), Vec3::new(40.0, 0.0, -10.0)),
-    (Vec3::new(-20.0, -60.0, 10.0), Vec3::new(20.0, 0.0, -10.0)),
-    (Vec3::new(-40.0, 0.0, 180.0), Vec3::new(40.0, 0.0, -20.0)),
+    (Vec3::new(20.0, -60.0, 16.0), Vec3::new(72.0, 0.0, -20.0)),
+    (Vec3::new(10.0, 0.0, 170.0), Vec3::new(60.0, 0.0, -20.0)),
 ];
 
 #[test]

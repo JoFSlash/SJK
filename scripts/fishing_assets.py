@@ -5,17 +5,18 @@ and the line between. Nothing here comes from another game: every part is a few
 cylinders and flat colours. This script writes, into the output folder:
 
 - `fishing.png`: the colour atlas, 128x128, a flat colour in each 16x16 cell;
-- `fishing_pond.png`: the pond's water, 128x128, ripples that tile (the shader moves
-  them);
 - `fishing_rod.md3`: the rod along +X, 72 units from its butt (the origin) to its tip;
 - `fishing_bucket.md3`: an open bucket with water in it and a handle, its origin in the
   middle of its bottom;
 - `fishing_float.md3`: the float, red over white, its origin where it meets the water;
 - `fishing_line.md3`: a thin square strand along +X, 64 units long (scaled to length);
 - `fishing_fish.md3`: a small fish along +X, its origin in its middle;
-- `fishing_pond.md3`: a small round pond with a muddy bank, stones round it, two lily
-  pads and reeds, its origin in the middle of its water at ground level, for a cast
-  where there is no water (the toy fishes anywhere);
+- `fishing_pond.md3`: a small round pond with a muddy bank, mossy stones round it,
+  floating leaves and reeds, its origin in the middle of its water at ground level, for
+  a cast where there is no water (the toy fishes anywhere). Its water, bank, stones and
+  leaves are drawn with the installed game's own swamp textures (named in
+  `fishing.shader`; nothing of them is copied here), so the pond looks like the maps'
+  water; only the reeds use the atlas;
 - `toy_fishing.png`: the toy's icon, 128x128 like `gfx/mp/f_icon_*`: a rod over a
   bucket, on transparency.
 
@@ -33,6 +34,9 @@ from pathlib import Path
 
 SHADER = "models/sjk/fishing"
 POND_SHADER = "models/sjk/fishing_pond_water"
+BANK_SHADER = "models/sjk/fishing_pond_bank"
+STONE_SHADER = "models/sjk/fishing_pond_stone"
+LEAF_SHADER = "models/sjk/fishing_pond_leaves"
 ATLAS = 128
 CELL = 16
 ICON_SIZE = 128
@@ -53,13 +57,6 @@ COLOURS = {
     "line": ((1, 2), (220, 224, 226)),
     "fish": ((2, 2), (226, 140, 52)),
     "fish_belly": ((3, 2), (240, 220, 180)),
-    "pond": ((0, 3), (52, 110, 150)),
-    "pond_edge": ((1, 3), (70, 96, 64)),
-    "mud": ((2, 3), (84, 70, 50)),
-    "rock": ((3, 3), (128, 126, 120)),
-    "rock_dark": ((4, 0), (96, 94, 90)),
-    "lily": ((4, 1), (64, 140, 60)),
-    "flower": ((4, 2), (236, 150, 190)),
     "reed": ((4, 3), (98, 130, 62)),
     "cattail": ((5, 0), (104, 70, 40)),
 }
@@ -123,6 +120,14 @@ class Mesh:
         self.positions.append(tuple(p))
         self.normals.append(tuple(n))
         self.uvs.append(uv(cell))
+        return len(self.positions) - 1
+
+    def vertex_st(self, p, n, st) -> int:
+        """A vertex with its own texture coordinates, for a surface with its own
+        texture rather than the atlas."""
+        self.positions.append(tuple(p))
+        self.normals.append(tuple(n))
+        self.uvs.append(tuple(st))
         return len(self.positions) - 1
 
     def tube(self, axis: int, start: float, end: float, r0: float, r1: float, cell: str,
@@ -316,100 +321,122 @@ def fish(output: Path) -> None:
     mesh.write(output, "fishing_fish")
 
 
-POND_RADIUS = 20.0
+POND_RADIUS = 32.0
 POND_WATER = 0.8
 
 
-def pond_water_texture(output: Path) -> None:
-    """Water that tiles: a blue ground under soft ripple bands, whole periods across
-    the picture so the shader can scroll it."""
-    size = 128
-    pixels = bytearray(size * size * 4)
-    for y in range(size):
-        for x in range(size):
-            u, v = 2 * math.pi * x / size, 2 * math.pi * y / size
-            wave = (
-                math.sin(3 * u + 2 * math.sin(2 * v))
-                + 0.6 * math.sin(5 * v + 1.5 * math.sin(3 * u))
-                + 0.35 * math.sin(7 * (u + v))
-            ) / 1.95
-            light = max(0.0, wave) ** 3
-            shade = 0.86 + 0.1 * wave
-            r = 36 * shade + 150 * light
-            g = 96 * shade + 150 * light
-            b = 136 * shade + 120 * light
-            i = (y * size + x) * 4
-            pixels[i : i + 4] = bytes((min(255, round(r)), min(255, round(g)), min(255, round(b)), 255))
-    png(output / "fishing_pond.png", size, size, pixels)
-
-
-def rock(radius: float, height: float, cell: str, sides: int, twist: float) -> Mesh:
-    """A low stone: a squat, faceted lump, wider at the bottom."""
+def rock(radius: float, height: float, sides: int, twist: float) -> Mesh:
+    """A low stone: a squat, faceted lump, wider at the bottom, its texture wrapped
+    round it."""
     mesh = Mesh()
-    mesh.tube(2, 0.0, height * 0.6, radius, radius * 0.8, cell, sides=sides, caps=False)
-    mesh.tube(2, height * 0.6, height, radius * 0.8, radius * 0.3, cell, sides=sides)
-    c, s = math.cos(twist), math.sin(twist)
-    out = Mesh()
-    out.add(mesh, lambda p, n: ((p[0] * c - p[1] * s, p[0] * s + p[1] * c, p[2]),
-                                (n[0] * c - n[1] * s, n[0] * s + n[1] * c, n[2])))
-    return out
+    rings = ((0.0, radius), (height * 0.6, radius * 0.8), (height, radius * 0.3))
+    loops = []
+    for z, r in rings:
+        loop = []
+        for i in range(sides + 1):
+            a = 2 * math.pi * i / sides + twist
+            n = (math.cos(a), math.sin(a), 0.6 if z else 0.2)
+            loop.append(mesh.vertex_st((r * math.cos(a), r * math.sin(a), z), n,
+                                       (i / sides, z / 8.0)))
+        loops.append(loop)
+    for lower, upper in zip(loops, loops[1:]):
+        for i in range(sides):
+            mesh.triangles += [(lower[i], upper[i + 1], upper[i]),
+                               (lower[i], lower[i + 1], upper[i + 1])]
+    top = mesh.vertex_st((0.0, 0.0, height * 1.05), (0, 0, 1), (0.5, height / 8.0 + 0.1))
+    last = loops[-1]
+    for i in range(sides):
+        mesh.triangles.append((top, last[i], last[i + 1]))
+    return mesh
+
+
+# The quarters of the game's leaf sheet (`textures/yavin/groundplants`) that the
+# floating clumps and bank patches show: (s0, t0, s1, t1).
+LEAF_PARTS = ((0.0, 0.0, 0.5, 0.5), (0.5, 0.0, 1.0, 0.5), (0.0, 0.5, 0.5, 1.0),
+              (0.5, 0.5, 1.0, 1.0))
+
+
+def leaf_patch(mesh: Mesh, x: float, y: float, z: float, size: float, turn: float,
+               part) -> None:
+    """A flat square of leaves (alpha-tested) centred on `(x, y)` at height `z`."""
+    s0, t0, s1, t1 = part
+    c, s = math.cos(turn), math.sin(turn)
+    corners = []
+    for dx, dy, st in ((-1, -1, (s0, t1)), (1, -1, (s1, t1)), (1, 1, (s1, t0)),
+                       (-1, 1, (s0, t0))):
+        px, py = dx * size / 2, dy * size / 2
+        corners.append(mesh.vertex_st((x + px * c - py * s, y + px * s + py * c, z),
+                                      (0, 0, 1), st))
+    mesh.triangles += [(corners[0], corners[2], corners[1]),
+                       (corners[0], corners[3], corners[2])]
 
 
 def pond(output: Path) -> None:
-    """The pond: its water (its own surface and shader, mapped flat so the ripples keep
-    their size), a muddy bank sloping up to the ground, stones round it, two lily pads,
-    one in flower, and two clumps of reeds with cattails."""
+    """The pond: its water, mapped flat so the game's ripples keep their size; a muddy
+    bank from under the water's edge up and out to the ground; mossy stones round it;
+    clumps of leaves floating and on the bank; and two clumps of reeds with cattails."""
+    sides = 32
+
+    def wobble(a: float) -> float:
+        return 1.0 + 0.06 * math.sin(3 * a) + 0.04 * math.sin(7 * a + 1)
+
     water = Mesh()
-    sides = 24
-    hub = len(water.positions)
-    water.positions.append((0.0, 0.0, POND_WATER))
-    water.normals.append((0, 0, 1))
-    water.uvs.append((0.5, 0.5))
+    hub = water.vertex_st((0.0, 0.0, POND_WATER), (0, 0, 1), (0.0, 0.0))
     for i in range(sides):
         a = 2 * math.pi * i / sides
-        x, y = POND_RADIUS * math.cos(a), POND_RADIUS * math.sin(a)
-        water.positions.append((x, y, POND_WATER))
-        water.normals.append((0, 0, 1))
-        water.uvs.append((0.5 + x / 48.0, 0.5 + y / 48.0))
+        r = POND_RADIUS * wobble(a)
+        x, y = r * math.cos(a), r * math.sin(a)
+        water.vertex_st((x, y, POND_WATER), (0, 0, 1), (x / 64.0, y / 64.0))
     for i in range(sides):
         water.triangles.append((hub, hub + 1 + (i + 1) % sides, hub + 1 + i))
 
-    land = Mesh()
-    # The bank: from under the water's edge up and out to the ground.
-    inner, outer = [], []
-    for i in range(sides):
-        a = 2 * math.pi * i / sides
-        wobble = 1.0 + 0.06 * math.sin(3 * a) + 0.04 * math.sin(7 * a + 1)
-        n = (math.cos(a) * -0.3, math.sin(a) * -0.3, 1.0)
-        inner.append(land.vertex((POND_RADIUS * 0.96 * math.cos(a), POND_RADIUS * 0.96 * math.sin(a), 0.2), n, "mud"))
-        r = (POND_RADIUS + 6.0) * wobble
-        outer.append(land.vertex((r * math.cos(a), r * math.sin(a), 0.05), (0, 0, 1), "pond_edge"))
-    for i in range(sides):
-        j = (i + 1) % sides
-        land.triangles += [(inner[i], outer[j], inner[j]), (inner[i], outer[i], outer[j])]
-    # Stones round the bank.
-    stones = 13
-    for i in range(stones):
-        a = 2 * math.pi * (i + 0.3 * math.sin(i * 2.3)) / stones
-        r = POND_RADIUS + 3.5 + 1.5 * math.sin(i * 1.7)
-        size = 2.2 + 1.2 * (0.5 + 0.5 * math.sin(i * 3.1))
-        stone = rock(size, size * 0.8, "rock" if i % 3 else "rock_dark", 5 + i % 3, i * 0.9)
+    # The bank: three rings, under the water's edge, a low lip just above it, and the
+    # ground, the mud mapped flat.
+    bank = Mesh()
+    rings = []
+    for scale, extra, z in ((0.94, 0.0, 0.1), (1.0, 3.0, 2.0), (1.0, 10.0, 0.05)):
+        ring = []
+        for i in range(sides):
+            a = 2 * math.pi * i / sides
+            r = POND_RADIUS * wobble(a) * scale + extra
+            x, y = r * math.cos(a), r * math.sin(a)
+            n = (-0.3 * math.cos(a), -0.3 * math.sin(a), 1.0) if extra < 3 else (0, 0, 1)
+            ring.append(bank.vertex_st((x, y, z), n, (x / 48.0, y / 48.0)))
+        rings.append(ring)
+    for inner, outer in zip(rings, rings[1:]):
+        for i in range(sides):
+            j = (i + 1) % sides
+            bank.triangles += [(inner[i], outer[j], inner[j]), (inner[i], outer[i], outer[j])]
+
+    stones = Mesh()
+    count = 15
+    for i in range(count):
+        a = 2 * math.pi * (i + 0.3 * math.sin(i * 2.3)) / count
+        r = POND_RADIUS * wobble(a) + 4.0 + 1.5 * math.sin(i * 1.7)
+        size = 3.5 + 2.5 * (0.5 + 0.5 * math.sin(i * 3.1))
+        stone = rock(size, size * 0.8, 6 + i % 3, i * 0.9)
         x, y = r * math.cos(a), r * math.sin(a)
-        land.add(stone, lambda p, n, x=x, y=y: ((p[0] + x, p[1] + y, p[2]), n))
-    # Two lily pads on the water, one in flower.
-    for x, y, flower in ((-8.0, 6.0, True), (6.0, -9.0, False)):
-        pad = Mesh()
-        pad.disc(POND_WATER + 0.15, 3.0, "lily", sides=10)
-        land.add(pad, lambda p, n, x=x, y=y: ((p[0] + x, p[1] + y, p[2]), n))
-        if flower:
-            bloom = Mesh()
-            bloom.tube(2, POND_WATER + 0.15, POND_WATER + 1.3, 0.6, 1.1, "flower", sides=6)
-            land.add(bloom, lambda p, n, x=x, y=y: ((p[0] + x + 0.8, p[1] + y, p[2]), n))
+        stones.add(stone, lambda p, n, x=x, y=y: ((p[0] + x, p[1] + y, p[2]), n))
+
+    # Leaves: clumps floating near the edge of the water, patches on the bank.
+    leaves = Mesh()
+    for k, (a, r, size) in enumerate(((0.6, 0.7, 11.0), (2.0, 0.6, 9.0),
+                                      (3.6, 0.72, 10.0), (4.9, 0.5, 8.0))):
+        r *= POND_RADIUS
+        leaf_patch(leaves, r * math.cos(a), r * math.sin(a), POND_WATER + 0.1, size,
+                   a * 1.7, LEAF_PARTS[k % 4])
+    for k in range(9):
+        a = 2 * math.pi * (k + 0.5) / 9 + 0.2 * math.sin(k)
+        r = POND_RADIUS * wobble(a) + 5.0
+        leaf_patch(leaves, r * math.cos(a), r * math.sin(a), 0.4 + 0.02 * k, 8.0,
+                   k * 2.1, LEAF_PARTS[(k + 1) % 4])
+
     # Two clumps of reeds on the bank, cattails on the tallest.
+    reeds = Mesh()
     for a0 in (2.3, 5.4):
         for k in range(5):
             a = a0 + 0.12 * (k - 2)
-            r = POND_RADIUS + 1.5 + 0.8 * (k % 2)
+            r = POND_RADIUS * wobble(a) + 1.5 + 0.8 * (k % 2)
             height = 13.0 + 3.0 * math.sin(k * 2.1 + a0)
             lean = 0.08 * (k - 2)
             stem = Mesh()
@@ -417,8 +444,11 @@ def pond(output: Path) -> None:
             if k % 2 == 0:
                 stem.tube(2, height * 0.72, height * 0.88, 0.55, 0.55, "cattail", sides=6)
             x, y = r * math.cos(a), r * math.sin(a)
-            land.add(stem, lambda p, n, x=x, y=y, lean=lean: ((p[0] + x + lean * p[2], p[1] + y, p[2]), n))
-    write_md3(output, "fishing_pond", [(water, POND_SHADER), (land, SHADER)])
+            reeds.add(stem, lambda p, n, x=x, y=y, lean=lean: ((p[0] + x + lean * p[2], p[1] + y, p[2]), n))
+    write_md3(output, "fishing_pond", [
+        (water, POND_SHADER), (bank, BANK_SHADER), (stones, STONE_SHADER),
+        (leaves, LEAF_SHADER), (reeds, SHADER),
+    ])
 
 
 def icon(output: Path) -> None:
@@ -480,7 +510,6 @@ def main() -> None:
     float_model(output)
     line(output)
     fish(output)
-    pond_water_texture(output)
     pond(output)
     icon(output)
 

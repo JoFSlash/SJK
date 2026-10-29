@@ -66,7 +66,7 @@ macro_rules! bundled {
 }
 
 /// The bundled files at their game paths.
-const FILES: [(&str, &[u8]); 10] = [
+const FILES: [(&str, &[u8]); 9] = [
     (ROD, bundled!("fishing_rod.md3")),
     (BUCKET, bundled!("fishing_bucket.md3")),
     (FLOAT, bundled!("fishing_float.md3")),
@@ -74,7 +74,6 @@ const FILES: [(&str, &[u8]); 10] = [
     (FISH, bundled!("fishing_fish.md3")),
     (POND, bundled!("fishing_pond.md3")),
     ("models/sjk/fishing.png", bundled!("fishing.png")),
-    ("models/sjk/fishing_pond.png", bundled!("fishing_pond.png")),
     ("shaders/sjk_fishing.shader", bundled!("fishing.shader")),
     (ICON, bundled!("toy_fishing.png")),
 ];
@@ -155,7 +154,6 @@ const SPOT_MOVED: f32 = 24.0;
 /// What a hooked bite brings up.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum Kind {
-    Nothing,
     Junk,
     Fish,
 }
