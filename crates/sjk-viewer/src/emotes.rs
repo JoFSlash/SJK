@@ -383,7 +383,8 @@ impl Music {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) enum Cue {
     /// Start `sound` `offset` into it (a synced emote's music joining the leader's),
-    /// at the sample `align`'s plays it (the leader's, for a follower).
+    /// at the sample `align`'s plays it (the leader's, for a follower; another of its
+    /// group's, for music back from away: [`ActiveEmotes::set_quiet`]).
     Start {
         slot: u8,
         sound: String,
@@ -563,6 +564,7 @@ impl ActiveEmotes {
         def: Option<&EmoteDef>,
         now: Instant,
     ) -> bool {
+        let align = self.in_step_with(slot);
         let Some(active) = self
             .slots
             .get_mut(usize::from(slot))
@@ -591,12 +593,36 @@ impl ActiveEmotes {
                 slot,
                 sound: sound.to_owned(),
                 offset,
-                align: active.leader,
+                align,
             });
             active.next_sound =
                 next.map(|next| (now + next, music.then.clone(), music.then_length));
         }
         true
+    }
+
+    /// Another player of `slot`'s synced group (its leader, else one following the
+    /// same leader) whose music plays, for `slot`'s music coming back to start at the
+    /// sample theirs plays. A leader back from away has no leader of its own, and a
+    /// follower's leader may be away too: the clock alone would bring it back a few
+    /// milliseconds off the others, two copies heard apart rather than one song (hub
+    /// report #195). `None` when it is in no group or no one else in it plays.
+    fn in_step_with(&self, slot: u8) -> Option<u8> {
+        let active = self.get(slot)?;
+        let root = active.leader.unwrap_or(slot);
+        let audible = |other: u8| {
+            other != slot
+                && self.follows(slot, other)
+                && self
+                    .get(other)
+                    .is_some_and(|it| !it.quiet && !it.sound.is_empty())
+        };
+        if audible(root) {
+            return Some(root);
+        }
+        self.playing()
+            .find(|(other, it)| it.leader == Some(root) && audible(*other))
+            .map(|(other, _)| other)
     }
 
     /// The player's own command carried `buttons`: with `enabled`
@@ -1305,6 +1331,40 @@ mod tests {
         // A third joining the follower follows the first leader.
         assert!(active.sync(3, 2, "heavy", Some(&heavy()), Some([0.0; 3]), late));
         assert_eq!(active.get(3).unwrap().leader, Some(1));
+    }
+
+    #[test]
+    fn music_back_from_away_lines_up_with_the_group_still_playing() {
+        let t0 = Instant::now();
+        let mut active = ActiveEmotes::default();
+        active.start(1, "heavy", Some(&heavy()), Some([0.0; 3]), t0);
+        assert!(active.sync(2, 1, "heavy", Some(&heavy()), Some([0.0; 3]), t0));
+        assert!(active.sync(3, 1, "heavy", Some(&heavy()), Some([0.0; 3]), t0));
+        let back = t0 + Duration::from_millis(1000);
+        let start = |slot, align| Cue::Start {
+            slot,
+            sound: "a.wav".into(),
+            offset: Duration::from_millis(1000),
+            align,
+        };
+        // The leader alt-tabs and comes back (hub report #195): its music starts at
+        // the sample a follower's plays, not from the clock alone.
+        assert!(active.set_quiet(1, true, Some(&heavy()), t0));
+        let _ = active.take_cues();
+        assert!(active.set_quiet(1, false, Some(&heavy()), back));
+        assert_eq!(active.take_cues(), [start(1, Some(2))]);
+        // A follower back while its leader is away lines up with the other follower.
+        assert!(active.set_quiet(1, true, Some(&heavy()), back));
+        assert!(active.set_quiet(2, true, Some(&heavy()), back));
+        let _ = active.take_cues();
+        assert!(active.set_quiet(2, false, Some(&heavy()), back));
+        assert_eq!(active.take_cues(), [start(2, Some(3))]);
+        // A follower back with its leader playing lines up with the leader, as before.
+        assert!(active.set_quiet(1, false, Some(&heavy()), back));
+        assert!(active.set_quiet(3, true, Some(&heavy()), back));
+        let _ = active.take_cues();
+        assert!(active.set_quiet(3, false, Some(&heavy()), back));
+        assert_eq!(active.take_cues(), [start(3, Some(1))]);
     }
 
     #[test]

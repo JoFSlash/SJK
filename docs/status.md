@@ -1,3 +1,21 @@
+## Synced emote music back from alt-tab in step
+
+29/10/2026, `fix/emote-sound-alt-tab`, based on `main` `b558d4ae`, hub report #195 (build
+2026.1028.1, CTF4: with 3+ players dancing, alt-tabbing changed the sound until it reset).
+Alt-tabbing quiets the player's emote (`quiet`), and coming back (`loud`) restarts its music
+from the clock (`ActiveEmotes::set_quiet`), aligned only to its leader's voice. The group's
+leader has no leader, so its music came back a few milliseconds off the followers', which
+stayed in step with each other: the mixer merges only voices at the very same sample
+(`same_sample`, `MixerConfig::protected_channels`), so two copies played apart, heard as a
+changed, doubled sound until the loop came round and every copy restarted together. A
+follower back while its leader was away had the same fault. Coming back now aligns to the
+leader's music, or, when the leader is the one back or is away, to another follower's
+(`ActiveEmotes::in_step_with`; [hub-chat.md](hub-chat.md#emotes-in-the-client)). No hub change.
+Verified: the unit test `music_back_from_away_lines_up_with_the_group_still_playing`, fmt,
+build, Clippy and the workspace's tests. The reporter's video agrees (silence while away,
+then a denser, layered sound for about 6 seconds, then normal again), but whether the
+reporter led the group is not known. Not reproduced or tried in a game.
+
 ## Holo frame nameplates
 
 28/10/2026, `personal/holo-nameplates`, based on `main` `8f73ab73` (Sol's switch to design C,

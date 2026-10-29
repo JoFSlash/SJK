@@ -1089,7 +1089,12 @@ the server, an SJK player or not.
   dance left running on purpose, whose music going quiet stopped it for everyone; since
   20/10/2026, hub report #107), unless they are away already. Going away, an emote the player plays goes quiet for everyone: the client
   posts `quiet` and each client stops its music (`ActiveEmotes::set_quiet`) while it
-  keeps time, so `loud`, posted on the way back, plays it again from where it would be.
+  keeps time, so `loud`, posted on the way back, plays it again from where it would be:
+  in a synced group, at the very sample the leader's music plays, or another
+  follower's when the leader is the one back or away too (`ActiveEmotes::in_step_with`;
+  since 29/10/2026, hub report #195: a leader back from alt-tab came in from the clock
+  alone, a few milliseconds off the followers, and the group sounded doubled until the
+  loop came round).
   Alt-tabbing out or minimising always does this to an emote playing, whatever
   `cg_awayAltTab` says (Sol's rule, 23/10/2026, `away_emote::alt_tab_quiets`): the
   setting only decides whether alt-tabbing with no emote playing starts the away emote
