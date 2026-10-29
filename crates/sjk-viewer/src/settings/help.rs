@@ -929,7 +929,7 @@ const HELP: &[(&str, &str)] = &[
     ),
     (
         crate::remap_blocked_maps::SERVER_CVAR,
-        "Lets servers swap the map's textures. Off by default; the map's own swaps and SJK's map fixes always apply.",
+        "Lets servers swap the map's textures. On by default; the map's own swaps and SJK's map fixes always apply.",
     ),
     (
         "cg_remaps",

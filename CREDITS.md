@@ -860,7 +860,9 @@ Turin, a player, asked for private messages to be heard with the public chat sou
 Sol built chat sounds by kind, each with its own sound (23/10/2026).
 
 Rollembones, a player, asked for emotes to stay on while typing: Sol built it as
-Typing keeps emote in Settings > Sound > Emotes (23/10/2026).
+Typing keeps emote in Settings > Sound > Emotes (23/10/2026). He asked too for server
+remaps to be on by default, as everyone turned them on anyway: Slash made
+`cg_serverRemaps` default to on again (29/10/2026).
 
 Sanjisan, a player, asked to whisper a player by clicking their name in the chat: Sol
 built it as the pinned chat card's Whisper button (23/10/2026).

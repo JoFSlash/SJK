@@ -66,7 +66,7 @@ migrated, except where the table says so. Where each is documented:
 | `cg_teamOutline` | on (red rings on enemies, green on teammates, in team games) | [Team outlines and logos](client.md#team-outlines-and-logos) |
 | `cg_killfeed` | on, saved 0 moved to 1 once | [Kill feed](client.md#kill-feed) |
 | `cg_mapEdits` | on (SJK's own map fixes from the hub) | [Map edits](map-edits.md) |
-| `cg_serverRemaps` | off (servers' shader remaps; the map's own apply), asked on the 18/10 what's-new card | [Shader remap controls](client.md#shader-remap-controls) |
+| `cg_serverRemaps` | on (servers' shader remaps; the map's own always apply), off from 18/10 to 29/10, saved values reset and asked on the what's-new card | [Shader remap controls](client.md#shader-remap-controls) |
 | `cg_hitMarker` | off (red damage-direction indicator) | [Client](client.md#launch) |
 | `cg_shieldBrightness` | 2 passes, old defaults 1 and 4 moved to 2 once | [Client](client.md#launch) |
 | `cg_duelGhost` | on: duellists as JoF EJK's blue figures (off: dark under the bubble) | [Rendering](rendering.md#entity-render-effects) |

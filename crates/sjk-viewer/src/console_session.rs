@@ -196,7 +196,7 @@ impl ViewerConsole {
         let server_remaps = console_cvars::IntegerSetting::bind(
             &mut cvars,
             crate::remap_blocked_maps::SERVER_CVAR,
-            0,
+            1,
         )?;
         let remap_blocked_maps =
             console_cvars::RevisionSetting::bind(&mut cvars, crate::remap_blocked_maps::CVAR)?;

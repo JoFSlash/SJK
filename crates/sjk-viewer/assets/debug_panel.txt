@@ -7351,6 +7351,14 @@ test: Join a JoF server with remaps (night ffa3, ffa1 walls): textures stay stoc
 test: Turn Server remaps on: the server's remaps appear live, without reloading the map.
 test: listRemaps with it off says "Server shader remaps are off".
 
+[server-remaps-on]
+area: Rendering & effects
+title: Server shader remaps on by default again (Rollembones' idea)
+change: cg_serverRemaps defaults to 1; the what's-new card resets a saved 0 and asks once.
+test: Update from 2026.1029.1 with Server remaps off: the card lists it, its switch on.
+test: Join a JoF server with remaps (night ffa3, ffa1 walls): the server's textures show.
+test: Turn it off on the card or in Settings > Game: restart, it stays off.
+
 [map-edits]
 area: Rendering & effects
 title: Map edits: hide props and surfaces, place models, remap (staff editor)

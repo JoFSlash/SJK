@@ -145,7 +145,7 @@ keeps its worldspawn and local remaps and picks the latest of the three.
 SJK's map edits ([map-edits.md](map-edits.md)) are a fourth source, `edit`: they win
 over the worldspawn and server remaps of a shader, and a console remap made after every
 server one still wins over them.
-`cg_serverRemaps` (default **0**, since 18/10/2026) must be on for any server remap
+`cg_serverRemaps` (default **1**; 0 from 18/10/2026 until 29/10/2026) must be on for any server remap
 to apply; it reads as `cg_remaps 0` while off. Then `cg_remaps` uses **0** to disable server remaps, **1** to exclude
 `models/players/` sources in both configstrings and reliable `remapShader`
 commands, and **2** (the default) to include all server entries. Mode 1 follows

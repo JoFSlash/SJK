@@ -101,9 +101,9 @@ pub(super) fn register_daily_cvars(cvars: &mut CvarRegistry) -> Result<(), sjk_s
     let definitions = [
         CvarDefinition::new(
             crate::remap_blocked_maps::SERVER_CVAR,
-            false,
+            true,
             archive,
-            "Let servers swap the map's textures (shader remaps); off by default, cg_remaps filters them when on",
+            "Let servers swap the map's textures (shader remaps); on by default, cg_remaps filters them",
         ),
         CvarDefinition::new(
             crate::map_edits::CVAR,
@@ -1599,6 +1599,20 @@ mod tests {
         let current = cvars.get(crate::away_emote::JAPLUS_CVAR).unwrap();
         assert_eq!(current.value.as_text(), "amsit");
         assert_eq!(current.name, crate::away_emote::JAPLUS_CVAR);
+    }
+
+    #[test]
+    fn server_remaps_are_on_by_default() {
+        // Off from 18/10/2026; on again since 29/10/2026 (Rollembones' idea), with
+        // the what's-new card resetting the 0 every profile saved.
+        let mut cvars = CvarRegistry::new();
+        register_daily_cvars(&mut cvars).unwrap();
+        let setting =
+            IntegerSetting::bind(&mut cvars, crate::remap_blocked_maps::SERVER_CVAR, 1).unwrap();
+        let cvar = cvars.get(crate::remap_blocked_maps::SERVER_CVAR).unwrap();
+        assert_eq!(cvar.default.as_text(), "1");
+        assert_eq!(cvar.value.as_text(), "1");
+        assert!(setting.enabled());
     }
 
     #[test]

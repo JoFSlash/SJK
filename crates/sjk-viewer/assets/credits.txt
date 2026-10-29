@@ -450,6 +450,7 @@ did: Chat sounds by kind: private messages heard with public chat off
 [Rollembones]
 role: Ideas for SJK
 did: Emotes kept while typing in the chat
+did: Server remaps on by default
 
 [Sanjisan]
 role: Ideas for SJK

@@ -30,6 +30,12 @@ The site (site/assets/site.js, parseChangelog) reads the release headings,
 introductions and recap lines too.
 Add each release's notes here when it is tagged (docs/sjk.md "Releases").
 -->
+## Unreleased
+
+= cg_serverRemaps reset: Servers swap the map's textures again by default, as most players chose. Turn this off to keep the map's own textures.
+
+- Server remaps are on by default again (Settings > Game, `cg_serverRemaps`): servers' shader remaps show without turning them on, and the what's-new card puts the setting back on and asks once, with its switch; `cg_remaps` still picks which apply _(Slash, after Rollembones' idea)_
+
 ## 2026.1029.1 (Alpha) | 29/10/2026
 
 Banana peels, the Monitor's Screen Saver, holo frame nameplates, collection marks, chat tabs and jaPRO movement that matches the server.

@@ -8,8 +8,9 @@
 
 /// The list of maps, archived with the player's settings.
 pub(crate) const CVAR: &str = "cg_remapsBlockedMaps";
-/// `cg_serverRemaps`: servers' shader remaps apply only while it is on (off by default
-/// since 18/10/2026); `cg_remaps` then filters them as in EternalJK.
+/// `cg_serverRemaps`: servers' shader remaps apply only while it is on (on by default
+/// again since 29/10/2026, off from 18/10/2026); `cg_remaps` then filters them as in
+/// EternalJK.
 pub(crate) const SERVER_CVAR: &str = "cg_serverRemaps";
 
 /// The map a list entry or a loaded BSP path names: `maps/mp/ffa4.bsp` and
