@@ -2109,8 +2109,9 @@ are not drawn and take no input. The same look in every menu style, on the 16:9 
   map loads again, on a server without leaving it.
 - **Foot:** the kit's tick and "Don't suggest this again" at the left; Not now
   (outlined, 150) and Use Vanilla graphics (gold, 260; Turn Vanilla graphics off when on) at
-  the right; keys bottom right: D don't suggest, Esc not now, Enter use Vanilla (turn
-  off). "EJK graphics" was the name until 12/10/2026.
+  the right; keys bottom right: Esc not now, Enter use Vanilla (turn off). The tick
+  takes a click only, and Space does nothing (a jump took the offer, hub report #194,
+  29/10/2026); no key or click counts for 0.6 s after the card opens. "EJK graphics" was the name until 12/10/2026.
 
 ## Alpha notice
 

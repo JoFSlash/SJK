@@ -2168,7 +2168,10 @@ a whole. The low-FPS help
   Vanilla graphics turn off, **Use Vanilla graphics** (Enter: the renderer choice,
   then `vid_restart`;
   the map loads again and the player stays on the server) or **Not now** (Escape),
-  and a **Don't suggest this again** tick (D, `cg_fpsHelp 0`).
+  and a **Don't suggest this again** tick (a click, `cg_fpsHelp 0`). It comes in the
+  middle of play, so Space, D and the other keys a player plays with choose nothing
+  on it, and for 0.6 s after it opens it takes no key or click at all: a jump once
+  switched to Vanilla graphics (hub report #194).
 - `help_fps` opens the same card at any time, on the menus or in a match, with the
   numbers once the frames it times while open come in. With Vanilla graphics on, its
   button turns them off and the player's settings come back.

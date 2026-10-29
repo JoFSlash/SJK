@@ -3137,6 +3137,15 @@ test: A model you do not have: Kyle, log "using Kyle", no retry every frame.
 test: cg_forcemodel 1 then 0 on a full server: brief stand-ins, no long freeze.
 note: Hilts, NPCs, corpses and cosmetics still load in one frame. Not tested in game yet.
 
+[slash-fps-card-keys]
+area: Menus & settings
+title: Low FPS card: jumping or strafing no longer chooses on it (Slash, #194)
+change: Space no longer turns Vanilla graphics on; D no longer ticks Don't suggest this again.
+change: For 0.6 s after the card opens, no key or click counts.
+test: help_fps in a match, hold W and press Space and D: the card stays, nothing changes.
+test: Press Enter (or click Use Vanilla graphics) after a moment: Vanilla graphics turn on.
+test: Click Don't suggest this again: it ticks; cg_fpsHelp reads 0.
+
 [fps-help]
 area: Rendering & effects
 title: Low FPS help: EJK graphics offered on heavy maps, help_fps opens it any time
@@ -3145,7 +3154,7 @@ change: If it keeps you under your FPS target (60-144), a card offers EJK graphi
 change: help_fps opens the same card; Ultra low is now called EJK graphics.
 test: Join JoFTemple on High at 4K: after ~10 s the card shows over the game menu.
 test: Use EJK graphics: the map reloads, baked lighting, you stay on the server.
-test: Tick Don't suggest this again (or D): no card on the next maps; cg_fpsHelp reads 0.
+test: Tick Don't suggest this again (a click): no card on the next maps; cg_fpsHelp reads 0.
 test: Type help_fps in a match and on the main menu: the card, with numbers after a moment.
 test: The log line "fps help: frame ... ms, SJK lighting ... ms" appears on each map.
 note: The 40% share and the 60-144 FPS target are from JoFTemple only; other GPUs untested.
