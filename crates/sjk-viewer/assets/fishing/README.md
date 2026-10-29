@@ -13,7 +13,7 @@ map's do, so nothing of them is in this folder.
 | --- | --- | --- |
 | `toy_fishing.png` | `gfx/sjk/toy_fishing.png` | The toy's icon (quick wheel, key bindings), 128x128 |
 | `fishing.png` | `models/sjk/fishing.png` | The colour atlas, 128x128, a flat colour a 16x16 cell |
-| `fishing_rod.md3` | `models/sjk/fishing_rod.md3` | The rod along +X, 72 units from its butt (the origin) to its tip |
+| `fishing_rod.md3` | `models/sjk/fishing_rod.md3` | A spinning rod along +X, 72 units from its butt (the origin) to its tip: cork grips, the reel seat, a tapered blank with thread wraps, seven guides and the tip-top, and the reel under it (body, spool wound with line, bail and crank) |
 | `fishing_bucket.md3` | `models/sjk/fishing_bucket.md3` | An open bucket with water and a handle, its origin in the middle of its bottom |
 | `fishing_float.md3` | `models/sjk/fishing_float.md3` | The float, red over white, its origin at the waterline |
 | `fishing_line.md3` | `models/sjk/fishing_line.md3` | A thin strand along +X, 64 units long, scaled to the length drawn |

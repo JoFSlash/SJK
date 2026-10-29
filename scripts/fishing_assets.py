@@ -5,7 +5,8 @@ and the line between, and the twelve fish. Nothing here comes from another game:
 part is cylinders, lofted shapes, flat colours or skins painted here. This script writes, into the output folder:
 
 - `fishing.png`: the colour atlas, 128x128, a flat colour in each 16x16 cell;
-- `fishing_rod.md3`: the rod along +X, 72 units from its butt (the origin) to its tip;
+- `fishing_rod.md3`: a spinning rod along +X, 72 units from its butt (the origin) to its
+  tip, with its cork grips, reel seat, guides and reel;
 - `fishing_bucket.md3`: an open bucket with water in it and a handle, its origin in the
   middle of its bottom;
 - `fishing_float.md3`: the float, red over white, its origin where it meets the water;
@@ -67,6 +68,16 @@ COLOURS = {
     "kyber": ((4, 1), (110, 230, 255)),
     "barbel": ((4, 2), (92, 80, 62)),
     "ray_tail": ((5, 1), (86, 92, 108)),
+    "blank": ((6, 0), (30, 36, 46)),
+    "wrap_red": ((7, 0), (150, 24, 28)),
+    "wrap_gold": ((5, 2), (206, 166, 70)),
+    "chrome": ((6, 1), (206, 210, 216)),
+    "dark_metal": ((7, 1), (56, 60, 66)),
+    "cork_dark": ((6, 2), (178, 140, 96)),
+    "eva": ((7, 2), (28, 28, 30)),
+    "reel_body": ((0, 3), (42, 46, 54)),
+    "reel_accent": ((1, 3), (172, 38, 34)),
+    "guide_ring": ((2, 3), (110, 116, 126)),
     "reed": ((4, 3), (98, 130, 62)),
     "cattail": ((5, 0), (104, 70, 40)),
 }
@@ -262,15 +273,185 @@ def write_md3(output: Path, name: str, surfaces) -> None:
     (output / f"{name}.md3").write_bytes(header + frame + body)
 
 
+def torus(mesh: Mesh, centre, u, v, radius: float, thick: float, cell: str,
+          segments: int = 14, sides: int = 5, start: float = 0.0,
+          end: float = 2 * math.pi) -> None:
+    """A ring (or an arc of one, from `start` to `end`) round `centre` in the plane of
+    the unit vectors `u` and `v`, its wire `thick` in radius."""
+    n = (u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2], u[0] * v[1] - u[1] * v[0])
+    closed = end - start >= 2 * math.pi - 1e-6
+    steps = segments if closed else segments + 1
+    loops = []
+    for i in range(steps):
+        a = start + (end - start) * i / segments
+        out = [u[k] * math.cos(a) + v[k] * math.sin(a) for k in range(3)]
+        loop = []
+        for j in range(sides):
+            b = 2 * math.pi * j / sides
+            normal = [out[k] * math.cos(b) + n[k] * math.sin(b) for k in range(3)]
+            point = [centre[k] + out[k] * radius + normal[k] * thick for k in range(3)]
+            loop.append(mesh.vertex(point, normal, cell))
+        loops.append(loop)
+    pairs = list(zip(loops, loops[1:])) + ([(loops[-1], loops[0])] if closed else [])
+    for l0, l1 in pairs:
+        for j in range(sides):
+            k = (j + 1) % sides
+            mesh.triangles += [(l0[j], l1[j], l1[k]), (l0[j], l1[k], l0[k])]
+
+
+# The rod's blank: from the fore grip to the tip, its radius at each end.
+BLANK_START = 17.6
+BLANK_RADII = (0.42, 0.1)
+
+
+def blank_radius(x: float) -> float:
+    f = (x - BLANK_START) / (ROD_LENGTH - BLANK_START)
+    return BLANK_RADII[0] + (BLANK_RADII[1] - BLANK_RADII[0]) * f ** 0.8
+
+
 def rod(output: Path) -> None:
-    mesh = Mesh()
-    mesh.tube(0, 0.0, 2.0, 0.9, 0.9, "grip")
-    mesh.tube(0, 2.0, 13.0, 0.85, 0.7, "cork")
-    # The reel under the rod, its spool across it.
-    mesh.tube(1, -1.6, 1.6, 1.6, 1.6, "reel", sides=10, centre=(15.0, -1.9))
-    mesh.tube(0, 13.0, 17.0, 0.55, 0.5, "grip")
-    mesh.tube(0, 17.0, ROD_LENGTH, 0.45, 0.12, "rod")
-    mesh.write(output, "fishing_rod")
+    """A spinning rod along +X from its butt (the origin) to its tip at `ROD_LENGTH`,
+    the reel hanging under it (-Z): a rubber butt cap, a cork rear grip in rings, the
+    reel seat with its locking nuts (held at 8, `fishing.rs`'s `GRIP`), a cork fore grip,
+    then the dark blank tapering to the tip with gold-edged red thread wraps, seven line
+    guides under it shrinking towards the tip-top, and the reel: its body and foot, the
+    rotor with its bail, the spool wound with line, and the crank."""
+    handle = Mesh()
+    sides = 12
+    # The butt cap, rounded.
+    handle.tube(0, 0.0, 0.25, 0.7, 0.92, "eva", sides=sides)
+    handle.tube(0, 0.25, 1.0, 0.92, 0.94, "eva", sides=sides, caps=False)
+    # The rear grip: cork rings, a little swollen in the middle.
+    x, k = 1.0, 0
+    while x < 6.5 - 1e-6:
+        x1 = min(6.5, x + 0.55)
+
+        def swell(at: float) -> float:
+            return 0.86 + 0.08 * math.sin(math.pi * (at - 1.0) / 5.5)
+
+        handle.tube(0, x, x1, swell(x), swell(x1), "cork" if k % 2 else "cork_dark",
+                    sides=sides, caps=False)
+        x, k = x1, k + 1
+    # The reel seat: a dark tube between two chrome-edged locking nuts, the reel's foot
+    # under it at its middle.
+    handle.tube(0, 6.5, 7.3, 0.86, 0.8, "chrome", sides=sides, caps=False)
+    handle.tube(0, 7.3, 10.8, 0.62, 0.62, "dark_metal", sides=sides, caps=False)
+    for x0 in (7.3, 9.9):
+        handle.tube(0, x0, x0 + 0.9, 0.76, 0.76, "reel_body", sides=sides, caps=False)
+        handle.tube(0, x0 + 0.05, x0 + 0.15, 0.79, 0.79, "chrome", sides=sides, caps=False)
+        handle.tube(0, x0 + 0.75, x0 + 0.85, 0.79, 0.79, "chrome", sides=sides, caps=False)
+    handle.tube(0, 10.8, 11.5, 0.8, 0.86, "chrome", sides=sides, caps=False)
+    # The fore grip, tapering to the winding check.
+    x, k = 11.5, 0
+    while x < 17.0 - 1e-6:
+        x1 = min(17.0, x + 0.55)
+        r0 = 0.84 - 0.3 * (x - 11.5) / 5.5
+        r1 = 0.84 - 0.3 * (x1 - 11.5) / 5.5
+        handle.tube(0, x, x1, r0, r1, "cork" if k % 2 else "cork_dark", sides=sides,
+                    caps=False)
+        x, k = x1, k + 1
+    handle.tube(0, 17.0, 17.6, 0.6, 0.46, "chrome", sides=sides)
+
+    blank = Mesh()
+    step = 3.0
+    x = BLANK_START
+    while x < ROD_LENGTH - 1e-6:
+        x1 = min(ROD_LENGTH, x + step)
+        blank.tube(0, x, x1, blank_radius(x), blank_radius(x1), "blank", sides=8,
+                   caps=x1 >= ROD_LENGTH)
+        x = x1
+
+    def wrap(at: float, width: float, trim: bool = True) -> None:
+        """A thread wrap round the blank at `at`: red, edged in gold."""
+        r = blank_radius(at) + 0.04
+        blank.tube(0, at - width / 2, at + width / 2, r, r, "wrap_red", sides=8, caps=False)
+        if trim:
+            for edge in (at - width / 2, at + width / 2 - 0.12):
+                blank.tube(0, edge, edge + 0.12, r + 0.02, r + 0.02, "wrap_gold", sides=8,
+                           caps=False)
+
+    # The decorative wraps above the fore grip, and the hook keeper.
+    wrap(18.4, 1.0)
+    wrap(20.2, 0.3, trim=False)
+    keeper = 20.2
+    torus(blank, (keeper, 0.0, -blank_radius(keeper) - 0.35), (1, 0, 0), (0, 0, 1), 0.3,
+          0.05, "chrome", segments=8, sides=4)
+
+    # The guides under the blank: a two-legged frame up to its foot on the blank, and a
+    # ring with a dark insert the line runs through, towards the tip ever smaller and
+    # closer to the blank.
+    rings = Mesh()
+    guides = ((26.0, 1.55), (34.0, 1.1), (41.0, 0.82), (47.5, 0.64), (53.5, 0.52),
+              (59.0, 0.44), (64.5, 0.38))
+    for at, radius in guides:
+        under = blank_radius(at)
+        lift = radius * 1.15 + 0.35
+        middle = (at, 0.0, -under - lift)
+        torus(rings, middle, (0, 1, 0), (0, 0, 1), radius, 0.12 + radius * 0.06, "chrome",
+              segments=12, sides=4)
+        torus(rings, middle, (0, 1, 0), (0, 0, 1), radius - 0.08, 0.07, "guide_ring",
+              segments=12, sides=3)
+        foot = 0.9 + radius * 0.7
+        for side in (1.0, -1.0):
+            top = (at - foot * 0.5, 0.0, -under * 0.8)
+            rim = (at, side * radius * 0.75, middle[2] + radius * 0.6)
+            segment(rings, top, rim, 0.09, 0.07, "chrome", 4)
+        segment(rings, (at - foot, 0.0, -under * 0.85), (at + 0.1, 0.0, -under * 0.85),
+                0.08, 0.08, "chrome", 4)
+        wrap(at - foot * 0.55, foot * 0.9)
+    # The tip-top, the line's last ring.
+    torus(rings, (ROD_LENGTH - 0.25, 0.0, -0.32), (0, 1, 0), (0, 0, 1), 0.24, 0.06,
+          "chrome", segments=10, sides=4)
+    segment(rings, (ROD_LENGTH - 1.0, 0.0, 0.0), (ROD_LENGTH, 0.0, 0.0), 0.14, 0.12,
+            "chrome", 6)
+    wrap(ROD_LENGTH - 1.3, 0.5, trim=False)
+
+    reel = Mesh()
+    # The foot on the seat and the stem down to the body.
+    stem = 9.1
+    segment(reel, (stem - 1.2, 0.0, -0.66), (stem + 1.2, 0.0, -0.66), 0.14, 0.14,
+            "reel_body", 4)
+    segment(reel, (stem, 0.0, -0.7), (stem - 0.3, 0.0, -2.9), 0.34, 0.28, "reel_body", 6)
+    body_z = -3.9
+    # The gearbox: a rounded body along the rod, its side covers chrome-rimmed.
+    reel.tube(0, 6.2, 7.0, 0.5, 1.25, "reel_body", sides=12, centre=(0.0, body_z))
+    reel.tube(0, 7.0, 10.6, 1.25, 1.35, "reel_body", sides=12, caps=False,
+              centre=(0.0, body_z))
+    for side in (1.0, -1.0):
+        reel.tube(1, side * 1.15, side * 1.4, 1.05, 1.0, "reel_accent", sides=12,
+                  centre=(8.6, body_z))
+        torus(reel, (8.6, side * 1.4, body_z), (1, 0, 0), (0, 0, 1), 1.0, 0.07, "chrome",
+              segments=14, sides=4)
+    # The rotor and the spool, wound with line, ahead of the body.
+    reel.tube(0, 10.6, 11.0, 1.35, 1.0, "chrome", sides=12, caps=False, centre=(0.0, body_z))
+    reel.tube(0, 11.0, 12.6, 1.0, 1.55, "reel_body", sides=12, caps=False,
+              centre=(0.0, body_z))
+    reel.tube(0, 12.6, 12.9, 1.55, 1.55, "reel_accent", sides=12, caps=False,
+              centre=(0.0, body_z))
+    reel.tube(0, 12.9, 13.2, 1.45, 1.45, "chrome", sides=12, centre=(0.0, body_z))
+    reel.tube(0, 13.2, 15.0, 1.25, 1.25, "line", sides=12, caps=False, centre=(0.0, body_z))
+    reel.tube(0, 15.0, 15.3, 1.42, 1.42, "chrome", sides=12, centre=(0.0, body_z))
+    reel.tube(0, 15.3, 15.9, 0.6, 0.35, "reel_accent", sides=10, centre=(0.0, body_z))
+    # The bail: two arms from the rotor forward, and the wire hoop round the spool's
+    # front between them, over the top.
+    for side in (1.0, -1.0):
+        segment(reel, (12.4, side * 1.5, body_z), (15.6, side * 1.75, body_z), 0.1, 0.09,
+                "chrome", 4)
+    torus(reel, (15.6, 0.0, body_z), (0, 1, 0), (0, 0, 1), 1.75, 0.08, "chrome",
+          segments=16, sides=4, start=0.0, end=math.pi)
+    # The crank on the left: an axle out of the side cover, the arm and its knob.
+    axle = (8.6, -1.4, body_z)
+    out = (8.6, -2.6, body_z)
+    segment(reel, axle, out, 0.18, 0.16, "chrome", 6)
+    elbow = (8.2, -2.7, body_z - 2.6)
+    segment(reel, out, elbow, 0.16, 0.13, "reel_body", 6)
+    reel.tube(1, -2.75, -3.8, 0.38, 0.42, "eva", sides=8, centre=(elbow[0], elbow[2]))
+    # The reel drawn at three quarters of the size above, from its foot on the seat.
+    foot = (stem, 0.0, -0.62)
+    small = Mesh()
+    small.add(reel, lambda p, n: ([foot[k] + (p[k] - foot[k]) * 0.75 for k in range(3)], n))
+    write_md3(output, "fishing_rod", [(handle, SHADER), (blank, SHADER), (rings, SHADER),
+                                         (small, SHADER)])
 
 
 def bucket(output: Path) -> None:
