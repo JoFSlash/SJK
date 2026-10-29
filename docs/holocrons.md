@@ -160,7 +160,7 @@ The client's list is [kyber.rs](../crates/sjk-viewer/src/kyber.rs) (`kyber::TIER
 - **Rewards** (`kyber::REWARDS`, pinned against `achievements::ALL`): Uncommon for
   `first_blood`, `streak_5`, `ledge_10`, `duel_wins_10`, `captures_10`, `maps_10`,
   `servers_5`, `hours_10`, `storyteller`, `bug_reporter`, `holocrons_10`, `craft_blade`,
-  `order66_kill`, `box_minutes_10`, `duel_close_call`, `saber_throw_far`; Rare for
+  `order66_kill`, `box_minutes_10`, `duel_close_call`, `saber_throw_far`, `fish_first`; Rare for
   `kills_100`, `saber_kills_100`, `streak_10`, `dark_side_25`, `arsenal`, `maps_25`,
   `surveyor` (retired 26/10/2026: its holders keep their crystal), `decorated`,
   `holocrons_50`, `mythical_find`, `craft_finishes`, `duel_flawless`, `duel_partners_25`,

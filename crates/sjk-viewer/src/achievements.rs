@@ -281,7 +281,7 @@ use Counter as C;
 use Source::{Client, Hub};
 
 /// Every achievement, in the hub's catalogue order.
-pub(crate) const ALL: [Kind; 44] = [
+pub(crate) const ALL: [Kind; 45] = [
     kind(
         "first_blood",
         "First Blood",
@@ -607,12 +607,19 @@ pub(crate) const ALL: [Kind; 44] = [
         Duels,
         Client(C::DuelStyleStaff),
     ),
-    // 29/10/2026 (Slash): the Fishing toy's, counted on servers as the rest; four, as
-    // many as the wall's Toys run has room for.
+    // 29/10/2026 (Slash): the Fishing toy's, counted on servers as the rest.
+    kind(
+        "fish_first",
+        "First Bite",
+        "Land a fish with the Fishing toy.",
+        1,
+        Toys,
+        Client(C::FishCaught),
+    ),
     kind(
         "fish_50",
         "Angler",
-        "Land 50 fish with the Fishing toy.",
+        "Land 50 fish.",
         50,
         Toys,
         Client(C::FishCaught),
@@ -1397,6 +1404,7 @@ mod tests {
                 "style_red_50",
                 "style_dual_50",
                 "style_staff_50",
+                "fish_first",
                 "fish_50",
                 "fish_kinds",
                 "echo_angler",

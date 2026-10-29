@@ -14,11 +14,16 @@ use crate::menu::sjk::{Frame, color, kit, text, wrap};
 use crate::menu_widgets::TextFamily;
 use sjk_ui::{DrawCommand, FontWeight, TextAlign};
 
-/// The wall: where its first band starts, the room a band takes, the medallions a band
-/// holds, a medallion's cell and its radius, and how many characters a line of a name
-/// under one holds.
+/// The wall: where its first band starts, the room a band takes and how far below its
+/// heading the medallions stand (four bands, then five a little closer, which still end
+/// over the keys), the medallions a band holds, a medallion's cell and its radius, and
+/// how many characters a line of a name under one holds.
 const WALL_TOP: f32 = 286.0;
 const BAND_STEP: f32 = 172.0;
+const BAND_INSET: f32 = 40.0;
+const FIVE_TOP: f32 = 272.0;
+const FIVE_STEP: f32 = 146.0;
+const FIVE_INSET: f32 = 36.0;
 const COLUMNS: usize = 12;
 const CELL: f32 = 85.0;
 const RADIUS: f32 = 28.0;
@@ -63,16 +68,6 @@ pub(super) fn groups(standings: &[Standing]) -> Vec<Group> {
             None => categories.push((category, vec![index])),
         }
     }
-    // The wall's order, so the six fit four bands: Combat, Duels and flags, Journeys beside
-    // Toys, Collection beside Community.
-    categories.sort_by_key(|(category, _)| match category {
-        Category::Combat => 0,
-        Category::Duels => 1,
-        Category::Journeys => 2,
-        Category::Toys => 3,
-        Category::Collection => 4,
-        Category::Community => 5,
-    });
     let mut groups = Vec::with_capacity(categories.len() + 1);
     let (mut band, mut column) = (0, 0);
     for (category, members) in categories {
@@ -208,8 +203,14 @@ impl Panel {
             fraction,
             color::GOLD,
         );
+        let bands = groups.last().map_or(0, |group| group.band + 1);
+        let (wall_top, step, inset) = if bands > 4 {
+            (FIVE_TOP, FIVE_STEP, FIVE_INSET)
+        } else {
+            (WALL_TOP, BAND_STEP, BAND_INSET)
+        };
         for group in &groups {
-            let top = WALL_TOP + group.band as f32 * BAND_STEP;
+            let top = wall_top + group.band as f32 * step;
             let left = LEFT_X + group.column as f32 * CELL;
             let right = left + group.members.len() as f32 * CELL - 8.0;
             let hue = tint(group.category);
@@ -254,7 +255,7 @@ impl Panel {
             for (offset, index) in group.members.iter().enumerate() {
                 if let Some(standing) = standings.get(*index) {
                     let x = left + offset as f32 * CELL;
-                    self.wall_medallion(frame, standing, *index, x, top + 40.0);
+                    self.wall_medallion(frame, standing, *index, x, top + inset);
                 }
             }
         }
@@ -602,9 +603,9 @@ mod tests {
         crate::achievements::Record::default().standings(&held)
     }
 
-    /// The six categories fit four bands of twelve: Combat alone, Duels and flags alone
-    /// (with the five style masters), Journeys beside Toys (with the four Fishing ones),
-    /// Collection beside Community;
+    /// The six categories fit five bands of twelve: Combat alone, Duels and flags alone
+    /// (with the five style masters), Journeys beside Community, Collection alone, Toys
+    /// alone (with the five Fishing ones);
     /// a retired achievement not held is left out and one held takes its place.
     #[test]
     fn the_wall_packs_the_categories_into_bands() {
@@ -620,9 +621,9 @@ mod tests {
                 ("Combat", 0, 0, 11),
                 ("Duels and flags", 1, 0, 11),
                 ("Journeys", 2, 0, 5),
-                ("Toys", 2, 6, 6),
+                ("Community", 2, 6, 3),
                 ("Collection", 3, 0, 7),
-                ("Community", 3, 8, 3),
+                ("Toys", 4, 0, 7),
             ]
         );
         let slots: Vec<Slot> = slots(&groups).collect();
@@ -650,8 +651,8 @@ mod tests {
         assert_eq!(vertical(&slots, below.index, false), arsenal.index);
         // Up from the first band and Down from the last stay.
         assert_eq!(vertical(&slots, arsenal.index, false), arsenal.index);
-        let community = index_of("decorated");
-        assert_eq!(vertical(&slots, community, true), community);
+        let toys = index_of("box_minutes_10");
+        assert_eq!(vertical(&slots, toys, true), toys);
         // Left and right read the wall in order, Tab wraps round.
         let first = slots[0].index;
         let last = slots.last().unwrap().index;

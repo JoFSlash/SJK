@@ -5198,7 +5198,7 @@ brings up are the ones the hub drops anyway.
   the holocron comes up on the line and its card shows. Missed twice, or with the rod put
   away, the card shows all the same. Fishing never brings an Echo the hub did not drop:
   the caps stay as they are ([holocrons.md](holocrons.md)).
-- **Achievements:** Angler (50 fish), Every Fish in the Pond (every kind), Echo Angler (10
+- **Achievements:** First Bite (a fish), Angler (50 fish), Every Fish in the Pond (every kind), Echo Angler (10
   Echoes on the line) and Old Whiskers (hidden), counted on servers only, as the others
   ([identity.md](identity.md#achievements)).
 - **Sounds:** Settings > Sound > Toys, "Fishing" (`s_toyFishingSound`).
