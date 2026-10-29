@@ -30,6 +30,10 @@ The site (site/assets/site.js, parseChangelog) reads the release headings,
 introductions and recap lines too.
 Add each release's notes here when it is tagged (docs/sjk.md "Releases").
 -->
+## Unreleased
+
+- Move the HUD with the mouse: Settings > HUD "Move HUD elements" (or `hud_edit`) outlines the health, Force, weapon, timer, lagometer, chat, kill feed, movement keys and the rest over the game; drag one to move it, right-click it to put it back _(Slash, after Lex's idea)_
+
 ## 2026.1029.1 (Alpha) | 29/10/2026
 
 Banana peels, the Monitor's Screen Saver, holo frame nameplates, collection marks, chat tabs and jaPRO movement that matches the server.
