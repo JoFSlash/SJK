@@ -274,6 +274,14 @@ impl HolocronPopup {
         self.queue.iter().any(|waiting| !waiting.announced)
     }
 
+    /// The tier slot of the first holocron whose card has not been given yet.
+    pub(crate) fn unannounced_tier(&self) -> Option<usize> {
+        self.queue
+            .iter()
+            .find(|waiting| !waiting.announced)
+            .map(|waiting| waiting.entry.tier.slot)
+    }
+
     /// Show the first holocron waiting; its ceremony begins once [`Self::update`] says
     /// the pop-up is seen.
     pub(crate) fn open_next(&mut self, now: Instant) {

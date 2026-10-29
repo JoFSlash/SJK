@@ -57,6 +57,10 @@ struct Sinks<'a> {
     jetpack_sounds: &'a mut crate::jetpack::Sounds,
     /// The boombox's model and who carries one (bits by slot, [`crate::boombox`]).
     boombox: (Option<usize>, u64),
+    /// The fishing rod's and line's models and each fisher's line ([`crate::fishing`]),
+    /// and where each rod's tip is drawn (for the next frame's catch).
+    fishing: (Option<usize>, Option<usize>, crate::fishing::Lines),
+    fishing_tips: &'a mut [Option<[f32; 3]>; 64],
     world: &'a sjk_runtime::World,
     actor_meshes: &'a [ActorMesh],
     object_meshes: &'a [StaticModelMesh],
@@ -275,6 +279,16 @@ pub(crate) fn submit(
                 .position(|mesh| mesh.appearance.model == crate::boombox::MODEL),
             gpu.boombox.carriers(),
         ),
+        fishing: (
+            gpu.object_meshes
+                .iter()
+                .position(|mesh| mesh.appearance.model == crate::fishing::ROD),
+            gpu.object_meshes
+                .iter()
+                .position(|mesh| mesh.appearance.model == crate::fishing::LINE),
+            gpu.fishing.lines,
+        ),
+        fishing_tips: &mut gpu.fishing.tips,
         world: active_world,
         actor_meshes: &gpu.actor_meshes,
         object_meshes: &gpu.object_meshes,
@@ -838,6 +852,33 @@ fn submit_actor(
         }) {
             instance.view_flags = sinks.entity_view_flags | u32::from(!draw_actor);
             sinks.object_groups[boombox].push(instance);
+        }
+    }
+    // A fisher's rod in their right hand and the line from its tip, as the boombox: the
+    // rod only in mirrors in first person, the line always.
+    if entity.kind == EntityKind::Actor
+        && let (Some(mesh), (Some(rod), Some(line_mesh), lines)) = (mesh, sinks.fishing)
+        && number < 64
+        && let Some(end) = lines.ends[usize::from(number)]
+        && e_flags & EF_DEAD_FLAG == 0
+        && !trick.hidden
+    {
+        let actor = &sinks.actor_meshes[mesh];
+        if let Some((mut instance, tip)) = actor.animator.requested.and_then(|_| {
+            crate::fishing::rod_in_hand(
+                &actor.preview,
+                actor.animator.matrices(),
+                *transform,
+                lines.bend[usize::from(number)],
+            )
+        }) {
+            instance.view_flags = sinks.entity_view_flags | u32::from(!draw_actor);
+            sinks.object_groups[rod].push(instance);
+            if let Some(mut line) = crate::fishing::line(tip, Vec3::from_array(end)) {
+                line.view_flags = sinks.entity_view_flags;
+                sinks.object_groups[line_mesh].push(line);
+            }
+            sinks.fishing_tips[usize::from(number)] = Some(tip.to_array());
         }
     }
     // Everything after stock's mind-trick cut-off is skipped for a hidden trickster:

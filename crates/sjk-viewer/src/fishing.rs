@@ -27,6 +27,7 @@ use glam::{Quat, Vec3};
 use sjk_protocol::UserCommand;
 use sjk_vfs::{VfsError, VirtualFileSystem};
 use std::path::Path;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{Duration, Instant};
 
 /// The toy's console command.
@@ -65,7 +66,7 @@ macro_rules! bundled {
 }
 
 /// The bundled files at their game paths.
-const FILES: [(&str, &[u8]); 9] = [
+const FILES: [(&str, &[u8]); 10] = [
     (ROD, bundled!("fishing_rod.md3")),
     (BUCKET, bundled!("fishing_bucket.md3")),
     (FLOAT, bundled!("fishing_float.md3")),
@@ -73,6 +74,7 @@ const FILES: [(&str, &[u8]); 9] = [
     (FISH, bundled!("fishing_fish.md3")),
     (POND, bundled!("fishing_pond.md3")),
     ("models/sjk/fishing.png", bundled!("fishing.png")),
+    ("models/sjk/fishing_pond.png", bundled!("fishing_pond.png")),
     ("shaders/sjk_fishing.shader", bundled!("fishing.shader")),
     (ICON, bundled!("toy_fishing.png")),
 ];
@@ -120,8 +122,20 @@ const BUCKET_LEFT: f32 = 16.0;
 const BUCKET_AHEAD: f32 = 4.0;
 /// How long the float flies out on a cast.
 const CAST_TIME: Duration = Duration::from_millis(700);
-/// A catch dangles from the rod's tip this long.
-const SHOW_CATCH: Duration = Duration::from_millis(1400);
+/// A catch is reeled in from the water to the tip this long, then dangles there till
+/// [`SHOW_CATCH`] is up.
+const REEL: Duration = Duration::from_millis(700);
+const SHOW_CATCH: Duration = Duration::from_millis(2100);
+/// What hangs from the tip hangs this far under it.
+const HANG: f32 = 14.0;
+/// The rod in the hand: the hand holds it this far up from its butt (the cork).
+const GRIP: f32 = 8.0;
+/// How far a bite bends the rod down (radians), and a fish being reeled in.
+const BITE_BEND: f32 = 0.25;
+const REEL_BEND: f32 = 0.18;
+/// The torso's pose while holding the rod: a two-handed weapon's ready pose, both hands
+/// before the chest (`TORSO_WEAPONREADY3`, the rifles').
+const HOLD_POSE: &str = "TORSO_WEAPONREADY3";
 /// The wait for a bite, in seconds.
 const BITE_WAIT: (f32, f32) = (30.0, 90.0);
 /// A fish's bite holds this long (seconds): the time to press `+use`.
@@ -273,10 +287,12 @@ enum Phase {
         bite: Instant,
     },
     Biting(Bite),
-    /// A catch dangles from the tip until then (none: the hook came up empty).
+    /// A catch is reeled in and dangles from the tip until then (none: the hook came up
+    /// empty); `echo`, the tier slot of an Echo fished up.
     Landed {
         until: Instant,
         catch: Option<&'static Catch>,
+        echo: Option<usize>,
     },
 }
 
@@ -301,6 +317,8 @@ pub(crate) struct Frame {
     pub(crate) health: i32,
     /// An Echo waits for its card ([`crate::holocron_popup::HolocronPopup::unannounced`]).
     pub(crate) echo_waiting: bool,
+    /// Its tier's slot, for the holocron that comes up on the line.
+    pub(crate) echo_tier: Option<usize>,
 }
 
 /// What the toy asks the frame to say or play.
@@ -311,6 +329,8 @@ pub(crate) enum Say {
     /// A catch, with how many the log now holds of it.
     Caught(&'static Catch, u32),
     Sound(&'static str),
+    /// A console command to run (`weapmelee`: empty hands for the rod).
+    Command(&'static str),
 }
 
 /// The fish log: how many of each catch the player brought up.
@@ -403,7 +423,17 @@ pub(crate) struct Fishing {
     said: Vec<Say>,
     /// Other players' floats, by slot.
     spots: [Option<Spot>; SLOTS],
+    /// Where each fisher's line ends this frame, and how far their rod bends: the actors
+    /// draw the rods in their hands and the lines from them ([`rod_in_hand`]).
+    pub(crate) lines: Lines,
+    /// Where each rod's tip was drawn the last frame (the actors say), for what hangs
+    /// from it.
+    pub(crate) tips: [Option<[f32; 3]>; SLOTS],
     sounds_registered: Option<u64>,
+    /// Rods to draw without a session, for the world shots: where the player stands,
+    /// their yaw, and whether a fish hangs from the tip.
+    #[cfg(test)]
+    pub(crate) shot_rods: Vec<([f32; 3], f32, bool)>,
 }
 
 impl Default for Fishing {
@@ -426,7 +456,11 @@ impl Default for Fishing {
             dice: Dice::seeded(),
             said: Vec::with_capacity(4),
             spots: [None; SLOTS],
+            lines: Lines::default(),
+            tips: [None; SLOTS],
             sounds_registered: None,
+            #[cfg(test)]
+            shot_rods: Vec::new(),
         }
     }
 }
@@ -579,6 +613,7 @@ impl Fishing {
             lands: now + CAST_TIME,
         });
         self.said.push(Say::Sound(CAST));
+        self.said.push(Say::Command("weapmelee"));
     }
 
     fn wait(&mut self, now: Instant, extra: Duration) {
@@ -671,6 +706,7 @@ impl Fishing {
                         self.phase = Some(Phase::Landed {
                             until: now + SHOW_CATCH,
                             catch: None,
+                            echo: Some(frame.echo_tier.unwrap_or(0)),
                         });
                     } else {
                         let (roll, pick) = (self.dice.next(), self.dice.next());
@@ -688,6 +724,7 @@ impl Fishing {
                         self.phase = Some(Phase::Landed {
                             until: now + SHOW_CATCH,
                             catch,
+                            echo: None,
                         });
                     }
                 } else if now >= bite.until {
@@ -751,7 +788,64 @@ impl Fishing {
     }
 }
 
-/// The rod beside a player standing at `origin` facing `yaw`: the instance and its tip.
+/// Each fisher's line this frame, by slot: where it ends, and how far the rod bends.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(crate) struct Lines {
+    pub(crate) ends: [Option<[f32; 3]>; SLOTS],
+    pub(crate) bend: [f32; SLOTS],
+}
+
+impl Default for Lines {
+    fn default() -> Self {
+        Self {
+            ends: [None; SLOTS],
+            bend: [0.0; SLOTS],
+        }
+    }
+}
+
+/// Who holds a rod this frame (bits by slot), for the pose ([`holding_rod`]).
+static HOLDING: AtomicU64 = AtomicU64::new(0);
+
+/// Whether the player in `slot` holds a rod this frame: their torso takes the rod's
+/// pose (`actor_pose_steps.rs`).
+pub(crate) fn holding_rod(slot: usize) -> bool {
+    slot < SLOTS && HOLDING.load(Ordering::Relaxed) & (1 << slot) != 0
+}
+
+/// The protocol animation of the pose holding the rod.
+pub(crate) fn hold_pose() -> Option<(usize, &'static str)> {
+    static POSE: std::sync::OnceLock<Option<usize>> = std::sync::OnceLock::new();
+    POSE.get_or_init(|| sjk_game_jka::legacy_animation_index(HOLD_POSE))
+        .map(|index| (index, HOLD_POSE))
+}
+
+/// The rod in the right hand of a body posed with `matrices`, placed at `transform`:
+/// held at its cork, pointing ahead where the body faces and up, bent down by `bend`
+/// (radians). The instance and the tip, where the line starts.
+pub(crate) fn rod_in_hand(
+    preview: &crate::PlayerPreview,
+    matrices: &[[[f32; 4]; 3]],
+    transform: sjk_runtime::Transform,
+    bend: f32,
+) -> Option<(ActorInstance, Vec3)> {
+    let hand = crate::saber::attachment_from_matrices(preview, matrices, crate::saber::HAND_BOLT)?;
+    let rotation = crate::weapon_view::actor_world_rotation(transform.rotation);
+    let (grip, _) =
+        crate::saber::world_attachment(Vec3::from_array(transform.translation), rotation, hand);
+    let forward = Quat::from_array(transform.rotation) * Vec3::X;
+    let yaw = forward.y.atan2(forward.x);
+    let tilt = Quat::from_rotation_z(yaw) * Quat::from_rotation_y(-(ROD_PITCH - bend));
+    let butt = grip - tilt * Vec3::X * GRIP;
+    let tip = butt + tilt * Vec3::X * ROD_LENGTH;
+    Some((
+        ActorInstance::new(butt.to_array(), tilt.to_array(), [1.0; 3]),
+        tip,
+    ))
+}
+
+/// The rod beside a player standing at `origin` facing `yaw`: the instance and its tip
+/// (the world shots, and where the tip is guessed before an actor said).
 fn rod(origin: [f32; 3], yaw: f32) -> (ActorInstance, Vec3) {
     let (ahead, right) = ahead_right(yaw);
     let butt = Vec3::from_array(origin) + right * ROD_RIGHT + ahead * ROD_AHEAD + Vec3::Z * FEET;
@@ -778,7 +872,7 @@ fn bucket(origin: [f32; 3], yaw: f32) -> (ActorInstance, Vec3) {
 }
 
 /// The line from `from` to `to`.
-fn line(from: Vec3, to: Vec3) -> Option<ActorInstance> {
+pub(crate) fn line(from: Vec3, to: Vec3) -> Option<ActorInstance> {
     let way = to - from;
     let length = way.length();
     (length > 0.5).then(|| {
@@ -799,6 +893,15 @@ fn pond(water: Vec3) -> ActorInstance {
 
 fn float(at: Vec3) -> ActorInstance {
     ActorInstance::new(at.to_array(), Quat::IDENTITY.to_array(), [1.0; 3])
+}
+
+/// The holocron of tier `slot` hanging at `at` (its top), turning.
+fn hanging_holocron(at: Vec3, turn: f32) -> ActorInstance {
+    ActorInstance::new(
+        (at - Vec3::Z * 4.5).to_array(),
+        Quat::from_rotation_z(turn).to_array(),
+        [1.0; 3],
+    )
 }
 
 /// A fish hanging head down at `at`, swinging.
@@ -842,9 +945,50 @@ impl GpuState {
                 .iter()
                 .position(|mesh| mesh.appearance.model == model)
         });
+        #[cfg(test)]
+        if let [
+            Some(rod_mesh),
+            Some(bucket_mesh),
+            Some(float_mesh),
+            Some(line_mesh),
+            Some(fish_mesh),
+            Some(pond_mesh),
+        ] = meshes
+        {
+            for &(stood, yaw, hanging) in &self.fishing.shot_rods {
+                let bsp = &self.bsp;
+                let (rod_instance, tip) = rod(stood, yaw);
+                let (bucket_instance, bucket_at) = bucket(stood, yaw);
+                self.object_groups[rod_mesh].push(rod_instance);
+                self.object_groups[bucket_mesh].push(bucket_instance);
+                self.object_groups[fish_mesh].push(bucket_fish(bucket_at, yaw));
+                let Some((water, in_pond)) = spot_ahead(stood, yaw, |point| {
+                    bsp.point_contents(point, CONTENTS_SOLID | CONTENTS_WATER)
+                }) else {
+                    continue;
+                };
+                let water = Vec3::from_array(water);
+                if in_pond {
+                    self.object_groups[pond_mesh].push(pond(water));
+                }
+                let at = if hanging {
+                    let hang = tip - Vec3::Z * 14.0;
+                    self.object_groups[fish_mesh].push(hanging_fish(hang - Vec3::Z * 4.0, 0.3));
+                    hang
+                } else {
+                    water
+                };
+                self.object_groups[float_mesh].push(float(at));
+                if let Some(instance) = line(tip, at + Vec3::Z * 3.0) {
+                    self.object_groups[line_mesh].push(instance);
+                }
+            }
+        }
         let Some(session) = self.live_session.as_ref() else {
             self.fishing.update(Frame::default(), now, || None);
             self.fishing.spots = [None; SLOTS];
+            self.fishing.lines = Lines::default();
+            HOLDING.store(0, Ordering::Relaxed);
             return;
         };
         let snapshot = session.latest_snapshot();
@@ -862,6 +1006,7 @@ impl GpuState {
             playing: Some(alive && !spectating),
             health: player.health(),
             echo_waiting: self.holocron_popup.unannounced(),
+            echo_tier: self.holocron_popup.unannounced_tier(),
         };
         let yaw = self.camera_yaw;
         let bsp = &self.bsp;
@@ -891,8 +1036,12 @@ impl GpuState {
                 self.fishing.save_log(&directory);
             }
         }
+        // What the actors drew the last frame, and what they draw this one.
+        let tips = std::mem::replace(&mut self.fishing.tips, [None; SLOTS]);
+        self.fishing.lines = Lines::default();
+        let mut holding = 0_u64;
         let [
-            Some(rod_mesh),
+            _,
             Some(bucket_mesh),
             Some(float_mesh),
             Some(line_mesh),
@@ -900,58 +1049,88 @@ impl GpuState {
             Some(pond_mesh),
         ] = meshes
         else {
+            HOLDING.store(0, Ordering::Relaxed);
             return;
         };
-        let push =
-            |mesh: usize, instance: ActorInstance, groups: &mut Vec<Vec<ActorInstance>>| {
-                groups[mesh].push(instance);
-            };
+        let holocron_mesh = |tier: usize| {
+            let request = crate::holocrons::stage::Request { tier, owned: true };
+            let body = request.model_of(&request.parts()[0]);
+            self.object_meshes
+                .iter()
+                .position(|mesh| mesh.appearance.model == body)
+        };
+        let seconds = presentation_time as f32 / 1000.0;
         // The own rod.
         if self.fishing.on
-            && let Some(_own) = own
+            && let Some(own) = own
         {
+            holding |= 1 << own;
             let fishing = &self.fishing;
-            let (rod_instance, tip) = rod(fishing.stood, fishing.yaw);
+            let tip = tips[own]
+                .map(Vec3::from_array)
+                .unwrap_or_else(|| rod(fishing.stood, fishing.yaw).1);
             let (bucket_instance, bucket_at) = bucket(fishing.stood, fishing.yaw);
-            push(rod_mesh, rod_instance, &mut self.object_groups);
-            push(bucket_mesh, bucket_instance, &mut self.object_groups);
+            self.object_groups[bucket_mesh].push(bucket_instance);
             if fishing.bucket > 0 {
-                push(
-                    fish_mesh,
-                    bucket_fish(bucket_at, fishing.yaw),
-                    &mut self.object_groups,
-                );
+                self.object_groups[fish_mesh].push(bucket_fish(bucket_at, fishing.yaw));
             }
             let water = Vec3::from_array(fishing.water);
             if fishing.pond {
-                push(pond_mesh, pond(water), &mut self.object_groups);
+                self.object_groups[pond_mesh].push(pond(water));
             }
-            let at = match fishing.phase {
+            let (end, bend) = match fishing.phase {
                 Some(Phase::Casting { lands }) => {
                     let left = lands.saturating_duration_since(now).as_secs_f32()
                         / CAST_TIME.as_secs_f32();
                     let along = 1.0 - left;
-                    tip.lerp(water, along) + Vec3::Z * (along * (1.0 - along) * 60.0)
+                    let at = tip.lerp(water, along) + Vec3::Z * (along * (1.0 - along) * 60.0);
+                    self.object_groups[float_mesh].push(float(at));
+                    (at + Vec3::Z * 3.0, 0.0)
                 }
-                Some(Phase::Landed { until, catch }) => {
-                    let shown = 1.0
-                        - until.saturating_duration_since(now).as_secs_f32()
-                            / SHOW_CATCH.as_secs_f32();
-                    let hang = tip - Vec3::Z * 14.0;
-                    if catch.is_some_and(|c| c.kind == Kind::Fish) {
-                        push(
-                            fish_mesh,
-                            hanging_fish(hang - Vec3::Z * 4.0, (shown * 25.0).sin() * 0.5),
-                            &mut self.object_groups,
-                        );
+                Some(Phase::Landed { until, catch, echo }) => {
+                    let elapsed = SHOW_CATCH.saturating_sub(until.saturating_duration_since(now));
+                    let reeled = (elapsed.as_secs_f32() / REEL.as_secs_f32()).min(1.0);
+                    let eased = reeled * reeled * (3.0 - 2.0 * reeled);
+                    let hang = tip - Vec3::Z * HANG;
+                    let at = water.lerp(hang, eased);
+                    let swing = (elapsed.as_secs_f32() * 6.0).sin() * 0.5 * eased;
+                    match (catch, echo) {
+                        (_, Some(tier)) => {
+                            if let Some(mesh) = holocron_mesh(tier) {
+                                self.object_groups[mesh]
+                                    .push(hanging_holocron(at, elapsed.as_secs_f32() * 1.5));
+                            }
+                        }
+                        (Some(catch), None) if catch.kind == Kind::Fish => {
+                            self.object_groups[fish_mesh]
+                                .push(hanging_fish(at - Vec3::Z * 4.0, swing));
+                        }
+                        _ => self.object_groups[float_mesh].push(float(at)),
                     }
-                    hang
+                    (at, if reeled < 1.0 { REEL_BEND } else { 0.0 })
                 }
-                _ => water - Vec3::Z * fishing.float_dip(now, fishing_since(now)),
+                Some(Phase::Biting(_)) => {
+                    let at = water - Vec3::Z * fishing.float_dip(now, fishing_since(now));
+                    self.object_groups[float_mesh].push(float(at));
+                    (
+                        at + Vec3::Z * 3.0,
+                        BITE_BEND + (seconds * 30.0).sin() * 0.05,
+                    )
+                }
+                _ => {
+                    let at = water - Vec3::Z * fishing.float_dip(now, fishing_since(now));
+                    self.object_groups[float_mesh].push(float(at));
+                    (at + Vec3::Z * 3.0, 0.0)
+                }
             };
-            push(float_mesh, float(at), &mut self.object_groups);
-            if let Some(instance) = line(tip, at + Vec3::Z * 3.0) {
-                push(line_mesh, instance, &mut self.object_groups);
+            self.fishing.lines.ends[own] = Some(end.to_array());
+            self.fishing.lines.bend[own] = bend;
+            // No hand drew a rod the last frame (first person, a model without the
+            // bolt): the line runs from where the tip would be.
+            if tips[own].is_none()
+                && let Some(instance) = line(tip, end)
+            {
+                self.object_groups[line_mesh].push(instance);
             }
         }
         // Other players' rods: their float where this client finds water ahead of them.
@@ -975,6 +1154,7 @@ impl GpuState {
             else {
                 continue;
             };
+            holding |= 1 << slot;
             let origin = presented.sample(presentation_time).translation;
             let yaw = presented
                 .sample_pose(presentation_time)
@@ -992,28 +1172,26 @@ impl GpuState {
                     water,
                 });
             }
-            let (rod_instance, tip) = rod(origin, yaw);
-            push(rod_mesh, rod_instance, &mut self.object_groups);
-            push(bucket_mesh, bucket(origin, yaw).0, &mut self.object_groups);
+            self.object_groups[bucket_mesh].push(bucket(origin, yaw).0);
             if let Some((water, in_pond)) = self.fishing.spots[slot].and_then(|spot| spot.water) {
                 if in_pond {
-                    push(
-                        pond_mesh,
-                        pond(Vec3::from_array(water)),
-                        &mut self.object_groups,
-                    );
+                    self.object_groups[pond_mesh].push(pond(Vec3::from_array(water)));
                 }
-                let t = presentation_time as f32 / 1000.0 + slot as f32;
+                let t = seconds + slot as f32;
                 let at = Vec3::from_array(water) - Vec3::Z * (t * 2.1).sin() * 0.25;
-                push(float_mesh, float(at), &mut self.object_groups);
-                if let Some(instance) = line(tip, at + Vec3::Z * 3.0) {
-                    push(line_mesh, instance, &mut self.object_groups);
+                self.object_groups[float_mesh].push(float(at));
+                self.fishing.lines.ends[slot] = Some((at + Vec3::Z * 3.0).to_array());
+                if tips[slot].is_none()
+                    && let Some(instance) = line(rod(origin, yaw).1, at + Vec3::Z * 3.0)
+                {
+                    self.object_groups[line_mesh].push(instance);
                 }
             }
         }
         if own.is_none() {
             self.fishing.spots = [None; SLOTS];
         }
+        HOLDING.store(holding, Ordering::Relaxed);
     }
 
     /// Say on the centre of the screen what the toy has to say; its sounds wait for
@@ -1038,6 +1216,14 @@ impl GpuState {
                 }
                 Say::Sound(path) => {
                     self.fishing_cues.push(path);
+                    continue;
+                }
+                Say::Command(command) => {
+                    if let Some(console) = self.console.as_mut()
+                        && let Err(error) = console.queue_command(command)
+                    {
+                        crate::log::progress(format_args!("fishing: {command}: {error}"));
+                    }
                     continue;
                 }
             };
@@ -1094,6 +1280,7 @@ mod tests {
             playing: Some(true),
             health: 100,
             echo_waiting,
+            echo_tier: echo_waiting.then_some(1),
         }
     }
 
@@ -1144,7 +1331,7 @@ mod tests {
         fishing.update(frame(false), bite + Duration::from_millis(300), || None);
         assert!(matches!(fishing.phase, Some(Phase::Landed { .. })));
         // Another bite let go waits for the next.
-        fishing.update(frame(false), bite + Duration::from_secs(2), || None);
+        fishing.update(frame(false), bite + Duration::from_secs(3), || None);
         let Some(Phase::Waiting { bite }) = fishing.phase else {
             unreachable!()
         };
