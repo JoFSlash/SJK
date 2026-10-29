@@ -781,6 +781,27 @@ and its hover cards (`duel6_sjk_more_achievements`). Not verified: anything in g
 counters against real servers (JA+ duel start health, a thermal batted back by a saber,
 throws at Saber Throw 1), the hub accepting the new ids.
 
+## Fishing toy
+
+29/10/2026, `feat/fishing` (PR #278), based on `main` `9f40fded` (Sanji's idea in #ideas):
+`toy_fishing` puts a rod in the right hand (the rifles' ready pose on the torso; in first
+person held in view), a bucket at the feet and a float on the water ahead, or on a small
+pond drawn where there is none, in the installed game's swamp textures
+([client.md](client.md#fishing)). A bite every 20 to 60 seconds, `+use` within about a
+second: nothing 15%, junk 30%, one of 12 fish 55%, counted in `fishing_log.txt`. An Echo
+the hub drops while fishing waits for a golden bite of its own and comes up on the line;
+fishing brings no Echo the hub did not drop. Collection > Toys has its tenth row (rows a
+little lower), the quick wheel's Toys page its icon. Five achievements in Toys,
+client-counted on servers only (`fish_first`, `fish_50`, `fish_kinds`, `echo_angler`,
+`old_whiskers` hidden); the wall gives Toys a fifth band, a little closer together. The
+look's toy bits went from u8 to u16. No hub change: the hub needs the five ids in its
+catalogue before they unlock online; selling junk (capped credits) is proposed to Sol, not
+built. Verified: fmt, build, the fishing, achievements, kyber and collection tests,
+earlier release builds in game (Slash: the rod in third person, the pond, bites; not yet
+the first-person rod or the five-band wall), world shots of the pond on duel6
+(`rods_at_the_first_spawn`). Not verified: the five ids at the hub, other players seeing a
+rod, an Echo bite online, the rod on custom models.
+
 ## Boombox toy
 
 25/10/2026, `personal/boombox-toy`, based on `main` `44184714` (Sol's idea): `toy_boombox`

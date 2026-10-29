@@ -5170,7 +5170,7 @@ UI atlas from the hub's packs for the Collection and the holocron opening
 
 ## Fishing
 
-Fishing (Slash's idea, 29/10/2026) is a toy for every SJK player: a rod in the hand, a
+Fishing (Sanji's idea in #ideas, 29/10/2026; Slash's rules) is a toy for every SJK player: a rod in the hand, a
 bucket at the feet and a float on the water, and a bite to hook now and then. It gives
 nothing the economy counts: catches go to the player's own fish log, and the Echoes it
 brings up are the ones the hub drops anyway.
