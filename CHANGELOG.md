@@ -33,7 +33,7 @@ Add each release's notes here when it is tagged (docs/sjk.md "Releases").
 ## Unreleased
 
 - Mystery boxes hold a holocron one time in ten (it was one in fifty), and the roll shows the four tiers' real holocrons, stopping on the one you won. A box that blows up laughs with Sol's own laugh when the SJK extras pack is installed _(Sol)_
-- Low FPS card: jumping no longer turns on Vanilla graphics when the card comes up in the middle of play, strafing right no longer ticks "Don't suggest this again", and the card takes no key or click for a moment after it opens (#194) _(Slash)_
+- Low FPS card: jumping no longer turns on Vanilla graphics when the card comes up in the middle of play, strafing right no longer ticks "Don't suggest this again", and the card takes no key or click for a moment after it opens (#194) _(Slash, PR #240)_
 - Centre prints and the words over mystery boxes (and the box hunt's mark) are drawn in Fira Sans Condensed, a real typeface close to the old menu font, instead of a tracing of a low-resolution bitmap _(Sol)_
 - Box hunt: one mark every 10 minutes at most, not one after the other. Hunters see the mark ringed in red, and a black name reads on the hunt's card _(Sol)_
 - Toys: each toy other players are seen with has a switch on its card in Collection > Toys to hide theirs on your PC (holocrons, boxes, ragdoll falls, drones, boomboxes, monitors) _(Sol)_

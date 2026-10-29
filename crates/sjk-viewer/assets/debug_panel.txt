@@ -3139,7 +3139,7 @@ note: Hilts, NPCs, corpses and cosmetics still load in one frame. Not tested in 
 
 [slash-fps-card-keys]
 area: Menus & settings
-title: Low FPS card: jumping or strafing no longer chooses on it (Slash, #194)
+title: Low FPS card: jumping or strafing no longer chooses on it (Slash, PR #240)
 change: Space no longer turns Vanilla graphics on; D no longer ticks Don't suggest this again.
 change: For 0.6 s after the card opens, no key or click counts.
 test: help_fps in a match, hold W and press Space and D: the card stays, nothing changes.
