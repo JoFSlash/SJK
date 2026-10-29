@@ -5168,6 +5168,49 @@ UI atlas from the hub's packs for the Collection and the holocron opening
 [tags.rs](../crates/sjk-viewer/src/tags.rs) and
 [tags_frame.rs](../crates/sjk-viewer/src/tags_frame.rs).
 
+## Fishing
+
+Fishing (Slash's idea, 29/10/2026) is a toy for every SJK player: a rod in the hand, a
+bucket at the feet and a float on the water, and a bite to hook now and then. It gives
+nothing the economy counts: catches go to the player's own fish log, and the Echoes it
+brings up are the ones the hub drops anyway.
+
+- **`toy_fishing`** (a bind, the quick wheel's Toys page, Collection > Toys, "Rod out")
+  gets the rod out or puts it away. The player must stand still: moving, getting hurt,
+  dying or leaving the game puts it away. The hands go empty (`weapmelee`), and the upper
+  body holds the rod in the rifles' ready pose (`TORSO_WEAPONREADY3`) while the legs stand.
+  In first person the own rod is held in view, low on the right, and the one in the hand
+  shows only in mirrors.
+- **Where it casts:** into water ahead (72, 56 or 40 units in front, the first that has
+  it), else onto ground ahead no more than 48 below the feet, where a small pond is drawn
+  for the cast: the toy fishes anywhere, since few maps have water. The pond is drawn
+  with the installed game's own swamp textures (Hidden Evil's lake layers over the stock
+  water, Yavin's mud, mossy rock and ground plants), so the game must be installed.
+- **Bites** come every 20 to 60 seconds: the float dips, a splash plays, and `+use` within
+  0.8 to 1.2 seconds hooks it. Too soon scares the fish (the next bite waits 10 to 20
+  seconds more); too late lets it go. A hooked bite comes up empty 15% of the time, with
+  junk 30% (six kinds) and a fish 55% (twelve kinds, from the Silver darter to Old
+  Whiskers, the great catfish, one fish in about 106), reeled in to the tip and dropped
+  in the bucket. Each catch is counted in `fishing_log.txt` in the settings folder
+  (`<id> <count>` a line) and said in the centre of the screen.
+- **Echoes:** when the hub drops the player an Echo while they fish, its card waits, and
+  a golden bite comes 5 to 15 seconds later (1.5 seconds to hook it, two tries); hooked,
+  the holocron comes up on the line and its card shows. Missed twice, or with the rod put
+  away, the card shows all the same. Fishing never brings an Echo the hub did not drop:
+  the caps stay as they are ([holocrons.md](holocrons.md)).
+- **Achievements:** Angler (50 fish), Every Fish in the Pond (every kind), Echo Angler (10
+  Echoes on the line) and Old Whiskers (hidden), counted on servers only, as the others
+  ([identity.md](identity.md#achievements)).
+- **Sounds:** Settings > Sound > Toys, "Fishing" (`s_toyFishingSound`).
+
+No game server knows of it. The rod is a toy in the player's look (`toys: ["fishing"]`),
+so other SJK players draw it in the fisher's hand, with the line to a float where their
+own client finds water or ground ahead of that player; players on stock clients see a
+player standing still. The models, picture, shader and icon are bundled, made by
+[fishing_assets.py](../scripts/fishing_assets.py) from shapes (nothing taken from another
+game), and mounted below all game data. See
+[fishing.rs](../crates/sjk-viewer/src/fishing.rs).
+
 ## Toy sounds
 
 Settings > Sound > Toys (Sol's request, 25/10/2026) sets how the toys sound on this PC:
@@ -5175,6 +5218,7 @@ Settings > Sound > Toys (Sol's request, 25/10/2026) sets how the toys sound on t
 toy's sounds, and a switch per toy silences that toy's sounds alone, the player's own
 and everyone else's (`s_toyBoxSound`, `s_toyOrder66Sound`, `s_toyHaxSound`,
 `s_toyRagdollSound`, `s_toyDroneSound`, `s_toyBoomboxSound`, `s_toyMonitorSound`,
+`s_toyFishingSound`,
 `s_toyMysteryBoxSound` (the [mystery boxes](mystery-boxes.md)), all
 on by default,
 archived). The toy still

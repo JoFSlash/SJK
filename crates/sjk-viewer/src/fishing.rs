@@ -186,6 +186,21 @@ const fn fish(id: &'static str, name: &'static str, weight: u32) -> Catch {
     }
 }
 
+/// The great catfish's id: its own achievement (Old Whiskers).
+pub(crate) const GREAT_CATFISH: &str = "old_whiskers";
+/// How many kinds of fish [`CATCHES`] holds.
+pub(crate) const FISH_KINDS: usize = {
+    let mut count = 0;
+    let mut index = 0;
+    while index < CATCHES.len() {
+        if matches!(CATCHES[index].kind, Kind::Fish) {
+            count += 1;
+        }
+        index += 1;
+    }
+    count
+};
+
 /// Everything a bite can bring up but nothing: SJK's own names.
 pub(crate) const CATCHES: [Catch; 18] = [
     junk("boot", "an old boot"),
@@ -1027,6 +1042,9 @@ impl GpuState {
             echo_waiting: self.holocron_popup.unannounced(),
             echo_tier: self.holocron_popup.unannounced_tier(),
         };
+        // The achievements count catches on servers, as the rest: never a demo, a game this
+        // client hosts or a server on this machine (`achievements::tracker`).
+        let counts = !session.is_local() && !session.server().ip().is_loopback();
         let yaw = self.camera_yaw;
         let bsp = &self.bsp;
         let was_landed = matches!(self.fishing.phase, Some(Phase::Landed { .. }));
@@ -1036,7 +1054,10 @@ impl GpuState {
             })
             .map(|spot| (spot, origin, yaw))
         });
-        if !was_landed && matches!(self.fishing.phase, Some(Phase::Landed { .. })) {
+        if !was_landed && let Some(Phase::Landed { catch, echo, .. }) = self.fishing.phase {
+            if counts {
+                crate::achievements::update(|record| record.fished(catch, echo.is_some()));
+            }
             if let Some(directory) = self
                 .console
                 .as_ref()

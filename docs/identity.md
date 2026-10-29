@@ -1011,10 +1011,18 @@ and in the hub (same ids):
 | Long Throw | `saber_throw_far` | a player defeated by a saber throw from 512 units or more | client |
 | Return to Sender | `thermal_return` | a player defeated with their own thermal detonator | client |
 | Blue, Yellow, Red, Dual, Staff Master | `style_blue_50`, `style_yellow_50`, `style_red_50`, `style_dual_50`, `style_staff_50` | 50 duels won with the saber in that style (`fd.saberAnimLevel` when the kill is made: 1 Fast, 2 Medium, 3 Strong, 6 two sabers, 7 staff; Desann's and Tavion's count towards none), in a private duel (saber only or full Force) or a duel game; kills out of a duel do not count | client |
+| Angler | `fish_50` | 50 fish landed with the Fishing toy ([client.md](client.md#fishing)) | client |
+| Every Fish in the Pond | `fish_kinds` | every kind of fish landed (12, `fishing::FISH_KINDS`) | client |
+| Echo Angler | `echo_angler` | 10 Echoes landed on the line | client |
+| Old Whiskers (hidden) | `old_whiskers` | Old Whiskers, the great catfish, landed | client |
 
 The fourteen after Decorated came on 26/10/2026 (Sol's list), with the categories
 Collection and Toys; the five style masters on 29/10/2026 (Dante's idea in #ideas,
-duels only at Slash's call). Each needs the same id in the hub's catalogue. A hidden achievement (Touched by the Force) is a secret until it
+duels only at Slash's call); the four Fishing ones on 29/10/2026 (Slash), in Toys, which
+the wall now draws beside Journeys (Collection beside Community), so the six categories
+still fit four bands. Each needs the same id in the hub's catalogue, and the hub bounds
+how fast a fishing count may rise as it does the others (a bite at most every 20
+seconds). A hidden achievement (Touched by the Force) is a secret until it
 is unlocked: the board, its hover card and the "Next up" list show "Secret" or "Secret
 achievement", a `?` in its medallion, no goal and no count; unlocked, it shows like any
 other (the unlock card names it). A retired achievement (Surveyor, since 26/10/2026)

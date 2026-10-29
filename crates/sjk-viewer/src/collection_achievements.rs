@@ -63,6 +63,16 @@ pub(super) fn groups(standings: &[Standing]) -> Vec<Group> {
             None => categories.push((category, vec![index])),
         }
     }
+    // The wall's order, so the six fit four bands: Combat, Duels and flags, Journeys beside
+    // Toys, Collection beside Community.
+    categories.sort_by_key(|(category, _)| match category {
+        Category::Combat => 0,
+        Category::Duels => 1,
+        Category::Journeys => 2,
+        Category::Toys => 3,
+        Category::Collection => 4,
+        Category::Community => 5,
+    });
     let mut groups = Vec::with_capacity(categories.len() + 1);
     let (mut band, mut column) = (0, 0);
     for (category, members) in categories {
@@ -593,7 +603,8 @@ mod tests {
     }
 
     /// The six categories fit four bands of twelve: Combat alone, Duels and flags alone
-    /// (with the five style masters), Journeys beside Community, Collection beside Toys;
+    /// (with the five style masters), Journeys beside Toys (with the four Fishing ones),
+    /// Collection beside Community;
     /// a retired achievement not held is left out and one held takes its place.
     #[test]
     fn the_wall_packs_the_categories_into_bands() {
@@ -609,9 +620,9 @@ mod tests {
                 ("Combat", 0, 0, 11),
                 ("Duels and flags", 1, 0, 11),
                 ("Journeys", 2, 0, 5),
-                ("Community", 2, 6, 3),
+                ("Toys", 2, 6, 6),
                 ("Collection", 3, 0, 7),
-                ("Toys", 3, 8, 2),
+                ("Community", 3, 8, 3),
             ]
         );
         let slots: Vec<Slot> = slots(&groups).collect();
@@ -639,8 +650,8 @@ mod tests {
         assert_eq!(vertical(&slots, below.index, false), arsenal.index);
         // Up from the first band and Down from the last stay.
         assert_eq!(vertical(&slots, arsenal.index, false), arsenal.index);
-        let toys = index_of("box_minutes_10");
-        assert_eq!(vertical(&slots, toys, true), toys);
+        let community = index_of("decorated");
+        assert_eq!(vertical(&slots, community, true), community);
         // Left and right read the wall in order, Tab wraps round.
         let first = slots[0].index;
         let last = slots.last().unwrap().index;
