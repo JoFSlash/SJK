@@ -358,7 +358,7 @@ impl State {
         self.hull_label.clear();
         let _ = write!(self.hull_text, "HULL {}", sample.hull.max(0));
         let _ = write!(self.hull_value, "{}", sample.hull.max(0));
-        let _ = write!(self.hull_label, "^3HULL ^7{}", sample.hull.max(0));
+        let _ = write!(self.hull_label, "^3HP ^7{}", sample.hull.max(0));
         let _ = write!(self.shield_text, "SHIELD {}", sample.shield.max(0));
         // The speed is shown in game units a second, as the `cg_speedometer` default.
         let speed = if sample.speed.is_finite() {
@@ -788,7 +788,7 @@ mod tests {
                 "{look:?}"
             );
             assert_eq!(hud.resolve_text(sjk_ui::TextId(VALUE_TEXT)), "60");
-            assert_eq!(hud.resolve_text(sjk_ui::TextId(LABEL_TEXT)), "^3HULL ^760");
+            assert_eq!(hud.resolve_text(sjk_ui::TextId(LABEL_TEXT)), "^3HP ^760");
         }
     }
 

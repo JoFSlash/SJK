@@ -4632,7 +4632,7 @@ give way. SJK's own looks show only the hull too, through their layout documents
 `draw_vehicle`): `radial` a yellow arc under the crosshair, on the health arc's circle
 between the left and right meters (132 to 48 degrees, four segments, the same track and
 shadow, moved by the radial placement with the rest of the status), with the hull's
-number inside it; `classic` a yellow bar with a `HULL` line above the weapon and
+number inside it; `classic` a yellow bar with an `HP` line above the weapon and
 ammunition lines. With a game-data HUD that has no vehicle menu, SJK draws its own
 ([hud/vehicle.rs](../crates/sjk-viewer/src/hud/vehicle.rs)): a vector strip at the
 bottom centre laid out on `swoopvehiclehud`'s 640x80 units (hull above, speed, shield
