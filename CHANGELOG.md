@@ -35,6 +35,7 @@ Add each release's notes here when it is tagged (docs/sjk.md "Releases").
 = cg_soundSonar: Sound sonar, for deaf and hard-of-hearing players: arcs round the crosshair point toward the sounds you hear.
 
 - Sound sonar (Settings > Sound, `cg_soundSonar`, off by default): short arcs round the crosshair point toward the sounds you hear, footsteps, shots and swings, voices, explosions and the rest, each kind its own colour, fading over a second _(Sol, after Dawson's idea)_
+- Prediction on JA+ servers: dual sabers jump attacks no longer sink you into the floor, and joining no longer throws you sideways at high speed before the server stops you; two prediction changes of 2026.1029.1 (dual jump attack hull, zero gravity push) are backed out after Lumaya checked them against an original JA+ server _(Lumaya, PRs #305, #307 and #308)_
 - jaPRO plugin options: Force jumps (Settings > Mods, `japro.plugin 1`) is offered now that SJK predicts it: off, holding jump bunny hops instead of Force jumping, on jaPRO servers that let players choose _(Sol, after Kushina's idea and Lumaya's PR #282)_
 
 - Mystery boxes: when the opener takes what came out, everyone else sees it go and the lid close at once, instead of it floating on for 10 seconds _(Sol)_

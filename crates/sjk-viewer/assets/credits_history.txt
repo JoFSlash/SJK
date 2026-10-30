@@ -2648,7 +2648,7 @@
 - 0874042 |  | Decode print and cp text as legacy bytes
 
 = Lukas
-+ 24/10/2026 | SJK #198 | Release stale profile VFS generations
++ 24/10/2026 | SJK #198 | Add VFS headroom and lifetime diagnostics
 - 69c6da4 |  | Release stale profile VFS generations
 + 21/10/2026 | SJK #179 | Add holocron notification modes
 - d7ae6dc |  | Add holocron notification modes
@@ -2692,6 +2692,15 @@
 - ddfe116 |  | Fix Linux clipboard integration
 
 = Lumaya
++ 30/10/2026 | SJK #305 | Audit reported JA+ prediction regressions after October 29 merges
+- 626f005 |  | Record reported JA+ prediction regressions and audit scope
+- e25ad39 |  | Record runtime regression audit of all prediction PRs
++ 30/10/2026 | SJK #308 | Back out zero-gravity push prediction after spawn regression
+- cb5a74c |  | Claim rollback of zero-gravity prediction regression
+- 97002d2 |  | Remove zero-gravity impulses from transient spawn prediction
++ 30/10/2026 | SJK #307 | Back out dual jump-hull prediction after JA+ regression
+- 3e7be04 |  | Claim rollback of dual jump-hull prediction regression
+- bbc8fd4 |  | Restore fixed dual-jump hull after JA+ runtime regression
 + 29/10/2026 | SJK #284 | Predict jaPRO new-jetpack activation and thrust
 - 588cd09 |  | Record jaPRO new-jetpack prediction scope
 - ea8ed75 |  | Predict jaPRO new jetpack only for current server profile

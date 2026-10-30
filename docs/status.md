@@ -1,3 +1,21 @@
+## Prediction regression audit
+
+30/10/2026, Windows x64: audit #305 reviewed the 25 prediction PRs from
+29/10 against release `2026.1030.1` (`b138373f`) and `main` `c1b90267`.
+An original JA+ 2.4 B7 private server reproduced two regressions: transient
+zero-gravity spawn impulses (#251, rollback #308), and dual-jump hull sinking
+below the floor (#266, rollback #307). Source-only and synthetic checks had
+missed these failures. The before-merge control is `0fd6a5e1`.
+
+Four 8/7/4/3 ms captures cover 1,598 acknowledged endpoints. Tested chained
+stock dual-saber moves matched server move IDs; this does not clear every
+attack or presentation path. The complete PR disposition, reference module
+hash, probe limits and remaining unverified cases are in
+[the networking review](networking.md#prediction-regression-review-30102026).
+Base-server, jaPRO and complete gameplay parity remain unverified. Further
+prediction feature work should wait for these corrections and targeted
+runtime validation.
+
 ## Banana peel in the look
 
 30/10/2026, `personal/sync-origin`, based on `main` `bc9343ff`, with the hub's `look-toys`
@@ -253,12 +271,8 @@ tests cover holding attack/use and releasing them at 8/7/4/3 ms on Windows
 x64. Live respawn behavior against an OpenJK server remains unverified.
 ## Dual jump-attack collision hull
 
-29/10/2026, `fix/prediction-dual-jump-hull`, based on `main` `e702b0b1`:
-ported local-player dual jump-attack hull resizing/restoration from OpenJK
-`4d0dfaf1`, codemp `PM_CheckDualForwardJumpDuck` and `PM_CheckFixMins`.
-Windows x64 synthetic tests cover both timing windows and clearance/crouch
-restoration around 8/7/4/3 ms boundaries. Live head/ceiling/ledge contacts
-and community animation tables remain unverified.
+PR #266's timed dual-attack hull resizing was rolled back in #307. An original JA+ 2.4 B7 server stayed grounded while prediction shrank the hull and acquired downward velocity (about 254 units/s in the captured case). The fixed -24-unit foot minimum is restored. Timed hull resizing remains unsupported.
+
 ## Equipped saber definitions in client prediction
 
 29/10/2026, `fix/prediction-saber-definitions`, based on `main` `e702b0b1`:
@@ -420,12 +434,8 @@ This measures only the lookup, excluding snapshot rebuild, full Pmove, BSP trace
 and rendering. Live contacts and rendered frame rates remain unverified.
 ## Prediction: zero-gravity push-off
 
-29/10/2026, `fix/prediction-zero-gravity`, based on `main` `e702b0b1`:
-shared movement includes codemp's gravity <= 0 impulse, backward trace and leg
-animation. It deliberately retains the clear-trace impulse (`fraction <= 1`).
-Reference: OpenJK multiplayer `bg_pmove.c:2057-2085`, revision `4d0dfaf1`.
-Windows x64 synthetic tests cover command steps 8/7/4/3 ms and the jump gates;
-zero-gravity map play against a live OpenJK server remains unverified.
+PR #251's shared zero-gravity impulse was rolled back in #308. Original JA+ 2.4 B7 spawn snapshots temporarily supplied zero gravity and base speed; prediction accumulated 450-unit/s impulses while the server stayed still. The previous jump branch is restored globally. Zero-gravity wall push-off remains unsupported.
+
 ## Prediction: trigger collision hull
 
 29/10/2026, `fix/prediction-trigger-hull`, based on `main` `e702b0b1`:
