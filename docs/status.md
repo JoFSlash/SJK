@@ -1,3 +1,79 @@
+## Banana peel in the look
+
+30/10/2026, `personal/sync-origin`, based on `main` `bc9343ff`, with the hub's `look-toys`
+(a look holds up to 32 toy ids, 8 before, `bad_look` past them). The Banana
+peel was kept out of the look's `toys` when it came (29/10/2026) because SJK's toys
+already filled the hub's 8; its id `banana` now goes there while it is on, as the other
+toys' do (`looks::TOYS`, nine; `Worn::toys` is a `u32`, as many bits as the hub's 32
+ids). The peels still go through the toy relay, and the dropper's `clear` stays: clients
+of 29/10 and 30/10/2026 do not list the toy. Nothing else in the client caps a look's
+toys (`sjk-identity` sends the list as it is; the blade's option lists keep their 8).
+The hub must be deployed first: a hub from before refuses a look with all nine toys out
+as `bad_look`, which the client takes as its blade skin refused. Verified:
+`looks::tests::every_toy_goes_both_ways_all_at_once`, the looks and banana tests. Not
+verified: a look with nine toys on the live hub.
+
+## jaPRO plugin options: Force jumps
+
+30/10/2026, `personal/sync-origin`, based on `main` `bc9343ff`: Force jumps (`cp_pluginDisable`
+bit 19, `JAPRO_PLUGIN_BHOP`), hidden by the plugin options of 29/10/2026 because the
+prediction did not follow it, is offered under jaPRO plugin options (`japro.plugin 1`,
+[mods.md](mods.md#plugin-options)). Lumaya's PR #282 made the prediction read the bit
+(`JaProRules::only_bhop`, both of EternalJK's checks, `bg_pmove.c:2670` and `2836`, only on
+a jaPRO profile advertising `JAPRO_CINFO_BHOP2`), refreshed from the cvar each frame
+(`runtime_settings.rs`). Verified: the table's tests (polarity, listing, switching) and
+`settings::plugin_rows::tests::japro_rows_follow_their_bits` (the row sets the bit the
+prediction reads), with Lumaya's `japro_only_bhop_*` tests. Not verified: only-bhop on a
+jaPRO server in game.
+
+## Mystery box: a take seen by everyone
+
+30/10/2026, `personal/box-take-sync`, based on `main` `c784eb8f` (Sol's report: when a
+player took what came out, the others still saw it float). The opener's client relays
+`mystery_box` `take_<box>` to each other SJK player (`looks::sjk_slots`), one every
+50 ms, and theirs closes the box with the take and closing sounds; only the opener's
+slot is heeded ([mystery-boxes.md](mystery-boxes.md)). No hub change: the relay checks no
+toy ids. Verified: `mystery_box::tests::a_take_is_told_to_each_other_player_and_closes_their_box`,
+fmt, the workspace's build, tests and Clippy. Not verified: two clients in a game.
+
+## Use prompt by the crosshair
+
+30/10/2026, `personal/use-prompt`, based on `main` `b138373f` (Sol's idea): a new anchor
+for what Use does at what the player faces, right of the crosshair with a gap, a key cap
+naming the key bound to `+use` (`keybind_editor::sjk_view::key_label`, its module now
+`pub(crate)`) ([client.md](client.md#use-prompt)). The mystery boxes use it in place of
+their centre prints: open (price or free roll), take it, and greyed why not (cooldown,
+credits, the hub answering, another player's roll); the words over a box lost their
+"press Use" ends. Verified: unit tests (`use_prompt`: the cap's words and width, the
+layout right of the crosshair and on the screen; `mystery_box`: every prompt at a box),
+fmt, the workspace's build, tests and Clippy. Not verified: how it looks (world shots do
+not draw the HUD's words), anything in game.
+
+## Mystery box: the extras pack's sounds, a cooldown, the teddy bear, a sturdier chest
+
+30/10/2026, `personal/box-teddy`, based on `main` `dbfb7e9a` (Sol's request), with the
+hub's `box-cooldown` branch ([mystery-boxes.md](mystery-boxes.md)). The box's opening,
+roll and closing are Sol's sounds in the optional SJK extras pack (`extras_open.mp3`,
+`extras_roll.mp3`, `extras_close.mp3` under `sound/sjk/mystery_box/`), each falling
+back to the crate slide, the bundled tune and silence without it (`mystery_box::EXTRAS`,
+the laugh's fallback made general). The roll ends at 5.2 s, the extras roll's last note;
+the bundled tune is played 6% faster to end there too (`mystery_box_assets.py`, `STEP`).
+A player opens one box every 15 seconds (the hub's `cooldown`, 3 before), which the client
+says at once from its own last opening. A box that blows up stops on a teddy bear
+(`teddy_bear_model.py`, never in the reel) and laughs at the box for everyone who sees the
+roll; 1.5 s later it blows up and the opener's client sends `kill` where the Ragdoll could
+strike (`GpuState::ragdoll_blown_up`, its ragdoll, is gone); the hunters' words of where
+the price went wait for the roll. The chest gained feet, a plinth, raised bands, corner
+posts, a rim, a lock plate, handles and an arched, banded lid (`mystery_box_model.py`,
+same atlas and size, so the hinge is unchanged). The box_cooldown refusal now says "You
+opened a box a moment ago: let someone else roll." Verified: fmt, the workspace build,
+tests and Clippy; `mystery_box` tests (the extras and their fallbacks, the bear, the laugh
+then the blast once and the opener told, the cooldown's seconds, the close); the world
+shot `duel6_mystery_box_teddy` (a closed chest and two open on the bear, lids open since
+the shots now give the lid its opening time); the hub's tests. Not verified: anything in
+game, `kill` on JA+, jaPRO and base servers, the extras pack's sounds against the roll in
+game, two clients seeing the same bear and death.
+
 ## Monitor Screen Saver
 
 29/10/2026, `personal/monitor-screen-saver`, based on `main` `9f40fded` (Sol's idea),
@@ -26,8 +102,8 @@ The slipping player's client decides the slip against its own predicted player (
 ground, moving, feet on a peel it came at) and falls as the Ragdoll does, with a blow at a
 foot (`ragdoll::UNTHROWN` names no monitor) that throws the feet over the head and lays the
 body on its back. Peels, slips and clears go through the toy relay as `drop_...`,
-`slip_<dropper>_<number>` and `clear`; nothing in the looks, which hold eight toy ids at
-most and are full. No hub change (the relay checks no toy ids: `relay.rs`, "The hub knows
+`slip_<dropper>_<number>` and `clear`; nothing in the looks, which held eight toy ids at
+most and were full (the look lists `banana` since 30/10/2026: "Banana peel in the look"). No hub change (the relay checks no toy ids: `relay.rs`, "The hub knows
 no toys"). Collection > Toys has ten rows (64 high, was 68), `cg_toyBananaShow` hides the
 peels, `s_toyBananaSound` silences them; the key bindings' icons have four more atlas
 cells (the atlas keeps its height). Model, picture, icon, slip and drop sounds are SJK's own
@@ -566,6 +642,14 @@ floor (`world_shot::duel6_tags_on_walls_and_floor`) and the Tags tab
 (`world_shot::duel6_sjk_collection_tags`). Not verified: in a game, against the hub, two
 clients seeing each other's tags, or the opening's tag prize drawn.
 
+30/10/2026, `personal/tags-gonk-geyon`, based on `main` `c784eb8f`: the first tags from
+the Discord's `#tag-proposals`, all three Blep's and picked by Sol: `tag_gonk` (Uncommon)
+and `tag_geyon` (Rare, for Creyon) join the catalogue, and the EZ tag gets its art (the
+pictures are in the hub's `sjk_tags` pack, hub branch `tags-gonk-geyon`).
+`scripts/tag_assets.py` now also reads the entries rustfmt wraps over two lines (it had
+dropped Crossed Sabers and Droid Doodle). Verified: the catalogue and bundled-shader unit
+tests. Not verified: in a game or against the live hub.
+
 ## Each swing heard once across the predicted and server animations
 
 27/10/2026, `fix/swing-sound-171`, based on `main` `685edded` (hub report #171, Kushina,
@@ -1040,11 +1124,11 @@ second: nothing 15%, junk 30%, one of 12 fish 55% (each its own model and painte
 counted in `fishing_log.txt`; the bucket holds the last fish caught (`last <id>` in the
 log). An Echo
 the hub drops while fishing waits for a golden bite of its own and comes up on the line;
-fishing brings no Echo the hub did not drop. Collection > Toys has its tenth row (rows a
-little lower), the quick wheel's Toys page its icon. Five achievements in Toys,
+fishing brings no Echo the hub did not drop. Collection > Toys has its eleventh row,
+after the Banana peel's (rows 58 high so eleven fit), the quick wheel's catalogue its icon. Five achievements in Toys,
 client-counted on servers only (`fish_first`, `fish_50`, `fish_kinds`, `echo_angler`,
 `old_whiskers` hidden); the wall gives Toys a fifth band, a little closer together. The
-look's toy bits went from u8 to u16. No hub change: the hub needs the five ids in its
+look has the toy `fishing` (main's u32 toy bits, after the Banana peel). No hub change: the hub needs the five ids in its
 catalogue before they unlock online; selling junk (capped credits) is proposed to Sol, not
 built. Verified: fmt, build, the fishing, achievements, kyber and collection tests,
 earlier release builds in game (Slash: the rod in third person, the pond, bites; not yet

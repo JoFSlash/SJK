@@ -148,6 +148,8 @@ const MODS_ROWS: &[&str] = &[
     #[cfg(feature = "mod-japro")]
     "japro.plugin 0",
     #[cfg(feature = "mod-japro")]
+    "japro.plugin 1",
+    #[cfg(feature = "mod-japro")]
     "japro.plugin 5",
     #[cfg(feature = "mod-japro")]
     "japro.plugin 6",
@@ -446,6 +448,8 @@ impl Group {
                 "japlus.plugin 15",
                 #[cfg(feature = "mod-japro")]
                 "japro.plugin 0",
+                #[cfg(feature = "mod-japro")]
+                "japro.plugin 1",
                 #[cfg(feature = "mod-japro")]
                 "japro.plugin 5",
                 #[cfg(feature = "mod-japro")]

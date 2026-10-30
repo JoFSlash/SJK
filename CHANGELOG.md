@@ -30,6 +30,30 @@ The site (site/assets/site.js, parseChangelog) reads the release headings,
 introductions and recap lines too.
 Add each release's notes here when it is tagged (docs/sjk.md "Releases").
 -->
+## Unreleased
+
+- jaPRO plugin options: Force jumps (Settings > Mods, `japro.plugin 1`) is offered now that SJK predicts it: off, holding jump bunny hops instead of Force jumping, on jaPRO servers that let players choose _(Sol, after Kushina's idea and Lumaya's PR #282)_
+
+- Mystery boxes: when the opener takes what came out, everyone else sees it go and the lid close at once, instead of it floating on for 10 seconds _(Sol)_
+- Tags: two new ones, Gonk (Uncommon) and Geyon (Rare), and the EZ tag has its real picture, all three drawn by Blep and picked from the Discord's #tag-proposals _(Sol, art by Blep)_
+- A prompt by the crosshair shows what Use does at a mystery box, with the key you bound to Use: Open mystery box and its price, Take it, or why you cannot yet (your turn in a few seconds, not enough credits), instead of a message in the middle of the screen _(Sol)_
+- Fishing toy: `toy_fishing` (the quick wheel's Toys page, Collection > Toys) gets a rod out. Stand still and press Use when the float dips to land fish and junk for your fish log; each of the 12 fish looks different, and your last catch waits in the bucket; where there is no water, a small pond appears. An Echo dropped to you while you fish comes up on the line. Five new achievements: First Bite, Angler, Every Fish in the Pond, Echo Angler and a hidden one _(Slash, PR #278, after Sanji's idea)_
+
+## 2026.1030.1 (Alpha) | 30/10/2026
+
+Mystery boxes: new sounds, a teddy bear that kills, a turn for everyone and a sturdier chest.
+
+> Teddy bear: A box that blows up shows a teddy bear and laughs, then kills you.
+> Sounds: New box sounds with the SJK extras pack from the Sith cloud.
+> Your turn: Wait 15 seconds between two boxes, so others get to roll.
+> The chest: Iron feet, bands, a lock, handles and an arched lid.
+
+- Mystery boxes have new opening, roll and closing sounds with the SJK extras pack (Settings > General > Sith cloud); without it they sound as before. The roll stops a little sooner, at 5.2 seconds _(Sol)_
+- Mystery boxes: after opening one, you wait 15 seconds before opening another, so other players get a turn _(Sol)_
+- A mystery box that blows up stops on a teddy bear and laughs, then blows up and kills you, for everyone to see, instead of throwing you down _(Sol, after Call of Duty zombies)_
+- The mystery box is a sturdier chest: iron feet, bands and corners that stand out, a lock, handles and an arched lid _(Sol)_
+- Mystery boxes pay back less: double 5% (was 15%), jackpot 1% (was 5%), empty 36% and blowing up 12% _(Sol)_
+
 ## 2026.1029.1 (Alpha) | 29/10/2026
 
 Banana peels, the Monitor's Screen Saver, holo frame nameplates, collection marks, chat tabs and jaPRO movement that matches the server.
@@ -56,7 +80,6 @@ Banana peels, the Monitor's Screen Saver, holo frame nameplates, collection mark
 - Holstered sabers: `cp_pluginDisable` bit 29 hides them, as in JoF EJK; bit 13, JA+'s single-player cartwheel, no longer does _(Sol, after JoF EJK)_
 - Mystery boxes can hold a pile of kyber shards (6%), a free roll (5%) or the Mystery blade (1%), a Legendary saber shader found nowhere else. The roll now only shows what a box can give, no more weapons _(Sol)_
 - Monitor: hit by 5 monitors within 20 seconds, you get a Screen Saver, a gold shell that monitors pass through for 30 seconds while you still throw yours. Two new achievements come with it: Payback, and a secret one _(Sol)_
-- Fishing toy: `toy_fishing` (the quick wheel's Toys page, Collection > Toys) gets a rod out. Stand still and press Use when the float dips to land fish and junk for your fish log; each of the 12 fish looks different, and your last catch waits in the bucket; where there is no water, a small pond appears. An Echo dropped to you while you fish comes up on the line. Five new achievements: First Bite, Angler, Every Fish in the Pond, Echo Angler and a hidden one _(Slash, PR #278, after Sanji's idea)_
 - Mystery boxes hold a holocron one time in ten (it was one in fifty), and the roll shows the four tiers' real holocrons, stopping on the one you won. A box that blows up laughs with Sol's own laugh when the SJK extras pack is installed _(Sol)_
 - Centre prints and the words over mystery boxes (and the box hunt's mark) are drawn in Fira Sans Condensed, a real typeface close to the old menu font, instead of a tracing of a low-resolution bitmap _(Sol)_
 - Box hunt: one mark every 10 minutes at most, not one after the other. Hunters see the mark ringed in red, and a black name reads on the hunt's card _(Sol)_

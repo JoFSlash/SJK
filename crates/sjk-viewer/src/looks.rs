@@ -62,7 +62,7 @@ fn blade_skin(id: &str) -> Option<&'static str> {
 /// The toys a look can have out that this client draws, by id (`PROTOCOL.md`, "Looks"):
 /// a toy's bit in [`Worn::toys`] is its place here. A look naming another id (a newer
 /// client's toy) draws nothing more.
-pub(crate) const TOYS: [&str; 9] = [
+pub(crate) const TOYS: [&str; 10] = [
     crate::cardboard_box::TOY,
     crate::order66::TOY,
     crate::hax::TOY,
@@ -73,13 +73,16 @@ pub(crate) const TOYS: [&str; 9] = [
     crate::monitor::TOY,
     // Box hunt's switch: the hub picks the mark among the players whose look has it.
     crate::box_hunt::TOY,
+    // The Banana peel's switch (since 30/10/2026: hubs before took 8 toy ids at most).
+    crate::banana::TOY,
+    // The fishing rod out: others draw the rod, the bucket and the float.
     crate::fishing::TOY,
 ];
-// A bit each in a `u16`.
-const _: () = assert!(TOYS.len() <= u16::BITS as usize);
+// A bit each in a `u32`: as many as a hub look holds (32 toy ids since 30/10/2026).
+const _: () = assert!(TOYS.len() <= u32::BITS as usize);
 
 /// The bit of toy `id` in [`Worn::toys`], if this client knows it.
-fn toy_bit(id: &str) -> Option<u16> {
+fn toy_bit(id: &str) -> Option<u32> {
     TOYS.iter()
         .position(|toy| *toy == id)
         .map(|place| 1 << place)
@@ -95,7 +98,7 @@ pub(crate) struct Worn {
     /// The blade skin's options its wearer switched off (`crate::saber_skin_options`).
     pub(crate) options_off: crate::saber_skin_options::OptionsOff,
     /// The toys out, a bit per [`TOYS`] entry.
-    pub(crate) toys: u16,
+    pub(crate) toys: u32,
     /// What the second saber wears (since 21/10/2026: `saber2`).
     pub(crate) second: SecondSkin,
     /// The second saber's skin's options its wearer switched off.
@@ -652,6 +655,29 @@ mod tests {
         assert!(looks.toy(3, "cardboard_box") && !looks.toy(5, "cardboard_box"));
         looks.set_muted(1 << 3);
         assert!(!looks.toy(3, "cardboard_box"), "muted here: nothing drawn");
+    }
+
+    /// Every toy this client knows goes out in the look and comes back from it, all of
+    /// them at once too: ten since the Banana peel and Fishing, more than the 8 hubs took
+    /// before 30/10/2026.
+    #[test]
+    fn every_toy_goes_both_ways_all_at_once() {
+        assert!(TOYS.contains(&crate::banana::TOY) && TOYS.contains(&crate::fishing::TOY));
+        let all = TOYS
+            .iter()
+            .fold(Worn::default(), |worn, toy| worn.with_toy(toy, true));
+        let look = all.to_look("");
+        assert_eq!(look.toys, TOYS);
+        let back = Worn::of(&look);
+        assert!(TOYS.iter().all(|toy| back.has_toy(toy)));
+        let peel_away = back.with_toy(crate::banana::TOY, false);
+        assert!(!peel_away.has_toy(crate::banana::TOY) && peel_away.has_toy(crate::box_hunt::TOY));
+        let rest: Vec<&str> = TOYS
+            .iter()
+            .copied()
+            .filter(|toy| *toy != crate::banana::TOY)
+            .collect();
+        assert_eq!(peel_away.to_look("").toys, rest);
     }
 
     /// Other players' boxes, boomboxes and holocrons hidden on this PC are not drawn on

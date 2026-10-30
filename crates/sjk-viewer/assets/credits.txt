@@ -58,6 +58,7 @@ did: The Box hunt toy: kill the mark for a free mystery box roll
 did: The Banana peel toy: drop peels; opted-in players who walk onto one slip as ragdolls
 did: A macOS build for Apple Silicon, built by GitHub with every release (experimental)
 did: Medals from the SJK team, with medal pictures generated and chosen by Sol
+did: Card pictures drawn from the game: characters posed with lit sabers, weapons, moves
 did: Medal ranks I to V set by the SJK team, from Polished to Solar, pips on ribbons
 did: Clan tags: the JoF, JoFA, JAWA and {{S}} emblems beside tagged names
 did: Holocron drops: loot boxes earned by playing, in four tiers, with a Holocrons tab
@@ -468,9 +469,10 @@ did: Reported fullscreen on a Mac shrinking the game into a black screen
 did: His frame rate in fullscreen: Mac sizes and the world now count points (r_highDpi)
 
 [Blep]
-role: Tester, and ideas for SJK
+role: Tester, tag artist and ideas for SJK
 did: Found encrypted whispers ending with a backslash going out unencrypted
 did: The player card on the inspect key only, never from a look (Key only)
+did: Drew the Gonk, EZ and Geyon tags
 
 == Made with
 

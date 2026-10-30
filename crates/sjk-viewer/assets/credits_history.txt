@@ -9,6 +9,36 @@
 #                               made it when that is not the piece's owner.
 
 = Sol
++ 30/10/2026 | - | jaPRO plugin options: offer Force jumps, now that prediction follows it
+- 6ed042b |  | jaPRO plugin options: offer Force jumps, now that prediction follows it
++ 30/10/2026 | - | Banana peel in the look: its id goes in the look's toys like the others
+- 01e9cb8 |  | Banana peel in the look: its id goes in the look's toys like the others
++ 30/10/2026 | - | Status: name the hub's look-toys branch, not its commit
+- ebe6a39 |  | Status: name the hub's look-toys branch, not its commit
++ 30/10/2026 | - | Tags: Gonk and Geyon, Blep's, picked from #tag-proposals
+- 1aaeb9c |  | Tags: Gonk and Geyon, Blep's, picked from #tag-proposals
++ 30/10/2026 | - | Credits history: the box take sync merge's entry
+- bc9343f |  | Credits history: the box take sync merge's entry
++ 30/10/2026 | - | Mystery box: the opener's take closes the box for everyone
+- eaf15ee |  | Mystery box: the opener's take closes the box for everyone
++ 30/10/2026 | - | Credits history: the Use prompt cap merge's entry
+- c784eb8 |  | Credits history: the Use prompt cap merge's entry
++ 30/10/2026 | - | Use prompt: further from the crosshair, the key centred in its cap by its ink
+- 0961996 |  | Use prompt: further from the crosshair, the key centred in its cap by its ink
++ 30/10/2026 | - | Card pictures drawn from the game: scenes for the JKA cards
+- ef04e96 |  | Card pictures drawn from the game: scenes for the JKA cards
++ 30/10/2026 | - | Credits history: the Use prompt merge's entry
+- ec78cf4 |  | Credits history: the Use prompt merge's entry
++ 30/10/2026 | - | Use prompt: what Use does, with its key, to the right of the crosshair
+- bc7779c |  | Use prompt: what Use does, with its key, to the right of the crosshair
++ 30/10/2026 | - | Release 2026.1030.1
+- b138373 |  | Release 2026.1030.1
++ 30/10/2026 | - | Credits history: the mystery box teddy merge's entry
+- a588b2e |  | Credits history: the mystery box teddy merge's entry
++ 30/10/2026 | - | Mystery box: extras pack sounds, a 15 s cooldown, the teddy bear that kills, a sturdier chest
+- e7bfadd |  | Mystery box: extras pack sounds, a 15 s cooldown, the teddy bear that kills, a sturdier chest
++ 29/10/2026 | - | Credits history: the start-dialog merge's entry
+- dbfb7e9 |  | Credits history: the start-dialog merge's entry
 + 29/10/2026 | - | Start-failure dialog: SJK_NO_START_DIALOG leaves it out for the package smoke check
 - 198e6cb |  | Start-failure dialog: SJK_NO_START_DIALOG leaves it out for the package smoke check
 + 29/10/2026 | - | Release 2026.1029.1

@@ -909,21 +909,6 @@ impl GpuState {
         self.ragdoll_fall_kicked(moment, damage_event, auto, [0.0; 3])
     }
 
-    /// The player is blown up by a mystery box (`mystery_box`, outcome `explode`): they
-    /// fall limp now, flung by `kick` (units a second) on top of their own speed, and get
-    /// up by themselves. False when they may not fall ([`Ragdoll::strikable`]) or lie
-    /// already.
-    pub(crate) fn ragdoll_blown_up(&mut self, kick: [f32; 3]) -> bool {
-        if self.ragdoll.mine.is_some() || !self.ragdoll.strikable() {
-            return false;
-        }
-        let Some(session) = self.live_session.as_ref() else {
-            return false;
-        };
-        let damage_event = session.latest_snapshot().player.damage_event();
-        self.ragdoll_fall_kicked(self.ragdoll.time as i32, damage_event, true, kick)
-    }
-
     /// [`Self::ragdoll_fall_at`], the body starting with `kick` added to the player's speed.
     fn ragdoll_fall_kicked(
         &mut self,

@@ -1479,6 +1479,12 @@ pub(super) const GAME: &[Setting] = &[
     },
     #[cfg(feature = "mod-japro")]
     Setting {
+        label: "Force jumps (jaPRO)",
+        cvar: "japro.plugin 1",
+        kind: ValueKind::Bool,
+    },
+    #[cfg(feature = "mod-japro")]
+    Setting {
         label: "Respawn where you fell (jaPRO)",
         cvar: "japro.plugin 5",
         kind: ValueKind::Bool,

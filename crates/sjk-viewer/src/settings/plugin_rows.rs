@@ -185,6 +185,16 @@ mod tests {
         switch(&mut console, "japro.plugin 9");
         assert_eq!(console.integer_cvar(CVAR), Some(1_536 | (1 << 27)));
         assert!(on(&console, "japro.plugin 9"));
+        // Force jumps off sets bit 19, which the movement prediction reads as the
+        // player's only-bhop choice (`LocalPrediction::set_ja_pro_plugin_disable`).
+        let only_bhop = sjk_game_jka::pmove_japro::PLUGIN_BHOP;
+        assert!(on(&console, "japro.plugin 1"), "force jumps");
+        assert_eq!(console.plugin_disable_bits() & only_bhop, 0);
+        switch(&mut console, "japro.plugin 1");
+        assert!(!on(&console, "japro.plugin 1"));
+        assert_eq!(console.plugin_disable_bits() & only_bhop, only_bhop);
+        switch(&mut console, "japro.plugin 1");
+        assert_eq!(console.plugin_disable_bits(), 1_536 | (1 << 27));
         // Black sabers is one bit on both families' lists.
         #[cfg(feature = "mod-japlus")]
         {

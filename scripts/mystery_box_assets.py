@@ -23,8 +23,9 @@ from pathlib import Path
 import numpy as np
 
 RATE = 22050
-# One eighth of the tune before it slows, in seconds.
-STEP = 0.19
+# One eighth of the tune before it slows, in seconds: the last chord at 5.2 s (Sol,
+# 30/10/2026: the extras pack's roll stops there; 0.19 before, 5.5 s).
+STEP = 0.1796
 # How much longer the last eighth lasts than the first (the spring winding down).
 SLOWING = 0.9
 

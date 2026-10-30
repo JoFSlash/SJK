@@ -24,6 +24,16 @@
 
 # ---- Console & chat ----
 
+[banana-in-look]
+area: Gameplay
+title: Banana peel in the hub look: its id goes in the look's toys while it is on
+change: The look lists banana while toy_banana is on, as the other toys; peels are unchanged.
+change: Needs the hub's look-toys (32 toy ids) deployed: an older hub took 8 at most.
+test: Turn every toy on (box, Order 66, Hax, Drone, Boombox, Monitor, Box hunt, Banana peel).
+test: A second SJK client still sees your blade skin and your carton: the look went through.
+test: Drop a peel with all of them on: the other client sees it and slips on it as before.
+note: An old hub refuses a look with all nine toys (bad_look): the blade skin stops showing.
+
 [banana-peel]
 area: Gameplay
 title: Banana peel toy: drop peels; opted-in players who walk onto one slip (Kushina's idea)
@@ -147,6 +157,16 @@ test: At cg_lagometerScale 1 the numbers read easily, about EJK's size; the grap
 test: cg_lagometer 3: no backdrops; stand still: the speed number goes.
 test: cg_lagometerScale 2 and cg_lagometerX/Y: the numbers and speed graph follow.
 test: cg_lagometerY 470 (graph at the top): the numbers stand under the graph, on screen.
+
+[japro-force-jumps-option]
+area: Menus & settings
+title: jaPRO plugin options: Force jumps offered, now that prediction follows bit 19
+change: Settings > Mods > jaPRO plugin options: Force jumps (japro.plugin 1), On by default.
+change: Off sets cp_pluginDisable bit 19: held jump bunny hops where the server allows it.
+test: Settings > Mods: Force jumps (jaPRO) On; japro.plugin lists 1 Force jumps: On.
+test: Off: cp_pluginDisable reads 525824 (1536 + bit 19); On again: 1536.
+test: Local jaPRO server with only-bhop by choice (g_onlyBhop 2): Off, hold jump: no snap back.
+test: Same server, On: held jump Force jumps as before. On a JA+ server: no change either way.
 
 [plugin-options]
 area: Menus & settings
@@ -463,6 +483,14 @@ test: Press again within 10 s: "Tag again in N s". toy_tag clear takes it off.
 test: A second SJK client on the same map sees it; one joining later sees it too.
 test: cg_toyTags 0 on the other client hides yours; a map change clears it.
 note: Pictures are hub placeholders until Sol's art; the hub branch is not deployed.
+
+[tags-gonk-geyon]
+area: Gameplay
+title: Blep's tags: Gonk and Geyon new, EZ drawn (needs the hub's tags-gonk-geyon branch)
+change: Gonk (Uncommon) and Geyon (Rare) join the tags; the EZ tag has Blep's art.
+test: Collection > Tags: Gonk after Rage Quit, Geyon after Saber Skull, EZ shows 100% EZ.
+test: Grant yourself tag_gonk and tag_geyon on the hub, stick each: the picture, not a badge.
+note: Old clients do not know Gonk or Geyon: deploy the hub with the release.
 
 [ragdoll-wake]
 area: Gameplay
@@ -1930,6 +1958,16 @@ change: Shader swatches not hovered animate up to 30 times a second, 6 redrawn a
 change: Setting lookups and the low-FPS check no longer allocate every frame.
 test: Collection > Shaders grid with many owned shaders: hovered one smooth, others still animate.
 test: Forge, Saber tab and a holocron reveal: the blade pictures show with no seams or glow left.
+
+[card-scenes]
+area: Menus & settings
+title: Character and Arsenal cards: pictures drawn from your own game's models
+change: A card naming a scene gets its picture drawn by SJK from the game's models, kept on disk.
+change: Characters posed with their sabers lit, weapons and items, Force and saber moves.
+test: Once the hub has the scenes: Collection > Cards, JKA Characters: pictures appear in a moment.
+test: First they show the old placeholder, then the drawing; a restart shows the drawing at once.
+test: Look closer at Luke: green blade lit; JKA Arsenal: the Disruptor drawn whole, not in bits.
+note: The drawings are kept in card_scenes beside identity.key; deleting the folder draws them again.
 
 [card-faces-lazy]
 area: Menus & settings

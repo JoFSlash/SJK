@@ -108,6 +108,7 @@ impl GpuState {
                     .with_toy(crate::boombox::TOY, self.boombox.on())
                     .with_toy(crate::monitor::TOY, self.monitor.on())
                     .with_toy(crate::box_hunt::TOY, self.box_hunt.on())
+                    .with_toy(crate::banana::TOY, self.banana.on())
                     .with_toy(crate::fishing::TOY, self.fishing.on()),
             );
             (
@@ -144,6 +145,7 @@ impl GpuState {
         .with_toy(crate::boombox::TOY, self.boombox.on())
         .with_toy(crate::monitor::TOY, self.monitor.on())
         .with_toy(crate::box_hunt::TOY, self.box_hunt.on())
+        .with_toy(crate::banana::TOY, self.banana.on())
         .with_toy(crate::fishing::TOY, self.fishing.on());
         if let Some(sent) = sent {
             let options = crate::blade_extras::gated(&options, player_identity::holds_card);

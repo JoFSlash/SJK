@@ -648,6 +648,31 @@ pub(crate) fn drop_quads_under(
     vertices.truncate(kept);
 }
 
+/// Move `vertices` so the bounds of their glyphs centre on `centre` (pixels from the top
+/// left of `viewport`): a word in a box, centred by its ink rather than its line box
+/// (a key cap, `use_prompt`).
+pub(crate) fn centre_vertices(vertices: &mut [TextVertex], centre: [f32; 2], viewport: [f32; 2]) {
+    let Some(first) = vertices.first() else {
+        return;
+    };
+    let (mut low, mut high) = (first.position, first.position);
+    for vertex in vertices.iter() {
+        for axis in 0..2 {
+            low[axis] = low[axis].min(vertex.position[axis]);
+            high[axis] = high[axis].max(vertex.position[axis]);
+        }
+    }
+    let target = [
+        centre[0] / viewport[0] * 2.0 - 1.0,
+        1.0 - centre[1] / viewport[1] * 2.0,
+    ];
+    let shift = [
+        target[0] - (low[0] + high[0]) * 0.5,
+        target[1] - (low[1] + high[1]) * 0.5,
+    ];
+    map_vertices(vertices, |point| [point[0] + shift[0], point[1] + shift[1]]);
+}
+
 /// Move every vertex of `vertices` by `map` (normalized device coordinates in and out):
 /// text drawn under a transform ([`sjk_ui::DrawCommand::PushTransform`]).
 pub(crate) fn map_vertices(vertices: &mut [TextVertex], map: impl Fn([f32; 2]) -> [f32; 2]) {
@@ -1310,5 +1335,34 @@ mod tests {
         assert_eq!(vertices.len(), 24);
         assert_eq!(vertices[6].color, [1.0, 0.5, 0.0, 1.0]);
         assert_eq!(vertices[18].color, [0.5, 0.5, 0.5, 1.0]);
+    }
+}
+
+#[cfg(test)]
+mod centre_tests {
+    use super::*;
+
+    #[test]
+    fn glyphs_are_centred_by_their_ink() {
+        let viewport = [200.0, 100.0];
+        let mut vertices = Vec::new();
+        // A glyph high and left in its line box: 10..30 across, 5..15 down.
+        push_quad(
+            &mut vertices,
+            [10.0, 5.0, 20.0, 10.0],
+            [0.0; 4],
+            [1.0; 4],
+            viewport,
+        );
+        centre_vertices(&mut vertices, [100.0, 50.0], viewport);
+        let xs = vertices.iter().map(|v| v.position[0]);
+        let ys = vertices.iter().map(|v| v.position[1]);
+        let (lx, hx) = xs.fold((f32::MAX, f32::MIN), |(l, h), x| (l.min(x), h.max(x)));
+        let (ly, hy) = ys.fold((f32::MAX, f32::MIN), |(l, h), y| (l.min(y), h.max(y)));
+        // The screen's middle is the origin of device coordinates.
+        assert!(((lx + hx) * 0.5).abs() < 1e-5 && ((ly + hy) * 0.5).abs() < 1e-5);
+        // Its size is kept: 20 of 200 pixels across is 0.2 of the device's 2.
+        assert!((hx - lx - 0.2).abs() < 1e-5);
+        centre_vertices(&mut [], [0.0; 2], viewport);
     }
 }

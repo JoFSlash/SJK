@@ -810,6 +810,7 @@ pub(crate) mod tests {
             art: "cards/sjk_alpha_010.jpg".to_owned(),
             grants: None,
             blade: None,
+            scene: None,
         }
     }
 

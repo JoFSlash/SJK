@@ -99,6 +99,17 @@ gfx/tags/tag_rage_quit
 		alphaGen vertex
 	}
 }
+gfx/tags/tag_gonk
+{
+	polygonOffset
+	nopicmip
+	{
+		clampmap gfx/tags/tag_gonk.png
+		blendFunc GL_SRC_ALPHA GL_ONE_MINUS_SRC_ALPHA
+		rgbGen vertex
+		alphaGen vertex
+	}
+}
 gfx/tags/tag_holocron
 {
 	polygonOffset
@@ -127,6 +138,17 @@ gfx/tags/tag_saber_skull
 	nopicmip
 	{
 		clampmap gfx/tags/tag_saber_skull.png
+		blendFunc GL_SRC_ALPHA GL_ONE_MINUS_SRC_ALPHA
+		rgbGen vertex
+		alphaGen vertex
+	}
+}
+gfx/tags/tag_geyon
+{
+	polygonOffset
+	nopicmip
+	{
+		clampmap gfx/tags/tag_geyon.png
 		blendFunc GL_SRC_ALPHA GL_ONE_MINUS_SRC_ALPHA
 		rgbGen vertex
 		alphaGen vertex

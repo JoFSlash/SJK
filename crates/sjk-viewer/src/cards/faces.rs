@@ -121,6 +121,9 @@ pub(crate) struct Face {
     /// The saber shader a blade card is of (`saber_sun`; 20/10/2026): the hub drops it
     /// to whoever finds or reveals a Solar copy. `None` for other cards.
     pub(crate) blade: Option<String>,
+    /// What the client draws as its picture from the game's own models, in place of
+    /// [`Self::art`] ([`super::scene`]; 30/10/2026); `None` for most cards.
+    pub(crate) scene: Option<String>,
 }
 
 impl Face {
@@ -198,6 +201,8 @@ struct File {
     grants: Option<String>,
     #[serde(default)]
     blade: Option<String>,
+    #[serde(default)]
+    scene: Option<String>,
 }
 
 /// The card file `text` of card `id`, read.
@@ -222,6 +227,18 @@ fn parse(id: &str, text: &str) -> Result<Face, String> {
     let kind = Kind::from_id(&file.kind).ok_or_else(|| format!("unknown kind {}", file.kind))?;
     let rarity =
         Rarity::from_id(&file.rarity).ok_or_else(|| format!("unknown rarity {}", file.rarity))?;
+    // A scene this client cannot read leaves the card its pack's picture.
+    let scene = file
+        .scene
+        .map(|text| text.trim().to_owned())
+        .filter(|text| !text.is_empty())
+        .filter(|text| match super::scene::parse(text) {
+            Ok(_) => true,
+            Err(why) => {
+                crate::log::progress(format_args!("cards: {id}: scene left out: {why}"));
+                false
+            }
+        });
     Ok(Face {
         id: id.to_owned(),
         name: file.name,
@@ -239,6 +256,7 @@ fn parse(id: &str, text: &str) -> Result<Face, String> {
         art: file.art,
         grants: file.grants.filter(|id| !id.trim().is_empty()),
         blade: file.blade.filter(|id| !id.trim().is_empty()),
+        scene,
     })
 }
 
@@ -331,6 +349,12 @@ impl Faces {
         Self::new(list, pictures, 1)
     }
 
+    /// Let face `index`'s picture be asked for again after it failed: its scene was just
+    /// drawn ([`super::scene`]).
+    pub(crate) fn retry(&self, index: usize) {
+        self.lock_art().failed.retain(|failed| *failed != index);
+    }
+
     /// The decoded picture of face `index`, taken for upload: `None` until a [`request`]
     /// for it has been decoded. The worker keeps no copy.
     pub(crate) fn take_art(&self, index: usize) -> Option<MipChain> {
@@ -394,9 +418,15 @@ fn work(faces: &Faces) {
             art.decoding = Some(index);
             index
         };
-        let decoded = match faces.pictures.get(index).and_then(Option::as_deref) {
-            Some(bytes) => decode_guarded(bytes, texture_edge()),
-            None => Err("missing".to_owned()),
+        // The drawing of the card's scene when the client keeps one, else the pack's.
+        let drawn =
+            scene_picture(&faces.list[index]).map(|bytes| decode_guarded(&bytes, texture_edge()));
+        let decoded = match drawn {
+            Some(Ok(chain)) => Ok(chain),
+            _ => match faces.pictures.get(index).and_then(Option::as_deref) {
+                Some(bytes) => decode_guarded(bytes, texture_edge()),
+                None => Err("missing".to_owned()),
+            },
         };
         let mut art = faces.lock_art();
         art.decoding = None;
@@ -408,6 +438,26 @@ fn work(faces: &Faces) {
             }
         }
     }
+}
+
+/// The drawing of `face`'s scene when the client keeps one ([`super::scene`]). When it
+/// does not, the drawing is asked for, and the pack's picture shows until it is ready.
+fn scene_picture(face: &Face) -> Option<Vec<u8>> {
+    let text = face.scene.as_deref()?;
+    let path = super::scene::cache_path(&face.id, text)?;
+    if let Ok(bytes) = std::fs::read(&path) {
+        return Some(bytes);
+    }
+    let scene = super::scene::parse(text).ok()?;
+    let colour = face.rarity.colour;
+    super::scene::want(super::scene::Job {
+        id: face.id.clone(),
+        scene,
+        path,
+        tint: [colour.r, colour.g, colour.b]
+            .map(|channel| (channel.clamp(0.0, 1.0) * 255.0).round() as u8),
+    });
+    None
 }
 
 /// [`decode`], a panic in it failing that picture alone: the worker goes on and clears

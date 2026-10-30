@@ -96,7 +96,7 @@ impl GpuState {
         self.update_banana(&relay_events);
         self.update_drone(&relay_events);
         self.update_boombox(&relay_events);
-        self.update_mystery_boxes(&toy_events);
+        self.update_mystery_boxes(&toy_events, &relay_events);
         self.update_e2e_whispers();
         self.update_player_trades();
         if !due {

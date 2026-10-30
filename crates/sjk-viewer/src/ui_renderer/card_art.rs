@@ -79,6 +79,16 @@ impl CardTextures {
             self.groups = (0..faces.list.len()).map(|_| None).collect();
             self.wanted.clear();
         }
+        // A card's scene just drawn (`cards::scene`): its picture is uploaded again, now
+        // from the drawing.
+        for id in crate::cards::scene::take_drawn() {
+            if let Some((index, _)) = faces.find(&id) {
+                faces.retry(index);
+                if let Some(slot) = self.groups.get_mut(index) {
+                    *slot = None;
+                }
+            }
+        }
         self.previous = self.now;
         self.now = Instant::now();
         let now = self.now;

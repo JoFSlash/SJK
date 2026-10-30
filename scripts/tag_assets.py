@@ -89,7 +89,8 @@ def icon():
 def shaders():
     """Every tag's decal shader, in the catalogue's order."""
     source = Path("crates/sjk-viewer/src/tags.rs").read_text(encoding="utf-8")
-    ids = re.findall(r'^    tag\("(tag_[a-z0-9_]+)"', source, re.MULTILINE)
+    # `\s*`: rustfmt puts a long entry's id on the next line.
+    ids = re.findall(r'^    tag\(\s*"(tag_[a-z0-9_]+)"', source, re.MULTILINE)
     lines = [
         "// The Tag toy's decals (SJK; made by scripts/tag_assets.py): each tag's picture",
         "// from the hub's sjk_tags pack, blended over the wall it is stuck on.",

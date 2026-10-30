@@ -187,7 +187,9 @@ restrictions and timer; the timer advances per command, not per rendered frame.
 `JAPRO_CINFO_BHOP2` (bit 26) enables the player's existing `cp_pluginDisable`
 bit 19 preference. The preference is remembered across sessions but can affect
 physics only on the current jaPRO/TaystJK profile. BHOP restrictions suppress
-wall moves and flips. There is no new setting or protocol field.
+wall moves and flips. There is no new protocol field; since 30/10/2026 Settings >
+Mods offers the bit as Force jumps under jaPRO plugin options (`japro.plugin 1`,
+[mods.md](mods.md#plugin-options)).
 
 The [new-jetpack adapter](../crates/sjk-game-jka/src/pmove_japro_jetpack.rs)
 implements jaPRO's separate active flag, inventory/resource/water/animation

@@ -39,6 +39,9 @@ pub(crate) struct Hunt {
     told: Option<u8>,
     /// The mark the card at the top of the screen names, while they are the mark.
     card: Option<Card>,
+    /// Where a box's price went when it blew up, told when its roll stops on the teddy
+    /// bear rather than at the opening (Sol, 30/10/2026): when, centred or not, the text.
+    laughs: Vec<(Instant, bool, String)>,
 }
 
 /// The card at the top of the screen naming the mark (Sol's idea, 28/10/2026), from the
@@ -189,7 +192,6 @@ impl GpuState {
         }
         let told_before = hunt.told;
         let mut lines = Vec::new();
-        let mut laughs = 0_u32;
         for event in events.iter().filter(|event| event.toy == wire::HUNT_TOY) {
             let Some(said) = wire::parse_hunt_event(&event.event) else {
                 continue;
@@ -228,16 +230,15 @@ impl GpuState {
                     to,
                     credits,
                 } => {
-                    laughs += 1;
                     let opener_name = self
                         .chat
                         .player_name(u16::from(opener))
                         .unwrap_or("Someone")
                         .to_owned();
-                    if let Some(line) =
+                    if let Some((centre, text)) =
                         laugh_words(opener, to, credits, own, &opener_name, &event.claimed_name)
                     {
-                        lines.push(line);
+                        hunt.laughs.push((now + super::ROLL, centre, text));
                     }
                 }
                 HuntEvent::Mark(_) => {}
@@ -251,14 +252,14 @@ impl GpuState {
         {
             lines.push(hunt.tell(slot, own, &name, now));
         }
-        // A box that blew up laughs for every hunter, the player alone hearing it.
-        if laughs > 0 {
-            self.mystery_boxes.cues.push(super::Cue {
-                path: super::LAUGH,
-                origin: None,
-                source: super::HUNT_SOURCE,
-            });
-        }
+        // Where the price of a box that blew up went, once its roll has stopped (the box
+        // laughs there, `super::MysteryBoxes::tick`).
+        let due = hunt.laughs.iter().filter(|(at, ..)| *at <= now).count();
+        lines.extend(
+            hunt.laughs
+                .drain(..due)
+                .map(|(_, centre, text)| (centre, text)),
+        );
         // A new mark rings the hunt's alarm, for the player alone.
         if hunt.told.is_some() && hunt.told != told_before {
             self.mystery_boxes.cues.push(super::Cue {

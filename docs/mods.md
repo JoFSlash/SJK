@@ -422,7 +422,7 @@ EternalJK's `plugin` command.
 | JA+ | 14 | 14 | Download redirect (clear; name and label disagree, unverified) | No: SJK downloads from the game server only |
 | JA+ | 15 | 29 | Holstered sabers (clear) | Yes ([holstered_sabers.rs](../crates/sjk-viewer/src/holstered_sabers.rs)) |
 | jaPRO | 0 | 3 | Black sabers (clear) | Yes |
-| jaPRO | 1 | 19 | Force jumps (clear; set, held jump bunny hops where the server lets players choose) | No: movement |
+| jaPRO | 1 | 19 | Force jumps (clear; set, held jump bunny hops where the server lets players choose) | Yes, since 30/10/2026: the prediction follows it ([pmove_japro.rs](../crates/sjk-game-jka/src/pmove_japro.rs), Lumaya's PR #282) |
 | jaPRO | 2, 3 | 20, 21 | Rolls, Cartwheels (clear) | No: movement |
 | jaPRO | 4 | 22 | Jawa run (set) | No: the run is picked by movement code SJK does not predict |
 | jaPRO | 5 | 23 | Respawn where you fell, after a duel death (clear) | Yes: a server respawn |

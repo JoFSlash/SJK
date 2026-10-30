@@ -380,6 +380,7 @@ mod tests {
             art: String::new(),
             grants: None,
             blade: None,
+            scene: None,
         }
     }
 

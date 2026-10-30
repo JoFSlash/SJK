@@ -33,10 +33,11 @@ pub const OPTIONS: PluginOptions = PluginOptions {
             help: "Holding jump makes a Force jump; off, it bunny hops instead, where the \
                    server lets players choose.",
             polarity: Polarity::SetTurnsOff,
-            offer: Offer::Hidden(MOVES_YOU),
+            offer: Offer::Offered,
             evidence: "JAPRO_PLUGIN_BHOP, EternalJK's \"Disable forcejumps\": bg_pmove.c:2670 \
                        and 2836 bunny hop instead while the bit is set and the server allows \
-                       it (JAPRO_CINFO_BHOP2, pers.onlyBhop)",
+                       it (JAPRO_CINFO_BHOP2, pers.onlyBhop); SJK predicts both since PR #282 \
+                       (sjk_game_jka::pmove_japro, JaProRules::only_bhop)",
             row: "japro.plugin 1",
         },
         PluginOption {
@@ -165,7 +166,7 @@ mod tests {
     fn the_polarity_follows_the_reference() {
         for (name, bit, on_when_set, offered) in [
             ("Black sabers", 3, false, true),
-            ("Force jumps", 19, false, false),
+            ("Force jumps", 19, false, true),
             ("Rolls", 20, false, false),
             ("Cartwheels", 21, false, false),
             ("Jawa run", 22, true, false),
@@ -192,9 +193,10 @@ mod tests {
     fn the_listing_under_the_default() {
         let lines = OPTIONS.listing(DEFAULT);
         assert_eq!(
-            lines[1..8],
+            lines[1..9],
             [
                 "^5 0 ^7Black sabers: ^2On",
+                "^5 1 ^7Force jumps: ^2On",
                 "^5 5 ^7Respawn where you fell: ^2On",
                 "^5 6 ^7Checkpoints on screen: ^2On",
                 "^5 7 ^7Checkpoints in chat: ^1Off",
@@ -204,9 +206,14 @@ mod tests {
             ]
         );
         assert_eq!(
-            lines[8],
-            "^3Not in SJK yet:^7 1 Force jumps, 2 Rolls, 3 Cartwheels, 4 Jawa run \
+            lines[9],
+            "^3Not in SJK yet:^7 2 Rolls, 3 Cartwheels, 4 Jawa run \
              (japro.plugin <number> says why)"
+        );
+        // Force jumps off is only-bhop: bit 19 set, as the prediction reads it.
+        assert_eq!(
+            OPTIONS.switch(DEFAULT, "1"),
+            Ok((DEFAULT | 1 << 19, "^5Force jumps^7: ^1Off".to_owned()))
         );
         assert_eq!(
             OPTIONS.switch(DEFAULT, "7"),

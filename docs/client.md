@@ -3306,6 +3306,22 @@ in every menu style, as the resolution list is ([sjk-ui.md](sjk-ui.md#settings))
 it was a boxed panel in retail's or the theme's colours. "Game HUD files" stays on the tab for lists the picker does not
 find.
 
+## Use prompt
+
+What the Use key does at what the player faces (Sol's idea, 30/10/2026), drawn to the
+right of the crosshair with a gap (56 pixels at 1080 lines; 34 at first), as many games show it
+([use_prompt.rs](../crates/sjk-viewer/src/use_prompt.rs)): a dark key cap naming the
+first key bound to `+use` as the key bindings show it ("E", "Mouse 2"; "Use" when none
+is), edged in gold, the key centred in it by its ink rather than its line box, then the action in white and a line under it in grey, each over a
+dark shadow, in the headline font (Fira Sans Condensed, as centre prints). A prompt that
+cannot be acted on now greys its cap and action. It follows the crosshair's middle
+(`cg_crosshairX`/`Y` and the dynamic crosshair) and stays on the screen at its edge; it
+is hidden with the words in the world (menus, console, scoreboard, intermission).
+
+A feature sets the prompt each frame it applies (`GpuState::want_use_prompt`); the frame
+draws the last one set and forgets it. The [mystery boxes](mystery-boxes.md#opening-one)
+are its first user, in place of their centre prints.
+
 ## Capture the flag HUD
 
 In Capture the Flag and Capture the Ysalamiri every HUD style shows the flags' state
@@ -5277,8 +5293,10 @@ onto it slips, cartoon style, and falls as a [ragdoll](#ragdoll).
   slip: a player with the toy on and peels hidden still slips on the ones they walk onto.
   Settings > Sound > Toys, "Banana peel sounds" (`s_toyBananaSound`), silences them.
 
-No game server knows of it, and nothing goes in the hub's looks (they hold eight toy ids
-at most, all taken): every SJK client on the server learns of a peel through the
+No game server knows of it. While it is on, the player's look lists it, as the other
+toys' do (`toys: ["banana"]`, since 30/10/2026, when the hub's looks went from eight toy
+ids to 32; [unlockables.md](unlockables.md); `looks::TOYS`). The peels go otherwise:
+every SJK client on the server learns of a peel through the
 [toy relay](hub-chat.md#toy-relay). The dropper's client tells each SJK player in turn,
 the nearest first, one event every 50 ms, and the ones who come later while it lies:
 `drop_<number>_<moment>_<x>_<y>_<z>_<dx>_<dy>_<dz>_<yaw>` (the peel's number among the

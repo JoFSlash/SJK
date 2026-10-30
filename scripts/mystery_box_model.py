@@ -216,15 +216,30 @@ def cuboid(x0, x1, y0, y1, z0, z1, regions) -> list:
 
 
 def write_md3(path: Path, name: str, quads: list) -> None:
+    """`quads`: (corners, normal, region) as [`cuboid`] gives them, or (corners, four
+    normals, None, four (s, t)) for a curved face; a triangle repeats its last corner.
+    Each is turned clockwise seen from outside, stock's front side, if it is not."""
     positions, normals, uvs, triangles = [], [], [], []
-    for corners, normal, region in quads:
+    for quad in quads:
+        corners, normal, region = quad[:3]
+        flat = not isinstance(normal[0], (tuple, list))
+        corner_normals = [normal] * 4 if flat else list(normal)
+        if len(quad) > 3:
+            sts = quad[3]
+        else:
+            sts = [uv_of(region, s, t) for s, t in ((0, 0), (1, 0), (1, 1), (0, 1))]
+        p = [np.array(c, dtype=float) for c in corners]
+        outward = np.sum(np.array(corner_normals, dtype=float), axis=0)
+        cross = np.cross(p[1] - p[0], p[2] - p[0])
+        order = [0, 1, 2, 3] if np.dot(cross, outward) <= 0 else [0, 3, 2, 1]
         base = len(positions)
-        for corner, (s, t) in zip(corners, ((0, 0), (1, 0), (1, 1), (0, 1))):
-            positions.append(corner)
-            normals.append(normal)
-            uvs.append(uv_of(region, s, t))
-        # Clockwise seen from outside: stock's front side.
-        triangles += [(base, base + 1, base + 2), (base, base + 2, base + 3)]
+        for i in order:
+            positions.append(tuple(corners[i]))
+            normals.append(tuple(corner_normals[i]))
+            uvs.append(tuple(sts[i]))
+        triangles.append((base, base + 1, base + 2))
+        if tuple(corners[order[2]]) != tuple(corners[order[3]]):
+            triangles.append((base, base + 2, base + 3))
 
     def text(value: str, size: int) -> bytes:
         return value.encode("ascii").ljust(size, b"\0")
@@ -268,20 +283,131 @@ def write_md3(path: Path, name: str, quads: list) -> None:
     path.write_bytes(header + frame + surface)
 
 
-def models(output: Path) -> None:
+# Every face of an iron part.
+IRON_ALL = {"+x": EDGE, "-x": EDGE, "+y": EDGE, "-y": EDGE, "+z": EDGE, "-z": EDGE}
+# The chest stands on four feet under an iron plinth; its planked body starts above it.
+FOOT = 1.5
+PLINTH = 3.5
+# The iron bands round the chest and over the lid, where the pictures paint them: both
+# ends and the middle, 56 of the side's 1024 pixels wide, standing BAND_OUT proud.
+BAND = 56 / 1024 * LENGTH
+BAND_OUT = 0.5
+# How high the lid's planks arch over its straight edge, and in how many strips.
+LID_EDGE = 1.5
+LID_ARCH = 7.0
+ARCH_STEPS = 10
+
+
+def bands_y(half: float) -> list:
+    """Where the three bands run along the length: both ends and the middle."""
+    return [(-half, -half + BAND), (-BAND / 2, BAND / 2), (half - BAND, half)]
+
+
+def chest() -> list:
     hx, hy = DEPTH / 2, LENGTH / 2
-    chest = cuboid(
-        -hx, hx, -hy, hy, 0.0, HEIGHT,
+    quads = []
+    # Feet at the corners, the plinth on them.
+    for sx in (-1, 1):
+        for sy in (-1, 1):
+            x, y = sx * (hx - 1.0), sy * (hy - 1.0)
+            quads += cuboid(x - 2, x + 2, y - 2, y + 2, 0.0, FOOT, IRON_ALL)
+    quads += cuboid(-hx - 1, hx + 1, -hy - 1, hy + 1, FOOT, PLINTH, IRON_ALL)
+    # The planked body, dark inside at the top.
+    quads += cuboid(
+        -hx, hx, -hy, hy, PLINTH, HEIGHT,
         {"+x": SIDE, "-x": SIDE, "+y": END, "-y": END, "+z": INSIDE},
     )
-    write_md3(output / "mystery_box.md3", "mystery_box", chest)
+    # Raised iron bands round it, over the painted ones (the end ones wrap the ends).
+    for y0, y1 in bands_y(hy):
+        y0 -= BAND_OUT if y0 <= -hy else 0.0
+        y1 += BAND_OUT if y1 >= hy else 0.0
+        quads += cuboid(
+            -hx - BAND_OUT, hx + BAND_OUT, y0, y1, PLINTH, HEIGHT,
+            {"+x": EDGE, "-x": EDGE, "+y": EDGE, "-y": EDGE, "+z": EDGE},
+        )
+    # Iron corner posts, standing out of the bands.
+    for sx in (-1, 1):
+        for sy in (-1, 1):
+            x, y = sx * hx, sy * hy
+            quads += cuboid(x - 1.2, x + 1.2, y - 1.2, y + 1.2, PLINTH, HEIGHT + 0.6, IRON_ALL)
+    # A rim round the top opening.
+    rim = 1.4
+    quads += cuboid(hx - 0.2, hx + 0.7, -hy, hy, HEIGHT - rim, HEIGHT, IRON_ALL)
+    quads += cuboid(-hx - 0.7, -hx + 0.2, -hy, hy, HEIGHT - rim, HEIGHT, IRON_ALL)
+    quads += cuboid(-hx, hx, hy - 0.2, hy + 0.7, HEIGHT - rim, HEIGHT, IRON_ALL)
+    quads += cuboid(-hx, hx, -hy - 0.7, -hy + 0.2, HEIGHT - rim, HEIGHT, IRON_ALL)
+    # The lock plate on the front, its hasp standing out of it.
+    quads += cuboid(hx, hx + 1.0, -3.0, 3.0, HEIGHT - 7.0, HEIGHT - 1.4, IRON_ALL)
+    quads += cuboid(hx + 1.0, hx + 1.6, -1.0, 1.0, HEIGHT - 5.5, HEIGHT - 2.0, IRON_ALL)
+    # A handle on each end: a bar on two posts.
+    for sy in (-1, 1):
+        near, far = hy + 0.6, hy + 2.2
+        y0, y1 = (near, far) if sy > 0 else (-far, -near)
+        bar0, bar1 = (far - 0.8, far) if sy > 0 else (-far, -far + 0.8)
+        quads += cuboid(-4.0, 4.0, bar0, bar1, 14.0, 15.4, IRON_ALL)
+        for x in (-4.0, 3.0):
+            quads += cuboid(x, x + 1.0, y0, y1, 14.0, 15.4, IRON_ALL)
+    return quads
+
+
+def arch(reach: float, rise: float, steps: int) -> list:
+    """Points across the lid's arch from the hinge to the front edge, half an ellipse:
+    (x, z, normal x, normal z)."""
+    points = []
+    for i in range(steps + 1):
+        a = math.pi * i / steps
+        x = reach / 2 * (1 - math.cos(a))
+        z = rise * math.sin(a)
+        nx, nz = (x - reach / 2) / (reach / 2) ** 2, z / rise**2
+        length = math.hypot(nx, nz)
+        points.append((x, z, nx / length, nz / length))
+    return points
+
+
+def lid() -> list:
     reach = DEPTH + 2 * LID_OVERHANG
     hy = LENGTH / 2 + LID_OVERHANG
-    lid = cuboid(
-        0.0, reach, -hy, hy, 0.0, LID_HEIGHT,
-        {"+z": LID, "+x": EDGE, "-x": EDGE, "+y": EDGE, "-y": EDGE, "-z": INSIDE},
+    quads = cuboid(
+        0.0, reach, -hy, hy, 0.0, LID_EDGE,
+        {"+x": EDGE, "-x": EDGE, "+y": EDGE, "-y": EDGE, "-z": INSIDE},
     )
-    write_md3(output / "mystery_box_lid.md3", "mystery_box_lid", lid)
+    points = arch(reach, LID_ARCH, ARCH_STEPS)
+
+    def on_arch(i: int, y: float, grow: float) -> tuple:
+        x, z, nx, nz = points[i]
+        return (x + nx * grow, y, LID_EDGE + z + nz * grow)
+
+    def strip(y0: float, y1: float, grow: float, region) -> None:
+        for i in range(ARCH_STEPS):
+            corners = [on_arch(i, y0, grow), on_arch(i, y1, grow), on_arch(i + 1, y1, grow), on_arch(i + 1, y0, grow)]
+            na, nb = (points[i][2], 0.0, points[i][3]), (points[i + 1][2], 0.0, points[i + 1][3])
+            ta, tb = i / ARCH_STEPS, (i + 1) / ARCH_STEPS
+            sts = [uv_of(region, 0, ta), uv_of(region, 1, ta), uv_of(region, 1, tb), uv_of(region, 0, tb)]
+            quads.append((corners, [na, na, nb, nb], None, sts))
+
+    # The planks over the arch, the lid's picture along its length.
+    strip(-hy, hy, 0.0, LID)
+    # The arch's ends, closed: a fan from the middle of the edge's top.
+    for y, ny in ((hy, 1.0), (-hy, -1.0)):
+        centre = (reach / 2, y, LID_EDGE)
+        for i in range(ARCH_STEPS):
+            a, b = on_arch(i, y, 0.0), on_arch(i + 1, y, 0.0)
+            st = lambda p: uv_of(END, p[0] / reach, 1 - (p[2] - LID_EDGE) / LID_ARCH)
+            quads.append(([centre, a, b, b], [(0.0, ny, 0.0)] * 4, None, [st(centre), st(a), st(b), st(b)]))
+    # Raised iron bands over the arch, and their sides.
+    for y0, y1 in bands_y(hy):
+        strip(y0, y1, BAND_OUT, EDGE)
+        for y, ny in ((y0, -1.0), (y1, 1.0)):
+            for i in range(ARCH_STEPS):
+                corners = [on_arch(i, y, 0.0), on_arch(i, y, BAND_OUT), on_arch(i + 1, y, BAND_OUT), on_arch(i + 1, y, 0.0)]
+                sts = [uv_of(EDGE, 0, 0), uv_of(EDGE, 0.05, 0), uv_of(EDGE, 0.05, 1), uv_of(EDGE, 0, 1)]
+                quads.append((corners, [(0.0, ny, 0.0)] * 4, None, sts))
+    return quads
+
+
+def models(output: Path) -> None:
+    write_md3(output / "mystery_box.md3", "mystery_box", chest())
+    write_md3(output / "mystery_box_lid.md3", "mystery_box_lid", lid())
 
 
 def icon(output: Path, atlas: Image.Image) -> None:
