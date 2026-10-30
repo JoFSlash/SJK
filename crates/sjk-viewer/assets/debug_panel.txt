@@ -189,6 +189,14 @@ test: With SJK open, add a model PK3 to base, type fs_restart: the profile lists
 test: assetbrowser, disable a pack, fs_restart, change map: its files are gone.
 test: The console says how many PK3s it mounted; a second fs_restart at once is refused.
 
+[lumaya-prediction-rollbacks]
+area: Gameplay
+title: Dual jump attack and joining a JA+ server predicted as before (Lumaya, PRs #305-#308)
+change: Back out the dual jump-attack hull (#266) and the zero-gravity push (#251) of 2026.1029.1.
+test: Local JA+ server, dual sabers: forward jump attack lands on the floor, no sinking or snap.
+test: Join a JA+ server: you stand still on spawn, no slide or speed burst before moving.
+test: Dual and staff swings, chained attacks, strafe jumps: no snapping back.
+
 [lumaya-japro-styles]
 area: Gameplay
 title: jaPRO movement styles, jumps and new jetpack predicted (Lumaya, PRs #279-#284)
@@ -200,7 +208,7 @@ test: Race jetpack: lift and steer at once. On a JA+ server: movement as before.
 [lumaya-prediction-audit-2]
 area: Gameplay
 title: Prediction audit, second part (Lumaya, PRs #252-#273)
-change: Saber-lock facing, respawn jump latch, dual jump-attack hull, equipped saber definitions,
+change: Saber-lock facing, respawn jump latch, equipped saber definitions (jump-attack hull backed out),
 change: remote vehicle hulls, and a still view when command history has a gap.
 test: Saber lock on a local server: the view turns to the opponent at once.
 test: Respawn holding jump: no jump until attack and use are let go.
