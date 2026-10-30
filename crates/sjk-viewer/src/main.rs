@@ -103,6 +103,7 @@ mod effect_geometry_gpu;
 mod vehicle_assets;
 mod vehicle_fire;
 mod vehicle_pose;
+mod vfs_lifetime;
 
 mod effect_library;
 mod effect_runtime;
@@ -292,6 +293,7 @@ mod rig_model;
 mod runtime_settings;
 mod saber;
 mod saber_clash_flare;
+mod saber_core;
 mod saber_defs;
 mod saber_ghosts;
 mod saber_gpu;
@@ -417,6 +419,7 @@ use winit::keyboard::{KeyCode, PhysicalKey};
 use winit::window::{Window, WindowAttributes, WindowId};
 fn main() {
     log::init();
+    platform::raise_open_file_limit();
     crash_report::install();
     if let Err(error) = app_launch::run() {
         log::progress(format_args!("sjk: {error}"));
@@ -763,6 +766,8 @@ struct GpuState {
     /// Collection's nameplate over the stage model).
     frame_view: Option<hud::identification::Camera>,
     pointer_captured: bool,
+    /// A primary press consumed by spectator aim-to-follow; consume its release too.
+    spectator_follow_click: bool,
     cursor_policy: pointer_input::CursorPolicy,
     cursor_position: [f32; 2],
     ui_epoch: Instant,
@@ -1697,6 +1702,7 @@ impl GpuState {
             profile_hub: profile_hub::Hub::default(),
             frame_view: None,
             pointer_captured: false,
+            spectator_follow_click: false,
             cursor_policy: pointer_input::CursorPolicy::new(),
             cursor_position: [0.0; 2],
             ui_epoch: Instant::now(),
@@ -2417,13 +2423,14 @@ impl GpuState {
             let team_sizes = self.live_session.as_ref().map_or([0, 0], |session| {
                 ingame_menu::team_sizes(session.game_state())
             });
+            let own_side = self.live_session.as_ref().map(|session| {
+                ingame_menu::OwnSide::of(session.game_state(), &session.latest_snapshot().player)
+            });
             let view = ingame_menu::View {
                 page: self.game_menu_page,
                 selected_row: self.game_menu_row,
-                team: self
-                    .live_session
-                    .as_ref()
-                    .map_or(3, |session| session.latest_snapshot().player.team()),
+                team: own_side.map_or(3, |own| own.team),
+                following: own_side.is_some_and(|own| own.following),
                 team_game: self.is_team_game(),
                 siege: self.is_siege_game(),
                 red_players: team_sizes[0],

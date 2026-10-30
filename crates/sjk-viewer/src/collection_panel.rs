@@ -72,7 +72,13 @@ pub(crate) use view::{MODEL_AREA, SABER_AREA, row_labels};
 /// `duel6_sjk_forge_drawn_swatches_fit`).
 pub(crate) const DRAW_COMMANDS: usize = 4_096;
 const MEDAL_BASE: u16 = 1_200;
-const ACHIEVEMENT_BASE: u16 = 1_240;
+/// The achievements' medallions (6000 to 6199, room to grow; at 1240 they ran into the
+/// toys' tokens past 60) and the board's pages' switch.
+const ACHIEVEMENT_BASE: u16 = 6_000;
+const ACHIEVEMENT_PAGE_BASE: u16 = 6_200;
+const _: () = assert!(
+    ACHIEVEMENT_BASE as usize + crate::achievements::ALL.len() <= ACHIEVEMENT_PAGE_BASE as usize
+);
 /// The shaders' rows have a range of their own, 7000 to 7299, for a catalogue of up
 /// to 299 skins (the stock blade is row 0).
 const SHADER_BASE: u16 = 7_000;
@@ -589,6 +595,8 @@ pub(crate) struct Panel {
     /// The achievements on the wall as the last frame laid them out, in its reading
     /// order (`collection_achievements.rs`): the arrows and Tab follow it.
     achievement_slots: Vec<achievements::Slot>,
+    /// The achievements board's page on show.
+    achievement_page: crate::achievements::Page,
     shader: usize,
     /// The toy chosen on Toys: 0 Illuminate, 1 the cardboard box, 2 Order 66, 3 the Hax,
     /// 4 the Ragdoll, 5 the Drone, 6 the Boombox, 7 the Monitor, 8 Box hunt, 9 the Banana
@@ -778,6 +786,7 @@ impl Panel {
             // The first frame chooses the one nearest to unlocking.
             achievement: usize::MAX,
             achievement_slots: Vec::with_capacity(crate::achievements::ALL.len()),
+            achievement_page: crate::achievements::Page::General,
             shader: 0,
             toy: 0,
             tag: 0,
@@ -1110,6 +1119,15 @@ impl Panel {
             Tab::Toys => Some(&mut self.toy),
             Tab::Tags => Some(&mut self.tag),
             _ => None,
+        }
+    }
+
+    /// Show the achievements board's `page`, its nearest to unlocking chosen.
+    fn set_achievement_page(&mut self, page: crate::achievements::Page) {
+        if self.achievement_page != page {
+            self.achievement_page = page;
+            // Not on the new page's wall: the board chooses afresh.
+            self.achievement = usize::MAX;
         }
     }
 
@@ -1584,6 +1602,15 @@ impl Panel {
         match key {
             KeyCode::Escape => return PanelAction::Close,
             KeyCode::KeyV if self.tab == Tab::Shaders => return self.set_grid(!self.grid),
+            // F turns the achievements board's page: General, Fun.
+            KeyCode::KeyF if self.tab == Tab::Achievements => {
+                let fun = self.achievement_page == crate::achievements::Page::General;
+                self.set_achievement_page(if fun {
+                    crate::achievements::Page::Fun
+                } else {
+                    crate::achievements::Page::General
+                });
+            }
             // K waits for a key to bind to the chosen toy.
             KeyCode::KeyK if self.tab == Tab::Toys => self.bind_wait = Some(0),
             KeyCode::KeyR if self.tab == Tab::Cards => return self.reveal(),
@@ -1832,6 +1859,13 @@ impl Panel {
             }
             if token == TAG_CHOOSE_TOKEN {
                 return self.choose_tag();
+            }
+            if let Some(page) = token
+                .checked_sub(ACHIEVEMENT_PAGE_BASE)
+                .and_then(|index| crate::achievements::Page::ALL.get(usize::from(index)))
+            {
+                self.set_achievement_page(*page);
+                return PanelAction::None;
             }
             if let Some(toy) = token
                 .checked_sub(TOY_SWITCH_BASE)

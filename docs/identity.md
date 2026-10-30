@@ -1013,10 +1013,31 @@ and in the hub (same ids):
 | Payback | `monitor_payback` | during the player's Screen Saver, the player whose monitor raised it struck with a monitor | client |
 | Power Surge (hidden) | `monitor_surge` | 3 different players struck with monitors during one Screen Saver | client |
 | Blue, Yellow, Red, Dual, Staff Master | `style_blue_50`, `style_yellow_50`, `style_red_50`, `style_dual_50`, `style_staff_50` | 50 duels won with the saber in that style (`fd.saberAnimLevel` when the kill is made: 1 Fast, 2 Medium, 3 Strong, 6 two sabers, 7 staff; Desann's and Tavion's count towards none), in a private duel (saber only or full Force) or a duel game; kills out of a duel do not count | client |
+| Sneaking Mission, Legendary Soldier | `box_minutes_30`, `box_minutes_60` | 30, 60 minutes hidden in the cardboard box with another player close by (Tactical Espionage's count) | client |
+| Surprise! | `box_ambush` | the player who lifted the player's box defeated by the player within 3 seconds | client |
+| Alert! | `box_spotted_10` | the boxes of 10 different players lifted | client |
+| Wipe Them Out | `order66_purge` | 5 holders of the toy brought down by one Order 66 of the player's | client |
+| I Am the Senate | `order66_victims_25` | 25 different players brought down by the player's Order 66s | client |
+| Puppet Master, Double Agent, Total Control (hidden) | `hax_puppet`, `hax_double`, `hax_triple` | 1, 2, 3 players defeated by a player the Hax steers, in one hack (the hacker not counted) | client |
+| Leap of Faith | `hax_fall` | a player the Hax steers dead by a fall, a pit or a hazard (by their own hand or the world's) | client |
+| Script Kiddie, Elite Hacker | `hax_minutes_5`, `hax_minutes_15` | 5, 15 minutes steering players with the Hax | client |
+| It's a Trap! | `hax_traps_5` | 5 hackers caught in the player's Hax trap | client |
+| Eye in the Sky | `drone_strike` | the player the Drone watched defeated by the player within 10 seconds of it landing (the peek ended) | client |
+| Special Delivery | `drone_monitor` | the player the Drone watched struck with the player's monitor within 5 seconds of it landing | client |
+| DJ | `boombox_minutes_30` | 30 minutes of the player's boombox playing with an SJK player within its range | client |
+| Block Party | `boombox_crowd` | 3 SJK players within the boombox's range at once | client |
+| Tough Crowd (hidden) | `boombox_tough_crowd` | a player within the boombox's range dead by their own hand or the world's while it plays | client |
+| Tech Support | `monitor_victims_25` | 25 different players struck with the player's monitors | client |
+| Two for One, Strike! (hidden) | `monitor_double`, `monitor_triple` | 2, 3 players struck with one monitor | client |
+| Long Distance Call | `monitor_far` | a player struck with a monitor 1500 units (about 40 metres) or more from where it was thrown (`achievements::MONITOR_FAR`) | client |
+| Bounty Hunter, Big Game Hunter | `box_hunt_mark`, `box_hunt_marks_10` | 1, 10 box hunt marks killed (a free roll won or not) | hub |
+| Still Standing, Most Wanted | `box_hunt_survive`, `box_hunt_survive_5` | 1, 5 marks stayed to the end without a hunter's kill, still in the hunt | hub |
 
 The fourteen after Decorated came on 26/10/2026 (Sol's list), with the categories
 Collection and Toys; the five style masters on 29/10/2026 (Dante's idea in #ideas,
-duels only at Slash's call). Each needs the same id in the hub's catalogue. A hidden achievement (Touched by the Force) is a secret until it
+duels only at Slash's call); the toys' own from Sneaking Mission on, on 30/10/2026 (a
+player's ideas, reworked with Sol), when Toys became a category for each toy on the
+board's Fun page. Each needs the same id in the hub's catalogue. A hidden achievement (Touched by the Force) is a secret until it
 is unlocked: the board, its hover card and the "Next up" list show "Secret" or "Secret
 achievement", a `?` in its medallion, no goal and no count; unlocked, it shows like any
 other (the unlock card names it). A retired achievement (Surveyor, since 26/10/2026)
@@ -1086,7 +1107,30 @@ live snapshot by `achievements_frame.rs`):
   (`achievements::note`), from the hits the struck players' own clients tell (their
   `hit_` event, never a hit only foreseen) on a server not on this machine: during the
   player's Screen Saver, a hit on the player whose monitor raised it counts Payback,
-  and the third different player hit counts Power Surge, each once a Screen Saver.
+  and the third different player hit counts Power Surge, each once a Screen Saver;
+- the toys' own (30/10/2026). The tracker weighs each obituary against what the toys
+  tell it of the moment (`tracker::Toys`, `GpuState::toy_moments`): who lifted the
+  player's box and when that reached this client, the player the Hax steers, the player
+  the Drone last watched and when it landed (the peek ended, or moved to another player),
+  and the SJK players within the range of the player's boombox while it plays. A kill of
+  the lifter within 3 seconds (`tracker::BOX_AMBUSH`) counts Surprise!, once a lift; of
+  the player the Drone watched within 10 seconds of its landing (`tracker::DRONE_STRIKE`),
+  Eye in the Sky, once a landing. A kill by the player steered of anyone but themselves
+  and the hacker counts towards the best of one hack (Puppet Master to Total Control);
+  their death by a fall, a pit or a hazard by their own hand or the world's, Leap of
+  Faith. Minutes steering and minutes with a listener in reach count as time played
+  does, the most listeners at once is kept (Block Party), and a listener dead by their
+  own hand or the world's counts Tough Crowd. The rest are counted by the toys
+  (`achievements::note`, `note_best`, `note_name`): a box lifted (Alert!, by the name
+  shown), a trap sprung on a hacker (It's a Trap!), the holders blown up in the window of
+  the player's own Order 66 (Wipe Them Out, the most of one order, and I Am the Senate,
+  by name), and the player's monitor's hits as the struck players' clients tell them
+  (Tech Support by name, Two for One and Strike! by the players one monitor struck, Long
+  Distance Call by how far it flew from its throw, and Special Delivery, a hit on the
+  player the Drone watched within 5 seconds of its landing). The sets of players are
+  kept by the name the server shows without colours (`sjk_identity::normal_form`), at
+  most 512 each, in `achievements.json`'s `named`, and the toys' minutes' spare
+  milliseconds in its `spare_ms`.
 
 The counts are kept in `achievements.json` beside `identity.key` (written at most
 every 20 seconds while they change, through a temporary file, and on the way out),
@@ -1148,14 +1192,19 @@ category stands, the medallion's picture or the tier's icon, and a holocron's li
 tier's colour. One arrival brings at most three cards, and the large pop-up that opens with
 the game menu takes back the cards of what it shows. The new medal and holocron pop-ups'
 entrances (and their fanfare) also wait for the window to come back. A newer SJK release
-the update check finds has a card too ([client.md](client.md#updates)). The board shows every
-achievement listed as a wall of medallions in four bands of up to twelve (since
-26/10/2026; each category's run under its name and count, two short categories
-sharing a band, `collection_achievements.rs`): a medallion with the goal that fills
-with the count, gold once unlocked, and the name under it, the categories Combat,
-Duels and flags, Journeys, Community, Collection and Toys. The arrows and Tab read the
-wall in its order; the one chosen shows up close on the right with what to do, a bar
-and the count or the date it was unlocked.
+the update check finds has a card too ([client.md](client.md#updates)). The board has two
+pages (since 30/10/2026, Sol: "the general/normal ones and the more specific ones / fun
+ones", so it can keep growing): General, with Combat, Duels and flags, Journeys,
+Community and Collection, and Fun, with a category for each toy (Cardboard box, Order
+66, Hax, Drone, Boombox, Monitor, Box hunt; `Category::page`). The switch at the wall's
+top right, or F, turns them; the board opens on General. Each page shows every
+achievement listed on it as a wall of medallions in four bands of up to twelve (since
+26/10/2026; each category's run under its name and count, short categories sharing a
+band, the categories in their own order, `collection_achievements.rs`): a medallion
+with the goal that fills with the count, gold once unlocked, and the name under it.
+The arrows and Tab read the wall in its order; the one chosen shows up close on the
+right with what to do, a bar and the count or the date it was unlocked, and "Next up"
+the page's three nearest to unlocking. The total at the top counts both pages.
 
 What this proves: an achievement is the player's own record, as a claim is the
 player's own word. A modified client or an edited `achievements.json` can send counts

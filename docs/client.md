@@ -1212,6 +1212,10 @@ the permanent ones the server sends only in its baselines, such as the `misc_bsp
 map pieces a server places in a map's void: stock `CG_BuildSolidList` adds them
 from `cg_permanents` (`cg_predict.c`), so the camera stops at their walls. The
 crosshair name trace uses the same list, so such a wall hides a player behind it.
+In a free spectator camera it still names the player under the crosshair, and a
+primary click while aimed at that player sends `follow <client>` to enter their
+view. The click is consumed instead of running the primary-button bind; a click
+with no visible player under the crosshair keeps its ordinary binding.
 Player and vehicle bodies do not obstruct this camera trace. When geometry
 collapses the camera onto its target, the view uses the intended forward direction
 instead of constructing an undefined look-at matrix.
@@ -1708,6 +1712,11 @@ switch copy, dropped there as the late one, gives back what it paid, so each
 put-away is paid once whichever comes first, and a staff weapon switch loop is
 capped like any other.
 
+Saber definitions are resolved in the game's file-list order, keeping the first
+case-insensitive name. Mounted replacements of the same `.sab` file still win
+through the VFS. The shared catalog supplies appearance, sounds and prediction;
+a later duplicate name must not replace its combat restrictions or special moves.
+
 `fd.saberAnimLevelBase` is no wire field, so the client works it out for every
 command it predicts, as `CG_PredictPlayerState` does before `Pmove`
 (`cg_predict.c:1335-1347` in EternalJK and JoF EJK): the current style, unless one
@@ -1974,6 +1983,16 @@ EternalJK's). Reduce bright flashes wins over both. The viewer reads them once a
 ([saber_clash_flare.rs](../crates/sjk-viewer/src/saber_clash_flare.rs)); the effect
 spawner and submission read the reduce switch from an atomic the frame sets.
 
+**Blade core thickness** (`cg_saberCoreSize`, archived, 0.5 to 2, default 1; Settings >
+Game options, under Clash flare size) draws the white core down a lit blade thinner or
+thicker: retail's core radius (a third of the blade's, with its flicker, `CG_DoSaber`)
+times the setting, for every blade in the world, held or thrown, plain or skinned. The
+glow, its hilt sprite and a skin's glints keep their size, and 2 still keeps the core
+inside the glow. Previews in menus (Profile, the Collection, the forge) keep retail's
+core. JoF EJK's nearest is `cg_shaderSaberCore` (not archived, 0.625), which scales
+the core of its SFX blades only; SJK draws no SFX blades, so the setting has a name of
+its own ([saber_core.rs](../crates/sjk-viewer/src/saber_core.rs)).
+
 **Saber hit sparks** (`cg_fleshSparks`, archived, 0 to 7, default 7; Settings > Game
 options, Effects) is EternalJK's count of the red sparks a saber hit on a body plays
 (JoF EJK `cg_event.c`, `EV_SABER_HIT`, each `FX_PlayEffectID` behind
@@ -2021,8 +2040,8 @@ of VIDEO is gone (10/10/2026). The groups are:
 
 | Tab | Settings |
 | --- | --- |
-| IMAGE | HDR scene and exposure, eye adaptation (`r_autoExposure`) and its range in EV, filmic tone curve, bloom, dynamic glow (`r_DynamicGlow` 0-3) and its blur style (`r_dynamicGlowStyle`), FXAA, supersampling (`r_superSample`), render scale (`r_renderScale`, also in the SJK UI's Simple Display; see [Render scale](rendering.md#render-scale-and-supersampling)), soft particles, ambient occlusion (`r_ssao`), sunbeam dust (`r_dustMotes`), per-pixel model lighting, reflection probes (`r_cubeMapping`), floor mirrors (`r_floorReflections`), normal and specular maps (`r_normalMapping`, `r_specularMapping`), parallax mapping (`r_parallaxMapping`) and its depth (`r_parallaxStrength`), emission maps (`r_emissiveMaps`), their strength (`r_emissionStrength`) and glow halo (`r_emissiveGlow`) |
-| LIGHTING | Sun and sky (`r_dayNight`), live lighting tier, time of day, day length, sunlight brightness, ambient fill and its corner shading, indirect boost, emission-map lights (`r_emissiveLights`), light shafts (`r_volumetrics`) and their clarity |
+| IMAGE | HDR scene and exposure, eye adaptation (`r_autoExposure`) and its range in EV, filmic tone curve, bloom, dynamic glow (`r_DynamicGlow` 0-3), No glow on sabers (`r_dynamicGlowNoSabers`) and the glow's blur style (`r_dynamicGlowStyle`), FXAA, supersampling (`r_superSample`), render scale (`r_renderScale`, also in the SJK UI's Simple Display; see [Render scale](rendering.md#render-scale-and-supersampling)), soft particles, ambient occlusion (`r_ssao`), sunbeam dust (`r_dustMotes`), per-pixel model lighting, reflection probes (`r_cubeMapping`), floor mirrors (`r_floorReflections`), normal and specular maps (`r_normalMapping`, `r_specularMapping`), parallax mapping (`r_parallaxMapping`) and its depth (`r_parallaxStrength`), emission maps (`r_emissiveMaps`), their strength (`r_emissionStrength`) and glow halo (`r_emissiveGlow`) |
+| LIGHTING | Sun and sky (`r_dayNight`), live lighting tier, time of day, time of day from the PC's clock (`r_dayClock`), day length, sunlight brightness, ambient fill and its corner shading, indirect boost, emission-map lights (`r_emissiveLights`), light shafts (`r_volumetrics`) and their clarity |
 | SHADOWS | World and character sun shadows, shadow resolution, sharp and close cascade distances, filter taps, slit closing, contact shadows |
 | WEATHER | Weather (`r_weather`), its density (`r_weatherDensity`), quality (`r_weatherQuality`), forced weather (`r_weatherForce`), ground fog (`r_weatherFog`) and volumetric clouds (`r_clouds`); see [Weather](rendering.md#weather) |
 
@@ -5711,12 +5730,20 @@ returning to the row ([wheel_editor.rs](../crates/sjk-viewer/src/settings/wheel_
 - **Right column:** a live preview of the page's ring, the focused choice
   highlighted, then the page's key and bind (`+wheel <id>`) or what the choice
   runs. Picking a choice shows the catalogue there instead (Up and Down, Enter,
-  Escape; actions already on the page say so), Custom command last, with a
-  search field right of its title that has the keyboard as it opens: typing keeps the actions and
-  emotes whose name or group holds every word (Custom command always stays),
+  Escape; actions already on the page say so), then under Your own the custom
+  commands named before and Custom command last, with a
+  search field right of its title that has the keyboard as it opens: typing keeps the actions,
+  emotes and named commands whose name or group (a named command's command too)
+  holds every word (Custom command always stays),
   held letters and Backspace repeat, Ctrl+A, Ctrl+C and Ctrl+V work as in every
   field, Backspace on an empty search closes it; a custom
   choice's form has its name and command fields, Save and Cancel.
+- **Named commands** (after Dante's idea): a custom command saved from its form is
+  remembered and offered under Your own in every page's catalogue, newest first,
+  one per command (the same command saved again takes its new name and moves
+  first), 24 at most (the oldest go). Delete on the highlighted one, or its cross,
+  forgets it; choices already on pages keep it. They are kept in
+  `wheel_commands.json` beside `wheel.json` (see below).
 - The pointer: hovering a row focuses it (a page row without showing that page,
   which a click does), the focused row's small controls act (Rename, up, down,
   remove), a click on a choice or Add a choice opens the catalogue, a click on a
@@ -5764,6 +5791,19 @@ as version 3; a Toys page removed afterwards stays removed, a wheel of 8 pages i
 left alone (the file is not rewritten) and a page of the player's own called Toys
 keeps its id, the new one taking `toys2`.
 
+The named custom commands are kept apart, in `wheel_commands.json` in the same
+folder, so Restore the default pages (which removes `wheel.json`) keeps them:
+
+```json
+{ "version": 1, "commands": [ {"name": "Ready", "command": "ready"} ] }
+```
+
+Newest first, one per command, 24 at most; an entry that is not a complete
+`{name, command}` object is left out. Without the file, the custom choices already
+on the pages are remembered as it is first read (installed emotes, `sjkemote <id>`,
+aside: the catalogue lists them already) and the file is written; once it exists,
+even empty, it is what is remembered.
+
 ## Configuration and content
 
 The default writable client folder is `GameData/SJK/`, under the selected game
@@ -5778,6 +5818,7 @@ is independent of the executable's location and working directory. The client cr
 | `jakey` | Persistent client identity key |
 | `hud.json` | Optional custom HUD |
 | `wheel.json` | The quick wheel's pages, once changed ([Quick wheels](#kept-in-wheeljson)) |
+| `wheel_commands.json` | The quick wheel's named custom commands ([Quick wheels](#kept-in-wheeljson)) |
 | `screenshots/`, `demos/` | Screenshots and recordings |
 | `chatlogs/`, `qconsole.log` | Logs when enabled |
 
@@ -6956,3 +6997,14 @@ the server; the world draws its own shaders until the server sends new remaps (a
 shader-state change or a `remapShader` command) or a new map loads. As in
 EternalJK, destination time offsets are kept. See [rendering](rendering.md#server-shader-remaps)
 for scope and remaining limitations. These controls do not edit map geometry.
+
+### Copying a server address
+
+The SJK and classic server browsers offer **Copy IP** for the selected server.
+Ctrl+C copies the selection while no text field or dialog is open; in a field it
+still copies that field. The copied endpoint includes the port (and brackets for
+IPv6), with no password or command. The browser reports success or clipboard failure.
+`copyServerIP` copies the connected server's endpoint from the console; disconnected
+clients report that no server is connected.
+
+[SJK browser with Copy IP](images/copy-server-ip.png).

@@ -230,6 +230,10 @@ pub(super) const COMMANDS: &[(&str, &str)] = &[
         crate::graphics_quality::RENDERER_HELP,
     ),
     ("cmd", "Forward arguments as a reliable server command"),
+    (
+        "copyServerIP",
+        "Copy the connected server IP and port to the clipboard",
+    ),
     ("clientinfo", "Print client state and userinfo"),
     ("userinfo", "Print userinfo"),
     ("model", "Set player model and optional skin"),

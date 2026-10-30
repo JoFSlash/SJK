@@ -454,7 +454,10 @@ impl Panel {
                     keys.push((&["R"], "reveal"));
                 }
             }
-            Tab::Achievements => keys.push((&["Arrows"], "choose")),
+            Tab::Achievements => {
+                keys.push((&["Arrows"], "choose"));
+                keys.push((&["F"], "General or Fun"));
+            }
             Tab::Forge if self.forge.ask.is_some() => {
                 keys.push((&["Tab"], "switch"));
                 keys.push((&["Enter"], "answer"));
