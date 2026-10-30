@@ -419,6 +419,7 @@ impl AudioOutput {
                 self.sonar.hear(request, Instant::now());
             }
             AudioCommand::ListenerSource(source) => self.sonar.listener_source = *source,
+            AudioCommand::StopEffects | AudioCommand::StopAll => self.sonar.clear(),
             _ => {}
         }
         // Never wait for good on a callback that stopped (its device went away): the
@@ -857,5 +858,36 @@ mod music_clock_tests {
             .position(start + Duration::from_millis(1)),
             u64::MAX
         );
+    }
+}
+
+#[cfg(test)]
+mod sonar_tests {
+    use super::*;
+
+    fn play(source: u32) -> AudioCommand {
+        AudioCommand::Play(
+            SoundHandle(0),
+            PlayRequest {
+                origin: Some([300.0, 0.0, 0.0]),
+                source: SourceId(source),
+                channel: ChannelId(2),
+                volume: 1.0,
+                attenuation: sjk_client::legacy_sound_attenuation(2),
+            },
+        )
+    }
+
+    #[test]
+    fn sent_world_sounds_reach_the_sonar_and_a_map_change_clears_it() {
+        let (mut output, _source) = AudioOutput::test_output();
+        output.sonar.enabled = true;
+        output.send(AudioCommand::ListenerSource(Some(SourceId(1))));
+        output.send(play(1));
+        output.send(play(5));
+        let count = || output.sonar.markers(Instant::now(), [0.0; 3], 0.0).count;
+        assert_eq!(count(), 1, "the listener's own sound is left out");
+        output.send(AudioCommand::StopEffects);
+        assert_eq!(output.sonar.markers(Instant::now(), [0.0; 3], 0.0).count, 0);
     }
 }

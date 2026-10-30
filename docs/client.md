@@ -1608,8 +1608,14 @@ an arc. It is fed where the audio output sends a positional one-shot
 24-entry ring), so it shows nothing the speakers do not get: muted players, `cg_footsteps
 0` and sounds past their falloff stay hidden, and the player's own, listener-relative,
 ambient, announcer, menu and music sounds and loops are left out. The volume cvars do
-not hide it, since it is for players who cannot hear. Drawn with the HUD
-(`cg_drawHud`), following `cg_hudScale`. Unit tests: the bearing, the ring, the
+not hide it, since it is for players who cannot hear. It needs an audio output: with
+`s_initsound 0` or no sound device nothing is sent, so the sonar shows nothing. Its
+memory is cleared when the setting goes off and when the output stops the effects (a
+new map's gamestate) or everything (`soundstop`); out of a game it draws nothing. A
+deliberate choice: the arcs give a sound's full direction round the player, ahead,
+behind and to either side, which stereo panning alone does not, as other games' sound
+visualisers do for accessibility; they add nothing the speakers do not get. Drawn with
+the HUD (`cg_drawHud`), following `cg_hudScale`. Unit tests: the bearing, the ring, the
 filters, the fade and falloff, the arc's place and scale.
 
 ## Voice volume

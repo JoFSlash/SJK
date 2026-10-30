@@ -77,7 +77,6 @@ pub(crate) struct Sonar {
     /// The listener's own entity, whose sounds are not shown.
     pub(crate) listener_source: Option<SourceId>,
     heard: [Option<Heard>; CAPACITY],
-    next: usize,
 }
 
 /// One arc to draw: `angle` in radians clockwise from straight ahead (positive to the
@@ -132,14 +131,27 @@ impl Sonar {
             *heard = entry;
             return;
         }
-        self.heard[self.next] = Some(entry);
-        self.next = (self.next + 1) % CAPACITY;
+        // An empty or expired slot first, else the sound heard longest ago.
+        let slot = self
+            .heard
+            .iter()
+            .position(|heard| {
+                heard.is_none_or(|heard| at.saturating_duration_since(heard.at) >= LIFETIME)
+            })
+            .unwrap_or_else(|| {
+                self.heard
+                    .iter()
+                    .enumerate()
+                    .min_by_key(|(_, heard)| heard.map(|heard| heard.at))
+                    .map_or(0, |(index, _)| index)
+            });
+        self.heard[slot] = Some(entry);
     }
 
-    /// Forget every sound (the setting turned off, a new map).
+    /// Forget every sound: the setting turned off, or the output told to stop the
+    /// effects (a new map, `install_gamestate`) or everything (`soundstop`).
     pub(crate) fn clear(&mut self) {
         self.heard = [None; CAPACITY];
-        self.next = 0;
     }
 
     /// The arcs for a listener at `origin` facing `yaw` (radians, Quake's: 0 along +X,
@@ -300,6 +312,46 @@ mod tests {
         }
         let markers = sonar.markers(now, [0.0; 3], 0.0);
         assert_eq!(markers.count, CAPACITY);
+    }
+
+    #[test]
+    fn a_full_ring_drops_the_oldest_and_keeps_a_refreshed_sound() {
+        let mut sonar = sonar();
+        let now = Instant::now();
+        // Source 3's steps, first of all, then refreshed after the ring filled.
+        sonar.hear(&request(3, 6, [200.0, 0.0, 0.0]), now);
+        for source in 0..CAPACITY as u32 - 1 {
+            let at = now + Duration::from_millis(10 + u64::from(source));
+            sonar.hear(&request(100 + source, 0, [300.0, 0.0, 0.0]), at);
+        }
+        let refreshed = now + Duration::from_millis(100);
+        sonar.hear(&request(3, 6, [0.0, 200.0, 0.0]), refreshed);
+        // Five more, within the lifetime: each replaces the oldest, never the refreshed.
+        for source in 0..5 {
+            let at = refreshed + Duration::from_millis(1 + u64::from(source));
+            sonar.hear(&request(200 + source, 0, [300.0, 0.0, 0.0]), at);
+        }
+        let later = refreshed + Duration::from_millis(10);
+        let markers = sonar.markers(later, [0.0; 3], 0.0);
+        assert_eq!(markers.count, CAPACITY);
+        assert_eq!(
+            markers
+                .iter()
+                .filter(|marker| marker.kind == Kind::Steps)
+                .count(),
+            1,
+            "the refreshed steps survive"
+        );
+        // An expired sound's slot is taken before any live one.
+        sonar.clear();
+        sonar.hear(&request(3, 6, [200.0, 0.0, 0.0]), now);
+        for source in 0..CAPACITY as u32 - 1 {
+            sonar.hear(&request(100 + source, 0, [300.0, 0.0, 0.0]), now + LIFETIME);
+        }
+        sonar.hear(&request(4, 2, [300.0, 0.0, 0.0]), now + LIFETIME);
+        let markers = sonar.markers(now + LIFETIME, [0.0; 3], 0.0);
+        assert_eq!(markers.count, CAPACITY);
+        assert!(markers.iter().any(|marker| marker.kind == Kind::Combat));
     }
 
     #[test]
