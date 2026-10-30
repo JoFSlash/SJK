@@ -19,6 +19,7 @@ pub(crate) mod logo_glyph;
 pub(crate) mod retail_font;
 pub(crate) mod sdf;
 pub(crate) mod style;
+pub(crate) mod system_font;
 pub(crate) mod wide;
 pub(crate) mod wide_texture;
 pub(crate) use bounded::append_bounded;
@@ -135,6 +136,7 @@ pub(crate) struct FontGlyph {
 }
 
 /// Immutable glyph metrics used by all menu, console, HUD, and chat layout.
+#[derive(Clone)]
 pub(crate) struct UiFont {
     glyphs: [[FontGlyph; GLYPH_COUNT]; 2],
     /// Fonts lending each face the characters beyond its slots ([`wide`]).

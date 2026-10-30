@@ -220,6 +220,7 @@ pub(super) fn choice_name(cvar: &str, value: &str) -> Option<&'static str> {
         .map(|(_, _, shown)| *shown)
         .or_else(|| crate::away_emote::choice_name(cvar, value))
         .or_else(|| crate::chat_sounds::choice_name(cvar, value))
+        .or_else(|| crate::text::system_font::choice_name(cvar, value))
 }
 
 /// What the detail column says, in gold, while the SJK renderer is on and a
@@ -488,6 +489,14 @@ const HELP: &[(&str, &str)] = &[
     (
         crate::toy_sounds::Toy::Banana.cvar(),
         "Off: Banana peel sounds are not played on this PC, yours or other players'. The toy still works and is still seen.",
+    ),
+    (
+        crate::text::system_font::CHAT_CVAR,
+        "A font from this PC for the chat. What it lacks (Cyrillic, CJK, emoji) comes from SJK's fonts.",
+    ),
+    (
+        crate::text::system_font::CONSOLE_CVAR,
+        "A font from this PC for the console, kept to its even grid. What it lacks comes from SJK's fonts.",
     ),
     (
         crate::away_emote::SJK_CVAR,

@@ -1,0 +1,848 @@
+//! Fonts installed on the PC, for chat (`cg_chatFont`) and the console (`con_font`).
+//!
+//! The player names a family the system has (Saturn's idea, 29/10/2026); empty keeps
+//! SJK's own font. Discovery reads only each font file's table directory and `name`
+//! table ([`read_faces`]), on a worker the first time the list is wanted, from the
+//! system's font folders ([`font_directories`]). Picking a family rasterizes its
+//! 256 Windows-1252 slots once, on a worker, into a coverage atlas like the bundled
+//! fonts' ([`load`]): chat as a proportional face (its bold face as the second weight
+//! when the family has one), the console in its fixed 8 by 16 cell, each glyph centred
+//! in the cell and the em sized so the widest ASCII character fits. A slot the font
+//! lacks comes from SJK's default for the scope (Inter, JetBrains Mono); characters
+//! beyond the code page keep the default's wide-glyph sources (Cyrillic, CJK, Hangul,
+//! SJK symbols) and emoji, so they draw as before. A missing or unreadable font keeps
+//! the default and logs why. Glyphs are outlined with `ab_glyph`, which reads outlines
+//! on demand, so a large CJK system font costs only the 256 glyphs drawn.
+
+use super::{FontAtlas, FontGlyph, GLYPH_COUNT, RasterizedGlyph, TextStyle, UiFont, paint_atlas};
+use ab_glyph::{Font, FontRef, PxScale, ScaleFont, point};
+use fontdue::Metrics;
+use std::error::Error;
+use std::io::{self, Read, Seek, SeekFrom};
+use std::path::{Path, PathBuf};
+use std::sync::{Arc, Mutex, Once, OnceLock};
+
+/// The chat box's and chat field's font family; empty for SJK's own.
+pub(crate) const CHAT_CVAR: &str = "cg_chatFont";
+/// The console's font family; empty for SJK's own (JetBrains Mono).
+pub(crate) const CONSOLE_CVAR: &str = "con_font";
+/// What the settings call the empty value.
+pub(crate) const DEFAULT_NAME: &str = "SJK default";
+
+/// Raster size of a chat glyph's em in pixels, as the SJK UI's families (1.5x the
+/// 96-pixel modern raster); layout units are a third of it, as theirs are.
+const CHAT_RASTER_EM: f32 = 144.0;
+const CHAT_UNITS: f32 = 3.0;
+/// Raster em of a console glyph, as JetBrains Mono's.
+const CONSOLE_RASTER_EM: f32 = 96.0;
+/// Largest `name` table read; real ones are a few kilobytes.
+const MAX_NAME_TABLE: u32 = 1 << 20;
+/// Most faces read from one collection file.
+const MAX_COLLECTION: u32 = 64;
+/// How deep the font folders are walked (Linux keeps fonts in subfolders).
+const MAX_DEPTH: usize = 4;
+
+/// Which surfaces a system font replaces.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum Scope {
+    Chat,
+    Console,
+}
+
+impl Scope {
+    pub(crate) const ALL: [Self; 2] = [Self::Chat, Self::Console];
+
+    pub(crate) const fn index(self) -> usize {
+        match self {
+            Self::Chat => 0,
+            Self::Console => 1,
+        }
+    }
+
+    pub(crate) const fn cvar(self) -> &'static str {
+        match self {
+            Self::Chat => CHAT_CVAR,
+            Self::Console => CONSOLE_CVAR,
+        }
+    }
+
+    const fn name(self) -> &'static str {
+        match self {
+            Self::Chat => "chat",
+            Self::Console => "console",
+        }
+    }
+}
+
+/// A face's family and style names, from its `name` table.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) struct FaceName {
+    pub(crate) family: String,
+    pub(crate) style: String,
+}
+
+/// One face of a font file: the file and the face's index in a collection.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) struct FaceFile {
+    pub(crate) path: PathBuf,
+    pub(crate) index: u32,
+}
+
+/// A family installed on the PC, with the faces SJK draws.
+#[derive(Clone, Debug)]
+pub(crate) struct InstalledFamily {
+    pub(crate) name: String,
+    pub(crate) regular: FaceFile,
+    pub(crate) bold: Option<FaceFile>,
+}
+
+fn u16_at(bytes: &[u8], at: usize) -> Option<u16> {
+    Some(u16::from_be_bytes(bytes.get(at..at + 2)?.try_into().ok()?))
+}
+
+fn u32_at(bytes: &[u8], at: usize) -> Option<u32> {
+    Some(u32::from_be_bytes(bytes.get(at..at + 4)?.try_into().ok()?))
+}
+
+fn read_exact_at(file: &mut (impl Read + Seek), at: u64, length: usize) -> io::Result<Vec<u8>> {
+    file.seek(SeekFrom::Start(at))?;
+    let mut bytes = vec![0; length];
+    file.read_exact(&mut bytes)?;
+    Ok(bytes)
+}
+
+/// The family and style of every face in a TrueType, OpenType or collection file,
+/// in face order, reading only the headers and `name` tables. A face whose names
+/// cannot be read is `None`.
+pub(crate) fn read_faces(file: &mut (impl Read + Seek)) -> io::Result<Vec<Option<FaceName>>> {
+    let header = read_exact_at(file, 0, 12)?;
+    let offsets = if &header[..4] == b"ttcf" {
+        let count = u32_at(&header, 8).unwrap_or(0).min(MAX_COLLECTION);
+        let table = read_exact_at(file, 12, count as usize * 4)?;
+        (0..count as usize)
+            .filter_map(|face| u32_at(&table, face * 4))
+            .collect()
+    } else if matches!(&header[..4], [0, 1, 0, 0] | b"OTTO" | b"true") {
+        vec![0]
+    } else {
+        return Err(io::Error::new(io::ErrorKind::InvalidData, "not a font"));
+    };
+    Ok(offsets
+        .into_iter()
+        .map(|offset| face_name(file, u64::from(offset)).ok().flatten())
+        .collect())
+}
+
+fn face_name(file: &mut (impl Read + Seek), offset: u64) -> io::Result<Option<FaceName>> {
+    let directory = read_exact_at(file, offset, 12)?;
+    let tables = u16_at(&directory, 4).unwrap_or(0) as usize;
+    let records = read_exact_at(file, offset + 12, tables * 16)?;
+    let Some(record) = records
+        .as_chunks::<16>()
+        .0
+        .iter()
+        .find(|record| &record[..4] == b"name")
+    else {
+        return Ok(None);
+    };
+    let (Some(at), Some(length)) = (u32_at(record, 8), u32_at(record, 12)) else {
+        return Ok(None);
+    };
+    let table = read_exact_at(file, u64::from(at), length.min(MAX_NAME_TABLE) as usize)?;
+    Ok(parse_names(&table))
+}
+
+/// The family (typographic family, ID 16, else ID 1) and style (ID 17, else 2) of a
+/// `name` table, preferring Windows English, then any Windows or Unicode name, then
+/// a Mac Roman one.
+pub(crate) fn parse_names(table: &[u8]) -> Option<FaceName> {
+    let count = u16_at(table, 2)? as usize;
+    let strings = u16_at(table, 4)? as usize;
+    let lookup = |wanted: u16| -> Option<String> {
+        let mut best: Option<(u8, String)> = None;
+        for record in 0..count {
+            let at = 6 + record * 12;
+            let field = |offset| u16_at(table, at + offset);
+            let (platform, encoding, language, id) = (field(0)?, field(2)?, field(4)?, field(6)?);
+            if id != wanted {
+                continue;
+            }
+            let (length, start) = (field(8)? as usize, strings + field(10)? as usize);
+            let Some(bytes) = table.get(start..start + length) else {
+                continue;
+            };
+            let (rank, text) = match platform {
+                3 | 0 => {
+                    let units: Vec<u16> = bytes
+                        .as_chunks::<2>()
+                        .0
+                        .iter()
+                        .map(|pair| u16::from_be_bytes(*pair))
+                        .collect();
+                    let rank = match (platform, language) {
+                        (3, 0x0409) => 0,
+                        (3, _) => 1,
+                        _ => 2,
+                    };
+                    (rank, String::from_utf16_lossy(&units))
+                }
+                1 if encoding == 0 => (3, bytes.iter().map(|&byte| char::from(byte)).collect()),
+                _ => continue,
+            };
+            let text = text.trim().to_owned();
+            if !text.is_empty() && best.as_ref().is_none_or(|(held, _)| rank < *held) {
+                best = Some((rank, text));
+            }
+        }
+        best.map(|(_, text)| text)
+    };
+    let family = lookup(16).or_else(|| lookup(1))?;
+    let style = lookup(17)
+        .or_else(|| lookup(2))
+        .unwrap_or_else(|| "Regular".to_owned());
+    Some(FaceName { family, style })
+}
+
+/// How far a style is from the upright regular face (0 best).
+fn regular_rank(style: &str) -> u8 {
+    let style = style.to_ascii_lowercase();
+    let slanted = style.contains("italic") || style.contains("oblique");
+    let base = match style.replace("italic", "").replace("oblique", "").trim() {
+        "" | "regular" | "normal" | "book" | "roman" | "plain" => 0,
+        "medium" => 1,
+        "light" | "semilight" => 2,
+        "semibold" | "demibold" | "bold" => 4,
+        _ => 3,
+    };
+    base + if slanted { 10 } else { 0 }
+}
+
+/// How far a style is from the upright bold face; `None` for one that is not bold.
+fn bold_rank(style: &str) -> Option<u8> {
+    let style = style.to_ascii_lowercase();
+    if style.contains("italic") || style.contains("oblique") {
+        return None;
+    }
+    match style.trim() {
+        "bold" => Some(0),
+        "semibold" | "demibold" | "semi bold" | "demi bold" => Some(1),
+        _ => None,
+    }
+}
+
+/// Families of `faces`, one each (names compared without case), with their regular and
+/// bold faces, sorted by name. Hidden families (a leading `.`, macOS's system UI ones)
+/// are left out.
+pub(crate) fn families(
+    faces: impl IntoIterator<Item = (FaceName, FaceFile)>,
+) -> Vec<InstalledFamily> {
+    let mut grouped: std::collections::BTreeMap<String, Vec<(FaceName, FaceFile)>> =
+        std::collections::BTreeMap::new();
+    for (name, file) in faces {
+        if name.family.starts_with('.') || name.family.is_empty() {
+            continue;
+        }
+        grouped
+            .entry(name.family.to_lowercase())
+            .or_default()
+            .push((name, file));
+    }
+    grouped
+        .into_values()
+        .filter_map(|faces| {
+            let (name, regular) = faces
+                .iter()
+                .min_by_key(|(name, _)| regular_rank(&name.style))?
+                .clone();
+            let bold = faces
+                .iter()
+                .filter_map(|(name, file)| Some((bold_rank(&name.style)?, file)))
+                .min_by_key(|(rank, _)| *rank)
+                .map(|(_, file)| file.clone())
+                .filter(|file| *file != regular);
+            Some(InstalledFamily {
+                name: name.family,
+                regular,
+                bold,
+            })
+        })
+        .collect()
+}
+
+/// The folders the system keeps fonts in, the user's own included.
+pub(crate) fn font_directories() -> Vec<PathBuf> {
+    let mut directories = Vec::new();
+    let env = |name: &str| std::env::var_os(name).map(PathBuf::from);
+    if cfg!(windows) {
+        directories.extend(env("WINDIR").map(|windows| windows.join("Fonts")));
+        directories.extend(
+            env("LOCALAPPDATA").map(|local| local.join("Microsoft").join("Windows").join("Fonts")),
+        );
+    } else if cfg!(target_os = "macos") {
+        directories.extend(["/System/Library/Fonts", "/Library/Fonts"].map(PathBuf::from));
+        directories.extend(env("HOME").map(|home| home.join("Library").join("Fonts")));
+    } else {
+        let data =
+            env("XDG_DATA_HOME").or_else(|| env("HOME").map(|home| home.join(".local/share")));
+        directories.extend(["/usr/share/fonts", "/usr/local/share/fonts"].map(PathBuf::from));
+        directories.extend(data.map(|data| data.join("fonts")));
+        directories.extend(env("HOME").map(|home| home.join(".fonts")));
+    }
+    directories
+}
+
+fn is_font_file(path: &Path) -> bool {
+    path.extension()
+        .and_then(|extension| extension.to_str())
+        .is_some_and(|extension| {
+            ["ttf", "otf", "ttc", "otc"]
+                .iter()
+                .any(|known| extension.eq_ignore_ascii_case(known))
+        })
+}
+
+fn collect_files(directory: &Path, depth: usize, files: &mut Vec<PathBuf>) {
+    let Ok(entries) = std::fs::read_dir(directory) else {
+        return;
+    };
+    for entry in entries.flatten() {
+        let path = entry.path();
+        match entry.file_type() {
+            Ok(kind) if kind.is_dir() && depth < MAX_DEPTH => {
+                collect_files(&path, depth + 1, files)
+            }
+            Ok(_) if is_font_file(&path) => files.push(path),
+            _ => {}
+        }
+    }
+}
+
+/// Every family in `directories`.
+pub(crate) fn scan(directories: &[PathBuf]) -> Vec<InstalledFamily> {
+    let mut files = Vec::new();
+    for directory in directories {
+        collect_files(directory, 0, &mut files);
+    }
+    let faces = files.into_iter().flat_map(|path| {
+        let faces = std::fs::File::open(&path)
+            .and_then(|file| read_faces(&mut io::BufReader::new(file)))
+            .unwrap_or_default();
+        faces
+            .into_iter()
+            .enumerate()
+            .filter_map(move |(index, name)| {
+                Some((
+                    name?,
+                    FaceFile {
+                        path: path.clone(),
+                        index: index as u32,
+                    },
+                ))
+            })
+    });
+    families(faces)
+}
+
+static CATALOGUE: OnceLock<Vec<InstalledFamily>> = OnceLock::new();
+static SCAN: Once = Once::new();
+
+fn installed_blocking() -> &'static [InstalledFamily] {
+    CATALOGUE.get_or_init(|| scan(&font_directories()))
+}
+
+/// The installed families once they are read; the first call starts reading them on
+/// a worker and returns `None` until it is done.
+pub(crate) fn installed() -> Option<&'static [InstalledFamily]> {
+    if let Some(families) = CATALOGUE.get() {
+        return Some(families);
+    }
+    SCAN.call_once(|| {
+        let _ = std::thread::Builder::new()
+            .name("installed fonts".to_owned())
+            .spawn(|| {
+                installed_blocking();
+            });
+    });
+    None
+}
+
+/// The values the font rows offer: empty (SJK's own) then every installed family.
+pub(crate) fn choices() -> &'static [&'static str] {
+    static CHOICES: OnceLock<Vec<&'static str>> = OnceLock::new();
+    let Some(families) = installed() else {
+        return &[""];
+    };
+    CHOICES.get_or_init(|| {
+        std::iter::once("")
+            .chain(families.iter().map(|family| family.name.as_str()))
+            .collect()
+    })
+}
+
+/// What the settings show for `value` of a font row: [`DEFAULT_NAME`] for empty.
+pub(crate) fn choice_name(cvar: &str, value: &str) -> Option<&'static str> {
+    let font_row = cvar.eq_ignore_ascii_case(CHAT_CVAR) || cvar.eq_ignore_ascii_case(CONSOLE_CVAR);
+    (font_row && value.trim().is_empty()).then_some(DEFAULT_NAME)
+}
+
+/// `name`'s family in `families`, compared without case.
+pub(crate) fn find<'a>(families: &'a [InstalledFamily], name: &str) -> Option<&'a InstalledFamily> {
+    let name = name.trim();
+    families
+        .iter()
+        .find(|family| family.name.eq_ignore_ascii_case(name))
+}
+
+/// The last atlas made for each scope, by family, so the next world takes it without
+/// reading the font again.
+static LOADED: Mutex<[Option<Loaded>; 2]> = Mutex::new([None, None]);
+
+/// A family's name and the atlas made from it.
+type Loaded = (String, Arc<FontAtlas>);
+
+/// The atlas already made for `family` in `scope`, if any.
+pub(crate) fn cached(scope: Scope, family: &str) -> Option<Arc<FontAtlas>> {
+    let loaded = LOADED
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+    loaded[scope.index()]
+        .as_ref()
+        .filter(|(name, _)| name.eq_ignore_ascii_case(family))
+        .map(|(_, atlas)| Arc::clone(atlas))
+}
+
+/// Find `family` on the PC and rasterize it for `scope` (blocking: run on a worker).
+pub(crate) fn load_installed(scope: Scope, family: &str) -> Result<Arc<FontAtlas>, String> {
+    if let Some(atlas) = cached(scope, family) {
+        return Ok(atlas);
+    }
+    let found = find(installed_blocking(), family)
+        .ok_or_else(|| format!("no font named \"{family}\" is installed"))?;
+    let read = |face: &FaceFile| std::fs::read(&face.path).map(|bytes| (bytes, face.index));
+    let regular = read(&found.regular).map_err(|error| format!("{}: {error}", found.name))?;
+    let bold = found.bold.as_ref().and_then(|face| read(face).ok());
+    let atlas = load(
+        scope,
+        (&regular.0, regular.1),
+        bold.as_ref()
+            .map(|(bytes, index)| (bytes.as_slice(), *index)),
+    )
+    .map_err(|error| format!("{}: {error}", found.name))?;
+    let atlas = Arc::new(atlas);
+    let mut loaded = LOADED
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+    loaded[scope.index()] = Some((found.name.clone(), Arc::clone(&atlas)));
+    crate::log::progress(format_args!(
+        "{} font: {} from the system",
+        scope.name(),
+        found.name
+    ));
+    Ok(atlas)
+}
+
+/// The pixel scale that sets `font`'s em to `em` pixels.
+fn em_scale(font: &FontRef<'_>, em: f32) -> PxScale {
+    let units = font.units_per_em().unwrap_or(1_000.0);
+    PxScale::from(em * font.height_unscaled() / units)
+}
+
+/// The font a slot's character comes from: `font` when it has it, else `fallback`,
+/// else `font`'s `.` (as the bundled fonts draw a character they lack).
+fn slot_source<'a>(
+    font: &'a FontRef<'a>,
+    fallback: &'a FontRef<'a>,
+    byte: u8,
+) -> (&'a FontRef<'a>, char) {
+    let character = sjk_protocol::windows_1252_char(byte);
+    if matches!(byte, b'\n' | b'\r' | b' ') || font.glyph_id(character).0 != 0 {
+        (font, character)
+    } else if fallback.glyph_id(character).0 != 0 {
+        (fallback, character)
+    } else {
+        (font, '.')
+    }
+}
+
+/// `character` of `font` at `em` pixels, as the fontdue metrics and coverage the
+/// atlas packer takes.
+fn rasterize(font: &FontRef<'_>, em: f32, character: char) -> (Metrics, Vec<u8>) {
+    let scale = em_scale(font, em);
+    let id = font.glyph_id(character);
+    let advance_width = font.as_scaled(scale).h_advance(id);
+    let Some(outlined) = font.outline_glyph(id.with_scale_and_position(scale, point(0.0, 0.0)))
+    else {
+        return (
+            Metrics {
+                advance_width,
+                ..Metrics::default()
+            },
+            Vec::new(),
+        );
+    };
+    let bounds = outlined.px_bounds();
+    let (width, height) = (bounds.width() as usize, bounds.height() as usize);
+    let mut pixels = vec![0; width * height];
+    outlined.draw(|x, y, coverage| {
+        let (x, y) = (x as usize, y as usize);
+        if x < width && y < height {
+            pixels[y * width + x] = (coverage.clamp(0.0, 1.0) * 255.0).round() as u8;
+        }
+    });
+    (
+        Metrics {
+            xmin: bounds.min.x as i32,
+            ymin: -(bounds.max.y as i32),
+            width,
+            height,
+            advance_width,
+            ..Metrics::default()
+        },
+        pixels,
+    )
+}
+
+/// Ascent and descent (negative) of `font` at `em` pixels.
+fn line(font: &FontRef<'_>, em: f32) -> (f32, f32, f32) {
+    let scaled = font.as_scaled(em_scale(font, em));
+    (scaled.ascent(), scaled.descent(), scaled.line_gap())
+}
+
+/// Rasterize a system font for `scope`: `regular` (font bytes and face index) and, for
+/// chat, its `bold` face when the family has one.
+pub(crate) fn load(
+    scope: Scope,
+    regular: (&[u8], u32),
+    bold: Option<(&[u8], u32)>,
+) -> Result<FontAtlas, Box<dyn Error>> {
+    let font = FontRef::try_from_slice_and_index(regular.0, regular.1)?;
+    match scope {
+        Scope::Chat => {
+            let bold = bold
+                .and_then(|(bytes, index)| FontRef::try_from_slice_and_index(bytes, index).ok());
+            load_chat(&font, bold.as_ref())
+        }
+        Scope::Console => load_console(&font),
+    }
+}
+
+fn load_chat(font: &FontRef<'_>, bold: Option<&FontRef<'_>>) -> Result<FontAtlas, Box<dyn Error>> {
+    let fallbacks = [
+        FontRef::try_from_slice(super::INTER_REGULAR)?,
+        FontRef::try_from_slice(super::INTER_SEMIBOLD)?,
+    ];
+    let faces = [font, bold.unwrap_or(font)];
+    let (ascent, descent, gap) = line(font, CHAT_RASTER_EM);
+    if ascent - descent <= 0.0 {
+        return Err("the font has no line metrics".into());
+    }
+    let face_count = if bold.is_some() { 2 } else { 1 };
+    let mut rasterized = Vec::with_capacity(GLYPH_COUNT * face_count);
+    for (face, font) in faces.iter().take(face_count).enumerate() {
+        for byte in 0..GLYPH_COUNT {
+            let (source, character) = slot_source(font, &fallbacks[face], byte as u8);
+            let (metrics, pixels) = rasterize(source, CHAT_RASTER_EM, character);
+            rasterized.push(RasterizedGlyph {
+                face,
+                byte,
+                metrics,
+                pixels,
+            });
+        }
+    }
+    let (image, rectangles) = paint_atlas(&rasterized);
+    let mut glyphs = [[FontGlyph::default(); GLYPH_COUNT]; 2];
+    for (glyph, uv) in rasterized.iter().zip(rectangles) {
+        let metrics = glyph.metrics;
+        let entry = FontGlyph {
+            width: metrics.width as f32 / CHAT_UNITS,
+            height: metrics.height as f32 / CHAT_UNITS,
+            advance: metrics.advance_width / CHAT_UNITS,
+            offset_x: metrics.xmin as f32 / CHAT_UNITS,
+            offset_y: (ascent - (metrics.ymin as f32 + metrics.height as f32)) / CHAT_UNITS,
+            uv,
+        };
+        glyphs[glyph.face][glyph.byte] = entry;
+        if face_count == 1 {
+            glyphs[1][glyph.byte] = entry;
+        }
+    }
+    Ok(FontAtlas {
+        font: UiFont {
+            glyphs,
+            wide: super::wide::INTER,
+            height: (ascent - descent + gap) / CHAT_UNITS,
+            modern: true,
+            style: TextStyle::NEUTRAL,
+        },
+        image,
+        distance_field: false,
+    })
+}
+
+fn load_console(font: &FontRef<'_>) -> Result<FontAtlas, Box<dyn Error>> {
+    use super::console_font::{HEIGHT, WIDTH};
+    let fallback = FontRef::try_from_slice(super::console_font::JETBRAINS_MONO)?;
+    let em = CONSOLE_RASTER_EM;
+    let (ascent, descent, _) = line(font, em);
+    let rasterized: Vec<RasterizedGlyph> = (0..GLYPH_COUNT)
+        .map(|byte| {
+            let (source, character) = slot_source(font, &fallback, byte as u8);
+            let (metrics, pixels) = rasterize(source, em, character);
+            RasterizedGlyph {
+                face: 0,
+                byte,
+                metrics,
+                pixels,
+            }
+        })
+        .collect();
+    // The widest printable ASCII character fills one cell.
+    let widest = rasterized[0x21..=0x7E]
+        .iter()
+        .map(|glyph| glyph.metrics.advance_width.max(glyph.metrics.width as f32))
+        .fold(0.0_f32, f32::max);
+    if widest <= 0.0 || ascent - descent <= 0.0 {
+        return Err("the font has no printable ASCII characters".into());
+    }
+    let unit = (WIDTH / widest).min(HEIGHT / (ascent - descent));
+    let baseline = (HEIGHT + (ascent + descent) * unit) * 0.5;
+    let (image, rectangles) = paint_atlas(&rasterized);
+    let mut glyphs = [[FontGlyph::default(); GLYPH_COUNT]; 2];
+    for (glyph, uv) in rasterized.iter().zip(rectangles) {
+        let metrics = glyph.metrics;
+        let ink_top = metrics.ymin as f32 + metrics.height as f32;
+        // Centred in the cell: proportional fonts keep the console a grid.
+        let centring = (WIDTH - metrics.advance_width * unit) * 0.5;
+        let entry = FontGlyph {
+            width: metrics.width as f32 * unit,
+            height: metrics.height as f32 * unit,
+            advance: WIDTH,
+            offset_x: centring + metrics.xmin as f32 * unit,
+            offset_y: baseline - ink_top * unit,
+            uv,
+        };
+        glyphs[0][glyph.byte] = entry;
+        glyphs[1][glyph.byte] = entry;
+    }
+    Ok(FontAtlas {
+        font: UiFont {
+            glyphs,
+            wide: [super::wide::MONO; 2],
+            height: HEIGHT,
+            modern: false,
+            style: TextStyle::NEUTRAL,
+        },
+        image,
+        distance_field: false,
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::text::TextFace;
+    use std::io::Cursor;
+
+    /// A `name` table with Windows English names `(id, text)`, and a Mac Roman family.
+    fn name_table(names: &[(u16, &str)], mac_family: Option<&str>) -> Vec<u8> {
+        let mut records = Vec::new();
+        let mut strings = Vec::new();
+        let mut push = |platform: u16, encoding: u16, language: u16, id: u16, bytes: Vec<u8>| {
+            for value in [
+                platform,
+                encoding,
+                language,
+                id,
+                bytes.len() as u16,
+                strings.len() as u16,
+            ] {
+                records.extend(value.to_be_bytes());
+            }
+            strings.extend(bytes);
+        };
+        if let Some(family) = mac_family {
+            push(1, 0, 0, 1, family.bytes().collect());
+        }
+        for &(id, text) in names {
+            push(
+                3,
+                1,
+                0x0409,
+                id,
+                text.encode_utf16().flat_map(u16::to_be_bytes).collect(),
+            );
+        }
+        let count = records.len() / 12;
+        let mut table = Vec::new();
+        table.extend(0_u16.to_be_bytes());
+        table.extend((count as u16).to_be_bytes());
+        table.extend((6 + records.len() as u16).to_be_bytes());
+        table.extend(records);
+        table.extend(strings);
+        table
+    }
+
+    /// A font file of one face holding only `name` (at `base` in a collection).
+    fn sfnt(name: &[u8], base: usize) -> Vec<u8> {
+        let mut face = Vec::new();
+        face.extend([0, 1, 0, 0]);
+        face.extend(1_u16.to_be_bytes());
+        face.extend([0; 6]);
+        face.extend(b"name");
+        face.extend(0_u32.to_be_bytes());
+        face.extend(((base + 28) as u32).to_be_bytes());
+        face.extend((name.len() as u32).to_be_bytes());
+        face.extend(name);
+        face
+    }
+
+    #[test]
+    fn names_prefer_the_typographic_family_and_windows_english() {
+        let table = name_table(
+            &[
+                (1, "Segoe UI Semibold"),
+                (2, "Regular"),
+                (16, "Segoe UI"),
+                (17, "Semibold"),
+            ],
+            Some("Mac Name"),
+        );
+        let name = parse_names(&table).unwrap();
+        assert_eq!(name.family, "Segoe UI");
+        assert_eq!(name.style, "Semibold");
+        // Only a Mac Roman family: taken, the style defaulting to Regular.
+        let mac = parse_names(&name_table(&[], Some("Chicago"))).unwrap();
+        assert_eq!(
+            (mac.family.as_str(), mac.style.as_str()),
+            ("Chicago", "Regular")
+        );
+        assert!(parse_names(&[0, 0]).is_none());
+    }
+
+    #[test]
+    fn single_fonts_and_collections_list_their_faces() {
+        let table = name_table(&[(1, "Arial"), (2, "Bold")], None);
+        let faces = read_faces(&mut Cursor::new(sfnt(&table, 0))).unwrap();
+        assert_eq!(
+            faces,
+            [Some(FaceName {
+                family: "Arial".into(),
+                style: "Bold".into()
+            })]
+        );
+        // A collection of two faces.
+        let first = sfnt(&name_table(&[(1, "MS Gothic")], None), 20);
+        let second_at = 20 + first.len();
+        let second = sfnt(&name_table(&[(1, "MS PGothic")], None), second_at);
+        let mut file = Vec::new();
+        file.extend(b"ttcf");
+        file.extend([0, 1, 0, 0]);
+        file.extend(2_u32.to_be_bytes());
+        file.extend(20_u32.to_be_bytes());
+        file.extend((second_at as u32).to_be_bytes());
+        file.extend(first);
+        file.extend(second);
+        let faces = read_faces(&mut Cursor::new(file)).unwrap();
+        let names: Vec<_> = faces
+            .iter()
+            .map(|face| face.as_ref().unwrap().family.as_str())
+            .collect();
+        assert_eq!(names, ["MS Gothic", "MS PGothic"]);
+        assert!(read_faces(&mut Cursor::new(b"PK\x03\x04 not a font".to_vec())).is_err());
+    }
+
+    #[test]
+    fn families_pick_their_regular_and_bold_faces() {
+        let face = |family: &str, style: &str, file: &str| {
+            (
+                FaceName {
+                    family: family.into(),
+                    style: style.into(),
+                },
+                FaceFile {
+                    path: file.into(),
+                    index: 0,
+                },
+            )
+        };
+        let found = families([
+            face("Verdana", "Bold Italic", "verdanaz.ttf"),
+            face("Verdana", "Bold", "verdanab.ttf"),
+            face("verdana", "Regular", "verdana.ttf"),
+            face("Verdana", "Italic", "verdanai.ttf"),
+            face("Bahnschrift", "Light", "bahn-light.ttf"),
+            face(".SF NS", "Regular", "sf.ttf"),
+        ]);
+        let names: Vec<_> = found.iter().map(|family| family.name.as_str()).collect();
+        assert_eq!(names, ["Bahnschrift", "verdana"]);
+        assert_eq!(found[1].regular.path, PathBuf::from("verdana.ttf"));
+        assert_eq!(
+            found[1].bold.as_ref().unwrap().path,
+            PathBuf::from("verdanab.ttf")
+        );
+        assert!(found[0].bold.is_none());
+        assert!(find(&found, " VERDANA ").is_some());
+        assert!(find(&found, "Comic Sans MS").is_none());
+    }
+
+    #[test]
+    fn the_rows_name_the_default() {
+        assert_eq!(choice_name(CHAT_CVAR, ""), Some(DEFAULT_NAME));
+        assert_eq!(choice_name("con_font", " "), Some(DEFAULT_NAME));
+        assert_eq!(choice_name(CHAT_CVAR, "Arial"), None);
+        assert_eq!(choice_name("cg_drawChat", ""), None);
+    }
+
+    #[test]
+    fn missing_glyphs_fall_back_and_wide_characters_keep_their_sources() {
+        // SJK Symbols stands in for a system font: it has capitals, but not `é` or `€`.
+        let symbols = include_bytes!("../../assets/fonts/SJKSymbols.ttf");
+        let font = FontRef::try_from_slice(symbols).unwrap();
+        let inter = FontRef::try_from_slice(super::super::INTER_REGULAR).unwrap();
+        let (source, character) = slot_source(&font, &inter, 0x80);
+        assert_eq!(character, '€');
+        assert!(
+            std::ptr::eq(source, &inter),
+            "a missing slot comes from Inter"
+        );
+        let atlas = load(Scope::Chat, (symbols, 0), None).unwrap();
+        let chat = &atlas.font;
+        assert!(chat.is_modern());
+        assert!(
+            chat.glyph(TextFace::Regular, 0x80).width > 0.0,
+            "€ from Inter"
+        );
+        assert!(chat.glyph(TextFace::Semibold, b'H').width > 0.0);
+        // Cyrillic, kanji and emoji go to Inter's wide sources as before.
+        assert_eq!(chat.wide[0], crate::text::wide::INTER[0]);
+        let console = load(Scope::Console, (symbols, 0), None).unwrap().font;
+        for byte in 0..=255_u8 {
+            let glyph = console.glyph(TextFace::Regular, byte);
+            assert_eq!(glyph.advance, super::super::console_font::WIDTH);
+        }
+        assert_eq!(console.wide[0], crate::text::wide::MONO);
+    }
+
+    #[test]
+    fn a_proportional_console_font_keeps_its_ink_in_the_cell() {
+        let font = load(Scope::Console, (super::super::INTER_REGULAR, 0), None)
+            .unwrap()
+            .font;
+        let width = super::super::console_font::WIDTH;
+        for byte in 0x21..=0x7E_u8 {
+            let glyph = font.glyph(TextFace::Regular, byte);
+            assert!(glyph.offset_x >= -0.6, "{byte} {glyph:?}");
+            assert!(
+                glyph.offset_x + glyph.width <= width + 0.6,
+                "{byte} {glyph:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn an_unreadable_font_is_an_error() {
+        assert!(load(Scope::Chat, (b"not a font", 0), None).is_err());
+        assert!(load_installed(Scope::Chat, "\u{1}no such family\u{1}").is_err());
+    }
+}

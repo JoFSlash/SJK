@@ -735,7 +735,7 @@ impl ChatOverlay {
         let ms = self.millis(Instant::now());
         self.build(
             draw_feed,
-            fonts.font(RetailFont::Small).unwrap_or(font),
+            fonts.font(chat_font(fonts)).unwrap_or(font),
             viewport,
             ms,
         );
@@ -752,13 +752,14 @@ impl ChatOverlay {
     ) {
         let (start, end) = self.center_text;
         let palette_of = self.palette_of();
+        let chat = chat_font(fonts);
         self.ui.append_text_routed(
             fonts,
             |id, _| {
                 Some(if (start..end).contains(&id.0) {
                     RetailFont::Headline
                 } else {
-                    RetailFont::Small
+                    chat
                 })
             },
             |id| palette_of(id.0),
@@ -781,6 +782,16 @@ impl ChatOverlay {
                 crate::text::CodePalette::Game
             }
         }
+    }
+}
+
+/// The font the chat box draws in: the player's own (`cg_chatFont`) once it is
+/// loaded, else the small game font (`FONT_SMALL`), which falls back to Inter.
+fn chat_font(fonts: &GameFonts) -> RetailFont {
+    if fonts.active(RetailFont::Chat) {
+        RetailFont::Chat
+    } else {
+        RetailFont::Small
     }
 }
 
