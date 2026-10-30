@@ -195,7 +195,7 @@ link: https://sol-vulpes.github.io/SJK/
 
 [Creyon]
 github: Creyon94
-role: Contributor and tester: 68 merged pull requests, EternalJK parity
+role: Contributor and tester: 70 merged pull requests, EternalJK parity
 medal: early_contributor
 did: #2 #7 Duel challenges from names with symbols, centre prints kept whole
 did: #3 The third-person camera damped per frame as EternalJK (cg_cameraFPS)
@@ -247,11 +247,13 @@ did: The Saber ideas page: the concepts of the Tidal, Circuit, Aurora, Echo, Neb
 did: The Blade Lab page: the Neon, Peppermint, Soap Bubble, Lava Lamp, Reactor and Bleeding Kyber blades
 did: The Blade Lab page: the Sketch, Hourglass, Fiber Optic, Serpent, Monarch, Phoenix and Quantum blades
 did: The Blade Lab page: the Comic, Quicksilver and Obsidian Edge blades
+did: #297 Blade core thickness: a slider for the white core of a lit blade
+did: #296 Day and night follow the PC's clock, in every graphics preset
 link: Creyon's pull requests | https://github.com/Sol-Vulpes/SJK/pulls?q=is%3Apr+author%3ACreyon94
 
 [Lumaya]
 github: lumayaa
-role: Contributor: 78 merged pull requests
+role: Contributor: 81 merged pull requests
 medal: early_contributor
 did: #24 Saber blades stop at walls instead of shining through them
 did: #29 Free camera: /freecam flies the camera away from your body
@@ -313,11 +315,13 @@ did: #252-#273 Six more prediction fixes: saber locks, respawn, vehicles
 did: #279 #282 jaPRO movement styles and their jumps predicted
 did: #284 jaPRO new jetpack predicted
 did: #305 #307 #308 Prediction checked against a real JA+ server, two fixes backed out
+did: #313 #314 Each prediction fix explained; saber files read in the game's order
+did: #312 Copy a server's IP from the browser or the console
 link: Lumaya's pull requests | https://github.com/Sol-Vulpes/SJK/pulls?q=is%3Apr+author%3Alumayaa
 
 [Lukas]
 github: LukasMoudry
-role: Contributor: 18 merged pull requests
+role: Contributor: 19 merged pull requests
 did: #115 Linux clipboard tools follow the desktop session; copy reports failures
 did: #108 clientlist and clientlistinfo, JoF EJK's player list commands
 did: #109 Two-key combo binds, such as bind K+L kill
@@ -336,11 +340,12 @@ did: #181 The chat key opens on All; remembering the channel is an option
 did: #190 JA+ anti-kiss: one Force Push breaks an amkiss
 did: #179 Holocron notifications: off, after duels or always
 did: #198 No more "Too many open files" after a long session
+did: #304 Spectators click the player under the crosshair to follow them
 link: Lukas's pull requests | https://github.com/Sol-Vulpes/SJK/pulls?q=is%3Apr+author%3ALukasMoudry
 
 [Slash]
 github: JoFSlash
-role: Contributor: 67 merged pull requests
+role: Contributor: 71 merged pull requests
 did: #114 Tab completes cfg file names after exec and writeconfig
 did: #113 CTF team saber colours, an option
 did: #153 The SJK scoreboard tells who won the Siege round or team match
@@ -411,6 +416,9 @@ did: #280 Name outline for nameplates: Off, Faint or Strong
 did: #281 Radial HUD spacing and height sliders
 did: #283 Laptops with two graphics cards start on the fast one
 did: #286 fs_restart: new PK3s without restarting SJK
+did: #310 Join the game while following a player
+did: #294 No glow on sabers: the dynamic glow without blades and trails
+did: #293 Quick wheel commands you name are remembered for any page
 link: Slash's pull requests | https://github.com/Sol-Vulpes/SJK/pulls?q=is%3Apr+author%3AJoFSlash
 
 [Milamber]
@@ -460,6 +468,14 @@ did: Click a name in the chat to whisper them
 [Nib]
 role: Ideas for SJK
 did: Saber sounds of your choice, apart from your saber shader
+
+[g0dchris]
+role: Ideas for SJK
+did: No glow on sabers: the dynamic glow without the blades, so their details show
+
+[Dante]
+role: Ideas for SJK
+did: Quick wheel custom commands remembered in the command list
 
 == Testing
 

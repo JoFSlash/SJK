@@ -33,14 +33,34 @@ Add each release's notes here when it is tagged (docs/sjk.md "Releases").
 ## Unreleased
 
 = cg_soundSonar: Sound sonar, for deaf and hard-of-hearing players: arcs round the crosshair point toward the sounds you hear.
+= r_dynamicGlowNoSabers: New: the dynamic glow leaves saber blades and trails out, so each saber's details show while the rest still glows; off, sabers glow as before.
+= r_dayClock: New: day and night follow your PC's clock in every preset: with Sun and sky the sun moves, without it the sky turns to night and the world darkens.
 
 - Sound sonar (Settings > Sound, `cg_soundSonar`, off by default): short arcs round the crosshair point toward the sounds you hear, footsteps, shots and swings, voices, explosions and the rest, each kind its own colour, fading over a second _(Sol, after Dawson's idea)_
-- Prediction on JA+ servers: dual sabers jump attacks no longer sink you into the floor, and joining no longer throws you sideways at high speed before the server stops you; two prediction changes of 2026.1029.1 (dual jump attack hull, zero gravity push) are backed out after Lumaya checked them against an original JA+ server _(Lumaya, PRs #305, #307 and #308)_
+- Lighting: day and night can follow your PC's clock (Settings > Lighting > Sun follows PC clock, `r_dayClock`); with Sun and sky off, as in the SJK and Vanilla presets, the sky turns to dusk and night and the world gets darker _(Creyon)_
+- Spectating: aim at a player to see their name, then left-click to follow their view; a click with nobody under the crosshair keeps its normal bind _(Lukas)_
+- Quick wheel commands you name are remembered: a custom command saved in Settings > Quick wheel is offered again under Your own in the catalogue when you add or change a choice on any page, so it goes on another page or wheel without typing it again. Delete (or its cross) forgets one; choices already on pages keep it _(Slash, after Dante's idea)_
+- Blade core thickness: a slider in Settings > Game options (`cg_saberCoreSize`, 0.5 to 2) draws the white core of every lit blade thinner or thicker, its glow unchanged _(Creyon)_
+- No glow on sabers (Settings > Graphics > Image, `r_dynamicGlowNoSabers`): the dynamic glow leaves saber blades, their glow and their trails out, so they keep their own look and the details of each saber show, while everything else still glows. Off until you turn it on _(Slash, after g0dchris' idea)_
+- Server browser: Copy IP copies the chosen server's address and port (also Ctrl+C), and `copyServerIP` copies the server you are on, never a password _(Lumaya, PR #312)_
+- Prediction with custom sabers: when two saber files define the same saber name, the first one counts, in the original game's file order, so a mod's saber no longer predicts the wrong flips, wall runs or jump attacks _(Lumaya, PR #314, after the original game)_
+- Mac and Linux: SJK raises its open-file limit at start as far as the system allows, so many PK3s no longer run out of files, and the log tracks how many game-file sets are still held at each map change _(Lukas, PR #198)_
+- Achievements: 26 new ones for the toys (the cardboard box, Order 66, the Hax, the Drone, the boombox, the monitor and the box hunt), three of them secret, and the board has two pages, General and Fun, a category for each toy on Fun (press F or use the switch at the top right) _(Sol, after a player's ideas)_
 - jaPRO plugin options: Force jumps (Settings > Mods, `japro.plugin 1`) is offered now that SJK predicts it: off, holding jump bunny hops instead of Force jumping, on jaPRO servers that let players choose _(Sol, after Kushina's idea and Lumaya's PR #282)_
-
+- Spectating: while you follow a player, the join menu and the match card offer Join again, as they read your own team rather than the followed player's (hub report #207) _(Slash, PR #310, after Jaykmeit's report)_
 - Mystery boxes: when the opener takes what came out, everyone else sees it go and the lid close at once, instead of it floating on for 10 seconds _(Sol)_
 - Tags: two new ones, Gonk (Uncommon) and Geyon (Rare), and the EZ tag has its real picture, all three drawn by Blep and picked from the Discord's #tag-proposals _(Sol, art by Blep)_
 - A prompt by the crosshair shows what Use does at a mystery box, with the key you bound to Use: Open mystery box and its price, Take it, or why you cannot yet (your turn in a few seconds, not enough credits), instead of a message in the middle of the screen _(Sol)_
+
+## 2026.1030.2 (Alpha) | 30/10/2026
+
+Hotfix: dual sabers and joining JA+ servers behave again as before 2026.1029.1.
+
+> Dual sabers: The forward jump attack lands on the floor again instead of sinking into it.
+> Joining: You no longer slide away at high speed while a JA+ server lets you in.
+> Movement: Two prediction changes of 2026.1029.1 are backed out after checks on a real JA+ server.
+
+- Prediction on JA+ servers: dual sabers jump attacks no longer sink you into the floor, and joining no longer throws you sideways at high speed before the server stops you; two prediction changes of 2026.1029.1 (dual jump attack hull, zero gravity push) are backed out after Lumaya checked them against an original JA+ server _(Lumaya, PRs #305, #307 and #308)_
 
 ## 2026.1030.1 (Alpha) | 30/10/2026
 

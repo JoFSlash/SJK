@@ -413,7 +413,7 @@ includes:
 Creyon and Lumaya wear the SJK team's Contributor medal, shown on their
 cards of the in-game credits page.
 
-Creyon ([Creyon94](https://github.com/Creyon94)), contributor and tester, has 68
+Creyon ([Creyon94](https://github.com/Creyon94)), contributor and tester, has 70
 pull requests merged into SJK, most of them bringing SJK in line with EternalJK
 ([all of them](https://github.com/Sol-Vulpes/SJK/pulls?q=is%3Apr+author%3ACreyon94)):
 
@@ -522,8 +522,13 @@ pull requests merged into SJK, most of them bringing SJK in line with EternalJK
   the Neon, Peppermint, Soap Bubble, Lava Lamp, Reactor and Bleeding Kyber blades, and
   its next seven the Sketch, Hourglass, Fiber Optic, Serpent, Monarch, Phoenix and Quantum
   blades, and its last three the Comic, Quicksilver and Obsidian Edge blades.
+- #297 Blade core thickness (`cg_saberCoreSize`, 0.5 to 2): the white core of every lit
+  blade drawn thinner or bolder, its glow unchanged, after the #ideas recap of 29/10/2026.
+- #296 day and night follow the PC's clock (`r_dayClock`): the sun moves with Sun and sky
+  on; without it the world darkens and the sky turns to night, in the SJK and Vanilla
+  presets too.
 
-Lumaya ([lumayaa](https://github.com/lumayaa)), contributor, has 78 pull requests
+Lumaya ([lumayaa](https://github.com/lumayaa)), contributor, has 81 pull requests
 merged into SJK
 ([all of them](https://github.com/Sol-Vulpes/SJK/pulls?q=is%3Apr+author%3Alumayaa)):
 
@@ -647,9 +652,12 @@ merged into SJK
   style jumps and only-bhop, and the new jetpack, only on servers that advertise jaPRO.
 - #305, #307, #308 the prediction regression audit: all 25 prediction PRs of 29/10 checked
   against an original JA+ server, and the two that broke dual jump attacks and joining
-  (#266, #251) backed out.
+  (#266, #251) backed out; #313 then gave each of the 25 its reason; #314 makes duplicate
+  saber names follow the original game's file order.
+- #312 Copy IP in both server browsers (and Ctrl+C), and `copyServerIP` for the server you
+  are on: the address and port only, never a password.
 
-Lukas ([LukasMoudry](https://github.com/LukasMoudry)), contributor, has 18 pull requests
+Lukas ([LukasMoudry](https://github.com/LukasMoudry)), contributor, has 19 pull requests
 merged into SJK
 ([all of them](https://github.com/Sol-Vulpes/SJK/pulls?q=is%3Apr+author%3ALukasMoudry)):
 
@@ -688,9 +696,13 @@ merged into SJK
   a private duel or always, duels included; the holocron still waits for the game menu. At the
   merge a card that comes during a duel waits for the duel's end instead of being dropped.
 - #198 "Too many open files" after a long session: the Profile menu's model icons, cosmetics and
-  Force templates let go of the previous map's game files (its PK3 reopening part held back).
+  Force templates let go of the previous map's game files (its PK3 reopening part held back);
+  its second part raises the open-file limit on Mac and Linux, lets cancelled map loads let go
+  of their game files sooner, and logs how many game-file sets are still held.
+- #304 a free spectator sees the name of the player under the crosshair and follows them
+  with a left click; a click on nobody does what it did.
 
-Slash ([JoFSlash](https://github.com/JoFSlash)), contributor, has 67 pull requests merged
+Slash ([JoFSlash](https://github.com/JoFSlash)), contributor, has 71 pull requests merged
 into SJK ([all of them](https://github.com/Sol-Vulpes/SJK/pulls?q=is%3Apr+author%3AJoFSlash)):
 
 - #114 Tab completes the cfg file argument of `exec`, `execq`, `writeconfig` and `write`
@@ -819,6 +831,12 @@ into SJK ([all of them](https://github.com/Sol-Vulpes/SJK/pulls?q=is%3Apr+author
   card, tries the other cards when one cannot open, and says why when none starts.
 - #286 `fs_restart` mounts the game files again without restarting SJK: new PK3s and the
   asset browser's pack choices reach the menus and the next map, after Blep's idea.
+- #310 joining the game while following a player: the join menu and the match card read your
+  own team, not the followed player's (hub report #207, Jaykmeit).
+- #294 No glow on sabers (`r_dynamicGlowNoSabers`): the dynamic glow leaves saber blades
+  and their trails out, after g0dchris' idea.
+- #293 the quick wheel's custom commands remembered under Your own in Settings > Quick
+  wheel, kept when the default pages are restored, after Dante's idea.
 
 His Peek work in #199 (closed 24/10/2026, not merged) shaped the Drone toy: a player is
 asked before being peeked, told who watches, and can end it. His #206 (closed 25/10/2026,
@@ -879,6 +897,13 @@ built it as the pinned chat card's Whisper button (23/10/2026).
 
 Nib, a player, asked to choose the saber sounds apart from the saber shader (18/10/2026,
 and hub report #109): Sol built it as the Saber tab's Sounds row (23/10/2026).
+
+Dante, a player, asked for the quick wheel's custom commands to be remembered in the
+command list once made, and for duels won in each saber style to count as achievements:
+Slash built the first (#293, 30/10/2026), Sol the style masters (29/10/2026).
+
+g0dchris, a player, asked for the dynamic glow on everything but the sabers, whose glow
+hid the blades' details: Slash built it as No glow on sabers (#294, 30/10/2026).
 
 Blep, a player, asked for the player card to come only from the `inspect` key, not from
 looking at a player: Sol built it as Key only, `cg_playerCard 2` (29/10/2026).

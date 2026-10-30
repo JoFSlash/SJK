@@ -35,6 +35,7 @@ impl crate::GpuState {
         self.gameplay_input.clear();
         self.game_menu = false;
         self.release_pointer();
+        crate::vfs_lifetime::log("disconnect", self.vfs.as_ref());
         crate::session_transition::show_disconnect(
             reason,
             self.console.as_mut(),
@@ -50,7 +51,12 @@ impl crate::GpuState {
                 return;
             }
         };
+        let reconnect = self.last_connect_address.as_deref() == Some(address.as_str());
         self.leave_session();
+        crate::vfs_lifetime::log(
+            if reconnect { "reconnect" } else { "connect" },
+            self.vfs.as_ref(),
+        );
         self.last_connect_address = Some(address.clone());
         if let Some(menu) = &mut self.client_menu {
             menu.release_local_server_unless(&address);

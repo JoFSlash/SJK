@@ -24,6 +24,74 @@
 
 # ---- Console & chat ----
 
+[day-pc-clock]
+area: Rendering & effects
+title: Day and night follow the PC's clock (r_dayClock), every preset, Creyon's #296
+change: Settings > Lighting > Sun follows PC clock: the hour is the PC's local time.
+change: Sun and sky on: the sun moves. Off (SJK, Vanilla): world 0.4 at night, a night sky.
+test: SJK preset, clock on in the evening: ffa3 darkens, the sky turns to night, HUD unchanged.
+test: Sun and sky on: the sun stands where the PC's hour puts it.
+test: Turn it off: the world is bright again at once; the sky after a map load or vid_restart.
+note: Off by default; with it off nothing changes. Check eye adaptation does not undo the night.
+
+[spectator-click-follow]
+area: Gameplay
+title: Spectators: aim at a player to see their name, left-click to follow them (Lukas, #304)
+change: Free spectating: the crosshair names the player under it; a left click sends follow.
+change: A click with nobody under the crosshair does what it did before (follow the next).
+test: Spectate freely on a server with players: aim at one, their name shows under the crosshair.
+test: Left-click: you follow that player. Aim at nothing and click: the usual follow cycle.
+test: While playing (not spectating) a left click still attacks.
+
+[wheel-commands-remembered]
+area: Menus & settings
+title: Quick wheel: custom commands you name are remembered (Dante's idea, Slash's #293)
+change: Settings > Quick wheel: a saved custom command shows under Your own in the command list.
+change: Kept in wheel_commands.json, newest first, 24 at most; Restore default pages keeps them.
+test: Add a custom command Ready / ready on a page: open another page's list, Your own has it.
+test: Pick it there: it goes on that page in one click; search finds it by name or command.
+test: Delete (or its cross) forgets it; the choices on pages stay. Restore defaults keeps it.
+
+[blade-core-thickness]
+area: Rendering & effects
+title: Blade core thickness slider (cg_saberCoreSize 0.5 to 2), Creyon's #297
+change: Settings > Game options, under Clash flare size: the white core of every lit blade.
+change: Glow, glints and skins' extras keep their size; menu previews keep the retail core.
+test: Set it to 2: your blade's core is bolder, the glow the same; 0.5: thinner.
+test: Throw the saber: the thrown blade follows it too; another player's blade as well.
+test: cg_saberCoreSize 10 in the console draws as 2; 1 is the original look.
+
+[glow-no-sabers]
+area: Rendering & effects
+title: No glow on sabers (r_dynamicGlowNoSabers), g0dchris' idea, Slash's #294
+change: Settings > Graphics > Image: No glow on sabers keeps blades and trails out of the glow.
+change: The rest of the scene still glows; the sabers themselves draw as before.
+test: Dynamic glow on, No glow on sabers on: a lit blade has no halo, glowing walls still glow.
+test: Swing: the trail has no glow either; turn it off: halo and trail glow come back live.
+test: Dynamic glow Sabers (2) with it on: nothing glows.
+
+[copy-server-ip]
+area: Menus & settings
+title: Copy a server's IP: Copy IP in both browsers, Ctrl+C, copyServerIP (Lumaya, #312)
+change: SJK and classic browsers: Copy IP copies the chosen server's address and port.
+change: Ctrl+C in the browser (outside a field) does the same; copyServerIP the server you are on.
+test: SJK browser: choose a server, Copy IP, paste in Notepad: ip:port, no password.
+test: Classic browser: COPY IP (where FIND PLAYER was) does the same; Ctrl+C too.
+test: In a game, copyServerIP in the console: the line says Copied server IP and pastes.
+
+[toy-achievements]
+area: Menus & settings
+title: Toy achievements (26) and the Achievements board's General and Fun pages
+change: Collection > Achievements: F or the switch at the top right turns General and Fun.
+change: Fun has a category per toy: box, Order 66, Hax, Drone, Boombox, Monitor, Box hunt.
+change: Counted on a server not on this PC; the box hunt's four are counted by the hub.
+test: Open the board: General shows Combat to Collection, Fun the seven toys, nothing cut off.
+test: Hit 2 opted-in players with one monitor: Two for One waits for the hub, then unlocks.
+test: Steer a player with the Hax into a pit: Leap of Faith; steer 5 minutes: Script Kiddie.
+test: Have a player lift your box, then kill them within 3 seconds: Surprise!.
+test: Peek a player, end the peek, kill them within 10 seconds: Eye in the Sky.
+note: Needs the hub's toy-achievements deployed, else they stay at Waiting for the SJK hub.
+
 [banana-in-look]
 area: Gameplay
 title: Banana peel in the hub look: its id goes in the look's toys while it is on
@@ -188,6 +256,25 @@ change: New or changed PK3s and the asset browser's pack choices apply without r
 test: With SJK open, add a model PK3 to base, type fs_restart: the profile lists the model.
 test: assetbrowser, disable a pack, fs_restart, change map: its files are gone.
 test: The console says how many PK3s it mounted; a second fs_restart at once is refused.
+
+[slash-join-following]
+area: Menus & settings
+title: Join the game while following a player (Slash, PR #310, hub #207)
+change: The join menu and the match card read your own team, not the followed player's.
+test: Local FFA server with a bot, spectate and follow the bot: Join the game is offered.
+test: The match card's Join works too; Spectate goes back to the free camera.
+
+[lumaya-saber-order]
+area: Gameplay
+title: Duplicate saber names follow the original game's file order (Lumaya, PRs #313, #314)
+change: The first definition of a saber name counts, mods before retail, as in the game.
+test: JA+ server with a custom hilt: flips, wall runs and jump attacks as the server does.
+
+[lukas-vfs-headroom]
+area: Console & chat
+title: Open-file limit and game-file lifetime in the log (Lukas, PR #198)
+change: Mac/Linux raise the open-file limit at start; the log counts live game-file sets.
+test: Change maps a few times: the log's "VFS lifetime" lines keep the live counts low.
 
 [lumaya-prediction-rollbacks]
 area: Gameplay

@@ -80,6 +80,21 @@ impl Runtime {
         }
     }
 
+    /// The sky alone following `values` (hour, day length) without the live sun, the
+    /// twilight over `azimuth`: written only when the hour or day length changes.
+    pub(crate) fn follow_day_clock(
+        &self,
+        queue: &crate::frame_queue::FrameQueue,
+        values: [f32; 2],
+        azimuth: [f32; 2],
+    ) {
+        if self.day_clock.is_none() || self.followed.get() == values {
+            return;
+        }
+        self.followed.set(values);
+        self.update_day_clock(queue, values, azimuth);
+    }
+
     /// Write the same live hour/rate used by the shadow fit and volume injection, and the
     /// authored sun azimuth (unit xy) the twilight glow sits over.
     pub(crate) fn update_day_clock(

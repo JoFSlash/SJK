@@ -72,6 +72,8 @@ struct Sinks<'a> {
     /// Who wears which blade skin.
     saber_skins: &'a crate::saber_skins::SaberSkins,
     black_sabers: crate::saber_rgb::black::Policy,
+    /// `cg_saberCoreSize` ([`crate::saber_core`]), read once a frame.
+    saber_core: f32,
     saber_states: &'a mut saber_trail::StateSlab,
     saber_segments: &'a mut saber_trail::SegmentPool,
     /// Trail edges for held and flying blades; `None` with `cg_saberTrail 0`.
@@ -304,6 +306,7 @@ pub(crate) fn submit(
                 .unwrap_or(i64::from(sjk_client::PLUGIN_DISABLE_DEFAULT)),
             gpu.muted_players.slots().muted,
         ),
+        saber_core: crate::saber_core::read(gpu.console.as_ref()),
         saber_states: &mut gpu.saber_states,
         saber_segments: &mut gpu.saber_trail_segments,
         trail_edges: trails.then(|| {
@@ -1294,6 +1297,7 @@ fn submit_equipment(
         sinks.trail_edges.as_mut(),
         sinks.lights,
         attacking,
+        sinks.saber_core,
     ) {
         return;
     }

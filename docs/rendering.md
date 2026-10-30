@@ -455,6 +455,7 @@ first drawn) and keys only a later remap uses. Not measured on a GPU; compare th
 | `r_liveLighting` | Lighting tier; default 0. Tier 1 retains world shadow casters between frames; tier 0 also uses available baked indirect light. Applies at map load |
 | `r_dayHour` | Solar hour; default 12 (noon, SJK); updated live when day/night resources are installed |
 | `r_dayMinutes` | Minutes per simulated day; 0 holds the hour |
+| `r_dayClock` | The hour follows the PC's local clock (read once a second, `day_live::PC_CLOCK_CVAR`), over `r_dayHour` and `r_dayMinutes`; default 0 (off); live. Without Sun and sky (`r_dayNight 0`, the SJK and Vanilla presets) the night is a darker exposure instead: factor 1 by day, 0.4 from 20:30 to 05:00, eased through dusk (18:00) and dawn (to 07:00), applied after eye adaptation in the scene resolve, so the HUD keeps its brightness (`day_live::night_tint`, `Params::night`), with eye adaptation brightening less as the night deepens and not at all in full night (`post_exposure::day_share`), so the dark sky does not undo it; and the sky alone follows the PC's hour, the sky stage's day tint installed without sun or shadows (`day::Settings::sky`, `sky_stage::Runtime::follow_day_clock`, written only when the hour changes), from the next map load or graphics reload; with the clock switched off again the sky shows noon, which leaves the authored sky as it is (`day_live::Clock::sky_values`) |
 | `r_indirectBoost` | Live sky/bounce illumination multiplier, 0–4; default 1. Does not amplify direct lights or add bounce iterations |
 | `r_ambientFill` | Live material-lighting floor in dark areas, 0–0.2; default 0.025. Fades as existing illumination increases |
 | `r_ambientFillOcclusion` | Fraction of ambient occlusion applied to the readability fill, 0–1; default 1 preserves the previous response. Real indirect lighting keeps full occlusion |
@@ -491,6 +492,7 @@ first drawn) and keys only a later remap uses. Not measured on a GPU; compare th
 | `r_floorReflections` | Polished floors mirror the scene (see [Floor reflections](#floor-reflections)); default 1, live |
 | `r_DynamicGlow` | Halo around `glow` shader stages: 0 off, 1 on (default), 2 saber blades only, 3 the glow alone (debug); live. See [Dynamic glow](#dynamic-glow) |
 | `r_dynamicGlowStyle` | Glow blur: 1 EternalJK rd-vulkan's (default), 0 retail rd-vanilla's; live |
+| `r_dynamicGlowNoSabers` | 1 keeps saber blades and trails out of the dynamic glow, everything else keeps it; default 0, live, archived |
 | `r_dynamicLightShadows` | Walls stop dynamic lights (sabers, bolts, explosions) in real-time lighting, 1 (default, SJK) or 0 (they light through, as retail); live, console only, archived. See [Dynamic lights and walls](#dynamic-lights-and-walls) |
 
 See [day_night.rs](../crates/sjk-viewer/src/day_night.rs),
@@ -3372,7 +3374,11 @@ same for the main view:
    glowing layers are emitted after the others, so the glow pass draws one tail
    range per slot; this only reorders layers within one slot, which leaves additive
    and modulating blends unchanged (alpha-blended layers stay back to front within
-   each part). Nothing glowing on screen means no pass, no blur and no composite
+   each part). `r_dynamicGlowNoSabers 1` leaves the saber part out (the blades' glow
+   capsules with their skins' glints and black-hole horizons, and the trails), so only
+   the rest of the scene glows; the sabers' own drawing in the scene and the effect
+   layer is unchanged ([`Live::sources`](../crates/sjk-viewer/src/post_glow.rs)).
+   Nothing glowing on screen means no pass, no blur and no composite
    work; a frame only walks the glowing world passes and the entity queue to decide.
 3. **Blur** ([post_glow.rs](../crates/sjk-viewer/src/post_glow.rs)), in 8-bit images
    that clamp after every pass as stock's framebuffer copies did:
@@ -3399,6 +3405,7 @@ same for the main view:
 | --- | --- | --- |
 | `r_DynamicGlow` | 1 | 0 off, 1 on, 2 saber blades only (JoF EternalJK), 3 the blurred glow without the scene (debug); live, 0 frees the images |
 | `r_dynamicGlowStyle` | 1 | 1 rd-vulkan pyramid, 0 retail kernel; rebuilds the blur |
+| `r_dynamicGlowNoSabers` | 0 | 1 keeps saber blades and trails out of the glow image (g0dchris' idea), with any style; with `r_DynamicGlow 2` nothing glows; live |
 | `r_DynamicGlowIntensity` | 1.13 | Retail per-pass gain; rd-vulkan scales its level sum by Intensity - 1; live |
 | `r_DynamicGlowPasses` | 5 | Retail passes, 1-32; live |
 | `r_DynamicGlowDelta` | 0.8 | Retail tap spread added per pass; live |
@@ -3407,9 +3414,10 @@ same for the main view:
 | `r_DynamicGlowWidth`, `r_DynamicGlowHeight` | 0 | Retail blur size in pixels when both are positive; rebuild |
 
 All are archived and keep stock's names (lookups ignore case, so the retail menu's
-`r_dynamicglow` is the same cvar); `r_dynamicGlowStyle` is SJK's. Stock defaults
-`r_DynamicGlow` to 0; SJK turns it on. The renderer settings' IMAGE tab has rows
-for `r_DynamicGlow` and `r_dynamicGlowStyle`. SJK's classic menus have no
+`r_dynamicglow` is the same cvar); `r_dynamicGlowStyle` and `r_dynamicGlowNoSabers`
+are SJK's. Stock defaults `r_DynamicGlow` to 0; SJK turns it on. The renderer
+settings' IMAGE tab has rows for `r_DynamicGlow`, `r_dynamicGlowNoSabers` (No glow on
+sabers) and `r_dynamicGlowStyle`. SJK's classic menus have no
 counterpart of the retail Setup page's glow toggle.
 
 Emission-mapped world stages are drawn too, writing only their emission (see

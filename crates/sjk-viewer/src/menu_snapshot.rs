@@ -2788,6 +2788,7 @@ fn in_game_menu(shots: &Snapshot, art: ArtSet) {
             page,
             selected_row,
             team: 1,
+            following: false,
             team_game,
             siege: false,
             red_players: 3,

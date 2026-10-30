@@ -320,9 +320,10 @@ impl GpuState {
         };
         let snapshot = session.latest_snapshot();
         let player = &snapshot.player;
+        let own = super::OwnSide::of(session.game_state(), player);
         let local = Local {
-            team: player.team(),
-            spectator: player.is_spectator(),
+            team: own.team,
+            spectator: own.watching,
             score: player.persistent[PERS_SCORE] as i32,
             rank: player.persistent[PERS_RANK],
         };

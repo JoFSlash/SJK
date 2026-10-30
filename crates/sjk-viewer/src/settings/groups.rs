@@ -364,6 +364,7 @@ impl Group {
                 crate::effect_flash::REDUCE_CVAR,
                 crate::saber_clash_flare::CVAR,
                 crate::saber_clash_flare::SIZE_CVAR,
+                crate::saber_core::CVAR,
                 crate::impacts::FLESH_SPARKS_CVAR,
                 crate::team_sabers::TEAM_COLORS_CVAR,
                 crate::team_sabers::CVAR,
