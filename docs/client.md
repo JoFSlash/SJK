@@ -2629,6 +2629,21 @@ and returns when the switch is off; console history/logs, centre notices and
 SJK hub chat are independent. Moving to another map resets the choice; a graphics
 reload preserves it. Unmarked private formats from other mods are not guessed.
 
+`quiet` toggles **quiet mode** (`cg_quietMode`, not archived; Settings > Chat > Quiet
+mode, both styles; `quiet on`/`off` and 1/0), after Lex Deifaber's idea of 30/10/2026,
+and says ON or OFF in the console. Until it is turned off or the map changes, the chat box
+hides public, team, SJK and admin chat, their beeps and the SJK chat sound, and keeps
+them out of the console's alert words, but for whispers (server tells, encrypted SJK
+whispers), the player's own lines and the private duel partner's (`ps.duelIndex` while
+`ps.duelInProgress` when the line arrives; on the SJK chat, the key the hub knows in that
+slot). Lines no player sent (server notices, the SJK team's announcements, refusals) and
+centre prints still show; the console scrollback keeps every line. Whether a line passes
+is decided when it arrives, so turning it off brings the hidden history back
+([quiet.rs](../crates/sjk-viewer/src/chat/quiet.rs)). The SJK scoreboard writes a muted
+"Quiet" after the player's own name while it is on; showing it on other players' rows
+needs the hub to relay the flag (for example a `quiet` field in the look of
+`POST /v1/look`, given back in presence and look events), which it does not yet.
+
 Chat remains connected to the real server during intermission, including
 global/team/private composer messages and console/bound chat commands. Messages
 received during background loading are retained; its loading notice hides the HUD. The scoreboard reserves a separate left column for messages and the

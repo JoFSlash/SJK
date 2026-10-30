@@ -13,6 +13,7 @@ mod layout;
 pub(crate) mod marks;
 pub(crate) mod options;
 pub(crate) mod pm_only;
+pub(crate) mod quiet;
 pub(crate) mod reply;
 pub(crate) mod server_copy;
 pub(crate) mod sjk;
@@ -83,6 +84,8 @@ struct ChatLine {
     /// The slot the player's own encrypted whisper went to: its line wears the
     /// recipient's marks (emblem, verified tick or trust mark, name emoji).
     recipient: Option<u16>,
+    /// The line passes quiet mode (`chat/quiet.rs`), decided when it arrived.
+    loud: bool,
 }
 
 /// An SJK chat line's id at the hub and its sender.
@@ -213,6 +216,8 @@ pub(crate) struct ChatOverlay {
     report_request: Option<u16>,
     /// The slot whose card asked to trade, for the frame (`crate::player_trades`).
     trade_request: Option<u16>,
+    /// The private duel partner's slot, for quiet mode (`chat/quiet.rs`).
+    duel_partner: Option<u16>,
     /// The feed draws during a world shot, which has no session.
     #[cfg(test)]
     pub(crate) for_shot: bool,
@@ -307,6 +312,7 @@ impl ChatOverlay {
             reportable_slots: 0,
             report_request: None,
             trade_request: None,
+            duel_partner: None,
             #[cfg(test)]
             for_shot: false,
         }
@@ -545,6 +551,12 @@ impl ChatOverlay {
             encrypted: false,
             verified: false,
             recipient: None,
+            loud: quiet::game_line_loud(
+                private || server_private,
+                target.map(|target| target.slot()),
+                self.own_slot,
+                self.duel_partner,
+            ),
         };
         self.push_line(line, server_private);
     }
@@ -561,8 +573,9 @@ impl ChatOverlay {
         if self.lines.len() == HISTORY_LIMIT {
             self.lines.pop_front();
         }
+        let shown = self.quiet_visible(&line);
         self.lines.push_back(line);
-        if self.is_typing() && self.scroll > 0 && (!self.options.pm_only || private) {
+        if self.is_typing() && self.scroll > 0 && (!self.options.pm_only || private) && shown {
             self.scroll = (self.scroll + 1).min(self.lines.len().saturating_sub(1));
             self.unread = (self.unread + 1).min(HISTORY_LIMIT);
         }
@@ -617,6 +630,7 @@ impl ChatOverlay {
             encrypted: true,
             verified,
             recipient,
+            loud: true,
         };
         self.push_line(line, true);
         true

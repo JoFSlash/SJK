@@ -140,6 +140,9 @@ impl GameAudio {
         self.kill_sounds = console
             .and_then(|c| c.integer_cvar("cg_killsounds"))
             .unwrap_or(2);
+        self.quiet_chat = console
+            .and_then(|c| c.bool_cvar(crate::chat::quiet::CVAR))
+            .unwrap_or(false);
         self.pm_only_chat = console
             .and_then(|c| c.bool_cvar("cg_pmonlychat"))
             .unwrap_or(false);
