@@ -24,6 +24,15 @@
 
 # ---- Console & chat ----
 
+[toy-switch-words]
+area: Gameplay
+title: Toys say ON and OFF in colour, toy_help lists every toy (Blep's idea, Creyon's #289)
+change: Switching a toy prints its name and ON in green or OFF in red on the centre of the screen.
+change: toy_help lists the eleven toys: name in yellow, command, what it does (Banana peel too).
+test: Switch each toy (box, Order 66, Hax, Drone, Monitor, Box hunt, Banana peel): name ON/OFF.
+test: Boombox: putting it away says Boombox OFF; starting it still names the track.
+test: A toy restored at start and a box lifted by someone else say nothing. Run toy_help.
+
 [day-pc-clock]
 area: Rendering & effects
 title: Day and night follow the PC's clock (r_dayClock), every preset, Creyon's #296

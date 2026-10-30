@@ -195,7 +195,7 @@ link: https://sol-vulpes.github.io/SJK/
 
 [Creyon]
 github: Creyon94
-role: Contributor and tester: 70 merged pull requests, EternalJK parity
+role: Contributor and tester: 71 merged pull requests, EternalJK parity
 medal: early_contributor
 did: #2 #7 Duel challenges from names with symbols, centre prints kept whole
 did: #3 The third-person camera damped per frame as EternalJK (cg_cameraFPS)
@@ -249,6 +249,7 @@ did: The Blade Lab page: the Sketch, Hourglass, Fiber Optic, Serpent, Monarch, P
 did: The Blade Lab page: the Comic, Quicksilver and Obsidian Edge blades
 did: #297 Blade core thickness: a slider for the white core of a lit blade
 did: #296 Day and night follow the PC's clock, in every graphics preset
+did: #289 Toys say ON and OFF in colour; toy_help explains every toy
 link: Creyon's pull requests | https://github.com/Sol-Vulpes/SJK/pulls?q=is%3Apr+author%3ACreyon94
 
 [Lumaya]
@@ -490,6 +491,7 @@ role: Tester, tag artist and ideas for SJK
 did: Found encrypted whispers ending with a backslash going out unencrypted
 did: The player card on the inspect key only, never from a look (Key only)
 did: Drew the Gonk, EZ and Geyon tags
+did: Toys say when they are switched on or off
 
 == Made with
 

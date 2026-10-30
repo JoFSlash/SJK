@@ -9,6 +9,8 @@
 #                               made it when that is not the piece's owner.
 
 = Sol
++ 30/10/2026 | - | Defaults are the stock base JKA experience (Sol's rule)
+- 7bd082a |  | Defaults are the stock base JKA experience (Sol's rule)
 + 30/10/2026 | - | Achievements: the toys' own, and a Fun page for them
 - 04151f1 |  | Achievements: the toys' own, and a Fun page for them
 + 30/10/2026 | - | Release 2026.1030.2
@@ -2407,6 +2409,8 @@
 - 0d215f1 |  | Initial JKR source
 
 = Creyon
++ 30/10/2026 | SJK #289 | Toys say ON and OFF in colour, and toy_help explains every toy
+- 5929535 |  | Toys say ON and OFF, and toy_help explains them
 + 30/10/2026 | SJK #296 | Day and night follow the PC's clock (r_dayClock), in every graphics preset
 - 874c7fb |  | Let day and night follow the PC's clock (r_dayClock)
 + 30/10/2026 | SJK #297 | Blade core thickness slider (cg_saberCoreSize)

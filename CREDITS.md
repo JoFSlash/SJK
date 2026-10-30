@@ -413,7 +413,7 @@ includes:
 Creyon and Lumaya wear the SJK team's Contributor medal, shown on their
 cards of the in-game credits page.
 
-Creyon ([Creyon94](https://github.com/Creyon94)), contributor and tester, has 70
+Creyon ([Creyon94](https://github.com/Creyon94)), contributor and tester, has 71
 pull requests merged into SJK, most of them bringing SJK in line with EternalJK
 ([all of them](https://github.com/Sol-Vulpes/SJK/pulls?q=is%3Apr+author%3ACreyon94)):
 
@@ -527,6 +527,8 @@ pull requests merged into SJK, most of them bringing SJK in line with EternalJK
 - #296 day and night follow the PC's clock (`r_dayClock`): the sun moves with Sun and sky
   on; without it the world darkens and the sky turns to night, in the SJK and Vanilla
   presets too.
+- #289 every toy says its name and ON in green or OFF in red when switched, and `toy_help`
+  lists every toy with what it does, after Blep's idea.
 
 Lumaya ([lumayaa](https://github.com/lumayaa)), contributor, has 81 pull requests
 merged into SJK
@@ -906,7 +908,9 @@ g0dchris, a player, asked for the dynamic glow on everything but the sabers, who
 hid the blades' details: Slash built it as No glow on sabers (#294, 30/10/2026).
 
 Blep, a player, asked for the player card to come only from the `inspect` key, not from
-looking at a player: Sol built it as Key only, `cg_playerCard 2` (29/10/2026).
+looking at a player: Sol built it as Key only, `cg_playerCard 2` (29/10/2026). Blep
+also asked for every toy to say when it is switched on or off: Creyon built it (#289,
+30/10/2026), each toy's name and ON in green or OFF in red.
 
 Atrosex, a player, asked for the Forge's Break down to mark the saber shader the player
 wears, and its last copy's card to say plainly that it is worn; Kushina asked for favourite

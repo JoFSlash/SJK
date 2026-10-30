@@ -629,6 +629,12 @@ impl GpuState {
     /// `toy_box`: put the box on, or take it off.
     pub(crate) fn toggle_cardboard_box(&mut self) {
         self.cardboard_box.toggle();
+        self.chat.receive(
+            sjk_client::ServerEventKind::CenterPrint,
+            crate::toy_switch_words::switched("Cardboard box", self.cardboard_box.on()),
+            None,
+            Instant::now(),
+        );
     }
 
     /// The frame's toy logic, after the looks: the own life, the hub's events (`events`,
