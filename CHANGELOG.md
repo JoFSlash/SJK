@@ -40,6 +40,7 @@ Add each release's notes here when it is tagged (docs/sjk.md "Releases").
 - Spectating: while you follow a player, the join menu and the match card offer Join again, as they read your own team rather than the followed player's (hub report #207) _(Slash, PR #310, after Jaykmeit's report)_
 - Mystery boxes: when the opener takes what came out, everyone else sees it go and the lid close at once, instead of it floating on for 10 seconds _(Sol)_
 - Tags: two new ones, Gonk (Uncommon) and Geyon (Rare), and the EZ tag has its real picture, all three drawn by Blep and picked from the Discord's #tag-proposals _(Sol, art by Blep)_
+- Vehicle HUD: each HUD style shows the health of the vehicle you pilot its own way: Text only just the number, SJK radial a yellow arc under the crosshair, SJK classic a yellow bar, instead of the same speed, shield and ammo strip for all _(Slash)_
 - A prompt by the crosshair shows what Use does at a mystery box, with the key you bound to Use: Open mystery box and its price, Take it, or why you cannot yet (your turn in a few seconds, not enough credits), instead of a message in the middle of the screen _(Sol)_
 
 ## 2026.1030.2 (Alpha) | 30/10/2026
