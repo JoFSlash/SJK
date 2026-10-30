@@ -288,6 +288,8 @@ pub(super) struct AudioOutput {
     pub(super) cache: std::cell::RefCell<Vec<(SoundHandle, usize, String)>>,
     /// Allocated at registration; the decoder publishes duration without taking a lock.
     lengths: std::cell::RefCell<Vec<Arc<AtomicU32>>>,
+    /// The world sounds sent lately, for the sound sonar (`sound_sonar.rs`).
+    pub(super) sonar: crate::sound_sonar::Sonar,
 }
 
 enum DecodeJob {
@@ -379,6 +381,7 @@ impl AudioOutput {
             stats,
             show: false,
             started: std::collections::VecDeque::with_capacity(64),
+            sonar: crate::sound_sonar::Sonar::default(),
             cache: std::cell::RefCell::new(Vec::new()),
             lengths: std::cell::RefCell::new(Vec::new()),
         };
@@ -410,6 +413,13 @@ impl AudioOutput {
                 self.started.pop_front();
             }
             self.started.push_back(*handle);
+        }
+        match &command {
+            AudioCommand::Play(_, request) | AudioCommand::PlayFrom(_, request, ..) => {
+                self.sonar.hear(request, Instant::now());
+            }
+            AudioCommand::ListenerSource(source) => self.sonar.listener_source = *source,
+            _ => {}
         }
         // Never wait for good on a callback that stopped (its device went away): the
         // game would stop answering. Every frame sends its state again.
