@@ -14,7 +14,7 @@
 //! the default and logs why. Glyphs are outlined with `ab_glyph`, which reads outlines
 //! on demand, so a large CJK system font costs only the 256 glyphs drawn.
 
-use super::{FontAtlas, FontGlyph, GLYPH_COUNT, RasterizedGlyph, TextStyle, UiFont, paint_atlas};
+use super::{FontAtlas, FontGlyph, GLYPH_COUNT, RasterizedGlyph, TextStyle, UiFont};
 use ab_glyph::{Font, FontRef, PxScale, ScaleFont, point};
 use fontdue::Metrics;
 use std::error::Error;
@@ -41,6 +41,14 @@ const MAX_NAME_TABLE: u32 = 1 << 20;
 const MAX_COLLECTION: u32 = 64;
 /// How deep the font folders are walked (Linux keeps fonts in subfolders).
 const MAX_DEPTH: usize = 4;
+/// Largest glyph (ink or advance), in ems, taken from a system font; a larger one is
+/// treated as missing.
+const MAX_GLYPH_EMS: f32 = 4.0;
+/// The line height a system font is held to, in ems, and its largest line gap.
+const LINE_EMS: (f32, f32) = (1.0, 1.6);
+const MAX_GAP_EMS: f32 = 0.5;
+/// Tallest atlas a system font may make: wgpu's default `max_texture_dimension_2d`.
+const MAX_ATLAS_HEIGHT: u32 = 8_192;
 
 /// Which surfaces a system font replaces.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -63,13 +71,6 @@ impl Scope {
         match self {
             Self::Chat => CHAT_CVAR,
             Self::Console => CONSOLE_CVAR,
-        }
-    }
-
-    const fn name(self) -> &'static str {
-        match self {
-            Self::Chat => "chat",
-            Self::Console => "console",
         }
     }
 }
@@ -162,12 +163,16 @@ pub(crate) fn parse_names(table: &[u8]) -> Option<FaceName> {
         let mut best: Option<(u8, String)> = None;
         for record in 0..count {
             let at = 6 + record * 12;
-            let field = |offset| u16_at(table, at + offset);
-            let (platform, encoding, language, id) = (field(0)?, field(2)?, field(4)?, field(6)?);
+            let Some(record) = table.get(at..at + 12) else {
+                // The table is shorter than its count: the records stop here.
+                break;
+            };
+            let field = |offset| u16::from_be_bytes([record[offset], record[offset + 1]]);
+            let (platform, encoding, language, id) = (field(0), field(2), field(4), field(6));
             if id != wanted {
                 continue;
             }
-            let (length, start) = (field(8)? as usize, strings + field(10)? as usize);
+            let (length, start) = (field(8) as usize, strings + field(10) as usize);
             let Some(bytes) = table.get(start..start + length) else {
                 continue;
             };
@@ -398,29 +403,45 @@ pub(crate) fn find<'a>(families: &'a [InstalledFamily], name: &str) -> Option<&'
 static LOADED: Mutex<[Option<Loaded>; 2]> = Mutex::new([None, None]);
 
 /// A family's name and the atlas made from it.
-type Loaded = (String, Arc<FontAtlas>);
+pub(crate) type Loaded = (String, Arc<FontAtlas>);
 
-/// The atlas already made for `family` in `scope`, if any.
-pub(crate) fn cached(scope: Scope, family: &str) -> Option<Arc<FontAtlas>> {
+/// The atlas already made for `family` in `scope`, if any, with the family's name as
+/// the system spells it.
+pub(crate) fn cached(scope: Scope, family: &str) -> Option<Loaded> {
     let loaded = LOADED
         .lock()
         .unwrap_or_else(|poisoned| poisoned.into_inner());
     loaded[scope.index()]
         .as_ref()
-        .filter(|(name, _)| name.eq_ignore_ascii_case(family))
-        .map(|(_, atlas)| Arc::clone(atlas))
+        .filter(|(name, _)| name.eq_ignore_ascii_case(family.trim()))
+        .cloned()
 }
 
-/// Find `family` on the PC and rasterize it for `scope` (blocking: run on a worker).
-pub(crate) fn load_installed(scope: Scope, family: &str) -> Result<Arc<FontAtlas>, String> {
-    if let Some(atlas) = cached(scope, family) {
-        return Ok(atlas);
+/// Keep `atlas` of family `name` as the one [`cached`] gives for `scope`: called for the
+/// atlas taken into use, never for a load that was asked for and then replaced.
+pub(crate) fn remember(scope: Scope, name: &str, atlas: &Arc<FontAtlas>) {
+    let mut loaded = LOADED
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+    loaded[scope.index()] = Some((name.to_owned(), Arc::clone(atlas)));
+}
+
+/// Find `family` on the PC and rasterize it for `scope` (blocking: run on a worker),
+/// with the family's name as the system spells it. Nothing is cached or logged here:
+/// the caller does that for the load it takes into use.
+pub(crate) fn load_installed(scope: Scope, family: &str) -> Result<Loaded, String> {
+    if let Some(loaded) = cached(scope, family) {
+        return Ok(loaded);
     }
     let found = find(installed_blocking(), family)
-        .ok_or_else(|| format!("no font named \"{family}\" is installed"))?;
+        .ok_or_else(|| format!("no font named \"{}\" is installed", family.trim()))?;
     let read = |face: &FaceFile| std::fs::read(&face.path).map(|bytes| (bytes, face.index));
     let regular = read(&found.regular).map_err(|error| format!("{}: {error}", found.name))?;
-    let bold = found.bold.as_ref().and_then(|face| read(face).ok());
+    // Only chat draws a second weight.
+    let bold = match scope {
+        Scope::Chat => found.bold.as_ref().and_then(|face| read(face).ok()),
+        Scope::Console => None,
+    };
     let atlas = load(
         scope,
         (&regular.0, regular.1),
@@ -428,60 +449,61 @@ pub(crate) fn load_installed(scope: Scope, family: &str) -> Result<Arc<FontAtlas
             .map(|(bytes, index)| (bytes.as_slice(), *index)),
     )
     .map_err(|error| format!("{}: {error}", found.name))?;
-    let atlas = Arc::new(atlas);
-    let mut loaded = LOADED
-        .lock()
-        .unwrap_or_else(|poisoned| poisoned.into_inner());
-    loaded[scope.index()] = Some((found.name.clone(), Arc::clone(&atlas)));
-    crate::log::progress(format_args!(
-        "{} font: {} from the system",
-        scope.name(),
-        found.name
-    ));
-    Ok(atlas)
+    Ok((found.name.clone(), Arc::new(atlas)))
 }
 
-/// The pixel scale that sets `font`'s em to `em` pixels.
-fn em_scale(font: &FontRef<'_>, em: f32) -> PxScale {
+/// Whether `value` is a usable size: finite and above zero (NaN is not).
+fn positive(value: f32) -> bool {
+    value.is_finite() && value > 0.0
+}
+
+/// The pixel scale that sets `font`'s em to `em` pixels; `None` for a font whose
+/// header gives no usable em or height.
+fn em_scale(font: &FontRef<'_>, em: f32) -> Option<PxScale> {
     let units = font.units_per_em().unwrap_or(1_000.0);
-    PxScale::from(em * font.height_unscaled() / units)
-}
-
-/// The font a slot's character comes from: `font` when it has it, else `fallback`,
-/// else `font`'s `.` (as the bundled fonts draw a character they lack).
-fn slot_source<'a>(
-    font: &'a FontRef<'a>,
-    fallback: &'a FontRef<'a>,
-    byte: u8,
-) -> (&'a FontRef<'a>, char) {
-    let character = sjk_protocol::windows_1252_char(byte);
-    if matches!(byte, b'\n' | b'\r' | b' ') || font.glyph_id(character).0 != 0 {
-        (font, character)
-    } else if fallback.glyph_id(character).0 != 0 {
-        (fallback, character)
-    } else {
-        (font, '.')
-    }
+    let height = font.height_unscaled();
+    let scale = em * height / units;
+    (positive(units) && positive(height) && positive(scale)).then(|| PxScale::from(scale))
 }
 
 /// `character` of `font` at `em` pixels, as the fontdue metrics and coverage the
-/// atlas packer takes.
-fn rasterize(font: &FontRef<'_>, em: f32, character: char) -> (Metrics, Vec<u8>) {
-    let scale = em_scale(font, em);
+/// atlas packer takes; `None` when the font has no glyph for it or the glyph is
+/// broken: bounds or advance that are not finite, or larger than [`MAX_GLYPH_EMS`]
+/// ems (a damaged or crafted font must not make the atlas allocate gigabytes).
+fn rasterize(font: &FontRef<'_>, em: f32, character: char) -> Option<(Metrics, Vec<u8>)> {
+    let scale = em_scale(font, em)?;
     let id = font.glyph_id(character);
     let advance_width = font.as_scaled(scale).h_advance(id);
+    let limit = em * MAX_GLYPH_EMS;
+    if !advance_width.is_finite() || advance_width.abs() > limit {
+        return None;
+    }
+    let advance_width = advance_width.max(0.0);
     let Some(outlined) = font.outline_glyph(id.with_scale_and_position(scale, point(0.0, 0.0)))
     else {
-        return (
+        // No outline: a space, an advance and no ink.
+        return Some((
             Metrics {
                 advance_width,
                 ..Metrics::default()
             },
             Vec::new(),
-        );
+        ));
     };
     let bounds = outlined.px_bounds();
-    let (width, height) = (bounds.width() as usize, bounds.height() as usize);
+    let corners = [bounds.min.x, bounds.min.y, bounds.max.x, bounds.max.y];
+    if corners
+        .iter()
+        .any(|corner| !corner.is_finite() || corner.abs() > limit)
+        || bounds.width() > limit
+        || bounds.height() > limit
+    {
+        return None;
+    }
+    let (width, height) = (
+        bounds.width().max(0.0) as usize,
+        bounds.height().max(0.0) as usize,
+    );
     let mut pixels = vec![0; width * height];
     outlined.draw(|x, y, coverage| {
         let (x, y) = (x as usize, y as usize);
@@ -489,7 +511,7 @@ fn rasterize(font: &FontRef<'_>, em: f32, character: char) -> (Metrics, Vec<u8>)
             pixels[y * width + x] = (coverage.clamp(0.0, 1.0) * 255.0).round() as u8;
         }
     });
-    (
+    Some((
         Metrics {
             xmin: bounds.min.x as i32,
             ymin: -(bounds.max.y as i32),
@@ -499,13 +521,49 @@ fn rasterize(font: &FontRef<'_>, em: f32, character: char) -> (Metrics, Vec<u8>)
             ..Metrics::default()
         },
         pixels,
-    )
+    ))
 }
 
-/// Ascent and descent (negative) of `font` at `em` pixels.
-fn line(font: &FontRef<'_>, em: f32) -> (f32, f32, f32) {
-    let scaled = font.as_scaled(em_scale(font, em));
-    (scaled.ascent(), scaled.descent(), scaled.line_gap())
+/// Slot `byte`'s glyph: `font`'s own when it has a sound one, else `fallback`'s
+/// (SJK's default for the scope), else `.`, else nothing.
+fn rasterize_slot(
+    font: &FontRef<'_>,
+    fallback: &FontRef<'_>,
+    byte: u8,
+    em: f32,
+) -> (Metrics, Vec<u8>) {
+    let character = sjk_protocol::windows_1252_char(byte);
+    let own = matches!(byte, b'\n' | b'\r' | b' ') || font.glyph_id(character).0 != 0;
+    own.then(|| rasterize(font, em, character))
+        .flatten()
+        .or_else(|| {
+            (fallback.glyph_id(character).0 != 0)
+                .then(|| rasterize(fallback, em, character))
+                .flatten()
+        })
+        .or_else(|| rasterize(font, em, '.'))
+        .or_else(|| rasterize(fallback, em, '.'))
+        .unwrap_or_default()
+}
+
+/// A font's line at `em` pixels: ascent, descent (negative) and gap, `None` when its
+/// metrics are unusable. A line outside [`LINE_EMS`] is scaled into it, keeping where
+/// the baseline sits, so a font with huge or tiny `hhea` metrics still draws its
+/// letters at their size.
+fn line(font: &FontRef<'_>, em: f32) -> Option<(f32, f32, f32)> {
+    let scaled = font.as_scaled(em_scale(font, em)?);
+    let (ascent, descent, gap) = (scaled.ascent(), scaled.descent(), scaled.line_gap());
+    let height = ascent - descent;
+    if !positive(height) || !ascent.is_finite() || !descent.is_finite() {
+        return None;
+    }
+    let fit = height.clamp(em * LINE_EMS.0, em * LINE_EMS.1) / height;
+    let gap = if gap.is_finite() {
+        gap.clamp(0.0, em * MAX_GAP_EMS)
+    } else {
+        0.0
+    };
+    Some((ascent * fit, descent * fit, gap))
 }
 
 /// Rasterize a system font for `scope`: `regular` (font bytes and face index) and, for
@@ -519,11 +577,21 @@ pub(crate) fn load(
     match scope {
         Scope::Chat => {
             let bold = bold
-                .and_then(|(bytes, index)| FontRef::try_from_slice_and_index(bytes, index).ok());
+                .and_then(|(bytes, index)| FontRef::try_from_slice_and_index(bytes, index).ok())
+                .filter(|bold| line(bold, CHAT_RASTER_EM).is_some());
             load_chat(&font, bold.as_ref())
         }
         Scope::Console => load_console(&font),
     }
+}
+
+/// A packed atlas and each glyph's rectangle in it.
+type Packed = (image::GrayImage, Vec<[f32; 4]>);
+
+/// Pack the glyphs, or fail when the atlas would be taller than a texture may be.
+fn pack(rasterized: &[RasterizedGlyph]) -> Result<Packed, Box<dyn Error>> {
+    super::paint_atlas_within(rasterized, MAX_ATLAS_HEIGHT)
+        .ok_or_else(|| "its glyphs do not fit one atlas".into())
 }
 
 fn load_chat(font: &FontRef<'_>, bold: Option<&FontRef<'_>>) -> Result<FontAtlas, Box<dyn Error>> {
@@ -532,16 +600,14 @@ fn load_chat(font: &FontRef<'_>, bold: Option<&FontRef<'_>>) -> Result<FontAtlas
         FontRef::try_from_slice(super::INTER_SEMIBOLD)?,
     ];
     let faces = [font, bold.unwrap_or(font)];
-    let (ascent, descent, gap) = line(font, CHAT_RASTER_EM);
-    if ascent - descent <= 0.0 {
-        return Err("the font has no line metrics".into());
-    }
+    let (ascent, descent, gap) =
+        line(font, CHAT_RASTER_EM).ok_or("the font has no usable line metrics")?;
     let face_count = if bold.is_some() { 2 } else { 1 };
     let mut rasterized = Vec::with_capacity(GLYPH_COUNT * face_count);
     for (face, font) in faces.iter().take(face_count).enumerate() {
         for byte in 0..GLYPH_COUNT {
-            let (source, character) = slot_source(font, &fallbacks[face], byte as u8);
-            let (metrics, pixels) = rasterize(source, CHAT_RASTER_EM, character);
+            let (metrics, pixels) =
+                rasterize_slot(font, &fallbacks[face], byte as u8, CHAT_RASTER_EM);
             rasterized.push(RasterizedGlyph {
                 face,
                 byte,
@@ -550,7 +616,7 @@ fn load_chat(font: &FontRef<'_>, bold: Option<&FontRef<'_>>) -> Result<FontAtlas
             });
         }
     }
-    let (image, rectangles) = paint_atlas(&rasterized);
+    let (image, rectangles) = pack(&rasterized)?;
     let mut glyphs = [[FontGlyph::default(); GLYPH_COUNT]; 2];
     for (glyph, uv) in rasterized.iter().zip(rectangles) {
         let metrics = glyph.metrics;
@@ -584,11 +650,10 @@ fn load_console(font: &FontRef<'_>) -> Result<FontAtlas, Box<dyn Error>> {
     use super::console_font::{HEIGHT, WIDTH};
     let fallback = FontRef::try_from_slice(super::console_font::JETBRAINS_MONO)?;
     let em = CONSOLE_RASTER_EM;
-    let (ascent, descent, _) = line(font, em);
+    let (ascent, descent, _) = line(font, em).ok_or("the font has no usable line metrics")?;
     let rasterized: Vec<RasterizedGlyph> = (0..GLYPH_COUNT)
         .map(|byte| {
-            let (source, character) = slot_source(font, &fallback, byte as u8);
-            let (metrics, pixels) = rasterize(source, em, character);
+            let (metrics, pixels) = rasterize_slot(font, &fallback, byte as u8, em);
             RasterizedGlyph {
                 face: 0,
                 byte,
@@ -602,12 +667,12 @@ fn load_console(font: &FontRef<'_>) -> Result<FontAtlas, Box<dyn Error>> {
         .iter()
         .map(|glyph| glyph.metrics.advance_width.max(glyph.metrics.width as f32))
         .fold(0.0_f32, f32::max);
-    if widest <= 0.0 || ascent - descent <= 0.0 {
+    if !positive(widest) {
         return Err("the font has no printable ASCII characters".into());
     }
     let unit = (WIDTH / widest).min(HEIGHT / (ascent - descent));
     let baseline = (HEIGHT + (ascent + descent) * unit) * 0.5;
-    let (image, rectangles) = paint_atlas(&rasterized);
+    let (image, rectangles) = pack(&rasterized)?;
     let mut glyphs = [[FontGlyph::default(); GLYPH_COUNT]; 2];
     for (glyph, uv) in rasterized.iter().zip(rectangles) {
         let metrics = glyph.metrics;
@@ -800,10 +865,11 @@ mod tests {
         let symbols = include_bytes!("../../assets/fonts/SJKSymbols.ttf");
         let font = FontRef::try_from_slice(symbols).unwrap();
         let inter = FontRef::try_from_slice(super::super::INTER_REGULAR).unwrap();
-        let (source, character) = slot_source(&font, &inter, 0x80);
-        assert_eq!(character, '€');
-        assert!(
-            std::ptr::eq(source, &inter),
+        assert_eq!(font.glyph_id('€').0, 0);
+        let (metrics, _) = rasterize_slot(&font, &inter, 0x80, 96.0);
+        let (inter_euro, _) = rasterize(&inter, 96.0, '€').unwrap();
+        assert_eq!(
+            metrics.width, inter_euro.width,
             "a missing slot comes from Inter"
         );
         let atlas = load(Scope::Chat, (symbols, 0), None).unwrap();
@@ -844,5 +910,90 @@ mod tests {
     fn an_unreadable_font_is_an_error() {
         assert!(load(Scope::Chat, (b"not a font", 0), None).is_err());
         assert!(load_installed(Scope::Chat, "\u{1}no such family\u{1}").is_err());
+    }
+
+    /// Malformed headers and tables are errors or `None`, never a panic or a huge read.
+    #[test]
+    fn malformed_files_and_tables_are_refused() {
+        // Truncated header.
+        assert!(read_faces(&mut Cursor::new(vec![0, 1, 0])).is_err());
+        // A collection claiming 0xFFFFFFFF faces with no offsets after it.
+        let mut huge = b"ttcf".to_vec();
+        huge.extend([0, 1, 0, 0]);
+        huge.extend(u32::MAX.to_be_bytes());
+        assert!(read_faces(&mut Cursor::new(huge)).is_err());
+        // A collection whose face offset lies past the end of the file.
+        let mut past = b"ttcf".to_vec();
+        past.extend([0, 1, 0, 0]);
+        past.extend(1_u32.to_be_bytes());
+        past.extend(1_000_000_u32.to_be_bytes());
+        assert_eq!(read_faces(&mut Cursor::new(past)).unwrap(), [None]);
+        // A `name` record pointing past the end of the file.
+        let mut face = sfnt(&[], 0);
+        face.truncate(20);
+        face.extend(u32::MAX.to_be_bytes());
+        face.extend(64_u32.to_be_bytes());
+        assert_eq!(read_faces(&mut Cursor::new(face)).unwrap(), [None]);
+        // More records than the table holds: the ones present still count.
+        let mut table = name_table(&[(1, "Tahoma")], None);
+        table[2..4].copy_from_slice(&900_u16.to_be_bytes());
+        assert_eq!(parse_names(&table).unwrap().family, "Tahoma");
+        // A string offset out of range is skipped, not read.
+        let mut table = name_table(&[(1, "Tahoma")], None);
+        table[6 + 10..6 + 12].copy_from_slice(&u16::MAX.to_be_bytes());
+        assert!(parse_names(&table).is_none());
+        // A bad record after a good one keeps the good one.
+        let mut table = name_table(&[(1, "Tahoma"), (1, "Other")], None);
+        table[6 + 12 + 10..6 + 12 + 12].copy_from_slice(&u16::MAX.to_be_bytes());
+        assert_eq!(parse_names(&table).unwrap().family, "Tahoma");
+    }
+
+    /// A glyph the packer cannot place (wider than the atlas, or whose pixels do not
+    /// match its size) draws nothing instead of panicking, and an atlas taller than a
+    /// texture may be is refused before it is allocated.
+    #[test]
+    fn degenerate_glyphs_do_not_break_the_atlas() {
+        let glyph = |width: usize, height: usize, pixels: usize| RasterizedGlyph {
+            face: 0,
+            byte: 0,
+            metrics: Metrics {
+                width,
+                height,
+                ..Metrics::default()
+            },
+            pixels: vec![255; pixels],
+        };
+        let glyphs = [
+            glyph(10, 10, 100),
+            glyph(100_000, 2, 200_000),
+            glyph(4, 4, 3),
+        ];
+        let (image, rectangles) = super::super::paint_atlas_within(&glyphs, 8_192).unwrap();
+        assert!(image.height() <= 64);
+        assert_eq!(
+            rectangles[1][0], rectangles[1][2],
+            "the wide glyph has no ink"
+        );
+        assert_eq!(rectangles[2][1], rectangles[2][3], "the short one neither");
+        let tall: Vec<_> = (0..21).map(|_| glyph(4_000, 400, 1_600_000)).collect();
+        assert!(super::super::paint_atlas_within(&tall, MAX_ATLAS_HEIGHT).is_none());
+        assert!(pack(&tall).is_err());
+    }
+
+    /// Unusable sizes are caught, NaN included.
+    #[test]
+    fn unusable_sizes_are_not_positive() {
+        assert!(positive(1.0));
+        for value in [0.0, -1.0, f32::NAN, f32::INFINITY] {
+            assert!(!positive(value), "{value}");
+        }
+        // A sane font's line stays within the band it is held to.
+        let inter = FontRef::try_from_slice(super::super::INTER_REGULAR).unwrap();
+        let (ascent, descent, gap) = line(&inter, 100.0).unwrap();
+        assert!((100.0..=160.0).contains(&(ascent - descent)));
+        assert!((0.0..=50.0).contains(&gap));
+        // Every glyph of a sane font passes the size check.
+        assert!(rasterize(&inter, 100.0, 'W').is_some());
+        assert!(rasterize(&inter, 100.0, ' ').is_some());
     }
 }

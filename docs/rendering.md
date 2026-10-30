@@ -4455,7 +4455,12 @@ are rasterized once on a worker into its own coverage atlas (chat proportional w
 family's bold face; the console in its 8 by 16 cell, each glyph centred and the em sized so
 the widest ASCII character fits). A slot the font lacks comes from the default (Inter,
 JetBrains Mono), characters beyond the code page and emoji from the default's wide sources,
-and a missing or unreadable font keeps the default; a changed value reloads only that atlas. The console font is drawn after all other text, so the
+and a missing or unreadable font keeps the default. A glyph whose bounds are not finite or
+exceed 4 ems counts as missing, the line is held to 1 to 1.6 ems, and a font whose atlas
+would pass 8192 texels is refused. `con_font` draws the console's own grid (classic and SJK UI
+consoles); the HUD's console-font text and notify lines keep JetBrains Mono. A changed value
+loads on one worker, the font on show staying until the new one is ready, and rebuilds only
+that atlas. The console font is drawn after all other text, so the
 console stays on top. The classic console (`con_style classic`, see
 [client.md](client.md#classic-console)) goes further: its background, bar and
 text are a layer of their own

@@ -353,7 +353,11 @@ impl SettingsMenu {
                 let value = super::choice_value(console, setting.cvar);
                 values
                     .iter()
-                    .position(|candidate| Some(*candidate) == value.as_deref())
+                    .position(|candidate| {
+                        value
+                            .as_deref()
+                            .is_some_and(|value| candidate.eq_ignore_ascii_case(value))
+                    })
                     .unwrap_or(0)
             }
             ValueKind::Quality => {

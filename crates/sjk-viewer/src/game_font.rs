@@ -42,7 +42,6 @@ use crate::gpu_texture;
 use crate::text::system_font::{self, Scope};
 use crate::text::{self, MAX_TEXT_VERTICES, TextVertex, UiFont, retail_font};
 use sjk_ui::{DrawList, TextId};
-use std::sync::Arc;
 use std::sync::mpsc::{self, Receiver};
 
 /// The cvar that turns the game fonts on.
@@ -259,7 +258,13 @@ pub(crate) struct GameFonts {
 #[derive(Default)]
 struct SystemSlot {
     wanted: String,
-    job: Option<Receiver<Result<Arc<text::FontAtlas>, String>>>,
+    /// The family [`Self::layer`] was made from, as the system spells it.
+    shown: String,
+    /// The last family that could not be loaded, so it is not tried every frame.
+    failed: String,
+    /// The one load in flight, for this family: a change while it runs waits for it,
+    /// and its result is dropped when the family is no longer wanted.
+    job: Option<(String, Receiver<Result<system_font::Loaded, String>>)>,
     layer: Option<Layer>,
 }
 
@@ -365,9 +370,7 @@ impl GameFonts {
     /// The console font's metrics when it is loaded, whether `ui_gameFont` is
     /// on or not (the classic console draws with it).
     pub(crate) fn console_font(&self) -> Option<&UiFont> {
-        self.slot(RetailFont::Console)
-            .as_ref()
-            .map(|layer| &layer.font)
+        self.console_layer().map(|layer| &layer.font)
     }
 
     /// The SJK UI's display and body families' atlases, each with whether it
@@ -381,19 +384,25 @@ impl GameFonts {
 
     /// The console font's atlas and whether it is a distance field.
     pub(crate) fn console_atlas(&self) -> Option<(&wgpu::BindGroup, bool)> {
-        self.slot(RetailFont::Console)
-            .as_ref()
+        self.console_layer()
             .map(|layer| (&layer.bind_group, layer.distance_field))
+    }
+
+    /// The layer the console's own grid (the classic console and the SJK UI's) draws
+    /// with: the player's font from the PC (`con_font`) once loaded, else JetBrains
+    /// Mono. The HUD's and notify lines' console text keeps JetBrains Mono.
+    fn console_layer(&self) -> Option<&Layer> {
+        self.system[Scope::Console.index()]
+            .layer
+            .as_ref()
+            .or(self.console.as_ref())
     }
 
     fn slot(&self, font: RetailFont) -> &Option<Layer> {
         match font {
             RetailFont::Medium => &self.menu,
             RetailFont::Small => &self.chat,
-            RetailFont::Console => match &self.system[Scope::Console.index()].layer {
-                Some(_) => &self.system[Scope::Console.index()].layer,
-                None => &self.console,
-            },
+            RetailFont::Console => &self.console,
             RetailFont::Headline => &self.headline,
             RetailFont::Chat => &self.system[Scope::Chat.index()].layer,
         }
@@ -403,28 +412,18 @@ impl GameFonts {
         match font {
             RetailFont::Medium => &mut self.menu,
             RetailFont::Small => &mut self.chat,
-            RetailFont::Console => {
-                if self.system[Scope::Console.index()].layer.is_some() {
-                    &mut self.system[Scope::Console.index()].layer
-                } else {
-                    &mut self.console
-                }
-            }
+            RetailFont::Console => &mut self.console,
             RetailFont::Headline => &mut self.headline,
             RetailFont::Chat => &mut self.system[Scope::Chat.index()].layer,
         }
     }
 
     /// Whether `font` is on this frame: the retail ones with `ui_gameFont`, the
-    /// headline and the player's chat font always, and the console's with
-    /// `con_font` naming one.
+    /// headline and the player's chat font always.
     fn on(&self, font: RetailFont) -> bool {
         match font {
             RetailFont::Headline | RetailFont::Chat => true,
-            RetailFont::Console => {
-                self.enabled || self.system[Scope::Console.index()].layer.is_some()
-            }
-            RetailFont::Medium | RetailFont::Small => self.enabled,
+            RetailFont::Medium | RetailFont::Small | RetailFont::Console => self.enabled,
         }
     }
 
@@ -615,15 +614,17 @@ impl GameFonts {
         pipeline: &wgpu::RenderPipeline,
         sdf_pipeline: &wgpu::RenderPipeline,
     ) {
-        if let Some(layer) = self.slot(RetailFont::Console) {
+        if let Some(layer) = &self.console {
             layer.draw(pass, pipeline, sdf_pipeline);
         }
     }
 
-    /// Follow `cg_chatFont` and `con_font` in `console`: a changed family starts
-    /// loading on a worker (or is taken at once when an earlier world made it), a
-    /// finished load is uploaded once, and empty, missing or unreadable keeps SJK's
-    /// own font. Called every frame; it allocates only when a value changes.
+    /// Follow `cg_chatFont` and `con_font` in `console`. A new family is taken at once
+    /// when an earlier world made it, else loaded on one worker at a time; the font on
+    /// show stays until the new one is ready (empty drops it at once). A load that
+    /// finishes for a family no longer wanted is dropped, unlogged and uncached, and the
+    /// wanted one starts. Missing or unreadable keeps SJK's own font. Every frame this
+    /// compares the cvars' text; it allocates only when a value changes or a load ends.
     fn follow_system_fonts(
         &mut self,
         console: Option<&crate::console::ViewerConsole>,
@@ -638,28 +639,13 @@ impl GameFonts {
             if value != slot.wanted {
                 slot.wanted.clear();
                 slot.wanted.push_str(value);
+            }
+            if slot.wanted.is_empty() && slot.layer.is_some() {
                 slot.layer = None;
-                slot.job = None;
-                if let Some(atlas) = system_font::cached(scope, value) {
-                    slot.layer = Some(Layer::upload(
-                        scope.cvar(),
-                        atlas.font.clone(),
-                        atlas.image.clone(),
-                        gpu,
-                    ));
-                } else if !value.is_empty() {
-                    let (sender, receiver) = mpsc::sync_channel(1);
-                    let family = value.to_owned();
-                    let spawned = std::thread::Builder::new()
-                        .name("system font".to_owned())
-                        .spawn(move || {
-                            let _ = sender.send(system_font::load_installed(scope, &family));
-                        });
-                    slot.job = spawned.ok().map(|_| receiver);
-                }
+                slot.shown.clear();
             }
             let finished = match &slot.job {
-                Some(receiver) => match receiver.try_recv() {
+                Some((_, receiver)) => match receiver.try_recv() {
                     Ok(result) => Some(result),
                     Err(mpsc::TryRecvError::Disconnected) => {
                         Some(Err("the font worker stopped".to_owned()))
@@ -668,22 +654,65 @@ impl GameFonts {
                 },
                 None => None,
             };
-            if let Some(result) = finished {
-                slot.job = None;
+            if let Some(result) = finished
+                && let Some((family, _)) = slot.job.take()
+                && family.eq_ignore_ascii_case(&slot.wanted)
+            {
                 match result {
-                    Ok(atlas) => {
+                    Ok((name, atlas)) => {
+                        system_font::remember(scope, &name, &atlas);
+                        crate::log::progress(format_args!(
+                            "{} font: {name} from the system",
+                            scope.cvar()
+                        ));
                         slot.layer = Some(Layer::upload(
                             scope.cvar(),
                             atlas.font.clone(),
                             atlas.image.clone(),
                             gpu,
                         ));
+                        slot.shown = name;
                     }
-                    Err(error) => crate::log::progress(format_args!(
-                        "warning: {} font unavailable, keeping SJK's: {error}",
-                        scope.cvar()
-                    )),
+                    Err(error) => {
+                        crate::log::progress(format_args!(
+                            "warning: {} font unavailable, keeping SJK's: {error}",
+                            scope.cvar()
+                        ));
+                        slot.layer = None;
+                        slot.shown.clear();
+                        slot.failed = family;
+                    }
                 }
+            }
+            let current = slot.layer.is_some() && slot.shown.eq_ignore_ascii_case(&slot.wanted);
+            if slot.wanted.is_empty()
+                || current
+                || slot.job.is_some()
+                || slot.failed.eq_ignore_ascii_case(&slot.wanted)
+            {
+                continue;
+            }
+            if let Some((name, atlas)) = system_font::cached(scope, &slot.wanted) {
+                slot.layer = Some(Layer::upload(
+                    scope.cvar(),
+                    atlas.font.clone(),
+                    atlas.image.clone(),
+                    gpu,
+                ));
+                slot.shown = name;
+                continue;
+            }
+            let (sender, receiver) = mpsc::sync_channel(1);
+            let family = slot.wanted.clone();
+            let request = family.clone();
+            let spawned = std::thread::Builder::new()
+                .name("system font".to_owned())
+                .spawn(move || {
+                    let _ = sender.send(system_font::load_installed(scope, &request));
+                });
+            match spawned {
+                Ok(_) => slot.job = Some((family, receiver)),
+                Err(_) => slot.failed = family,
             }
         }
     }
