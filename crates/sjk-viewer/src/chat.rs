@@ -216,8 +216,11 @@ pub(crate) struct ChatOverlay {
     report_request: Option<u16>,
     /// The slot whose card asked to trade, for the frame (`crate::player_trades`).
     trade_request: Option<u16>,
-    /// The private duel partner's slot, for quiet mode (`chat/quiet.rs`).
-    duel_partner: Option<u16>,
+    /// The private duel partner, kept a while after the duel, for quiet mode
+    /// (`chat/quiet.rs`).
+    duel_partner: sjk_client::DuelPartner,
+    /// The player's own SJK identity key, for quiet mode's SJK lines.
+    sjk_own_key: Option<String>,
     /// The feed draws during a world shot, which has no session.
     #[cfg(test)]
     pub(crate) for_shot: bool,
@@ -312,7 +315,8 @@ impl ChatOverlay {
             reportable_slots: 0,
             report_request: None,
             trade_request: None,
-            duel_partner: None,
+            duel_partner: sjk_client::DuelPartner::default(),
+            sjk_own_key: None,
             #[cfg(test)]
             for_shot: false,
         }
@@ -475,6 +479,9 @@ impl ChatOverlay {
                 return;
             }
         }
+        // A public line of a player whose name starts with the tell marker is no tell.
+        let server_private =
+            server_private && !sjk_client::forged_tell(&text, sender, &self.roster);
         // EternalJK's escapes for `%` and `"` show as what was typed, in the
         // chat box only, as in EternalJK.
         let display = chat_display_text(&chat_unescape(&text));
@@ -551,11 +558,11 @@ impl ChatOverlay {
             encrypted: false,
             verified: false,
             recipient: None,
-            loud: quiet::game_line_loud(
+            loud: sjk_client::quiet_passes(
                 private || server_private,
-                target.map(|target| target.slot()),
+                sjk_client::line_sender(&display, sender, &self.roster),
                 self.own_slot,
-                self.duel_partner,
+                self.duel_partner.target(),
             ),
         };
         self.push_line(line, server_private);

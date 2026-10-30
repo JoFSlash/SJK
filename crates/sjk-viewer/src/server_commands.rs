@@ -124,8 +124,8 @@ pub(crate) fn consume_messages(
     chat.update_roster(session.game_state());
     chat.configure(console.as_deref());
     // Quiet mode lets the private duel partner's chat through (`chat/quiet.rs`).
-    let player = &session.latest_snapshot().player;
-    chat.set_duel_partner(player.duel_in_progress().then(|| player.duel_index()));
+    let snapshot = session.latest_snapshot();
+    chat.observe_duel(&snapshot.player, i64::from(snapshot.server_time));
     // Duel starts, read once the events are drained (they borrow the session).
     let mut duel_starts = Vec::new();
     // The server's copy of an SJK chat message waits for the message while the SJK chat

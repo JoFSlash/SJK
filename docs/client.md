@@ -2634,12 +2634,16 @@ mode, both styles; `quiet on`/`off` and 1/0), after Lex Deifaber's idea of 30/10
 and says ON or OFF in the console. Until it is turned off or the map changes, the chat box
 hides public, team, SJK and admin chat, their beeps and the SJK chat sound, and keeps
 them out of the console's alert words, but for whispers (server tells, encrypted SJK
-whispers), the player's own lines and the private duel partner's (`ps.duelIndex` while
-`ps.duelInProgress` when the line arrives; on the SJK chat, the key the hub knows in that
-slot). Lines no player sent (server notices, the SJK team's announcements, refusals) and
-centre prints still show; the console scrollback keeps every line. Whether a line passes
-is decided when it arrives, so turning it off brings the hidden history back
-([quiet.rs](../crates/sjk-viewer/src/chat/quiet.rs)). The SJK scoreboard writes a muted
+whispers), the player's own lines (the gamestate's slot, never a followed player's) and
+the private duel partner's (`ps.duelIndex` while the player's own `ps.duelInProgress`, kept
+10 seconds after the duel ends for the "gg", until they leave or rename; on the SJK chat,
+the key the hub knows in that slot). Lines no player's name starts (server notices) and the
+SJK team's announcements still show, and so do centre prints; a line two players' names fit
+is a player's and is hidden. A public line of a player whose name starts with the tell
+marker is not taken for a tell (this holds for `pmonly` too). The console scrollback keeps
+every line. Whether a line passes is decided when it arrives, so turning it off brings the
+hidden history back ([quiet.rs](../crates/sjk-viewer/src/chat/quiet.rs), the shared rules
+in [quiet_chat.rs](../crates/sjk-client/src/quiet_chat.rs)). The SJK scoreboard writes a muted
 "Quiet" after the player's own name while it is on; showing it on other players' rows
 needs the hub to relay the flag (for example a `quiet` field in the look of
 `POST /v1/look`, given back in presence and look events), which it does not yet.

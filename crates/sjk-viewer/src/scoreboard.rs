@@ -231,10 +231,12 @@ impl Scoreboard {
             score: player.persistent[PERS_SCORE] as i32,
             ready: player.stats[STAT_CLIENTS_READY],
             intermission: player.movement_type() == PM_INTERMISSION,
-            quiet: if local < 32
+            // The player's own slot, not a followed player's.
+            quiet: if let Ok(own) = u16::try_from(session.game_state().client_num)
+                && own < 32
                 && options.is_some_and(|c| c.bool_cvar(crate::chat::quiet::CVAR) == Some(true))
             {
-                1 << local
+                1 << own
             } else {
                 0
             },

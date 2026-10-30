@@ -41,6 +41,7 @@ impl GpuState {
         let own_key = player_identity::own_key_id();
         // Quiet mode (`chat/quiet.rs`): only the player's own and their duel partner's
         // messages sound.
+        self.chat.set_sjk_own_key(own_key.as_deref());
         let quiet = self.chat.quiet_keys();
         let hushed = |key: &str| {
             is_muted(key)

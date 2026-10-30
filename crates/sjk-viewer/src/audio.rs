@@ -110,7 +110,7 @@ pub(crate) struct GameAudio {
     /// The chat sound settings (`chat_sounds.rs`), read once a frame.
     pub(crate) chat_sounds: crate::chat_sounds::Options,
     pm_only_chat: bool,
-    /// Quiet mode (`chat/quiet.rs`): public chat beeps stay silent.
+    /// Quiet mode (`chat/quiet.rs`): the sound adapter keeps its chat beeps to its rule.
     quiet_chat: bool,
     deferred_starts: u64,
     maximum_deferred_start_ms: f64,
@@ -414,12 +414,6 @@ impl GameAudio {
                         self.output.sample_length_ms(handle),
                     )
                     && !self.mute.silences(decision.request.source, decision.cause)
-                    && !crate::chat::quiet::silences_beep(
-                        self.quiet_chat,
-                        decision.event,
-                        decision.cause,
-                        &snapshot.player,
-                    )
                     && !self.holster_sync.intercept(
                         handle,
                         decision.request,
@@ -493,12 +487,6 @@ impl GameAudio {
                         self.output.sample_length_ms(handle),
                     )
                     && !self.mute.silences(decision.request.source, decision.cause)
-                    && !crate::chat::quiet::silences_beep(
-                        self.quiet_chat,
-                        decision.event,
-                        decision.cause,
-                        &snapshot.player,
-                    )
                 {
                     self.output
                         .send(AudioCommand::Play(handle, decision.request));

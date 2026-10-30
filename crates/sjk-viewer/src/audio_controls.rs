@@ -148,6 +148,7 @@ impl GameAudio {
             .unwrap_or(false);
         if let Some(adapter) = &mut self.legacy {
             adapter.set_pm_only_chat(self.pm_only_chat);
+            adapter.set_quiet_chat(self.quiet_chat);
             adapter.set_chat_sound_mode(
                 console
                     .and_then(|c| c.integer_cvar("cg_chatsounds"))
