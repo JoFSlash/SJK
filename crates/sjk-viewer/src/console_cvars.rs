@@ -865,6 +865,12 @@ pub(super) fn register_daily_cvars(cvars: &mut CvarRegistry) -> Result<(), sjk_s
             archive,
             "Saber clash flare size, 0 to 2",
         ),
+        CvarDefinition::new(
+            crate::saber_core::CVAR,
+            1.0_f64,
+            archive,
+            "Blade core thickness: the white line down a lit blade, 0.5 to 2 (1 as in the original game)",
+        ),
         // EternalJK's (JoF EJK `cg_xcvar.h`, `cg_event.c` `EV_SABER_HIT`): the red sparks
         // of a saber hit on a body ([`crate::impacts::flesh_sparks`]).
         CvarDefinition::new(

@@ -411,6 +411,8 @@ mod footprints_shots;
 #[cfg(test)]
 #[path = "world_shot_mover_models.rs"]
 mod mover_models_shots;
+#[path = "world_shot_pc_clock.rs"]
+mod pc_clock_shots;
 #[path = "world_shot_pings.rs"]
 mod pings;
 #[cfg(test)]

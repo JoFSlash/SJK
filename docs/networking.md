@@ -362,6 +362,13 @@ movement for every weapon, as in OpenJK `codemp/game/bg_pmove.c`.
 PR #266's timed dual-attack hull resizing was rolled back in #307. An original JA+ 2.4 B7 server stayed grounded while prediction shrank the hull and acquired downward velocity (about 254 units/s in the captured case). The fixed -24-unit foot minimum is restored. Timed hull resizing remains unsupported. Source agreement with OpenJK did not establish runtime compatibility.
 Local prediction loads the equipped hilts' movement flags, named special-move
 overrides and ready/draw/putaway animations from the shared `.sab` catalog.
+The shared catalog follows OpenJK's `FS_GetFileList` order and keeps the first
+case-insensitive saber name (`WP_SaberLoadParms` / `WP_SaberParseParms`,
+`codemp/game/bg_saberLoad.c`, `4d0dfaf1`). A higher-priority mount still replaces
+the same virtual file. Sorting file paths or replacing duplicate names can select
+a different move restriction/override; PR #314 corrects that inherited integration
+problem exposed by #267. Synthetic duplicate-file/name cases are covered; a live
+custom-hilt server remains unverified.
 Clientinfo changes refresh this configuration for committed moves, replay and
 previews; unknown or multiplayer-forbidden names fall back to Kyle and
 two-handed hilts exclude a second saber. Authoritative moves keep the game's
@@ -645,33 +652,48 @@ server and have separate rollback PRs: #251 in #308 and #266 in #307. Source
 agreement and synthetic tests had missed both integration failures. This review
 supersedes the implementation recommendations for those two rows below.
 
-| PR | Disposition and remaining evidence gap |
+The necessity reassessment uses each merge's first parent, its production delta
+and the current callers at `82c8c185` (hotfix `2026.1030.2`). A concrete missing
+input or wrong constant establishes a source-level reason for a change; it does
+not certify the implementation on every mod. In particular, the earlier
+"Retain" labels must not be read as approval based on the narrow dual-saber run.
+The #251/#266 rollbacks are merged in this hotfix.
+
+| PR | Before the change, and reassessment |
 | --- | --- |
-| #249 gametype | Retain: source-aligned context; live CTY flag-carrier jumps unverified. |
-| #250 actor context | Retain: actor/NPC filtering reviewed; live multiplayer target interactions unverified. |
-| #251 zero-gravity push | Roll back in #308: transient spawn data repeatedly injects 450-unit/s impulses while JA+ remains stationary. |
-| #252 command-history gaps | Retain: bounded replay freeze; real network overflow recovery unverified. |
-| #253 saber-lock facing | Retain: active-lock/opponent gates reviewed; live locks unverified. |
-| #254 trigger hull | Retain: uses final Pmove box; live jump-pad/trigger timing unverified. |
-| #260 respawn jump gate | Retain: multiplayer reference blocks jumping until attack/use releases; ordinary controlled motion unchanged. |
-| #261 held-player movement | Retain: existing heldByClient field and nonzero gate; live carried players unverified. |
-| #262 gestures | Retain: gesture-only command path matches shared Pmove; live gesture timing unverified. |
-| #263 rider weapon whitelist | Retain: vehicle-only path; live rider weapons unverified. |
-| #264 exposed-rider weapon prediction | Retain: vehicle-only path; live mounted firing unverified. |
-| #265 rocket trace mask | Retain: rocket-only targeting path; live lock traces unverified. |
-| #266 dual-jump hull | Roll back in #307: prediction sinks below the floor during a dual forward jump while JA+ remains grounded. |
-| #267 saber definitions | Retain: no saber-move mismatch in tested stock dual single_1 sequences; custom hilt flags/overrides unverified. |
-| #268 rocket targets | Retain: target identity/powerup filtering reviewed; live rocket targets unverified. |
-| #270 inline-brush contents | Retain: separates presentation contents from physics sweeps; live moving/liquid brushes unverified. |
-| #271 audit documentation | Correct its source-only verification interpretation with this review. |
-| #273 remote vehicle bounds | Retain: vehicle/NPC scope reviewed; live vehicle contacts unverified. |
-| #274 vehicle collision exclusions | Unmerged: cannot explain this release regression. |
-| #276 passenger physics suppression | Retain: vehicle-number gate; live missing-seat-context cases unverified. |
-| #277 jaPRO command slicing | Retain: disabled on the tested JA+ profile; live jaPRO parity unverified. |
-| #279 jaPRO movement styles | Retain: disabled on JA+; live jaPRO acceleration/friction unverified. |
-| #282 jaPRO jumps | Retain: disabled on JA+; live jaPRO jump policies unverified. |
-| #284 jaPRO jetpack | Retain: disabled on JA+; remove the shared zero-gravity impulse assumption in #308. Live jaPRO jetpack unverified. |
-| #287 Lugormod prediction | Unmerged: cannot explain this release regression. |
+| #249 gametype | Client moves used `MoveContext::CLIENT` gametype 0 despite serverinfo already supplying the real gametype to roll rules. CTY flag-carrier Force restrictions therefore received the wrong input. A real missing input, not a second movement algorithm; live CTY still unverified. |
+| #250 actor context | Collision could identify an entity, but body-animation lookup returned None and NPC lookup false in committed moves, replay, previews and rides. Existing bounce/target kernels could not consume snapshot actor state. Wiring was missing; multiplayer interactions still unverified. |
+| #251 zero-gravity push | Added a genuinely absent OpenJK branch, but applied it to transient uninitialized spawn data. Integration was wrong; rolled back by #308. Missing reference code alone was insufficient justification. |
+| #252 history gaps | The bounded 512-command queue discarded unacknowledged commands and then replayed the surviving tail as complete. The freeze prevents that invalid replay; join/explicit transition resets clear the gap. This is an overflow safeguard, not ordinary movement tuning. Real network overflow recovery remains unverified. |
+| #253 saber-lock facing | Existing lock input filtering retained the old view but did not face the presented opponent as `CG_PredictPlayerState` does. The missing step is distinct from that freeze. Snapshot/presentation timing in a live lock remains unverified. |
+| #254 trigger hull | Reconstructed a box from final posture flags despite Pmove already storing its actual box. Roll selection runs after movement and can change those flags. Reusing the stored box removes the inconsistent reconstruction; the old tests set the mismatch synthetically, so live roll/trigger timing remains unverified. |
+| #260 respawn jump | The shared latch already cleared on attack/use release, but `PM_CheckJump` did not refuse jumping while it was set. The gate was missing, not duplicated. Respawn timing on each mod remains unverified. |
+| #261 held player | Snapshot field 121 was not transferred into movement state, and the command freeze lacked its held-player branch. Both were missing. Carried-player mod semantics remain unverified. |
+| #262 gesture | No `PM_Animate` call handled BUTTON_GESTURE. The existing taunt filter handled ongoing poses, not starting this command-driven taunt. The shared reference calls it outside vehicle/noAnimate paths; mod-specific taunts remain unverified. |
+| #263 rider whitelist | `WP_BLASTER` was incorrectly 4 (Bryar pistol), rather than 5. This is a concrete constant bug in an existing whitelist. It does not alter on-foot movement. Live mounted weapons remain unverified. |
+| #264 rider weapons | The existing legal external-rider weapon path was blocked by `config.authoritative`, although codemp runs it in cgame too. This removes an inappropriate ownership gate, not a new weapon algorithm. Live mounted timing remains unverified. |
+| #265 rocket mask | Lock traces used `0x1 | 0x100 | 0x10000` instead of player-solid mask `0x1 | 0x10 | 0x100 | 0x1000`. PLAYERCLIP and TERRAIN were omitted. Real mask defect; live lock traces remain unverified. |
+| #266 dual hull | Added absent timed hull resizing, but original JA+ runtime contradicted its grounded motion. Rolled back by #307. The source algorithm's presence did not justify enabling it in the existing integration. |
+| #267 saber definitions | Roll prohibition and speed scales were already loaded; other wall/attack restrictions and authored move/stance overrides were not supplied to existing kernels. That missing input is real, but the reused catalog selects duplicate definitions in the wrong order. #314 corrects that integration defect; it predates #267, which exposes more of its data to prediction. Live custom hilts remain unverified. |
+| #268 rocket targets | Only entity numbers below 32 were targets; no snapshot NPC identity or powerups reached lock filtering. Adds missing target facts to an existing trace, including codemp's literal PW_CLOAKED ordinal test. Live mod-specific target semantics remain unverified. |
+| #270 brush contents | Point contents reused physics-time brush translation, while cgame queries the presented transform. Sweeps and contents need separate inputs. The architectural distinction is real; live moving/rotating liquid brushes remain unverified. |
+| #271 audit docs | Documentation only; supplies no prediction behavior. Its source comparison is not runtime certification. |
+| #273 vehicle bounds | Remote vehicle solids used packed boxes; the existing vehicle orientation calculation was used only by local vehicle movement. The PR shares that shape calculation and adds definition/presentation inputs to remote collision. Real missing remote path, with live vehicle contacts still unverified. |
+| #274 vehicle exclusions | Unmerged; cannot affect the reported release. Remains a separate proposal, not a demonstrated fix in the runtime captures. |
+| #276 passenger physics | `riding_move` required optional pilot/vehicle context as well as m_iVehicleNum. Passengers lacking that context could execute on-foot gravity/acceleration, contrary to codemp's vehicle-number dispatch. Missing passenger gate; live attachment behavior remains unverified. |
+| #277 jaPRO slicing | Requested new mod support: ordinary fixed/66 ms slicing and stock velocity snapping did not implement jaPRO race/high-FPS policy. Disabled profiles retain those old policies. Source/fixture coverage establishes selected kernels, not complete live jaPRO correctness. |
+| #279 jaPRO styles | Requested new mod support: previous kernels had stock acceleration/friction, with existing JA+ head sliding kept in its own fallback. Adds style-specific rules only with current jaPRO policy. All style/map interactions remain unverified in game. |
+| #282 jaPRO jumps | Requested new mod support: old jump behavior used stock takeoff/release/Force rules. Style impulses, ramp metadata and only-bhop policies are separate requirements. Disabled profiles follow the old branch; live jaPRO jumping remains unverified. |
+| #284 jaPRO jetpack | Requested new mod support: existing PM_JETPACK is distinct from jaPRO's flag/fuel-based pack. The new path is gated and leaves foreign flags owned by snapshots. Its inherited #251 impulse expectation was removed in #308. Live jaPRO pack behavior remains unverified. |
+| #287 Lugormod | Unmerged; cannot affect the reported release. Its necessity and server behavior require a separate mod-specific validation. |
+
+This review found no second implementation already covering the specific missing
+inputs/gates above. It does not recommend keeping an implementation merely
+because that missing behavior exists. The concrete additional defect is the
+catalog feeding #267; it has a separate failing-before/passing-after correction
+in #314. Other runtime gaps remain open, rather than being cleared by the stock
+dual-saber evidence. No further blanket rollback is justified by this source
+review alone.
 
 Evidence was collected on Windows x64 using a private loopback server with no
 human players: original 2011 JA+ module SHA-256

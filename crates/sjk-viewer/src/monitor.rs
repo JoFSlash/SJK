@@ -374,9 +374,33 @@ pub(crate) struct Monitor {
     others_saver: std::collections::HashMap<u8, (i64, i64)>,
     /// The shells to draw this frame.
     glows: Glows,
+    /// The players each of the player's latest monitors struck (its number, bits by
+    /// slot), for Two for One and Strike!.
+    own_struck: Vec<(u8, u64)>,
+    /// The Drone's landing a hit already counted for Special Delivery.
+    delivered: Option<Instant>,
 }
 
+/// Special Delivery: how soon after the Drone landed the player it watched must be hit.
+const DELIVERY: std::time::Duration = std::time::Duration::from_secs(5);
+/// How many of the player's own monitors [`Monitor::own_struck`] keeps.
+const OWN_STRUCK_KEPT: usize = 8;
+
 impl Monitor {
+    /// The player's monitor `number` struck `slot`: how many players it struck so far.
+    fn own_strike(&mut self, number: u8, slot: u8) -> u32 {
+        let bit = 1_u64 << (slot as u32 % 64);
+        if let Some((_, struck)) = self.own_struck.iter_mut().find(|(n, _)| *n == number) {
+            *struck |= bit;
+            return struck.count_ones();
+        }
+        if self.own_struck.len() >= OWN_STRUCK_KEPT {
+            self.own_struck.remove(0);
+        }
+        self.own_struck.push((number, bit));
+        1
+    }
+
     /// `toy_monitor`: on or off.
     pub(crate) fn toggle(&mut self) {
         self.on = !self.on;
@@ -433,6 +457,8 @@ impl Monitor {
         self.mark = None;
         self.guesses.clear();
         self.others_struck.clear();
+        self.own_struck.clear();
+        self.delivered = None;
         self.put_down();
         self.forget_savers();
     }
@@ -790,6 +816,8 @@ impl GpuState {
             }
             shown.rest = None;
             let at = Some(shown.flight.centre());
+            let origin = Vec3::from_array(shown.flight.throw().origin.map(|c| c as f32));
+            let far = shown.flight.centre().distance(origin) >= crate::achievements::MONITOR_FAR;
             if Some(hit.struck) != own {
                 self.monitor
                     .others_struck
@@ -799,6 +827,7 @@ impl GpuState {
             // player's Screen Saver, that may earn its achievements.
             if Some(hit.by.thrower) == own && Some(hit.struck) != own {
                 self.monitor_saver_struck(hit.struck, when);
+                self.monitor_own_hit(hit.struck, hit.by.number, far);
             }
             // Foreseen, it was heard and marked already.
             if guess.is_some() {
@@ -944,6 +973,35 @@ impl GpuState {
         }
         if earned.surge {
             crate::achievements::note(crate::achievements::Counter::MonitorSurge);
+        }
+    }
+
+    /// The player's monitor `number` struck the player in `slot`, by their word, from
+    /// [`crate::achievements::MONITOR_FAR`] or more when `far`: Tech Support, Two for One,
+    /// Strike!, Long Distance Call and Special Delivery count (not on a server of this
+    /// machine).
+    fn monitor_own_hit(&mut self, slot: u8, number: u8, far: bool) {
+        use crate::achievements::{Counter, note, note_best, note_name};
+        let struck = self.monitor.own_strike(number, slot);
+        let Some(session) = self.live_session.as_ref().filter(|_| self.toys_count()) else {
+            return;
+        };
+        if let Some(name) =
+            crate::player_identity::shown_name(session.game_state(), usize::from(slot))
+        {
+            note_name(Counter::MonitorVictims, &name);
+        }
+        note_best(Counter::MonitorBestThrow, u64::from(struck));
+        if far {
+            note(Counter::MonitorFar);
+        }
+        if let Some((watched, landed)) = self.drone.landed()
+            && watched == u16::from(slot)
+            && landed.elapsed() <= DELIVERY
+            && self.monitor.delivered != Some(landed)
+        {
+            self.monitor.delivered = Some(landed);
+            note(Counter::DroneMonitor);
         }
     }
 

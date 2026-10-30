@@ -2760,3 +2760,7 @@ classic version:
 
 `sjk` became the default `ui_menuStyle` before these were done. mp/duel6 has
 its tour, player stage and saber shot.
+
+The Servers detail panel offers **Copy IP** beside Join and Favourites. It copies
+the selected endpoint, including its port, and reports clipboard success or failure
+in the status line. Ctrl+C does the same outside text fields and dialogs.
