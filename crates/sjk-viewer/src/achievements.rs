@@ -656,7 +656,8 @@ pub(crate) const ALL: [Kind; 47] = [
         1,
         Toys,
         Client(C::GreatCatfish),
-    ),
+    )
+    .secret(),
     // Since 29/10/2026 (Sol's Screen Saver, `monitor/saver.rs`).
     kind(
         "monitor_payback",
@@ -1458,8 +1459,7 @@ mod tests {
             crate::cards::FINISHES.len() as u64
         );
         let hidden: Vec<&str> = ALL.iter().filter(|k| k.hidden).map(|k| k.id).collect();
-        assert_eq!(hidden, ["mythical_find", "old_whiskers"]);
-        assert_eq!(hidden, ["mythical_find", "monitor_surge"]);
+        assert_eq!(hidden, ["mythical_find", "old_whiskers", "monitor_surge"]);
         let retired: Vec<&str> = ALL.iter().filter(|k| k.retired).map(|k| k.id).collect();
         assert_eq!(retired, ["surveyor"]);
         assert_eq!(OBTAINABLE, ALL.len() - 1);
