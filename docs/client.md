@@ -4582,7 +4582,11 @@ list: the `toy_illuminate` command lights it or puts it out, from a bind
 (Settings > Key bindings > Interaction > Toy: Illuminate, unbound until a key is
 picked), from the quick wheel's [Toys page](#toys-page), or from the switch on the
 Collection's Toys tab ([SJK UI](sjk-ui.md#collection)). Every toy is a
-`toy_<name>` command ([sjk.md](sjk.md#names)).
+`toy_<name>` command ([sjk.md](sjk.md#names)). Switching any toy says so on the centre of
+the screen, its name and ON in green or OFF in red ("Illuminate ON"), and `toy_help` lists
+every toy in the console, its name in yellow and what it does and how in white
+([toy_switch_words.rs](../crates/sjk-viewer/src/toy_switch_words.rs)); a toy restored at
+start, or taken off by the game, says nothing.
 
 **Other players' toys, hidden on request** (Sol's request, 29/10/2026): each toy other
 players are seen with has a second switch on its card in the Collection's Toys tab, and
@@ -4646,7 +4650,8 @@ The cardboard box is a toy, SJK's own and free for every player (Sol's idea,
 takes it off, from a bind (Settings > Key bindings > Interaction > Toy: Cardboard box,
 unbound until a key is picked), from the quick wheel's [Toys page](#toys-page) or from
 the Collection's Toys tab ([SJK UI](sjk-ui.md#collection)). It is off at every start.
-Putting it on plays its sound (one's own at once, in both ears; another's where they
+Switching it says "Cardboard box ON" or "OFF" ([Illuminate](#illuminate)); a box lifted by
+another player goes without it. Putting it on plays its sound (one's own at once, in both ears; another's where they
 stand when their look gains the box, but not for the boxes already in the looks in the
 first 5 seconds on a server).
 
@@ -4723,7 +4728,8 @@ It stays as last switched, across deaths, maps, servers and restarts of the game
 the player turns it off (since 22/10/2026: saved in the archived `cl_toyOrder66`,
 [toy_saved.rs](../crates/sjk-viewer/src/toy_saved.rs)). `order66` (Interaction > Execute
 Order 66, or the Toys page) gives the order; only a player whose own toy is on, alive in
-the match on a server, can give it.
+the match on a server, can give it. Switching the toy says "Order 66 ON" or "OFF"
+([Illuminate](#illuminate)).
 
 - **Who takes part:** the players whose toy is on. It is a toy in their look
   (`toys: ["order66"]`, [unlockables.md](unlockables.md); `looks::TOYS`), so every SJK
@@ -4792,7 +4798,8 @@ player who has it on hacks another who has it on, then steers them for a few sec
 Hax, unbound until a key is picked), from the quick wheel's [Toys page](#toys-page) or
 from the Collection's Toys tab ([SJK UI](sjk-ui.md#collection)). It stays as last
 switched, across maps, servers and restarts, until the player turns it off (saved in
-the archived `cl_toyHax`, as Order 66 in `cl_toyOrder66`).
+the archived `cl_toyHax`, as Order 66 in `cl_toyOrder66`). Switching it says "Hax ON" or "OFF"
+([Illuminate](#illuminate)).
 
 - **Who takes part:** the players whose toy is on. It is a toy in their look
   (`toys: ["hax"]`, [unlockables.md](unlockables.md); `looks::TOYS`), so the hacker's
@@ -5109,7 +5116,8 @@ close by. It works like emotes: the music is in pk3s, and SJK passes only its na
   away. `boombox` in the console lists the tracks; `boombox <id>`, `next`, `prev`, `play`
   and `stop` choose and play them (Settings > Key bindings > Interaction has "Boombox:
   next track"). When a track ends the next one plays, the first after the last. It is off
-  at every start and on every new server.
+  at every start and on every new server. Starting names the track on the centre of the
+  screen; putting it away says "Boombox OFF" in red.
 - **Verified players only** (Sol's rule, 25/10/2026): on a server only a player whose key
   the SJK hub verified may turn it on ("The boombox is for verified SJK players"), and every
   SJK client ignores the boombox, music and stereo, of a player the hub does not show as
@@ -5294,8 +5302,8 @@ onto it slips, cartoon style, and falls as a [ragdoll](#ragdoll).
   quick wheel's Toys group, Collection > Toys, "Slip on peels") is the switch, both the
   right to drop peels and the consent to slip on them (the Monitor's rule: always opt
   in). It stays as last switched, across maps, servers and restarts (`cl_toyBanana`,
-  archived), and says so on the centre of the screen. A player without it walks over
-  peels.
+  archived), and says "Banana peel ON" or "OFF" on the centre of the screen, as every
+  toy does ([Illuminate](#illuminate)). A player without it walks over peels.
 - **`banana_drop`** (Interaction > Drop banana peel, the Collection's Drop key, the quick
   wheel's Drop banana peel) drops one: standing (slower than 80 units a second along the
   floor) 20 units ahead of the feet the way the player looks, moving 72 units ahead the

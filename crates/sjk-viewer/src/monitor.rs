@@ -660,11 +660,10 @@ impl GpuState {
     /// `toy_monitor`: on or off, said on the centre of the screen.
     pub(crate) fn toggle_monitor(&mut self) {
         self.monitor.toggle();
-        self.monitor_centre(if self.monitor.on() {
-            "Monitor: throw with your throw key, hold it to charge; monitors knock you flying"
-        } else {
-            "Monitor off: monitors pass through you"
-        });
+        self.monitor_centre(&crate::toy_switch_words::switched(
+            "Monitor",
+            self.monitor.on(),
+        ));
     }
 
     /// `monitor_throw`: throw one.

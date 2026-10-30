@@ -579,6 +579,7 @@ impl GpuState {
         if self.boombox.on {
             self.boombox.on = false;
             self.boombox.stop_own();
+            self.boombox_centre(&crate::toy_switch_words::switched("Boombox", false));
             return;
         }
         if !self.boombox_allowed() {

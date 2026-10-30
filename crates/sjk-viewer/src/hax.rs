@@ -717,6 +717,7 @@ impl GpuState {
     /// `toy_hax`: turn the toy on or off.
     pub(crate) fn toggle_hax(&mut self) {
         self.hax.toggle();
+        self.hax_centre(crate::toy_switch_words::switched("Hax", self.hax.on()));
     }
 
     /// Say `text` on the centre of the screen.

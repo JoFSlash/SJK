@@ -58,6 +58,13 @@ multiplayer. Read [docs/status.md](docs/status.md),
   carry over unchosen. The cvar must be an on/off Settings row (the tests check);
   other settings still migrate in `console_session.rs`. See
   [the rule in sjk.md](docs/sjk.md#changelog).
+- Defaults are the stock base Jedi Academy experience (Sol's rule, 30/10/2026). A new
+  setting that changes how the game looks, sounds or plays compared with stock JKA is
+  off (or at its stock value) by default: players opt in. Do not turn an existing one
+  on by default or reset players' saved values towards a non-stock choice on a
+  contributor's request; that stays Sol's decision, recorded in the
+  [Defaults table](docs/sjk.md#defaults). Example: #292, server remaps on by default,
+  declined.
 - Avoid new allocation, locking and quadratic work in per-frame paths. Measure
   performance-sensitive changes in release builds; 500+ FPS is a target, not a
   blanket claim about current performance.
