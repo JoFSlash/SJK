@@ -581,7 +581,7 @@ impl Panel {
                     rect,
                     radius: 12.5 * s,
                     width: 1.2 * s,
-                    color: color::alpha(tile.rarity.colour, ink),
+                    color: color::alpha(tile.tone(faces).colour, ink),
                 });
                 text(
                     &mut self.ui,
@@ -589,7 +589,7 @@ impl Panel {
                     format_args!("{}", perk.mark),
                     frame.rect(left, y - 5.0, 25.0, 23.0),
                     18.0 * s,
-                    color::alpha(tile.rarity.colour, ink),
+                    color::alpha(tile.tone(faces).colour, ink),
                     FontWeight::Semibold,
                     TextAlign::Center,
                 );
@@ -614,7 +614,7 @@ impl Panel {
                 color: if solar {
                     color::GOLD_BRIGHT
                 } else {
-                    color::alpha(tile.rarity.colour, 0.9)
+                    color::alpha(tile.tone(faces).colour, 0.9)
                 },
             });
             text(
@@ -908,7 +908,7 @@ fn card_words(tile: &Tile, faces: &cards::faces::Faces) -> CardWords {
     } else if tile.finish().index == 2 {
         color::GOLD_BRIGHT
     } else {
-        tile.rarity.colour
+        tile.tone(faces).colour
     };
     let held = if tile.owned() {
         tile.breakdown()
@@ -918,9 +918,8 @@ fn card_words(tile: &Tile, faces: &cards::faces::Faces) -> CardWords {
     let about = match (&tile.slot, face) {
         (_, Some(face)) => {
             let mut about = format!(
-                "{} {}   ·   {}   ·   {}",
-                crate::symbols::card_rarity(tile.rarity.index),
-                tile.rarity.name,
+                "{}   ·   {}   ·   {}",
+                face.face.tone(),
                 face.face.kind.name(),
                 face.face.set_name,
             );
@@ -945,7 +944,10 @@ fn card_words(tile: &Tile, faces: &cards::faces::Faces) -> CardWords {
             date => format!("First found {date}"),
         }
     } else {
-        rarity_odds(tile.rarity, faces)
+        match face {
+            Some(shown) if shown.face.rank.is_some() => card_odds(shown.face, faces),
+            _ => rarity_odds(tile.rarity, faces),
+        }
     };
     // A card that brings a blade (or whose Solar copies drop one) says so first, a line
     // more before the keys.
@@ -1033,6 +1035,40 @@ pub(super) fn rarity_odds(rarity: &cards::Rarity, faces: &cards::faces::Faces) -
         0 | 1 => format!("{odds}."),
         pool => format!("{odds}, one of the {pool} {} cards.", rarity.name),
     }
+}
+
+/// How a ranked card is obtained, with its own odds (its rarity is not named: a rank
+/// stands in its place): "From holocrons: about 1 in 9 560 holocrons found holds this
+/// card (0.01%)." The hub picks a set among those with cards of the rarity rolled, then
+/// a card of it in that set (`docs/cards.md`, "SJK Blades").
+pub(super) fn card_odds(face: &cards::faces::Face, faces: &cards::faces::Faces) -> String {
+    use crate::cards::loot;
+    let rarity = face.rarity;
+    let of_rarity = || {
+        faces
+            .list
+            .iter()
+            .filter(|other| other.rarity.id == rarity.id)
+    };
+    let mut sets: Vec<&str> = of_rarity().map(|other| other.set.as_str()).collect();
+    sets.sort_unstable();
+    sets.dedup();
+    let in_set = of_rarity().filter(|other| other.set == face.set).count();
+    let chance: f64 = FINISHES
+        .iter()
+        .map(|finish| loot::kind_any(rarity.index, finish.index))
+        .sum::<f64>()
+        / (sets.len().max(1) * in_set.max(1)) as f64;
+    crate::terms::say_owned(match loot::one_in(chance) {
+        rare if rare.is_empty() => format!(
+            "From holocrons: {} of holocrons found hold this card.",
+            loot::percent(chance)
+        ),
+        rare => format!(
+            "From holocrons: about {rare} holocrons found holds this card ({}).",
+            loot::percent(chance)
+        ),
+    })
 }
 
 #[cfg(test)]
