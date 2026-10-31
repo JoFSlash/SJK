@@ -118,6 +118,8 @@ const SABER_TOKEN: u16 = 1_316;
 const FORGE_LINK_TOKEN: u16 = 1_317;
 /// The Nameplates tab's See and share nameplates switch.
 const SHARE_TOKEN: u16 = 1_319;
+/// The Nameplates tab's style choices, one per [`crate::hud::nameplate::Style`].
+const STYLE_BASE: u16 = 1_380;
 /// The target switch over the lone saber: the first saber (or half), the second (1_303,
 /// 1_304, 1_307 and 1_308 are the Monitor's, Box hunt's, the Boombox's and the Drone's).
 const TARGET_FIRST_TOKEN: u16 = 1_301;
@@ -406,6 +408,8 @@ pub(crate) enum PanelAction {
     /// See and share nameplates on (`true`) or off: `cg_nameplate`
     /// ([`crate::hud::nameplate::see_and_share`]).
     SeeAndShare(bool),
+    /// The nameplates' look: `cg_nameplateStyle` ([`crate::hud::nameplate::Style`]).
+    NameplateStyle(crate::hud::nameplate::Style),
     /// Other players' toy seen (`true`) or hidden on this PC: set the toy's `cvar`
     /// ([`crate::toy_sight`]).
     ToySight {
@@ -553,6 +557,9 @@ pub(crate) struct Inputs<'a> {
     /// See and share nameplates (`cg_nameplate`): the player sees nameplates and shares
     /// their health, shield and Force.
     pub(crate) share: bool,
+    /// The nameplates' look (`cg_nameplateStyle`), which the Nameplates tab draws and
+    /// offers to change.
+    pub(crate) nameplate_style: crate::hud::nameplate::Style,
     /// The keys bound to the toys' commands, as players read them ("F5", "F5 / K"), in
     /// the order of [`toys::COMMANDS`]; empty for none (or none known).
     pub(crate) toy_keys: &'a [String],
@@ -1932,6 +1939,12 @@ impl Panel {
         if event.kind != UiEventKind::Activate {
             return PanelAction::None;
         }
+        if let Some(style) = token
+            .checked_sub(STYLE_BASE)
+            .and_then(|index| crate::hud::nameplate::Style::ALL.get(usize::from(index)))
+        {
+            return PanelAction::NameplateStyle(*style);
+        }
         if let Some(index) = token
             .checked_sub(OPTION_BASE)
             .map(usize::from)
@@ -2191,6 +2204,7 @@ mod tests {
             second: "",
             pair: crate::saber_skins::Pair::None,
             share: true,
+            nameplate_style: crate::hud::nameplate::Style::Holo,
             toy_keys: &[],
             toys_unseen: 0,
             tag: "",
@@ -2734,6 +2748,49 @@ mod tests {
             1 << 5,
             "the Drone's bit"
         );
+    }
+
+    /// The Nameplates tab's Style row offers every nameplate style, the one in use
+    /// lit, and a click on another asks for it; each style's plate fits the page.
+    #[test]
+    fn the_style_row_chooses_the_nameplates_look() {
+        use crate::hud::nameplate::Style;
+        for style in Style::ALL {
+            let shown = Inputs {
+                nameplate_style: style,
+                ..inputs(Holdings::Known(&[]), "")
+            };
+            let mut panel = drawn(Tab::Nameplates, &shown);
+            assert!(!panel.ui.overflowed(), "{style:?}");
+            for (index, other) in Style::ALL.into_iter().enumerate() {
+                let rect = panel
+                    .ui
+                    .rect_for(STYLE_BASE + index as u16)
+                    .expect("a style's segment");
+                let at = sjk_ui::Vec2::new(rect.x + rect.width * 0.5, rect.y + rect.height * 0.5);
+                let button = sjk_ui::PointerButton::Primary;
+                let action = [
+                    InputEvent::PointerMove(at),
+                    InputEvent::PointerPress {
+                        position: at,
+                        button,
+                    },
+                    InputEvent::PointerRelease {
+                        position: at,
+                        button,
+                    },
+                ]
+                .into_iter()
+                .map(|event| panel.pointer_at(event, true, Instant::now()))
+                .find(|action| *action != PanelAction::None);
+                assert_eq!(action, Some(PanelAction::NameplateStyle(other)));
+            }
+            let all = panel.ui.text_runs().collect::<Vec<_>>().join(
+                "
+",
+            );
+            assert!(all.contains("Capsule") && all.contains("Classic"), "{all}");
+        }
     }
 
     /// The Nameplates tab's See and share nameplates switch, clicked or with Enter, flips the

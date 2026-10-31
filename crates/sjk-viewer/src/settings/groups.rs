@@ -512,6 +512,7 @@ impl Group {
                 "cg_playerCardOutline",
                 crate::hud::team_outline::CVAR,
                 "cg_nameplate",
+                crate::hud::nameplate::STYLE_CVAR,
                 "cg_nameplateRange",
                 "cg_nameplateNear",
                 "cg_nameplateScale",

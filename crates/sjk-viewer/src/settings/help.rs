@@ -218,6 +218,9 @@ const CHOICE_NAMES: &[(&str, &str, &str)] = &[
     (crate::audio::SKIN_SOUNDS_CVAR, "0", "Off"),
     (crate::audio::SKIN_SOUNDS_CVAR, "1", "With normal"),
     (crate::audio::SKIN_SOUNDS_CVAR, "2", "Only skin"),
+    (crate::hud::nameplate::STYLE_CVAR, "0", "Holo"),
+    (crate::hud::nameplate::STYLE_CVAR, "1", "Capsule"),
+    (crate::hud::nameplate::STYLE_CVAR, "2", "Classic"),
     ("cg_nameplateOutline", "0", "Off"),
     ("cg_nameplateOutline", "1", "Faint"),
     ("cg_nameplateOutline", "2", "Strong"),
@@ -633,6 +636,10 @@ const HELP: &[(&str, &str)] = &[
     (
         "cg_nameplate",
         "Nameplates over players, and your health, shield and Force for SJK players on your server. Off: neither.",
+    ),
+    (
+        crate::hud::nameplate::STYLE_CVAR,
+        "Holo: your picture in a hexagon by a plate. Capsule: a pill, the bars under it. Classic: the name over a plate of bars.",
     ),
     (
         "cg_nameplateRange",

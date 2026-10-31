@@ -658,6 +658,11 @@ pub(super) const HUD: &[Setting] = &[
         kind: ValueKind::Bool,
     },
     Setting {
+        label: "Nameplate style",
+        cvar: crate::hud::nameplate::STYLE_CVAR,
+        kind: ValueKind::Choice(&["0", "1", "2"]),
+    },
+    Setting {
         label: "Nameplate range",
         cvar: "cg_nameplateRange",
         kind: ValueKind::Integer {

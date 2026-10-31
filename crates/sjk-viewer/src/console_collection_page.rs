@@ -132,6 +132,12 @@ impl ViewerConsole {
             PanelAction::SeeAndShare(on) => {
                 self.set_cvar("cg_nameplate", if on { "1" } else { "0" });
             }
+            PanelAction::NameplateStyle(style) => {
+                self.set_cvar(
+                    crate::hud::nameplate::STYLE_CVAR,
+                    &style.value().to_string(),
+                );
+            }
             PanelAction::ToySight { cvar, seen } => {
                 self.set_cvar(cvar, if seen { "1" } else { "0" });
             }
@@ -422,6 +428,10 @@ impl ViewerConsole {
         };
         let enabled = self.bool_cvar("cl_identity") == Some(true);
         let share = crate::hud::nameplate::see_and_share(self);
+        let nameplate_style = crate::hud::nameplate::Style::of(
+            self.integer_cvar(crate::hud::nameplate::STYLE_CVAR)
+                .unwrap_or(0),
+        );
         let snapshot =
             crate::player_identity::collection_snapshot(crate::debug_collectibles::wanted(self));
         let held = snapshot
@@ -458,6 +468,7 @@ impl ViewerConsole {
                 second: &second,
                 pair,
                 share,
+                nameplate_style,
                 toy_keys: &toy_keys,
                 toys_unseen,
                 tag: &tag,
@@ -490,6 +501,7 @@ impl ViewerConsole {
             second: &second,
             pair,
             share,
+            nameplate_style,
             toy_keys: &toy_keys,
             toys_unseen,
             tag: &tag,
