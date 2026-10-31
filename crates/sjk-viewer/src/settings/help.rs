@@ -99,6 +99,61 @@ pub(super) fn classic_label<'a>(cvar: &str, label: &'a str) -> (&'a str, Timing)
 /// a code: each `(cvar, value, name)`. A value not listed is shown as it is
 /// written ([`super::classic_view::choice_label`]).
 const CHOICE_NAMES: &[(&str, &str, &str)] = &[
+    (
+        crate::chat::incoming_color::CVAR,
+        "0",
+        crate::chat::incoming_color::LABELS[0],
+    ),
+    (
+        crate::chat::incoming_color::CVAR,
+        "1",
+        crate::chat::incoming_color::LABELS[1],
+    ),
+    (
+        crate::chat::incoming_color::CVAR,
+        "2",
+        crate::chat::incoming_color::LABELS[2],
+    ),
+    (
+        crate::chat::incoming_color::CVAR,
+        "3",
+        crate::chat::incoming_color::LABELS[3],
+    ),
+    (
+        crate::chat::incoming_color::CVAR,
+        "4",
+        crate::chat::incoming_color::LABELS[4],
+    ),
+    (
+        crate::chat::incoming_color::CVAR,
+        "5",
+        crate::chat::incoming_color::LABELS[5],
+    ),
+    (
+        crate::chat::incoming_color::CVAR,
+        "6",
+        crate::chat::incoming_color::LABELS[6],
+    ),
+    (
+        crate::chat::incoming_color::CVAR,
+        "7",
+        crate::chat::incoming_color::LABELS[7],
+    ),
+    (
+        crate::chat::incoming_color::CVAR,
+        "8",
+        crate::chat::incoming_color::LABELS[8],
+    ),
+    (
+        crate::chat::incoming_color::CVAR,
+        "9",
+        crate::chat::incoming_color::LABELS[9],
+    ),
+    (
+        crate::chat::incoming_color::CVAR,
+        "10",
+        crate::chat::incoming_color::LABELS[10],
+    ),
     (crate::chat_sounds::MASTER_CVAR, "0", "Off"),
     (crate::chat_sounds::MASTER_CVAR, "1", "On"),
     (crate::chat_sounds::MASTER_CVAR, "2", "Distinct (EJK)"),
@@ -710,6 +765,10 @@ const HELP: &[(&str, &str)] = &[
     (
         crate::chat::options::BACKDROP_CVAR,
         "A dark band behind each chat line, so it reads over bright maps: how dark, in per cent. 0 shows none.",
+    ),
+    (
+        crate::chat::incoming_color::CVAR,
+        "Colour public All chat text. Names, team/admin chat, whispers and SJK chat keep their colours. 0 keeps originals.",
     ),
     (
         crate::chat::options::OUTLINE_CVAR,

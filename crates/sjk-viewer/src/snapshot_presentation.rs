@@ -115,6 +115,9 @@ pub(crate) fn observe(
         }
     }
     if let Some(console) = sinks.console.as_mut() {
+        if let Some(free_saber) = sjk_client::free_saber_event(snapshot) {
+            console.note_free_saber(free_saber);
+        }
         for offset in (0..obituary_count as usize).rev() {
             if let Some(event) = sinks.obituaries.feed().newest(offset) {
                 console.push_log(format_obituary(event, game_state, sinks.localization));

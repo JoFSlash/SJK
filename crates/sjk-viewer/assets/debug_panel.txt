@@ -24,6 +24,29 @@
 
 # ---- Console & chat ----
 
+[pr-batch-1031]
+area: Gameplay
+title: PRs 31/10: chat colour, GIF hiding, Change name, melee kick, duel noclip, vehicle clips
+change: #315 cg_chatColor (Lumaya); #320 hide GIFs + Hidden tab (Creyon); #299 Change name (Slash).
+change: #322 held melee kick restarts each kick; #323 no fakenoclip/freecam in duels (Slash).
+change: #274 riders and vehicles each skip their own pilot or chassis in prediction (Lumaya).
+test: Settings > Chat > All chat colour: All chat turns that colour, team and SJK chat do not.
+test: SJK chat: Hide this GIF on a GIF message: reads GIF hidden; Hidden tab shows it again.
+test: Profile > SJK Profile > Change name: Character tab opens with the Name field ready.
+test: Hold melee kick: each kick plays from the start. In a duel, fakenoclip is refused.
+test: Ride a swoop and a shuttle on a siege map: no snag or jitter against your own vehicle.
+
+[slash-fixes-1030]
+area: Menus & settings
+title: Slash's fixes 30/10: config.cfg, settings search, Shaders wheel, vehicle away, Force templates
+change: #288 config.cfg edited while running is loaded; deleted, it is not written back that run.
+change: #290 typed values in every search result; #291 wheel past Shaders tier headings.
+change: #298 no away emote on a vehicle; #309 Force templates keep Speed on saber-only servers.
+test: Edit cg_fov in config.cfg while SJK runs, quit: the edit stays. Delete it, quit: not back.
+test: Settings search "chat": click a later result's value and type a number: it takes it.
+test: Collection > Shaders with Owned on: the wheel scrolls past every tier heading.
+test: Ride a vehicle, alt-tab out a while: no away emote. JoF Fullforce FFA template: Speed kept.
+
 [toy-switch-words]
 area: Gameplay
 title: Toys say ON and OFF in colour, toy_help lists every toy (Blep's idea, Creyon's #289)

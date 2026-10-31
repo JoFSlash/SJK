@@ -282,6 +282,10 @@ pub(super) const COMMANDS: &[(&str, &str)] = &[
     ),
     ("in_restart", "Reset held input and pointer capture"),
     (crate::fs_restart::COMMAND, crate::fs_restart::HELP),
+    (
+        crate::chat_gifs::hidden::UNHIDE_ALL,
+        crate::chat_gifs::hidden::UNHIDE_ALL_HELP,
+    ),
 ];
 
 /// Queue and worker replies exist only for explicitly requested commands.
@@ -1274,6 +1278,10 @@ impl crate::GpuState {
             }
             crate::gameplay_fps::COMMAND => return self.gameplay_fps_command(args),
             crate::fs_restart::COMMAND => return self.fs_restart_command(),
+            crate::chat_gifs::hidden::UNHIDE_ALL => {
+                let count = crate::chat_gifs::hidden::clear();
+                return Ok(vec![crate::chat_gifs::hidden::unhide_all_reply(count)]);
+            }
             "freecam" => return self.free_camera_command(args),
             "peek" => return self.peek_command(args),
             "cosmetics" => return self.cosmetics_command(args),

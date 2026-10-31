@@ -195,7 +195,8 @@ pub use force_profile_negotiation::{
     server_legal_forcepowers,
 };
 pub use force_rank_reply::{
-    ForceRankReply, force_rank_reply, force_rules_from_serverinfo, server_force_rules,
+    ForceRankReply, force_rank_reply, force_rules_from_serverinfo, free_saber_event,
+    server_force_rules, serverinfo_shows_free_saber,
 };
 pub use ghoul2_pose::{LegacyGhoul2Animator, LegacyGhoul2PosePolicy};
 pub use impact_events::{

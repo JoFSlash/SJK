@@ -2409,6 +2409,9 @@
 - 0d215f1 |  | Initial JKR source
 
 = Creyon
++ 31/10/2026 | SJK #320 | Chat GIFs: hide chosen GIFs on this PC, a Hidden tab to show them again
+- 4d8595a |  | Chat GIFs: hide chosen GIFs on this PC, a Hidden tab to show them again
+- e9afed7 |  | CI: run the checks again
 + 30/10/2026 | SJK #289 | Toys say ON and OFF in colour, and toy_help explains every toy
 - 5929535 |  | Toys say ON and OFF, and toy_help explains them
 + 30/10/2026 | SJK #296 | Day and night follow the PC's clock (r_dayClock), in every graphics preset
@@ -2707,6 +2710,17 @@
 - ddfe116 |  | Fix Linux clipboard integration
 
 = Lumaya
++ 31/10/2026 | SJK #274 | Apply vehicle and rider collision exclusions per predicted actor
+- 71172a6 |  | Record the missing per-entity vehicle collision exclusions
+- f5e5223 |  | Separate pilot and chassis collision exclusions during prediction
+- 9b9efcb |  | Record original JA+ vehicle prediction comparison
++ 31/10/2026 | SJK #315 | Add a local colour override for public All chat
+- b20f5ee |  | Let players force incoming chat message colours
+- e71522e |  | Fix chat colour settings values and verify incoming display
+- 9c00f25 |  | Show the incoming chat colour in the UI guide
+- c7f9a31 |  | Place the chat UI guide beside implemented features
+- d75b368 |  | Limit chat colour override to the public All channel
+- 533f67f |  | Verify preserved channel colours and refresh the chat screenshot
 + 30/10/2026 | SJK #312 | Let players copy server IPs from the browser and console
 - 13856ad |  | Let players copy selected and connected server IPs
 - c8afe53 |  | Show and document the Copy IP browser action
@@ -2937,6 +2951,27 @@
 - fed9acd |  | Hide duel opponents' bars and send nothing while duelling
 
 = Slash
++ 31/10/2026 | SJK #323 | Duels: fakenoclip and freecam no longer make you take no damage (#209)
+- cf43dcc |  | Keep fakenoclip and freecam out of duels (hub #209)
++ 31/10/2026 | SJK #322 | Melee kick: holding it no longer freezes your kick on its last frame
+- 628f8e2 |  | Restart a held animation whose stand went unseen
++ 31/10/2026 | SJK #299 | SJK profile: the nickname can be set again (#202)
+- 7e2eb55 |  | Start fix for the missing nickname option (hub report #202)
+- 0860d6d |  | Add Change name to the Profile screen's SJK Profile tab
+- 8f4ec53 |  | Document Change name and test the Profile tab's button row
++ 30/10/2026 | SJK #309 | Force templates: Force Speed no longer turns into Force Sense (#206)
+- cb942b6 |  | Start fix for Force Sense taking Force Speed's place (hub report #206)
+- 6202a1f |  | Take free saber skills from the server's EV_SET_FREE_SABER
+- 52f52da |  | Keep the server's free-saber word across map changes
++ 30/10/2026 | SJK #291 | Collection > Shaders: the wheel scrolls past the tiers' headings (#201)
+- a3f9075 |  | Collection > Shaders: the wheel scrolls past the tiers' headings (#201)
++ 30/10/2026 | SJK #298 | Away emote: alt-tab on a vehicle no longer breaks riding (#205)
+- a2a15e4 |  | Start fix for the away emote on a vehicle (hub report #205)
+- dc5f0df |  | Keep the away emote off a vehicle rider (hub report #205)
++ 30/10/2026 | SJK #288 | Settings no longer go back to old values after config.cfg is edited or deleted while running
+- 1bfb4c6 |  | Settings no longer go back to old values after config.cfg is edited or deleted while running
++ 30/10/2026 | SJK #290 | Settings search: every result takes a typed value (#203)
+- ebd048e |  | Settings search: every result takes a typed value (#203)
 + 30/10/2026 | SJK #293 | Quick wheel: custom commands are remembered in the command list (Dante's idea)
 - b8744f9 |  | Quick wheel: custom commands are remembered in the catalogue (Dante's idea)
 - aa573c2 |  | Changelog: credit the remembered wheel commands to Slash

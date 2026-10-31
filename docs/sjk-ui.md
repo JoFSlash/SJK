@@ -621,8 +621,10 @@ overlay routes their text to the UI's families (`console_sjk_pages.rs`).
   SJK Profile tab, under the screen's title and row of tabs, moved down 44 pixels
   (`profile_panel::Mode`). Three columns: who the player is (their picture, a disc 104
   across with "Add a picture" or "Change picture" under it, beside the hub name in its
-  colours at 38, verified, member since, other names; then Staff tools for a staff
-  key) over "Your record" (eight numbers in two columns) and "Unlocked lately"; "About
+  colours at 38, verified, member since, other names; then, on the Profile screen,
+  Change name (it opens the Character tab's Name field, the hub's name being the one
+  worn in game; hub report #202, 30/10/2026), the Name emoji button and Staff tools
+  for a staff key) over "Your record" (eight numbers in two columns) and "Unlocked lately"; "About
   you", the bio's box (620 by 300, Exo 2 at 18, wrapped by measured width, the end
   being written kept in view) with its counts, Revert and Save (gold) and the rules;
   Medals (pictures at 84, on its own only), Achievements (how many unlocked, a gold
@@ -669,8 +671,10 @@ overlay routes their text to the UI's families (`console_sjk_pages.rs`).
   line ([hub-chat.md](hub-chat.md#how-a-line-looks)): its name in its colours, the
   verified tick for a verified sender, and its text in the SJK chat's gold going on
   after them and wrapping when too long, with Staff and how long ago on the right of
-  its first row; a chosen one is banded and shown on the right with Block on this PC and, for
-  staff, Delete for everyone, Mute and Unmute at the hub. "N older: Page Up" and "N
+  its first row; a chosen one is banded and shown on the right with Block on this PC, for
+  a message with a GIF Add GIF to favourites beside Hide this GIF (one row) and Manage GIF
+  source, and, for staff, two rows: Delete for everyone beside Lift chat ban, Mute at the
+  hub beside Unmute at the hub, all above the keys line. "N older: Page Up" and "N
   newer: Page Down" mark the ends when it scrolls. Resting the pointer on a name shows
   the sender's sender card over the page, beside the name, with Block or Unblock
   ([hub-chat.md](hub-chat.md#blocking-a-player)). With no message chosen, the right
@@ -1516,8 +1520,10 @@ grown to four. The same module serves the Collection screen's row
   menu, which waits under it), or to the main page.
 - **SJK Profile tab:** the page without its top bar's title (the keyboard starts on
   the picture), its medals left to the Collection and its Identity settings button
-  gone (the identity is in Settings, Network); See the board and See the collection
-  open the Collection screen on Achievements and Medals.
+  gone (the identity is in Settings, Network); Change name, before the Name emoji and
+  Staff tools buttons, opens the Character tab's Name field (`PanelAction::EditName`);
+  See the board and See the collection open the Collection screen on Achievements and
+  Medals.
 - **Opened by:** the in-game menu's Profile (the tab shown last in the run, Character
   the first time; the tab a console page turned to itself counts too) and its profile
   card (SJK Profile); the main page's Profile (Character, on the menu map's stage) and
@@ -2745,6 +2751,17 @@ separate approval; removing a source stops cached playback. See
 [trusted media sources](hub-chat.md#trusted-media-sources) for formats and privacy.
 The field uses the shared text-entry handler, including selection, clipboard and
 held-key editing.
+
+## Incoming chat colour
+
+Settings > Chat includes **Incoming chat colour**, a named choice shared with
+the classic settings. Original preserves authored colours; the other ten choices
+force the game server's public All message bodies while keeping sender names and non-message controls distinct.
+Team/admin chat, whispers and the separate SJK channel keep their own colours.
+
+Incoming chat colour, cyan selected (offline fixture):
+
+![Incoming chat colour](images/incoming-chat-colour.png)
 
 ## Plan
 

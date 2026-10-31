@@ -27,8 +27,8 @@ use std::fmt::Write as _;
 use winit::keyboard::KeyCode;
 
 /// The rows' wheel target over the panel and the scrollbar beside it, clear
-/// of the row (0-499), tab (500), slider value (700), chrome (800) and back
-/// (900) tokens.
+/// of the row (0-499), tab (500), chrome (800), back (900) and slider value
+/// (`VALUE_BASE`) tokens.
 pub(super) const CLASSIC_SCROLL_TOKEN: u16 = 911;
 pub(super) const CLASSIC_SCROLLBAR_TOKEN: u16 = 912;
 /// Choice `i` of an open dropdown answers to `DROPDOWN_BASE + i`.
@@ -70,7 +70,9 @@ impl RowControl {
                     index: offset % MAX_SEGMENTS,
                 })
             }
-            RESET_BASE.. => Some(Self::Reset(usize::from(token - RESET_BASE))),
+            RESET_BASE..crate::menu_widgets::numeric::VALUE_BASE => {
+                Some(Self::Reset(usize::from(token - RESET_BASE)))
+            }
             _ => None,
         }
     }
@@ -1288,13 +1290,24 @@ mod tests {
         }
         // Rows, tabs, values, chrome, footer, search and dropdown choices are not
         // controls.
-        for token in [0, 499, 500, 700, 800, 911, 913, DROPDOWN_BASE + 5] {
+        let value = crate::menu_widgets::numeric::VALUE_BASE;
+        for token in [
+            0,
+            499,
+            500,
+            800,
+            911,
+            913,
+            DROPDOWN_BASE + 5,
+            value,
+            value + 300,
+        ] {
             assert_eq!(RowControl::of(token), None, "{token}");
         }
         // Every searchable row's segments fit below the reset buttons.
         let rows = search::rows().len();
         assert!(SEGMENT_BASE as usize + rows * MAX_SEGMENTS <= RESET_BASE as usize);
-        assert!(RESET_BASE as usize + rows <= usize::from(u16::MAX));
+        assert!(RESET_BASE as usize + rows <= usize::from(value));
     }
 
     #[test]

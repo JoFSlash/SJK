@@ -43,6 +43,8 @@ const HUB_UNMUTE_TOKEN: u16 = 1_305;
 /// GIF beside Send (the picker), and the chosen message's Add GIF to favourites.
 const GIF_TOKEN: u16 = 1_306;
 const FAVOURITE_TOKEN: u16 = 1_307;
+/// The chosen message's "Hide this GIF" / "Show this GIF again" ([`crate::chat_gifs::hidden`]).
+const HIDE_GIF_TOKEN: u16 = 1_366;
 /// Retry, beside the notice that says the hub did not take the last message.
 const RETRY_TOKEN: u16 = 1_308;
 /// The chosen message's Ban 24 h, and staff's Lift chat ban.
@@ -486,8 +488,21 @@ impl Panel {
             self.gifs.search_now();
             return Some(PanelAction::None);
         }
+        if token == gif_picker::UNHIDE_TOKEN && self.gifs.tab == Tab::Hidden {
+            if let Some(id) = self.gifs.hidden_chosen.take() {
+                crate::chat_gifs::hidden::set(&id, false);
+            }
+            self.focus = TAB_BASE + Tab::Hidden.index() as u16;
+            return Some(PanelAction::None);
+        }
         if (TILE_BASE..TILE_BASE + TILES as u16).contains(&token) {
             let id = self.gifs.tile(token)?.clone();
+            if self.gifs.tab == Tab::Hidden {
+                // Chosen: Show this GIF again acts on it.
+                self.focus = token;
+                self.gifs.hidden_chosen = Some(id);
+                return Some(PanelAction::None);
+            }
             match gif_picker::with_gif(&self.draft, &id) {
                 Some(draft) => {
                     self.draft = draft;
@@ -503,6 +518,9 @@ impl Panel {
             return Some(PanelAction::None);
         }
         if (STAR_BASE..STAR_BASE + TILES as u16).contains(&token) {
+            if self.gifs.tab == Tab::Hidden {
+                return Some(PanelAction::None);
+            }
             if let Some(id) = self.gifs.tile(TILE_BASE + (token - STAR_BASE)).cloned() {
                 let favourite = crate::chat_gifs::favourites::contains(&id);
                 crate::chat_gifs::favourites::set(&id, !favourite);
@@ -666,6 +684,15 @@ impl Panel {
             if let Some(id) = self.shown.chosen_gif.clone() {
                 let favourite = crate::chat_gifs::favourites::contains(&id);
                 crate::chat_gifs::favourites::set(&id, !favourite);
+            }
+            return PanelAction::None;
+        }
+        if token == HIDE_GIF_TOKEN {
+            // Hidden or shown again on this PC; the keyboard stays on the button.
+            self.focus = token;
+            if let Some(id) = self.shown.chosen_gif.clone() {
+                let hidden = crate::chat_gifs::hidden::contains(&id);
+                crate::chat_gifs::hidden::set(&id, !hidden);
             }
             return PanelAction::None;
         }
@@ -1019,6 +1046,7 @@ mod tests {
             CARD_BAN_TOKEN,
             CARD_TRADE_TOKEN,
             ONLY_TOKEN,
+            HIDE_GIF_TOKEN,
         ];
         tokens.extend((0..MESSAGES_SHOWN as u16).map(|index| MESSAGE_BASE + index));
         let mut sorted = tokens.clone();
@@ -1027,6 +1055,44 @@ mod tests {
         assert_eq!(sorted.len(), tokens.len(), "{tokens:?}");
         assert!(tokens.iter().all(|token| *token < NAME_BASE));
     }
+    /// The chosen message's Hide this GIF hides it on this PC and the same button shows
+    /// it again; in the picker's Hidden tab a click on a tile only chooses it, Show this
+    /// GIF again shows that one again, and its tile has no star (F does nothing there).
+    #[test]
+    fn a_gif_is_hidden_and_shown_again_one_by_one() {
+        use crate::chat_gifs::hidden;
+        use gif_picker::{STAR_BASE, TILE_BASE, Tab};
+        let id = crate::chat_gifs::GifId::new("PanelHide01xyz").unwrap();
+        let other = crate::chat_gifs::GifId::new("PanelHide02xyz").unwrap();
+        let mut panel = Panel::new();
+        panel.shown.chosen_gif = Some(id.clone());
+        assert_eq!(panel.activate(HIDE_GIF_TOKEN), PanelAction::None);
+        assert!(hidden::contains(&id));
+        assert_eq!(panel.focus, HIDE_GIF_TOKEN, "the keyboard stays on it");
+        assert_eq!(panel.activate(HIDE_GIF_TOKEN), PanelAction::None);
+        assert!(!hidden::contains(&id), "shown again");
+        hidden::set(&id, true);
+        hidden::set(&other, true);
+        panel.gifs.open = true;
+        panel.gifs.choose_tab(Tab::Hidden);
+        panel.gifs.ids = vec![other.clone(), id.clone()];
+        let favourite = crate::chat_gifs::favourites::contains(&id);
+        let _ = panel.activate_gifs(STAR_BASE + 1);
+        assert_eq!(
+            crate::chat_gifs::favourites::contains(&id),
+            favourite,
+            "no star"
+        );
+        let _ = panel.activate_gifs(TILE_BASE + 1);
+        assert!(hidden::contains(&id), "a click only chooses it");
+        assert_eq!(panel.gifs.hidden_chosen, Some(id.clone()));
+        let _ = panel.activate_gifs(gif_picker::UNHIDE_TOKEN);
+        assert!(!hidden::contains(&id), "Show this GIF again shows it");
+        assert!(hidden::contains(&other), "the other stays hidden");
+        assert_eq!(panel.gifs.hidden_chosen, None);
+        hidden::set(&other, false);
+    }
+
     use sjk_identity::ChatMessage;
 
     pub(super) fn message(id: u64, key: &str, text: &str) -> ChatMessage {

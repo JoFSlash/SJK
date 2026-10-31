@@ -245,6 +245,7 @@ impl ChatOverlay {
                     body_row(
                         &mut self.ui,
                         BodyRow {
+                            forced: line.incoming_colour(self.options.incoming),
                             text: &line.body[range.clone()],
                             carry: line.wrap.carry[row],
                             marks: &line.emojis,
@@ -283,6 +284,7 @@ impl ChatOverlay {
                     emojis: self.options.emojis.then_some(&self.emojis),
                     hovered,
                     colour,
+                    forced: line.incoming_colour(self.options.incoming),
                     label_colour: if line.encrypted {
                         encrypted_pink(alpha * 0.85)
                     } else {
@@ -407,6 +409,7 @@ fn line_marks<'a>(
 
 /// One wrapped row of a message body and the emojis its marks stand for.
 struct BodyRow<'a> {
+    forced: Option<Color>,
     text: &'a str,
     /// The colour code in force where the row starts: a wrapped message goes on in
     /// the colour the row before it ended in, not in the base colour.
@@ -432,11 +435,21 @@ fn body_row(
     size: f32,
     color: Color,
 ) {
+    let color = super::incoming_color::colour(color, row.forced);
+    let carry = if row.forced.is_some() {
+        Carry::NONE
+    } else {
+        row.carry
+    };
     let ellipsis = if row.truncated { "..." } else { "" };
     let is_mark = |character: char| emoji::mark_index(character).is_some();
     if !row.text.contains(is_mark) {
         ui.text_fmt_aligned(
-            format_args!("{}{}{ellipsis}", row.carry, row.text),
+            format_args!(
+                "{}{}{ellipsis}",
+                carry,
+                super::incoming_color::Body(row.text, row.forced.is_some())
+            ),
             rect,
             size,
             color,
@@ -447,14 +460,17 @@ fn body_row(
         return;
     }
     let mut x = rect.x;
-    let mut colour = row.carry;
+    let mut colour = carry;
     let mut rest = row.text;
     loop {
         let (run, after) = rest.split_at(rest.find(is_mark).unwrap_or(rest.len()));
         let tail = if after.is_empty() { ellipsis } else { "" };
         if !run.is_empty() || !tail.is_empty() {
             ui.text_fmt_aligned(
-                format_args!("{colour}{run}{tail}"),
+                format_args!(
+                    "{colour}{}{tail}",
+                    super::incoming_color::Body(run, row.forced.is_some())
+                ),
                 Rect::new(x, rect.y, (rect.right() - x).max(1.0), rect.height),
                 size,
                 color,
@@ -469,7 +485,9 @@ fn body_row(
                 TextFace::Regular,
                 row.spacing,
             );
-            colour = colour.after(run);
+            if row.forced.is_none() {
+                colour = colour.after(run);
+            }
         }
         let Some(mark) = after.chars().next() else {
             break;
@@ -606,6 +624,7 @@ mod tests {
         body_row(
             &mut ui,
             BodyRow {
+                forced: None,
                 text: &text,
                 carry,
                 marks: &marks,

@@ -798,7 +798,8 @@ on the hub, in the SJK UI's look in every menu style:
 - who they are: the hub name with its colours, Verified by the SJK team or not yet,
   the date the key was registered (`Member since`) and up to three other
   names worn (the switch, the key and the hub are on the Identity page, in Settings,
-  Network, since 09/10/2026);
+  Network, since 09/10/2026); on the Profile screen Change name opens the Character
+  tab's Name field, since the hub name is the `name` worn in game;
 - their record, from the achievement counts kept on this PC (players defeated, saber
   kills, best streak, duels won, flags captured, maps and servers played, time
   played) and the last four achievements unlocked;
