@@ -13,7 +13,6 @@ Format, read by the client (crates/sjk-viewer/src/changelog_data.rs, whose
 tests check this file):
 - "## <version> | <dd/mm/yyyy>" starts a release ("## Unreleased" for main
   after the last release, without a date);
-- Prediction as in 2026.1028.1: Settings > Game options > Prediction brings back how that release predicted your own movement, for players who preferred it; `cg_predictLegacy` turns the changes back off one by one (saber files, saber-lock facing, respawn jump, trigger box, gesture, held, other players, history gap). Current, the default, follows the server _(Sol, after Kushina's request)_
 - other lines up to the first item are the release's introduction;
 - "> <Heading>: <sentence>" lines before the first item are the release's short
   recap (3 to 6 lines, shown by the what's-new card after an update); every release
@@ -31,12 +30,22 @@ The site (site/assets/site.js, parseChangelog) reads the release headings,
 introductions and recap lines too.
 Add each release's notes here when it is tagged (docs/sjk.md "Releases").
 -->
-## Unreleased
+## 2026.1031.1 (Alpha) | 31/10/2026
+
+Nameplate styles, a day that follows your clock, toy achievements and many fixes.
+
+> Nameplates: Pick Holo, Capsule or Classic for nameplates.
+> Lighting: Day and night can follow your PC's clock.
+> Achievements: 26 new ones for the toys, on a Fun page.
+> Chat: Hide a GIF on your PC, or colour public All chat.
+> Fixes: Duels, kicks, vehicles, Force templates and more.
 
 = r_dynamicGlowNoSabers: New: the dynamic glow leaves saber blades and trails out, so each saber's details show while the rest still glows; off, sabers glow as before.
 = r_dayClock: New: day and night follow your PC's clock in every preset: with Sun and sky the sun moves, without it the sky turns to night and the world darkens.
 
 - Nameplate styles: choose how nameplates look, Holo (today's), Capsule (your picture in a pill, the bars on a tray under it) or Classic (the name over a framed plate of bars, grey bars on players who do not share). Settings > Nameplate style or Collection > Nameplates, which shows yours (`cg_nameplateStyle`) _(Sol)_
+- Prediction as in 2026.1028.1: Settings > Game options > Prediction brings back how that release predicted your own movement, for players who preferred it; `cg_predictLegacy` turns the changes back off one by one (saber files, saber-lock facing, respawn jump, trigger box, gesture, held, other players, history gap). Current, the default, follows the server _(Sol, after Kushina's request)_
+- Toys reach the hub sooner: a toy you switch on or off is sent between the hub's regular calls, and a send the hub turned away for coming too fast is tried again a second later, so other players see it change sooner _(Sol)_
 - Cards: a card can show a rank and its colour in place of a rarity, for the JoF collection (Leaders in cyan, the Council in green): its foot, tile, close-up, hover, the opening and the chat's grand finds name the rank, its hover gives the card's own odds, and the rarity chip leaves ranked cards out _(Sol)_
 - Profile > SJK Profile has a Change name button: it opens the Character tab with its Name field ready to type, the name the hub and other SJK players see being the one you wear in game _(Slash, PR #299, after hub report #202, Nib)_
 - Chat GIFs: Hide this GIF on the chosen message in SJK chat hides one GIF on your PC: its line reads GIF hidden and it never loads. The GIF picker's new Hidden tab lists the GIFs you hid, and a click on one shows it again; `gif_unhideall` shows them all (Kushina's idea) _(Creyon)_
@@ -60,7 +69,6 @@ Add each release's notes here when it is tagged (docs/sjk.md "Releases").
 - Mac and Linux: SJK raises its open-file limit at start as far as the system allows, so many PK3s no longer run out of files, and the log tracks how many game-file sets are still held at each map change _(Lukas, PR #198)_
 - Achievements: 26 new ones for the toys (the cardboard box, Order 66, the Hax, the Drone, the boombox, the monitor and the box hunt), three of them secret, and the board has two pages, General and Fun, a category for each toy on Fun (press F or use the switch at the top right) _(Sol, after a player's ideas)_
 - jaPRO plugin options: Force jumps (Settings > Mods, `japro.plugin 1`) is offered now that SJK predicts it: off, holding jump bunny hops instead of Force jumping, on jaPRO servers that let players choose _(Sol, after Kushina's idea and Lumaya's PR #282)_
-
 - Spectating: while you follow a player, the join menu and the match card offer Join again, as they read your own team rather than the followed player's (hub report #207) _(Slash, PR #310, after Jaykmeit's report)_
 - Mystery boxes: when the opener takes what came out, everyone else sees it go and the lid close at once, instead of it floating on for 10 seconds _(Sol)_
 - Tags: two new ones, Gonk (Uncommon) and Geyon (Rare), and the EZ tag has its real picture, all three drawn by Blep and picked from the Discord's #tag-proposals _(Sol, art by Blep)_
