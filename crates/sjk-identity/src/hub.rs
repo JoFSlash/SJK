@@ -344,7 +344,8 @@ pub trait Hub: Send {
             "this hub client does not claim rewards".to_owned(),
         ))
     }
-    /// The creator's announcement (`POST /v1/creator/announce`, 25/10/2026), checked by
+    /// The SJK team's announcement (`POST /v1/staff/announce`, 31/10/2026; the
+    /// creator's `POST /v1/creator/announce` on an older hub), checked by
     /// [`crate::news::check`] first; the hub answers it as stored.
     fn announce(
         &mut self,
@@ -353,6 +354,24 @@ pub trait Hub: Send {
     ) -> Result<crate::news::Announcement, HubError> {
         Err(HubError::Protocol(
             "this hub client does not announce".to_owned(),
+        ))
+    }
+    /// Store a news picture for an announcement (`PUT /v1/staff/news-image`): `bytes`,
+    /// a PNG or a JPEG as `mime` says.
+    fn upload_news_image(
+        &mut self,
+        _identity: &Identity,
+        _bytes: &[u8],
+        _mime: &str,
+    ) -> Result<crate::news::NewsImage, HubError> {
+        Err(HubError::Protocol(
+            "this hub client does not upload news pictures".to_owned(),
+        ))
+    }
+    /// News picture `id` as the hub serves it (`GET /v1/news-image/<id>`).
+    fn news_image(&mut self, _id: &str) -> Result<Vec<u8>, HubError> {
+        Err(HubError::Protocol(
+            "this hub client does not read news pictures".to_owned(),
         ))
     }
     /// Make `png` (already cropped and scaled, `crate::avatar`) the identity's picture;
@@ -1678,12 +1697,48 @@ impl Hub for HttpHub {
         identity: &Identity,
         request: &crate::news::AnnounceRequest,
     ) -> Result<crate::news::Announcement, HubError> {
-        parse(self.send(
+        match self.send(
             Some(identity),
             "POST",
-            "/v1/creator/announce",
+            "/v1/staff/announce",
             Some(announce_body(request)),
+        ) {
+            // A hub before 31/10/2026 takes announcements from the creator only.
+            Err(HubError::Rejected { status: 404, .. }) => parse(self.send(
+                Some(identity),
+                "POST",
+                "/v1/creator/announce",
+                Some(announce_body(request)),
+            )?),
+            answer => parse(answer?),
+        }
+    }
+
+    fn upload_news_image(
+        &mut self,
+        identity: &Identity,
+        bytes: &[u8],
+        mime: &str,
+    ) -> Result<crate::news::NewsImage, HubError> {
+        parse(self.send_bytes(
+            Some(identity),
+            "PUT",
+            "/v1/staff/news-image",
+            bytes,
+            mime,
         )?)
+    }
+
+    fn news_image(&mut self, id: &str) -> Result<Vec<u8>, HubError> {
+        if !crate::news_markup::image_id_ok(id) {
+            return Err(HubError::Protocol(
+                "a news picture is named by 16 hex digits".to_owned(),
+            ));
+        }
+        self.fetch(
+            &crate::news::news_image_path(id),
+            crate::news::NEWS_IMAGE_MAX,
+        )
     }
 
     fn buy_offer(
