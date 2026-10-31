@@ -41,6 +41,10 @@ mod cards;
 pub(crate) mod forge;
 #[path = "collection_forge_view.rs"]
 mod forge_view;
+#[path = "collection_history.rs"]
+pub(crate) mod history;
+#[path = "collection_history_view.rs"]
+mod history_view;
 #[path = "collection_hover.rs"]
 mod hover;
 #[path = "collection_marks_view.rs"]
@@ -743,6 +747,8 @@ pub(crate) struct Panel {
     /// The blade skins the hub's packs brought, the swatches' looks (`sjk_packs.rs`);
     /// taken again only when they change ([`Panel::follow_skins`]).
     pub(super) skins: std::sync::Arc<crate::saber_skins::LoadedSkins>,
+    /// The History tab: its filter, rows and reads ([`history`]).
+    history: history::History,
     /// What a world shot shows in place of the own profile's unlocks.
     #[cfg(test)]
     pub(crate) preview: Option<Vec<sjk_identity::Unlock>>,
@@ -854,6 +860,7 @@ impl Panel {
             widen: 1.0,
             epoch: Instant::now(),
             skins: Default::default(),
+            history: Default::default(),
             #[cfg(test)]
             preview: None,
             #[cfg(test)]
@@ -930,6 +937,8 @@ impl Panel {
     pub(crate) fn close(&mut self) -> bool {
         self.leave_viewing();
         let owned = self.open && self.owns_console;
+        // Shown again, the History tab reads the newest lines.
+        self.history.shown = false;
         self.open = false;
         self.owns_console = false;
         self.backstage = Backstage::None;
@@ -1184,6 +1193,12 @@ impl Panel {
             if let PanelAction::ShaderView(grid) = action {
                 return self.set_grid(grid);
             }
+            return action;
+        }
+        if self.tab == Tab::History
+            && !control
+            && let Some(action) = self.history_key(key, shift)
+        {
             return action;
         }
         if self.tab == Tab::Cards && self.card_inspect {
@@ -1751,6 +1766,15 @@ impl Panel {
             return PanelAction::None;
         }
         if let InputEvent::PointerWheel { delta, .. } = event
+            && self.tab == Tab::History
+        {
+            // The wheel scrolls the list three rows a notch.
+            if delta.y != 0.0 {
+                self.history.scroll(if delta.y > 0.0 { -3 } else { 3 });
+            }
+            return PanelAction::None;
+        }
+        if let InputEvent::PointerWheel { delta, .. } = event
             && self.tab == Tab::Cards
         {
             if self.card_inspect {
@@ -1788,6 +1812,15 @@ impl Panel {
         let Some(token) = event.token else {
             return PanelAction::None;
         };
+        if self.tab == Tab::History
+            && let Some(action) = self.history_token(
+                token,
+                event.kind == UiEventKind::Activate,
+                matches!(event.kind, UiEventKind::HoverEnter | UiEventKind::Hover),
+            )
+        {
+            return action;
+        }
         if self.tab == Tab::Forge && (forge::forge_token(token) || self.forge.ask.is_some()) {
             let activate = event.kind == UiEventKind::Activate;
             let resting = matches!(event.kind, UiEventKind::HoverEnter | UiEventKind::Hover);
@@ -2133,6 +2166,7 @@ impl Panel {
             Tab::Tags => TAG_BASE + self.tag.min(crate::tags::CATALOGUE.len() - 1) as u16,
             Tab::Cards if self.cards_shown > 0 => CARD_BASE + self.card as u16,
             Tab::Nameplates => SHARE_TOKEN,
+            Tab::History => self.history_focus(),
             Tab::Forge => match self.forge.ask {
                 Some(ask) => {
                     if matches!(

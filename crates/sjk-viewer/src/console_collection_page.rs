@@ -534,6 +534,12 @@ impl ViewerConsole {
         {
             let _ = crate::player_identity::read_shop();
         }
+        // The History tab's read (31/10/2026), asked by its last frame.
+        if let Some(before) = self.collection_panel.take_history_ask()
+            && !crate::player_identity::read_history(before)
+        {
+            self.collection_panel.history_not_sent();
+        }
         // A star or a padlock the hub refused (29/10/2026): said once; the hub's marks
         // come back with its next answer.
         if let Some(words) = self.collection_panel.take_mark_refusal(snapshot) {
@@ -570,6 +576,22 @@ impl ViewerConsole {
         data: Option<super::collection_panel::forge::ForgeData>,
     ) {
         self.collection_panel.preview_forge(data);
+    }
+
+    /// Show `state` on the History tab in place of the identity's (`None` lets go), for
+    /// a world shot.
+    #[cfg(test)]
+    pub(crate) fn preview_history(
+        &mut self,
+        state: Option<std::sync::Arc<sjk_identity::HistoryState>>,
+    ) {
+        self.collection_panel.preview_history(state);
+    }
+
+    /// Open or close the History tab's row `index` and choose it, for a world shot.
+    #[cfg(test)]
+    pub(crate) fn history_activate_for_shot(&mut self, index: usize) {
+        self.collection_panel.history_activate_for_shot(index);
     }
 
     /// Show the Forge's `section`, for a world shot.

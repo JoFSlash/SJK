@@ -1326,6 +1326,7 @@ Found the fog bug, ask me about it!"
             marks_revision: 0,
             mark_refusal: None,
             trades: None,
+            history: None,
             announcements: Vec::new(),
             announcements_revision: 0,
             rewards: None,

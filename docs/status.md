@@ -1,3 +1,20 @@
+## Inventory history
+
+31/10/2026, `personal/history`, based on `main` `1475cb58` (Sol: "a general inventory
+history for players"): the Collection's tenth tab, History, reads the hub's new signed
+`GET /v1/history` (`sjk_identity::history`, `Service::read_history`,
+`Snapshot::history` behind an `Arc` so the per-frame snapshot copy stays cheap) and lists
+what came, what was opened and held, credits and shards gained and spent, mystery boxes
+and finished trades, newest first, a page at a time (Load older), with Open alls
+gathered into one row and a client-side filter ([cards.md](cards.md#history)). Verified:
+unit tests (every kind read, unknown kinds and unreadable lines skipped, missing and null
+fields, pages following on and a refresh starting again, the refusals' words, the dates,
+the service's page-by-page reads, the sentences, the grouping, the filter, the reads on
+showing and Load older), fmt, the touched crates' tests and Clippy (no new warning), and
+one offline world shot of the tab on made-up lines. Not verified: against the hub's real
+answers (its `history` branch was written alongside), in game, the hover and wheel by
+hand, and in the classic menus' style.
+
 ## Local incoming chat colour
 
 30/10/2026, `feat/chat-color`, based on `main` `82c8c185`: archived `cg_chatColor`

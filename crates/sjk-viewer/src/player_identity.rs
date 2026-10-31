@@ -1130,6 +1130,13 @@ pub(crate) fn read_shop() -> bool {
     with_service(Service::read_shop).is_some()
 }
 
+/// Ask the hub for a page of the player's history: the newest (`None`) or the one before
+/// `before`; false when the service has not started. It arrives in the snapshot's
+/// `history`.
+pub(crate) fn read_history(before: Option<i64>) -> bool {
+    with_service(|service| service.read_history(before)).is_some()
+}
+
 /// What became of the last reveal of sealed cards, if the service has started.
 pub(crate) fn reveal_outcome() -> Option<sjk_identity::RevealOutcome> {
     with_snapshot(|snapshot| snapshot.reveal.clone()).flatten()

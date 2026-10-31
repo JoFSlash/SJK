@@ -1546,7 +1546,8 @@ the Forge (the shop, crafting and breaking shaders down) and, since 12/10/2026, 
 (what opening holocrons brings, [cards.md](cards.md)), and since 27/10/2026 Tags after Toys
 (the tags `toy_tag` sticks, [client.md](client.md#tag): a wall of tiles, the ones not held
 dimmed, the chosen one on a card with Choose, which sets `cg_tag`; with nine tabs the row
-shrinks its names when even its narrowest gaps leave them too wide). Sol picked the
+shrinks its names when even its narrowest gaps leave them too wide), and since 31/10/2026
+History last (what came, was opened, spent and traded, [cards.md](cards.md#history)). Sol picked the
 direction from a design canvas (`the vault`): every thing has its place from the
 start, the ones the player lacks dimmed; each tab shows its things on the left and
 the one chosen up close on the right.
@@ -1854,6 +1855,20 @@ for the run.
   closer: the card 660 wide over the darkened tab with its words at its right, the
   arrows or the wheel to the previous or next tile, Escape or a click to put it back. The row's count is the copies held. World shots: `world_shot::cards_shots`
   (`duel6_sjk_card_binder` with the hub's card pack).
+- **History** ([collection_history.rs](../crates/sjk-viewer/src/collection_history.rs),
+  [collection_history_view.rs](../crates/sjk-viewer/src/collection_history_view.rs),
+  [cards.md](cards.md#history), 31/10/2026): "History" and its line, the filter's chips
+  at y 320 (All, Drops, Opened, Credits, Shards, Trades, Boxes) with what the read is
+  doing at their right (or why it failed, in ember), then a list of 15 rows 41 high from y
+  352, full width with a bar at the right when it scrolls: each row a chip of its kind in
+  its tier's colour, the sentence, the credits and shards it moved (gains green, spends
+  red) and the date on the right; an Open all is one row with a gold + (- once open) whose
+  lines stand indented under it, each with a bar of its tier's colour. Load older ends the
+  list while the hub has more. An empty list says "Nothing yet", a read under way
+  "Reading your history...", a failure "History unavailable" and why. Left and Right
+  filter, Up, Down, Page Up, Page Down, Home and End choose, Enter (or a click) opens a
+  row or loads older, R reads again, the wheel scrolls three rows; hovering chooses. It
+  reads the newest page each time it is shown. Ctrl+Tab goes on to Medals.
 - **The model:** behind Shaders, Toys and Nameplates the page darkens only the left
   and the bottom. From the main page the backdrop camera goes to the player's shot
   (`ClientMenu::set_collection_stage`, which first reads the model, sabers and

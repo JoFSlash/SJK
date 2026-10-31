@@ -494,6 +494,7 @@ contact sheets of twelve).
 | Kyber shards, shattering, crafting and the tables | [economy.rs](../crates/sjk-viewer/src/economy.rs); wire and requests in [wire.rs](../crates/sjk-identity/src/wire.rs), [hub.rs](../crates/sjk-identity/src/hub.rs), [service.rs](../crates/sjk-identity/src/service.rs) (`Service::shatter`, `craft`, `read_shop`, `buy`, `Snapshot::shop`, `Snapshot::trade`) |
 | The kyber shard's mark | [cards/shard.rs](../crates/sjk-viewer/src/cards/shard.rs) |
 | The Forge: the shop, crafting and breaking down (the shop was the Holocrons tab's overlay, `holocrons_panel_shop.rs`, until 21/10/2026) | [collection_forge.rs](../crates/sjk-viewer/src/collection_forge.rs), [collection_forge_view.rs](../crates/sjk-viewer/src/collection_forge_view.rs) |
+| The Collection's History tab (31/10/2026): what came, was opened, spent and traded, `GET /v1/history` ([History](#history)) | [history.rs](../crates/sjk-identity/src/history.rs), [service.rs](../crates/sjk-identity/src/service.rs) (`Service::read_history`, `Snapshot::history`); [collection_history.rs](../crates/sjk-viewer/src/collection_history.rs), [collection_history_view.rs](../crates/sjk-viewer/src/collection_history_view.rs) |
 | The Collection's Cards tab | [collection_cards.rs](../crates/sjk-viewer/src/collection_cards.rs); its tiles, filter and sets' progress in [cards/binder.rs](../crates/sjk-viewer/src/cards/binder.rs) |
 | `debug_open` | [cards/rehearsal.rs](../crates/sjk-viewer/src/cards/rehearsal.rs) |
 | The faces from the packs, their pictures decoded on a worker when drawn | [cards/faces.rs](../crates/sjk-viewer/src/cards/faces.rs), mounted by [sjk_packs.rs](../crates/sjk-viewer/src/sjk_packs.rs) |
@@ -792,6 +793,48 @@ contact sheets of twelve).
   with made-up cards (or shaders, or piles of kyber shards) on the Holocrons tab; nothing is
   sent or kept. A card comes as a pack, with made-up shards from the tier's card shards. A rarity the packs have
   faces of shows one of them, as the hub would pick.
+
+## History
+
+Since 31/10/2026 (Sol: "a general inventory history: what they got, opened, what they
+spent credits and shards on, and the drops"), the Collection's last tab, History, lists
+the player's economy as the hub keeps it, newest first.
+
+The hub answers `GET /v1/history` (signed as `GET /v1/holocrons` is; its `PROTOCOL.md`,
+"History") with `{"lines":[...],"more":bool,"before":<unix s>}`: a page is 100 lines
+plus the rest of its oldest second (one second's lines are never split), and while
+`more` is true `GET /v1/history?before=<before>` brings the older ones. A line has `at`
+and `kind`:
+
+| Kind | What it is | Its fields |
+| --- | --- | --- |
+| `came` | a holocron or kyber crystal came (not through a trade: the trade's line says it) | `holocron`, `tier`, `source` (`play`, `staff`, `achievement`, `bought`, `box`, `reward`), `note`, `traded` |
+| `opened` | the player opened one | `holocron`, `tier`, `credits`, `shards`, `card` (`card`, null while sealed; `rarity`, `finish`; or null), `unlock` ("" for none) |
+| `credits` | a credits ledger line no other kind covers | `delta` (signed), `reason` (`holocron_buy`, `staff`, `reward`, `mystery_box` with `note` `explode_gift`), `note` |
+| `shards` | a kyber shard ledger line no other kind covers | `delta`, `reason` (`shatter`, `craft`, `shop` with the shader's id as `note`, `staff`, `reward`), `note` |
+| `box` | a mystery box opened | `outcome` ([mystery-boxes.md](mystery-boxes.md)), `price` (0 a free roll), `won`, `shards` |
+| `trade` | a finished trade | `trade`, `with` (`name` with colour codes, `verified`), `gave` and `got` (the trade items of `GET /v1/trades`, `value` included) |
+
+The client skips a line of a kind it does not know, or one it cannot read, and takes a
+missing field as empty, so the hub can add kinds. No key id comes ([No keys in
+game](identity.md)). An unknown key gets 403 `not_registered`; a hub from before the
+history answers 404, and the tab says "This SJK hub keeps no history yet."
+
+The tab reads the newest page each time it is shown (and on R), and Load older, the
+list's last row while the hub has more, the next page (`HistoryState::take` adds a page
+only when it follows what was read, so a second press adds nothing twice). A row is one
+line: a chip of its kind (Drop, Opened, Credits, Shards, Box, Trade) in the tier's colour
+(holocrons, crystals) or the kind's, a sentence ("Opened a Rare Holocron: card Sol
+(Holo), Sun blade", "Bought a holocron", "Shattered Sun blade", "Mystery box: double,
+paid 100, won 200", "Traded with Nib: gave a Rare Holocron, got Sun blade"), what it moved
+("+120 credits", "-400 credits", "+15 shards", gains green and spends red) and when, in
+this PC's time (`dd/mm/yyyy HH:MM`). Consecutive openings of one second (Open all) are one
+row, "Opened 37 Holocrons (5 Rare, 32 Uncommon): 30 cards, 7 unlocks" with their totals,
+and so are holocrons that came in one second the same way; Enter or a click opens it on
+its lines. The filter (All, Drops, Opened, Credits, Shards, Trades, Boxes; Left and Right)
+works on what was read: Credits and Shards keep every line that moved them, openings and
+boxes included. The rows' words are made once for what was read, the filter and the rows
+opened, not each frame. World shot: `world_shot::collection::duel6_sjk_collection_history`.
 
 ## Planned, not built
 

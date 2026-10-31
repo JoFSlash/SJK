@@ -908,3 +908,118 @@ fn duel6_sjk_collection_tags() {
         assert!(!overflowed(&gpu));
     });
 }
+
+/// The History tab (31/10/2026) on made-up lines: an Open all of five gathered (opened on
+/// its lines), single openings with a card and a shader, drops, a purchase, a shatter, a
+/// mystery box and a trade, then Load older.
+#[test]
+#[ignore = "renders with the GPU and the installed game data named by JKA_GAME_DATA"]
+fn duel6_sjk_collection_history() {
+    use crate::console::collection_panel::history::tests::{came, ledger, opened};
+    use sjk_identity::history::{BoxLine, HistoryCard, HistoryLine, OpenedLine, TradeLine};
+    on_big_stack(|| {
+        let cvars = [
+            ("ui_menuStyle", "sjk"),
+            (crate::settings::quick::HIDE_CVAR, "1"),
+            (crate::discord_presence::CVAR, "0"),
+        ];
+        let Some((mut gpu, _profile)) = open(
+            "maps/mp/duel6.bsp",
+            [1920, 1080],
+            Some(menu::ClientMenu::new(true, String::new())),
+            &cvars,
+        ) else {
+            return;
+        };
+        let _ = frame(&mut gpu, 10);
+        let now = 1_793_440_000;
+        let mut lines = vec![
+            HistoryLine::Opened(OpenedLine {
+                at: now,
+                tier: "legendary".into(),
+                credits: 240,
+                card: Some(HistoryCard {
+                    card: Some("sjk_alpha_000".into()),
+                    rarity: "legendary".into(),
+                    finish: "holo".into(),
+                }),
+                unlock: "saber_sun".into(),
+                ..OpenedLine::default()
+            }),
+            HistoryLine::Credits(ledger(now - 60, -400, "holocron_buy", "")),
+            came(now - 60, "legendary", "bought"),
+        ];
+        lines.extend((0..5).map(|index| {
+            opened(
+                now - 3_600,
+                ["uncommon", "rare", "uncommon", "mythical", "rare"][index],
+                40 + index as i64 * 15,
+                if index == 3 { 12 } else { 0 },
+            )
+        }));
+        lines.extend([
+            HistoryLine::Shards(ledger(now - 7_200, 15, "shatter", "saber_sun")),
+            HistoryLine::Box(BoxLine {
+                at: now - 9_000,
+                outcome: "double".into(),
+                price: 100,
+                won: 200,
+                shards: 0,
+            }),
+            HistoryLine::Box(BoxLine {
+                at: now - 9_100,
+                outcome: "explode".into(),
+                price: 100,
+                ..BoxLine::default()
+            }),
+            HistoryLine::Trade(TradeLine {
+                at: now - 86_400,
+                trade: 3,
+                with: sjk_identity::history::HistoryPartner {
+                    name: "^1Nib^7bles".into(),
+                    verified: true,
+                },
+                gave: vec![sjk_identity::TradeItem {
+                    kind: "holocron".into(),
+                    tier: "rare".into(),
+                    ..Default::default()
+                }],
+                got: vec![sjk_identity::TradeItem {
+                    kind: "shader".into(),
+                    id: Some("saber_sun".into()),
+                    tier: "mythical".into(),
+                    ..Default::default()
+                }],
+            }),
+            came(now - 90_000, "kyber_rare", "achievement"),
+            came(now - 100_000, "rare", "play"),
+            came(now - 100_000, "uncommon", "play"),
+            HistoryLine::Credits(ledger(now - 120_000, 500, "reward", "Bug hunting week")),
+            came(now - 130_000, "mythical", "staff"),
+        ]);
+        let state = sjk_identity::HistoryState {
+            serial: 1,
+            lines,
+            more: true,
+            before: now - 130_000,
+            message: String::new(),
+        };
+        if let Some(console) = gpu.console.as_mut() {
+            console.preview_profile(preview());
+            console.preview_collection(Some(vec![sun()]), 0.8);
+            console.preview_history(Some(std::sync::Arc::new(state)));
+            console.open_profile_hub_page(Tab::History, ReturnTarget::MainMenu);
+        }
+        assert_eq!(gpu.profile_hub_tab(), Some(Tab::History));
+        let _ = frame(&mut gpu, 2);
+        // Open the gathered row (the fourth) and choose it.
+        if let Some(console) = gpu.console.as_mut() {
+            console.history_activate_for_shot(3);
+        }
+        println!(
+            "{}",
+            shoot(&mut gpu, 20, "duel6-collection-history").display()
+        );
+        assert!(!overflowed(&gpu));
+    });
+}
