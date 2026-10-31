@@ -32,6 +32,7 @@ Add each release's notes here when it is tagged (docs/sjk.md "Releases").
 -->
 ## Unreleased
 
+- Achievements: Long Distance Call (a monitor hit from 40 metres or more) unlocks again: the hit was measured after the monitor's flight had been run again from the hand, so it always looked 0 metres long. It now takes where the monitor met the body, 40 metres as the world ping shows them _(Slash, after hub reports #216 and #220)_
 - What's new and the SJK team's announcements are now one News panel (`news`): the releases' recaps and the announcements in one list, with their settings to review, links that take you straight to a setting or a page, pictures and switches you can flip on the spot. It opens after an update and when there is news you have not read, never in the middle of play _(Sol)_
 - The switches on the what's-new card's Settings to review work for every setting: some (the dynamic glow's saber setting) did nothing and always showed Off _(Sol)_
 - JoF content and the Sith cloud can update themselves: turn on Update automatically on their card (or Settings > JoF content auto-update, Sith cloud auto-update) and tick Auto on the groups you want; SJK checks at start and every hour, also during a match, downloads what changed and says so in a small card, the new files loading from the next map. Off by default (`jof.contentAuto`, `sith.cloudAuto`) _(Sol)_
