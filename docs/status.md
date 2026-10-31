@@ -1,3 +1,23 @@
+## Cloud content updates itself (opt in)
+
+31/10/2026, `personal/cloud-auto-update`, based on `main` `7ce876c0` (Sol's request: JoF
+content and the Sith cloud updated automatically, opt in, choosing what): `jof.contentAuto`
+and `sith.cloudAuto` (off by default) and `jof.contentAutoGroups` /
+`sith.cloudAutoGroups` (`all`, the default, or group ids) make each collection check 30 s
+after the start and every hour, also during a match, and fetch what changed in its Auto
+groups only, removing only files SJK downloaded for an Auto group that the server dropped
+(`Plan::auto`, `Job::auto`; the record notes each file's group). The card gains Update
+automatically, an Auto tick per group (A), and "Next automatic check HH:MM"; Settings
+gains a row for each auto switch; a run that changed files shows a small card
+([jof-content.md](jof-content.md#automatic-updates), [sith-cloud.md](sith-cloud.md#automatic-updates)).
+Verified: fmt, build, Clippy and the workspace's tests, with new tests for the restricted
+plan, a whole automatic run against a local HTTP server, the schedule, the card's keys
+and the small card's words; off screen at 1080p with Sol's `GameData`, the JoF content
+card with automatic updates on and a group's files with them off
+(`jof_content_card::tests::the_jof_content_card_renders_on_a_gpu`). Not verified in game:
+an hourly run in a real session or a match, its small card on screen, or the Sith cloud
+live.
+
 ## Nameplate styles
 
 31/10/2026, `personal/nameplate-styles`, based on `main` `1475cb58` (Sol's decision: bring

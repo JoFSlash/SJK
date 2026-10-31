@@ -1086,6 +1086,14 @@ const HELP: &[(&str, &str)] = &[
         "The S community's maps, skins and extras, into the game's base folder. Off until you turn it on; Enter opens the card.",
     ),
     (
+        "jof.contentAuto",
+        "Off by default. With JoF content on, checks at start and every hour and fetches what changed in the groups marked Auto.",
+    ),
+    (
+        "sith.cloudAuto",
+        "Off by default. With the Sith cloud on, checks at start and every hour and fetches what changed in the groups marked Auto.",
+    ),
+    (
         "jof.contentSource",
         "Where JoF content downloads from: JoF Cloud, then jofhub.eu when a file is missing there (Auto), or only one of them.",
     ),

@@ -163,8 +163,10 @@ const MODS_ROWS: &[&str] = &[
     #[cfg(feature = "mod-japro")]
     "japro.plugin 10",
     "jof.downloads",
+    "jof.contentAuto",
     "jof.contentSource",
     "sith.downloads",
+    "sith.cloudAuto",
     crate::brush_view::CVAR,
     crate::entity_view::CVAR,
     crate::ghost_replay::SHOWCASE_CVAR,
@@ -437,8 +439,10 @@ impl Group {
                 #[cfg(feature = "mod-jof")]
                 sjk_mod_jof::HONOR_NAMES,
                 "jof.downloads",
+                "jof.contentAuto",
                 "jof.contentSource",
                 "sith.downloads",
+                "sith.cloudAuto",
                 #[cfg(feature = "mod-japlus")]
                 "japlus.plugin 1",
                 #[cfg(feature = "mod-japlus")]
@@ -655,7 +659,9 @@ impl Group {
                 crate::player_trades::SIZE_CVAR,
                 super::catalog::IMPORT_ROW,
                 "jof.downloads",
+                "jof.contentAuto",
                 "sith.downloads",
+                "sith.cloudAuto",
                 "cl_autoUpdate",
                 "cl_sjkChat",
                 crate::holocron_popup::NOTIFICATIONS_CVAR,
@@ -955,8 +961,9 @@ mod tests {
     fn simple_mode_keeps_its_categories_short() {
         for simple in Simple::ALL {
             let rows = Group::Simple(simple).rows();
+            // General holds the two content collections' automatic updates too.
             assert!(
-                (3..=13).contains(&rows.len()),
+                (3..=15).contains(&rows.len()),
                 "{simple:?}: {} rows",
                 rows.len()
             );
