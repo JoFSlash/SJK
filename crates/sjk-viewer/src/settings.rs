@@ -997,6 +997,14 @@ pub(crate) fn has_row(cvar: &str) -> bool {
         .any(|setting| setting.cvar.eq_ignore_ascii_case(cvar))
 }
 
+/// The label of `cvar`'s Settings row (any case): what a News link to it reads.
+pub(crate) fn row_label(cvar: &str) -> Option<&'static str> {
+    search::rows()
+        .iter()
+        .find(|setting| setting.cvar.eq_ignore_ascii_case(cvar))
+        .map(|setting| setting.label)
+}
+
 /// Where `cvar` sits in Settings (any case), for the command reference
 /// (`console_command_reference.rs`): the group a Settings search shows it under, the
 /// row's label and the row's help line; `None` when no row edits it.

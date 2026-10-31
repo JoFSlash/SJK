@@ -586,7 +586,7 @@ overlay routes their text to the UI's families (`console_sjk_pages.rs`).
   each change after a gold dot with its credit under it, scrolled by Page Up
   and Down or the wheel. Lines are wrapped by their measured width, and what a
   change puts in backticks is drawn as a chip, clickable as on the
-  [what's-new card](#whats-new-card) (`inline_code.rs`).
+  [News panel](#news-panel) (`inline_code.rs`).
 - **Update** ([update_panel_sjk.rs](../crates/sjk-viewer/src/update_panel_sjk.rs)):
   a pop-up card (840 wide, as tall as what it says) over the map darkened all
   over, since 08/10/2026 (Sol asked for it with First setup's). Update (gold)
@@ -2293,19 +2293,14 @@ play too; a command closes the console first, while a line clicked on the chat p
 its window over the page, which is back once the window closes. While a window shows the
 cursor is free and the window takes every key and click (held keys are let go); the claim
 window opens on the main menu or over the game menu, after the medal,
-holocron, reload, FPS and log request cards and before the what's-new card, never in the
+holocron, reload, FPS and log request cards and before the News panel, never in the
 middle of play. Every card is 920 wide from x 500, as tall as what it holds, centred; its
 head is the mark (SJK's logo, or the gift box U+E028 in gold for rewards, 52), a kicker in
 gold (Rajdhani 19) and on the right the date (`dd/mm/yyyy HH:MM`, UTC) or the round; then
 the title (Rajdhani 32, two lines at most). A click outside the card closes the
 announcement and the round list.
 
-- **Announcement:** "FROM THE SJK TEAM" (or "SJK RELEASE"), the title, then the text in
-  Exo 2 18: paragraphs with a gap between them, `- ` lines as gold bullets whose wrapped
-  lines stay indented; 16 lines at once, Up, Down and the wheel scroll the rest. Close
-  (gold for news; Esc, Enter, Space). A release adds Update (gold, U) while this build is
-  older than its version (the main menu's update action: install a release waiting, else
-  the Update page), else See what's new (W, the what's-new card's newest recap).
+- **Announcement:** read on the [News panel](#news-panel) since 31/10/2026.
 - **Round list:** "REWARD ROUND 1 OF 3", the round's title and note, then each person
   rewarded on a row of 34, alternate rows banded: the clan emblem for a known tag, the
   name with its colour codes ("Someone" when the hub has none) and the verified seal in a
@@ -2474,78 +2469,78 @@ every menu style, on the 16:9 frame:
   restart (Sol's review, 25/10/2026); registering again or the feed's word of a trade
   reads it at once.
 
-## What's new card
+## News panel
 
-[whats_new_card.rs](../crates/sjk-viewer/src/whats_new_card.rs): the pop-up a player
-gets the first time they reach the menu after an update (Sol, 12/10/2026: "a popup
-for updates that would show short recaps"). It tells what the update brought in a few
-short lines, the release's recap in [CHANGELOG.md](../CHANGELOG.md)
-([sjk.md](sjk.md#changelog)). It shows on the main page or over the game menu, never in
-the middle of play, after the medal, holocron, reload, FPS and log-request cards and
-not while the window is away; the menus under it are not drawn and take no input. The
-same look in every menu style, on the 16:9 frame:
+[news_panel.rs](../crates/sjk-viewer/src/news_panel.rs) with
+[news_panel_frame.rs](../crates/sjk-viewer/src/news_panel_frame.rs), 31/10/2026 (Sol:
+the what's-new card and the announcements "are kinda the same", so one panel for both,
+with working switches, pictures, and links into the UI that only the SJK team writes).
+It replaced the what's-new card (12/10/2026) and the announcement card (25/10/2026). One
+SJK pop-up over the darkened screen, the same look in every menu style, on the 16:9
+frame; the menus under it are not drawn and take no input, and while it shows the cursor
+is free and it takes every key and click.
 
-- **When:** `cl_whatsNewSeen` holds the version whose card the player closed. The card
-  shows when the installed version differs and the changelog lists it: the recaps of
-  every release since the seen one, newest first, at most five, a page each; with no
-  marker only the installed release's. A new installation (no marker, and First setup
-  not yet ticked away) writes the marker and shows nothing, and a local build no
-  release lists shows nothing. Closing writes the marker; quitting with the card up
-  shows it again next time. `whatsnew` shows the newest recap again, "Unreleased"
-  included, as a preview that writes nothing.
-- **Settings to review** (17/10/2026): when the releases since the seen one name
-  settings to choose again (`= <cvar>[ reset]: <sentence>` in the changelog,
-  [sjk.md](sjk.md#changelog); `changelog::reviews`, every release since the seen one,
-  past the five recap pages), the card opens on a page of them before the recaps:
-  "Settings to review" as its headline, "Changed by this update: choose again" on the
-  right, and a row each with the heading's icon, "1." and the setting's Settings name
-  (`settings::switch_label`) in gold, its switch at the right and the sentence under
-  them. A click on the switch or the row's number key (1 to 9) flips the setting and
-  leaves the card up; the switches read the console each frame, as the Settings rows
-  do (a number cvar is on when nonzero; Sol's report, 31/10/2026: one held in a number
-  cvar did nothing and always showed Off). A `reset` setting is
-  put back to its default when the card is offered, not in a preview (`whatsnew` shows
-  "Unreleased"'s with working switches), once per version: `cl_whatsNewReset` records
-  the version whose resets were applied as soon as they are, so a player who joins with
-  `+connect` or quits with the card up, then turns the setting on in game, keeps it at
-  the next start, while the card is still offered (`changelog::resets`; an update past
-  it resets only the newer releases' settings). That one generic marker serves every
-  release; no setting has a migration cvar of its own, and `cl_whatsNewSeen` still says
-  what the player has not seen.
-- **Card:** the kit's card over its scrim, 920 wide from x 500, centred vertically, as
-  tall as its tallest page, so the buttons stay put while the pages turn.
-- **Words:** "SJK updated" (or "Preview") in gold (Rajdhani 22) and, right-aligned on
-  the same line, the release's date (with "Release 2 of 3" when there are pages; muted
-  Rajdhani 19); "What's new in <release>" ("What's coming next" for the unreleased
-  preview; Rajdhani 36); then one block per recap line: its heading's icon (26, a
-  settings or quick wheel icon, chosen by the words of the heading from
-  `HEADING_ICONS`, the changelog icon when none match), its heading in bright gold
-  (Rajdhani 21, semibold) beside the icon, and under the heading its sentence (Exo 2
-  18, 28 a line, 16 between blocks; Sol, 12/10/2026: "the titles shouldn't be on the
-  left but on the top"). The sentences are wrapped by their measured width when the
-  card is drawn, again whenever the menu text size or spacing changes. A release
-  without a recap shows its introduction (six lines at most, "..." when cut) in muted
-  text; once a page's recap would pass 640 pixels it says "More in the full
-  changelog." Under the recap, in gold Exo 2 16, who made the release's changes and
-  the clients they follow, from the changes' credits, most credited first: "By Creyon
-  and Sol, after OpenJK and JoF EJK".
-- **Chips:** what a recap sentence puts in backticks (a command or cvar: `` `whatsnew` ``)
-  is drawn as a chip, as messaging apps draw inline code (Sol, 12/10/2026;
-  [inline_code.rs](../crates/sjk-viewer/src/inline_code.rs), shared with the changelog
-  page): JetBrains Mono 17 on a faint holo fill with a holo edge, 25 high, rounded 6, 7
-  of room each side. A chip is never split across lines; a full stop or comma written
-  against it stays with it, 3 apart. The changelog's parser keeps the backticks (it
-  drops them in introductions and headings, and the classic+ page drops them) and
-  rejects a line that leaves one open. A chip lights gold under the pointer; a click
-  closes the card and follows it: a cvar Settings has a row for (`settings::has_row`)
-  opens Settings with it searched (the SJK UI's Settings, or the classic Setup panel
-  under the classic style), anything else (a command, a cvar with a value) is typed on
-  the console's input line, not run (`ViewerConsole::follow_chip`).
-- **Pages:** with several releases, the foot's left holds a previous arrow, a dot per
-  release (the one on show gold) and a next arrow; Left and Right turn the pages too.
-- **Buttons:** Full changelog (outlined, 230) opens the changelog page, Close (gold, 150)
-  puts the card away; focus starts on Close. Keys bottom right: Left and Right turn the
-  pages (with several), Enter, Space, Esc or Backspace close, C opens the changelog.
+- **When it opens on its own:** on the main menu or over the game menu, never in the
+  middle of play, after the medal, holocron, reload, FPS, log-request and claim cards and
+  not while the window is away. After an update, on its "Settings to review" (when the
+  releases since the one seen name any) or its recap: `cl_whatsNewSeen` holds the
+  version whose panel the player closed, as the card's did; a new installation (no
+  marker, First setup not yet ticked away) writes the marker and shows nothing, and a
+  local build no release lists shows nothing. And when an announcement came that the
+  player has not read, once a run for each: `announcements_seen.txt` keeps `read`, the
+  highest announcement number seen on the panel ([official/seen.rs](../crates/sjk-viewer/src/official/seen.rs));
+  a file from before counts what the chat showed as read, and a new key counts what the
+  hub lists first as read, so a fresh install opens nothing. Closing the panel counts
+  every announcement it listed as read and writes the update's marker.
+- **Asked for**, it shows at once, over play and over the console: `news` (its newest
+  entry), `whatsnew` (the newest recap, "Unreleased" included, as a preview that writes
+  nothing; its settings to review switch), `announcement [n]` and a click on an
+  announcement's line in the SJK chat ("Read more").
+- **Settings to review** (17/10/2026): `= <cvar>[ reset]: <sentence>` in the changelog
+  ([sjk.md](sjk.md#changelog)), every release since the seen one. A `reset` setting is put
+  back to its default when the update's panel is offered, once per version
+  (`cl_whatsNewReset`, written as soon as it is applied).
+- **Left, the entries,** ten at a time (the wheel scrolls; Up and Down change the entry):
+  "Settings to review" first, then the hub's announcements and the six newest releases'
+  recaps, newest first by date. Each row: its kicker ("SETTINGS TO REVIEW" in gold, "SJK
+  RELEASE", "FROM THE SJK TEAM", "PREVIEW"; Rajdhani 14), its date on the right, its name
+  (Rajdhani 21), a gold dot while unread. A release's announcement (kind `release`, its
+  version a release the changelog lists) goes on that release's entry, its text above the
+  recap; one for a release this build does not list is an entry of its own with Update.
+- **Right, the entry:** its kicker in gold and its date (dd/mm/yyyy, with HH:MM for an
+  announcement), its title (Rajdhani 34), then its text 1124 wide, by lines that scroll
+  (the wheel, Page Up and Down; a gold thumb on the right shows where). Recap lines are
+  a heading with its icon (`HEADING_ICONS`) over its sentence; a release without a recap
+  shows its introduction (six lines, "...") or says its changes are in the full
+  changelog; "By ..., after ..." closes a release in gold. Announcement lines are
+  paragraphs, `- ` bullets (a gold dot, wrapped lines indented) and three kinds of
+  markup ([sjk_identity::news_markup](../crates/sjk-identity/src/news_markup.rs)):
+  - **Links**, `[Label](target)`, drawn semibold in the holo colour and underlined, gold
+    under the pointer. `setting:<cvar>` opens Settings searched for it (the SJK UI's,
+    or the classic Setup panel); `open:<page>` opens a place of
+    [ui_links.rs](../crates/sjk-viewer/src/ui_links.rs)'s `PAGES` table (Settings,
+    Collection, Achievements, Holocrons, Profile, SJK identity, SJK chat, Emotes, Toys,
+    Model viewer, Contributor rewards, Changelog, Credits, Update, and with `mod-jof` JoF
+    content and Sith cloud), each by a command of this client. A link names a place,
+    never a command, and one this build does not know reads as its label.
+  - **Pictures**, `[[image:<id>]]` on a line of their own: drawn at their size within the
+    pane (at most 470 high), a framed "Picture loading..." until they arrive
+    ([news_images.rs](../crates/sjk-viewer/src/news_images.rs): a worker reads them from
+    `news/<id>` beside the settings, else downloads them from the hub and keeps them
+    there; three textures of their own, given back as 1x1 after 600 frames unused, and
+    at most four kept decoded). A picture the hub took down is left out.
+  - **Switches**, `[[switch:<cvar>]]` on a line of their own: the setting's Settings
+    name in gold and its switch, as a setting to review (a cvar Settings has no plain
+    on/off row for is left out).
+  Commands and cvars in backticks are chips (`inline_code`), as in the changelog.
+- **Switches** read the console each frame as the Settings rows do (a number cvar is on
+  when nonzero; Sol's report, 31/10/2026: one held in a number cvar did nothing and always
+  showed Off). A click or the row's number key (1 to 9) flips it and the panel stays.
+- **Foot:** Full changelog (outlined), Update (gold, on a release newer than this build:
+  install a release waiting, else the Update page) and Close (gold otherwise); keys
+  bottom right: 1-9 switch, Up and Down entry, PgUp and PgDn scroll, U update, C full
+  changelog, Esc (also Enter, Space, Backspace) close. A chip or a link closes the panel
+  and follows it.
 
 ## Symbols
 

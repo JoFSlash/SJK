@@ -332,8 +332,11 @@ pub struct Snapshot {
     pub rewards_revision: u64,
     /// What became of the last claim ([`Service::claim_reward`]).
     pub claim: Option<ClaimOutcome>,
-    /// What became of the creator's last announcement ([`Service::announce`]).
+    /// What became of the SJK team's last announcement ([`Service::announce`]).
     pub announce: Option<ReportOutcome>,
+    /// What became of the last news picture uploaded ([`Service::upload_news_image`]):
+    /// its serial, and the picture or why it was refused.
+    pub news_image: Option<(u64, Result<crate::news::NewsImage, String>)>,
 }
 
 /// The player's trades with other players, as last read (`crate::trades`).
@@ -642,6 +645,7 @@ impl Snapshot {
             rewards_revision: 0,
             claim: None,
             announce: None,
+            news_image: None,
         }
     }
 
@@ -801,8 +805,10 @@ enum Command {
     RefreshRewards,
     /// Claim this reward.
     ClaimReward(u64),
-    /// The creator's announcement.
+    /// The SJK team's announcement.
     Announce(AnnounceRequest),
+    /// A news picture for an announcement: its bytes and type.
+    UploadNewsImage(Vec<u8>, &'static str),
     Stop,
 }
 
@@ -1676,6 +1682,7 @@ impl Worker {
             }
             Command::ClaimReward(id) => self.claim_reward(id, now),
             Command::Announce(request) => self.announce(&request),
+            Command::UploadNewsImage(bytes, mime) => self.upload_news_image(&bytes, mime),
             Command::Stop => self.release(),
         }
         self.publish_feed();
@@ -2530,6 +2537,32 @@ impl Worker {
         self.update(|snapshot| {
             let serial = snapshot.announce.as_ref().map_or(1, |last| last.serial + 1);
             snapshot.announce = Some(outcome_of(serial, outcome.map_err(announce_refusal)));
+        });
+    }
+
+    fn upload_news_image(&mut self, bytes: &[u8], mime: &str) {
+        let outcome = match (self.hub.as_mut(), self.registered) {
+            (Some(hub), true) => {
+                hub.upload_news_image(&self.identity, bytes, mime)
+                    .map_err(|error| match error {
+                        HubError::Rejected { code, message, .. } => match code.as_str() {
+                            "not_staff" | "not_registered" => {
+                                "Only the SJK team can upload news pictures".to_owned()
+                            }
+                            "image_quota" => {
+                                "Thirty pictures an hour at most: wait a while".to_owned()
+                            }
+                            _ if message.is_empty() => format!("the hub refused it ({code})"),
+                            _ => message,
+                        },
+                        other => other.to_string(),
+                    })
+            }
+            _ => Err(self.not_connected().to_string()),
+        };
+        self.update(|snapshot| {
+            let serial = snapshot.news_image.as_ref().map_or(1, |(last, _)| last + 1);
+            snapshot.news_image = Some((serial, outcome));
         });
     }
 
@@ -3426,7 +3459,7 @@ fn announce_refusal(error: HubError) -> HubError {
             status,
             message: match code.as_str() {
                 "creator_only" | "not_staff" | "staff" | "not_registered" => {
-                    "Only SJK's creator can announce".to_owned()
+                    "Only the SJK team can announce".to_owned()
                 }
                 "announce_quota" => "Ten announcements an hour at most: wait a while".to_owned(),
                 _ => format!("the hub refused it ({code})"),
@@ -3813,6 +3846,13 @@ impl Service {
     /// creator.
     pub fn announce(&self, request: AnnounceRequest) {
         let _ = self.commands.send(Command::Announce(request));
+    }
+
+    /// Upload a news picture (a PNG or JPEG, `mime`) for an announcement: the hub's id
+    /// and size, or why it refused, arrive in [`Snapshot::news_image`]. The hub refuses
+    /// anyone but the SJK team.
+    pub fn upload_news_image(&self, bytes: Vec<u8>, mime: &'static str) {
+        let _ = self.commands.send(Command::UploadNewsImage(bytes, mime));
     }
 
     /// Put `announcements` (oldest first, read from the hub: made while the player was
@@ -4729,6 +4769,7 @@ mod tests {
                 title: request.title.clone(),
                 text: request.text.clone(),
                 version: request.version.clone(),
+                images: std::collections::BTreeMap::new(),
             })
         }
         fn log_requests(&mut self, _: &Identity) -> Result<Vec<LogRequest>, HubError> {
@@ -6559,6 +6600,7 @@ mod tests {
             title: format!("News {id}"),
             text: "Text".to_owned(),
             version: String::new(),
+            images: std::collections::BTreeMap::new(),
         }
     }
 
@@ -6687,7 +6729,7 @@ mod tests {
         worker.handle(Command::Announce(request("refused")), t0);
         assert_eq!(
             lock(&snapshot).announce.clone().unwrap().message,
-            "Only SJK's creator can announce"
+            "Only the SJK team can announce"
         );
         worker.handle(Command::Announce(request("SJK 2026.1025.1")), t0);
         let sent = lock(&snapshot).clone();

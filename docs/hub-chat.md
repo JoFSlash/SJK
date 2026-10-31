@@ -1425,7 +1425,7 @@ never in a game server's chat.
   sent to a game server.
 - "Read more": a click on the line in the dock or on the chat page (Up and Down on the
   page pass over it), or the console's `announcement [number]` (no number: the newest),
-  opens the announcement's card ([sjk-ui.md](sjk-ui.md#announcements-and-reward-rounds)).
+  opens the announcement on the News panel ([sjk-ui.md](sjk-ui.md#news-panel)).
   The command closes the console first; the card frees the cursor, in a match too
   (Sol's report, 25/10/2026: the console stayed under the card, and closing it closed
   the card too).
@@ -1452,13 +1452,32 @@ never in a game server's chat.
   the game's chat) and the windows offline: nothing is sent, nothing is written to
   `announcements_seen.txt`, a rehearsed Claim only closes the reward.
 
-**The creator** writes announcements in game: the `announce` window (Kind News or Release
-with its version, Title, Text; a live preview of the chat line; Ctrl+Enter or Send, then
-a confirmation) sends `POST /v1/creator/announce`, checked first with the hub's rules
-(`news::check`: a title of 1 to 80 characters on one line, a text of 1 to 2000 characters
-on at most 30 lines, the chat's alphabet without `^`, a release's version like
-`2026.1025.1`). Anyone else is told "Only SJK's creator can announce", and the hub refuses
+**The SJK team** writes announcements in game (the creator alone until 31/10/2026, then
+every staff member, Sol's decision): the `announce` window (Kind News or Release with its
+version, Title, Text; a live preview of the chat line; Ctrl+Enter or Send, then a
+confirmation) sends `POST /v1/staff/announce` (`POST /v1/creator/announce` on a hub from
+before), checked first with the hub's rules (`news::check`: a title of 1 to 80 characters
+on one line, a text of 1 to 2000 characters on at most 30 lines, the chat's alphabet
+without `^`, the backtick allowed for chips, well-formed markup, a release's version like
+`2026.1025.1`). Anyone else is told "Only the SJK team can announce", and the hub refuses
 them too.
+
+**News panel markup** (31/10/2026, [sjk-ui.md](sjk-ui.md#news-panel),
+[news_markup.rs](../crates/sjk-identity/src/news_markup.rs)): an announcement's text may
+hold links into the client's UI, `[Label](setting:<cvar>)` and `[Label](open:<page>)`,
+and lines `[[image:<id>]]` and `[[switch:<cvar>]]`. Only announcements are read this way,
+never chat messages, so only the SJK team makes links. The chat line shows a link's label
+and leaves pictures and switches out (`news_markup::plain`). In the `announce` window's
+Text: Ctrl+L makes the cvar just typed a link to its setting, named as Settings names it,
+or with none opens a picker of the places `ui_links.rs` knows; Ctrl+K makes the cvar just
+typed its switch, on a line of its own; Ctrl+I opens the system's file dialog (on a thread
+of its own) for a PNG or JPEG of at most 3 MB, uploads it (`PUT /v1/staff/news-image`,
+`Service::upload_news_image`, the outcome in `Snapshot::news_image`) and puts its line at
+the end. The hub re-encodes pictures (no metadata kept) at most 1600 x 900, names each by
+a hash of the file, and lists each announcement's pictures with their sizes (`images`);
+clients read them unsigned at `GET /v1/news-image/<id>` and keep them in `news/` beside
+the settings. On a hub before the panel the pictures and the staff route are missing:
+the announcement goes the creator's way and a picture upload fails with the hub's words.
 
 Checked (25/10/2026): unit tests for the wire types (the spec's examples), the rules,
 the request bodies, the feed's merging and its news, the posting of read announcements,

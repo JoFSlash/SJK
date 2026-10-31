@@ -63,6 +63,11 @@ impl GpuState {
             self.official_key(&event);
             return;
         }
+        // And the News panel, over the console too when it was asked for.
+        if self.news.is_open() {
+            self.news_key(&event);
+            return;
+        }
         if !console_open && self.text_dialog.is_open() {
             let action = self.text_dialog.handle_key(&event);
             self.apply_dialog_action(action);
@@ -135,12 +140,6 @@ impl GpuState {
         if !console_open && self.log_request_card.is_open() {
             let choice = self.log_request_card.handle_key(&event);
             self.log_request_card_choice(choice);
-            return;
-        }
-        // And the what's-new card.
-        if !console_open && self.whats_new_card.is_open() {
-            let choice = self.whats_new_card.handle_key(&event);
-            self.whats_new_card_choice(choice);
             return;
         }
         // Ctrl+Tab changes the Profile screen's tab, whichever screen shows it.

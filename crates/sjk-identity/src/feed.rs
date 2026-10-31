@@ -975,6 +975,7 @@ mod tests {
             title: title.to_owned(),
             text: "Hello all".to_owned(),
             version: String::new(),
+            images: std::collections::BTreeMap::new(),
         }
     }
 

@@ -1241,6 +1241,7 @@ pub(crate) mod tests {
             rewards_revision: 0,
             claim: None,
             announce: None,
+            news_image: None,
             public_key: String::new(),
         }
     }

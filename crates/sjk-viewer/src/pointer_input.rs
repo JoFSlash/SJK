@@ -241,6 +241,7 @@ impl GpuState {
             || self.text_dialog.is_open()
             // The SJK team's window, which may show in the middle of play.
             || self.official.window.is_open()
+            || self.news.is_open()
             || self.chat.is_typing()
             || self
                 .console
@@ -308,6 +309,11 @@ impl GpuState {
         // The SJK team's window, over the console too.
         if self.official.window.is_open() {
             self.official_pointer(event);
+            return true;
+        }
+        // And the News panel.
+        if self.news.is_open() {
+            self.news_pointer(event);
             return true;
         }
         if self
@@ -386,11 +392,6 @@ impl GpuState {
         if self.log_request_card.is_open() {
             let choice = self.log_request_card.handle_pointer(event);
             self.log_request_card_choice(choice);
-            return true;
-        }
-        if self.whats_new_card.is_open() {
-            let choice = self.whats_new_card.handle_pointer(event);
-            self.whats_new_card_choice(choice);
             return true;
         }
         // The update card, over the menus: a click on it installs the update.

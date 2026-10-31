@@ -1333,6 +1333,7 @@ Found the fog bug, ask me about it!"
             rewards_revision: 0,
             claim: None,
             announce: None,
+            news_image: None,
             public_key: String::new(),
         };
         let standings = crate::achievements::ALL

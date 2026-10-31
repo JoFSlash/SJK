@@ -663,6 +663,14 @@ impl ViewerConsole {
         self.shell.push_log_quiet(text);
     }
 
+    /// Whether `cmdlist` lists command `name` (any case).
+    #[cfg(test)]
+    pub(crate) fn has_command(&self, name: &str) -> bool {
+        self.shell
+            .command_help()
+            .any(|(known, _, _)| known.eq_ignore_ascii_case(name))
+    }
+
     /// Queue `text` to run as if typed, on the next command frame.
     pub(crate) fn queue_command(&mut self, text: &str) -> Result<(), String> {
         self.shell

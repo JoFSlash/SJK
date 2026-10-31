@@ -147,6 +147,7 @@ mod tests {
             title: "Big ^1news".to_owned(),
             text: text.to_owned(),
             version: String::new(),
+            images: Default::default(),
         })
     }
 

@@ -268,6 +268,9 @@ includes:
   can move or be switched off without a release; and their automatic updates
   (`jof.contentAuto`, `sith.cloudAuto`, 31/10/2026), opt in, at start and every hour
   for the groups the player marks Auto;
+- the News panel (`news`, 31/10/2026): release recaps and the SJK team's announcements in
+  one panel, with links into the UI only the SJK team writes, pictures and switches, and
+  announcing open to every staff member;
 - Mythical shader parts: the Sun's prominences, rising sparks, glints circling its
   blade below the tip and heat haze, the Void's orbiting black holes, warped space,
   gravity pulse and afterimages, the Spectral's wisps, souls, smoky edge, cold rim and swaying echo, each a part

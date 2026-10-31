@@ -263,6 +263,8 @@ mod map_blocks;
 mod map_edits;
 mod mystery_box;
 mod net_timing;
+mod news_images;
+mod news_panel;
 mod particle_motion;
 mod particle_physics;
 mod particle_room;
@@ -340,6 +342,7 @@ mod text_dialog;
 mod text_entry;
 mod text_select;
 mod tile_shine;
+mod ui_links;
 mod ui_renderer;
 mod ui_scale;
 mod ui_target;
@@ -353,7 +356,6 @@ mod weapon_select;
 mod weapon_view;
 mod weather;
 mod wgsl_source;
-mod whats_new_card;
 mod window_icon;
 mod world_materials;
 mod world_notes;
@@ -492,8 +494,8 @@ struct GpuState {
     /// A client mod's notice, shown once on its servers ([`mod_notice_card`]).
     mod_notice: mod_notice_card::State,
     small_card_notice: small_card_notice::Card,
-    /// What the update brought ([`whats_new_card`]).
-    whats_new_card: whats_new_card::Card,
+    /// What the update brought and the SJK team's announcements ([`news_panel`]).
+    news: news_panel::Panel,
     /// The SJK team's announcements and contributor rewards ([`official`]).
     official: official::Official,
     window: Option<Arc<Window>>,
@@ -1515,7 +1517,7 @@ impl GpuState {
             log_request_card: log_request_card::Card::default(),
             mod_notice: mod_notice_card::State::default(),
             small_card_notice: small_card_notice::Card::default(),
-            whats_new_card: whats_new_card::Card::default(),
+            news: news_panel::Panel::default(),
             official: official::Official::default(),
 
             screenshots: screenshot_setup.manager,
@@ -2206,7 +2208,7 @@ impl GpuState {
                 || self.holocron_popup.pending(),
         );
         // And what the update brought, last.
-        let news_shown = self.prepare_whats_new_card(
+        let news_shown = self.prepare_news_panel(
             covered
                 || medal_shown
                 || holocron_shown
@@ -2553,7 +2555,7 @@ impl GpuState {
         } else if official_shown {
             self.append_official(viewport);
         } else if news_shown {
-            self.append_whats_new_card(viewport);
+            self.append_news_panel(viewport);
         } else if emote_help_shown {
             self.append_emote_help_card(viewport);
         } else if emote_picker_shown {
@@ -2622,7 +2624,7 @@ impl GpuState {
             fps_shown.then(|| self.fps_card.draw_list()),
             logs_shown.then(|| self.log_request_card.draw_list()),
             official_shown.then(|| self.official.window.draw_list()),
-            news_shown.then(|| self.whats_new_card.draw_list()),
+            news_shown.then(|| self.news.draw_list()),
             emote_help_shown.then(|| self.emote_help.card.draw_list()),
             emote_picker_shown.then(|| self.emote_picker.card.draw_list()),
             whisper_shown.then(|| self.e2e_whispers.card.draw_list()),
