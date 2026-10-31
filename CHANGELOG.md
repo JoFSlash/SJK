@@ -32,7 +32,7 @@ Add each release's notes here when it is tagged (docs/sjk.md "Releases").
 -->
 ## Unreleased
 
-- Legendary and Mythical saber shaders draw faster, looking the same: about a fifth less GPU time over the 48 of them, and half on Bleeding Kyber, Abyssal Eye and Sith Holocron _(Sol)_
+- Legendary and Mythical saber shaders draw faster, looking the same: about a quarter less GPU time over the 48 of them, and half or more on Bleeding Kyber, Abyssal Eye, Sith Holocron, Reactor and Felucia Spores _(Sol)_
 
 ## 2026.1031.1 (Alpha) | 31/10/2026
 

@@ -3102,6 +3102,23 @@ blades of the scene). Bleeding Kyber 3.57 to 1.49 ms, Abyssal Eye 3.03 to 1.37, 
 2.52 to 1.32, Exogorth 4.06 to 2.92, Between Worlds 3.86 to 3.05; World Shift and the five
 blades without a signature unchanged. Not timed on another GPU or backend.
 
+A second round (31/10/2026) gave the blades' own loops the same kind of exact skip: a piece's
+reach from a point or the axis is known, and past it plus three widths of its widest glow (and
+three pixels) it adds under a ten-thousandth. Reactor's magnetic loops, Felucia Spores'
+filaments and spores, Between Worlds' streams (which draw nothing past 2 anyway), Starforge's
+granules and embers, Exogorth's saliva strands and Nebula Song's ribbons. Sheets again within
+1/255 of the original `main`'s. Timed against `main` in one sitting (`game` / `close`): Felucia
+Spores 2.06 to 1.22 / 1.17 to 0.68 ms, Reactor 2.03 to 1.26 / 1.10 to 0.63, Between Worlds 2.78
+to 2.33 / 1.60 to 1.29, Starforge 1.86 to 1.65 / 1.03 to 0.92, Nebula Song 0.98 to 0.83 and
+Exogorth 1.51 to 1.32 in `close`; untouched blades moved up to a tenth either way in that run,
+so smaller changes are noise.
+
+The smoke (`fxSmoke`, in 40 signatures) is not where the time goes: switched off, the 48 top
+blades' `game` total fell by 2.9 of 54.6 ms, 0.29 ms at most for one blade (Starkiller Frost).
+Its noise has no exact shortcut, so it is left as it is. Measuring while the client runs is
+unreliable: during one run the stand-in blade went from 0.57 to 2.57 ms and the switched-off
+helpers seemed to cost time; check the stand-in line of each run.
+
 ### Falling blossoms
 
 Built 21/10/2026 for the Varykino Blossom (blade 166, Kushina's idea: "the afterimage like

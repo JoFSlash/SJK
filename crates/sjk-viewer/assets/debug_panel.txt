@@ -7986,6 +7986,7 @@ change: Signature blades work out the blade's hiding once per pixel; lightning s
 change: About a fifth less GPU time over the 48 Legendary/Mythical blades, up to half on some.
 test: debug_collectibles 1, wear Bleeding Kyber, Abyssal Eye, Exogorth: they look as before.
 test: World Shift and Sith Holocron: lightning and climates as before, no flicker or cut bolts.
+test: Reactor, Felucia Spores, Between Worlds, Starforge: loops, spores, streams as before.
 test: cg_drawFPS 1 with several top-tier blades in view: FPS a little higher than before.
 
 [tcgen-vector]
