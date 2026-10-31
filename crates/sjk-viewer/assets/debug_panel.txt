@@ -24,6 +24,16 @@
 
 # ---- Console & chat ----
 
+[look-sync]
+area: Gameplay
+title: Toys (the box) reach other players faster
+change: A toy or blade change no longer waits behind the client's other hub calls.
+change: A look the hub finds too fast is retried after 1 s, not 10 s; a lapsed claim at once.
+change: The log says how long each look took: "SJK look sent: N ms after the change ...".
+test: With a second SJK client on the same server, toy_box on/off: it shows within ~1-2 s.
+test: Toggle the box quickly several times: the other client ends on the right state.
+test: logs\last-client.log has "SJK look sent" lines with small waits.
+
 [predict-legacy]
 area: Gameplay
 title: Prediction as in 2026.1028.1 (cg_predictLegacy, after Kushina's request)

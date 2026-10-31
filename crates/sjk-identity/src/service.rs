@@ -89,6 +89,9 @@ const LOOK_EVERY: Duration = Duration::from_secs(1);
 /// How long a look waits after the hub said too many (429: `look_quota`, or the
 /// address's `rate_limited`), refused the signature (401) or failed.
 const LOOK_AGAIN: Duration = Duration::from_secs(10);
+/// How long a look waits after the hub said the key's looks came too fast (429
+/// `look_quota`): the hub counts whole seconds, so a second more is enough.
+const LOOK_QUOTA_AGAIN: Duration = Duration::from_secs(1);
 /// The hub's answer to a map edits publication: the map, the checksum and the new
 /// revision, or why it was refused.
 pub type MapEditsPublished = Result<(String, i32, u64), String>;
@@ -715,8 +718,12 @@ enum Command {
     SetAvatar(Vec<u8>),
     /// Take the picture down.
     RemoveAvatar,
-    /// The look the player wears.
+    /// The look the player wears (the tests' way; [`Service::set_look`] leaves it in
+    /// [`Worker::latest_look`]).
+    #[cfg_attr(not(test), allow(dead_code))]
     Look(Look),
+    /// A new look waits in [`Worker::latest_look`] (what [`Service::set_look`] sends).
+    LookWaiting,
     /// The feed relayed a look event of the player's own key: its id and blade skin.
     OwnLook(u64, String),
     /// The folder to keep the hub's asset packs in.
@@ -858,6 +865,12 @@ struct Worker {
     ping_outcome: Arc<Mutex<Option<ReportOutcome>>>,
     /// The look the viewer last gave.
     look: Look,
+    /// The newest look [`Service::set_look`] gave, not yet taken: the worker reads it
+    /// between its other hub calls too, so a slow one does not hold a toy back for a
+    /// whole round (the cardboard box's slow sync, 31/10/2026).
+    latest_look: Arc<Mutex<Option<Look>>>,
+    /// Since when the look waits to reach the hub (logged with its outcome).
+    look_since: Option<Instant>,
     /// The claim (server, slot and name) the hub accepted last, while it holds it: a
     /// look lives on it.
     look_claim: Option<(String, u8, String)>,
@@ -1176,6 +1189,8 @@ impl Worker {
             chat: Arc::default(),
             ping_outcome: Arc::default(),
             look: Look::default(),
+            latest_look: Arc::default(),
+            look_since: None,
             look_claim: None,
             look_held: Held::Unknown,
             due_look: now,
@@ -1587,7 +1602,8 @@ impl Worker {
             Command::SetChat(on) => self.chat_on = on,
             Command::SetAvatar(png) => self.change_avatar(Some(&png)),
             Command::RemoveAvatar => self.change_avatar(None),
-            Command::Look(look) => self.look = look,
+            Command::Look(look) => self.wear(look, now),
+            Command::LookWaiting => self.take_latest_look(now),
             Command::OwnLook(id, saber) => self.own_look_seen(id, &saber, now),
             Command::AssetsDir(dir) => {
                 if self.assets_dir.as_ref() != Some(&dir) {
@@ -2313,14 +2329,21 @@ impl Worker {
         }
         self.run_due(now);
         self.keep_holocrons(now);
+        self.look_between(now);
         self.keep_trades(now);
+        self.look_between(now);
         self.keep_log_requests(now);
+        self.look_between(now);
         self.keep_announcements(now);
         self.keep_rewards(now);
+        self.look_between(now);
         self.keep_assets(now);
+        self.look_between(now);
         self.keep_map_edits(now);
         self.keep_mystery_boxes(now);
+        self.look_between(now);
         self.send_crashes(now);
+        self.look_between(now);
         let mut wait = IDLE_MAX;
         if self.location.is_some() {
             wait = wait
@@ -2903,7 +2926,15 @@ impl Worker {
         let (Some((server, _, _)), Some(hub)) = (self.look_claim.clone(), self.hub.as_mut()) else {
             return;
         };
+        let started = Instant::now();
         let outcome = hub.look(&self.identity, &server, &look);
+        // The next look leaves a second after this one's answer, not its start: it then
+        // reaches the hub more than a second after this one, in another of the whole
+        // seconds the hub counts (a `look_quota` refusal otherwise).
+        // In whole milliseconds, which keeps the worker's timing exact under test.
+        let took =
+            Duration::from_millis(u64::try_from(started.elapsed().as_millis()).unwrap_or(u64::MAX));
+        let now = now + took;
         self.due_look = now + LOOK_EVERY;
         match &outcome {
             Ok(id) => {
@@ -2989,10 +3020,18 @@ impl Worker {
                 self.look_sounds_unsupported = true;
                 self.due_look = now;
             }
-            // The claim lapsed at the hub: the next accepted claim sends the look again.
+            // The claim lapsed at the hub: the next accepted claim sends the look again,
+            // and it is asked for at once rather than at the next renewal.
             Err(HubError::Rejected { code, .. }) if code == "not_on_server" => {
                 self.look_claim = None;
                 self.look_held = Held::none();
+                self.due_claim = now;
+            }
+            // The key's looks came too fast: the hub counts whole seconds.
+            Err(HubError::Rejected {
+                status: 429, code, ..
+            }) if code == "look_quota" => {
+                self.due_look = now + LOOK_QUOTA_AGAIN;
             }
             // Too many: the key's look quota, or the address's allowance (429
             // `rate_limited`) shared with the chat and emotes. A signature refused
@@ -3009,13 +3048,57 @@ impl Worker {
             }
             Err(_) => self.due_look = now + LOOK_AGAIN,
         }
+        let waited = self
+            .look_since
+            .map_or(Duration::ZERO, |since| now.saturating_duration_since(since));
+        if outcome.is_ok() && !self.look_waiting() {
+            self.look_since = None;
+        }
+        let note = format!(
+            "{} ms after the change, the hub answered in {} ms",
+            waited.as_millis(),
+            took.as_millis()
+        );
         self.update(|snapshot| {
             let serial = snapshot
                 .look_outcome
                 .as_ref()
                 .map_or(1, |last| last.serial + 1);
-            snapshot.look_outcome = Some(outcome_of(serial, outcome.map(|_| String::new())));
+            let mut reported = outcome_of(serial, outcome.map(|_| String::new()));
+            reported.message = if reported.sent {
+                note
+            } else {
+                format!("{} ({note})", reported.message)
+            };
+            snapshot.look_outcome = Some(reported);
         });
+    }
+
+    /// Wear `look` from now on, noting when it starts waiting for the hub.
+    fn wear(&mut self, look: Look, now: Instant) {
+        if look != self.look && self.look_since.is_none() {
+            self.look_since = Some(now);
+        }
+        self.look = look;
+    }
+
+    /// Take the newest look [`Service::set_look`] left, if any.
+    fn take_latest_look(&mut self, now: Instant) {
+        let latest = self
+            .latest_look
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .take();
+        if let Some(look) = latest {
+            self.wear(look, now);
+        }
+    }
+
+    /// Between two of a round's other hub calls: a look given meanwhile goes now if it
+    /// may, rather than after the rest of the round.
+    fn look_between(&mut self, now: Instant) {
+        self.take_latest_look(now);
+        self.send_look(now);
     }
 
     /// Whether the hub should hear the achievement counts at `now`: they changed since
@@ -3349,6 +3432,8 @@ fn set_achievements(snapshot: &mut Snapshot, achievements: Vec<Achievement>) {
 /// The running service: commands go in, a [`Snapshot`] comes out.
 pub struct Service {
     commands: Sender<Command>,
+    /// The worker's [`Worker::latest_look`].
+    latest_look: Arc<Mutex<Option<Look>>>,
     snapshot: Arc<Mutex<Snapshot>>,
     staff: Arc<Mutex<StaffState>>,
     chat: Arc<Mutex<ChatState>>,
@@ -3416,6 +3501,7 @@ impl Service {
             Instant::now(),
         );
         let chat = Arc::clone(&worker.chat);
+        let latest_look = Arc::clone(&worker.latest_look);
         let ping_outcome = Arc::clone(&worker.ping_outcome);
         let feed = Arc::clone(&worker.feed);
         let own_drops = commands.clone();
@@ -3525,6 +3611,7 @@ impl Service {
         }
         Self {
             commands,
+            latest_look,
             snapshot,
             staff,
             chat,
@@ -4016,7 +4103,11 @@ impl Service {
     /// second; a blade skin the hub says the key does not hold is left out until the
     /// profile changes. What became of it arrives in [`Snapshot::look_outcome`].
     pub fn set_look(&self, look: Look) {
-        let _ = self.commands.send(Command::Look(look));
+        *self
+            .latest_look
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner) = Some(look);
+        let _ = self.commands.send(Command::LookWaiting);
     }
 
     /// The looks the feed received since the last call, oldest first: those it read
@@ -6535,14 +6626,20 @@ mod tests {
         }
         let mut at = t0 + LOOK_EVERY;
         worker.handle(Command::Look(lit("")), at);
-        for (n, code) in ["rate_limited", "look_quota", "clock"].iter().enumerate() {
+        // The key's own quota counts whole seconds: a second more is enough.
+        let waits = [
+            ("rate_limited", LOOK_AGAIN),
+            ("look_quota", LOOK_QUOTA_AGAIN),
+            ("clock", LOOK_AGAIN),
+        ];
+        for (n, (code, wait)) in waits.into_iter().enumerate() {
             worker.tick(at);
             assert_eq!(fake.looks().len(), sent + n + 1, "{code}");
             assert!(!lock(&snapshot).look_outcome.clone().unwrap().sent);
             // Not again within the wait, then again.
-            worker.tick(at + LOOK_AGAIN - Duration::from_millis(1));
+            worker.tick(at + wait - Duration::from_millis(1));
             assert_eq!(fake.looks().len(), sent + n + 1, "{code}");
-            at += LOOK_AGAIN;
+            at += wait + Duration::from_millis(5);
         }
         worker.tick(at);
         assert_eq!(fake.looks().len(), sent + 4);
@@ -6556,6 +6653,48 @@ mod tests {
         worker.tick(at + LOOK_AGAIN);
         worker.tick(at + LOOK_AGAIN * 3);
         assert_eq!(fake.looks().len(), sent + 5);
+    }
+
+    /// A look [`Service::set_look`] leaves in the shared slot is taken between the
+    /// round's hub calls and goes at once; its outcome says how long it waited.
+    #[test]
+    fn a_look_left_in_the_slot_goes_at_the_next_tick_and_reports_its_wait() {
+        let fake = Fake::default();
+        let t0 = Instant::now();
+        let (mut worker, snapshot) = worker(&fake, t0);
+        worker.handle(Command::Configure(on("https://hub")), t0);
+        worker.handle(Command::Enter(here(3, "Sol")), t0);
+        worker.tick(t0);
+        let sent = fake.looks().len();
+        *worker.latest_look.lock().unwrap() = Some(lit(""));
+        worker.handle(Command::LookWaiting, t0 + Duration::from_millis(300));
+        worker.tick(t0 + LOOK_EVERY);
+        assert_eq!(fake.looks().len(), sent + 1);
+        assert!(worker.latest_look.lock().unwrap().is_none());
+        let outcome = lock(&snapshot).look_outcome.clone().unwrap();
+        assert!(outcome.sent);
+        assert!(outcome.message.starts_with("70"), "{}", outcome.message);
+    }
+
+    /// A look refused because the claim lapsed at the hub asks for the claim again at
+    /// once, rather than at the next renewal 45 seconds later.
+    #[test]
+    fn a_lapsed_claim_is_asked_again_at_once() {
+        let fake = Fake::default();
+        let t0 = Instant::now();
+        let (mut worker, _snapshot) = worker(&fake, t0);
+        worker.handle(Command::Configure(on("https://hub")), t0);
+        worker.handle(Command::Enter(here(3, "Sol")), t0);
+        worker.tick(t0);
+        fake.look_refusals
+            .lock()
+            .unwrap()
+            .push_back(refused(403, "not_on_server"));
+        let at = t0 + LOOK_EVERY;
+        worker.handle(Command::Look(lit("saber_sun")), at);
+        worker.tick(at);
+        assert!(worker.look_claim.is_none());
+        assert!(worker.due_claim <= at + Duration::from_millis(50));
     }
 
     /// A hub from before the sounds choice refuses `saber_sounds` as an unknown field:

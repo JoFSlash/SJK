@@ -713,10 +713,17 @@ blade-skin unlock id or `""`, and whether the Illuminate holocron is lit.
   it is none. A `not_unlocked` or `bad_look` answer leaves that skin out (the look
   goes with `saber:""`, so Illuminate still syncs) until the profile's unlocks change,
   and a `not_unlocked` has the own profile read again soon (at most once every 30
-  seconds); too many (429: `look_quota`, or the address's `rate_limited`), a refused
-  signature (401, the clock still off after the one retry) and failures wait 10
-  seconds and go again; another refusal (an older hub) is not repeated until the look
-  or the claim changes. Leaving sends nothing: the release drops the look. `Snapshot::look_outcome` says what became of the last one.
+  seconds); the key's `look_quota` (429) waits 1 second, the address's `rate_limited`
+  (429), a refused signature (401, the clock still off after the one retry) and
+  failures wait 10 seconds and go again; `not_on_server` asks for the claim again at
+  once; another refusal (an older hub) is not repeated until the look or the claim
+  changes. The second between two looks counts from the earlier one's answer, so they
+  reach the hub in different whole seconds (the hub's quota counts whole seconds).
+  `Service::set_look` leaves the look in a slot the worker reads between its other hub
+  calls (`Worker::look_between`), so a slow call does not hold a toy back for a whole
+  round of the worker's calls (the cardboard box's slow sync, 31/10/2026); the viewer
+  logs each outcome as `SJK look sent: <n> ms after the change, the hub answered in
+  <m> ms`. Leaving sends nothing: the release drops the look. `Snapshot::look_outcome` says what became of the last one.
 - Receiving: presence entries carry `look` (`Presence::look`) and the feed carries look
   events (`Feed::looks`, `LookEvent`), queued for the viewer (`Service::take_looks`, the
   newest 64, handing over only those read for the viewer's server under the feed's
