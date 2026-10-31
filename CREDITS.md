@@ -404,6 +404,9 @@ includes:
   (`cg_fleshSparks`), a held mouse 4 or 5 repeating its bind (`in_mouseRepeat`, 20 times
   a second at any frame rate) and the lagometer's numbers and speed graph
   (`cg_lagometer` 2 and 3);
+- blade cost ranking (31/10/2026): `scripts/blade_cost.py` times every Legendary and
+  Mythical blade on the GPU and ranks them, and every blade change is timed against
+  `main` from now on;
 - SJK Alpha (19/10/2026), the first collection of cards: the Mythical rarity, the
   Credits and Meme kinds, and card 1, "Bishop", honouring the author of JKR (art by
   Sol, AI-assisted: a rusted helmet portrait).
