@@ -888,6 +888,11 @@ pub(super) const HUD: &[Setting] = &[
         },
     },
     Setting {
+        label: "Incoming chat colour",
+        cvar: crate::chat::incoming_color::CVAR,
+        kind: ValueKind::Choice(crate::chat::incoming_color::CHOICES),
+    },
+    Setting {
         label: "Chat text outline",
         cvar: crate::chat::options::OUTLINE_CVAR,
         kind: ValueKind::Bool,
@@ -1376,6 +1381,11 @@ pub(super) const GAME: &[Setting] = &[
         label: "Free look when held",
         cvar: crate::held_view::LOOK_CVAR,
         kind: ValueKind::Bool,
+    },
+    Setting {
+        label: "Prediction",
+        cvar: "cg_predictLegacy",
+        kind: ValueKind::Choice(&["0", "255"]),
     },
     Setting {
         label: "Prediction error smoothing (ms)",

@@ -755,8 +755,16 @@ filters the grid as the classic profile's search does (see above).
 `forcepowers` is the player's own profile. On a server, every userinfo sends it
 fitted to the server's rules from `CS_SERVERINFO` (`g_maxForceRank`, free saber
 skills when every other weapon is off, the game type), as stock
-`BG_LegalizedForcePowers` would fit it, but keeping team powers and the powers
-`g_forcePowerDisable` turns off: the server drops unavailable powers from its own
+`BG_LegalizedForcePowers` would fit it. Whether saber skills are free is then
+taken from the server's own `EV_SET_FREE_SABER` event, which stock cgame keeps in
+`ui_freeSaber` for the Force menu, once one arrives, and kept through the same
+server's map changes (a disconnect or another address forgets it):
+`CS_SERVERINFO` may lack `g_weaponDisable` (keys past `MAX_INFO_STRING` are
+dropped). Until either tells, a profile that only fits with free saber skills is
+sent fitted with them, so the first life is not cut by a guess; stock sends the
+profile unfitted and the server fits it. An event that alters the profile sent
+has it sent again with `forcechanged`. The fitting keeps team
+powers and the powers `g_forcePowerDisable` turns off: the server drops unavailable powers from its own
 copy without calling the profile illegal, so sending them never parks the player in
 spectator, and a mod that gives them back in a full Force duel finds them
 (jaPRO lets the powers its `g_forcePowerDisableFFA` holds back work in duels).
@@ -1090,6 +1098,16 @@ tauntaun rider holding attack, whose `BOTH_VT_ATR_S` restarts on both tracks eac
 (`PM_VehicleWeaponAnimate`), picked up the legs' finished frame and showed one swing for
 many swing sounds (Slash, hub report #123). See
 [animation_selection.rs](../crates/sjk-client/src/animation_selection.rs).
+
+The local player's predicted animation also starts over when a held animation's timer
+ran out and came back up on the same clip and flip
+([local_actor_state.rs](../crates/sjk-viewer/src/local_actor_state.rs)). A frame shows
+the last command, so the one-command stand between two held melee kicks can go unseen,
+and a JA+ 2.5 server restarts the kick with no stand and no flip (a demo of 30/10/2026:
+`BOTH_A7_KICK_F` timer 4, then 692 a snapshot later, `legsFlip` never set). The torso
+then kept the finished kick's clock, the legs started their kick on its frame, and the
+kick stood frozen while the server kept kicking (Slash, 30/10/2026). Other players are
+shown the server's animation, which carries no timers, so this does not reach them.
 
 ## Tavion and Desann idle poses
 
@@ -4559,7 +4577,11 @@ list: the `toy_illuminate` command lights it or puts it out, from a bind
 (Settings > Key bindings > Interaction > Toy: Illuminate, unbound until a key is
 picked), from the quick wheel's [Toys page](#toys-page), or from the switch on the
 Collection's Toys tab ([SJK UI](sjk-ui.md#collection)). Every toy is a
-`toy_<name>` command ([sjk.md](sjk.md#names)).
+`toy_<name>` command ([sjk.md](sjk.md#names)). Switching any toy says so on the centre of
+the screen, its name and ON in green or OFF in red ("Illuminate ON"), and `toy_help` lists
+every toy in the console, its name in yellow and what it does and how in white
+([toy_switch_words.rs](../crates/sjk-viewer/src/toy_switch_words.rs)); a toy restored at
+start, or taken off by the game, says nothing.
 
 **Other players' toys, hidden on request** (Sol's request, 29/10/2026): each toy other
 players are seen with has a second switch on its card in the Collection's Toys tab, and
@@ -4623,7 +4645,8 @@ The cardboard box is a toy, SJK's own and free for every player (Sol's idea,
 takes it off, from a bind (Settings > Key bindings > Interaction > Toy: Cardboard box,
 unbound until a key is picked), from the quick wheel's [Toys page](#toys-page) or from
 the Collection's Toys tab ([SJK UI](sjk-ui.md#collection)). It is off at every start.
-Putting it on plays its sound (one's own at once, in both ears; another's where they
+Switching it says "Cardboard box ON" or "OFF" ([Illuminate](#illuminate)); a box lifted by
+another player goes without it. Putting it on plays its sound (one's own at once, in both ears; another's where they
 stand when their look gains the box, but not for the boxes already in the looks in the
 first 5 seconds on a server).
 
@@ -4700,7 +4723,8 @@ It stays as last switched, across deaths, maps, servers and restarts of the game
 the player turns it off (since 22/10/2026: saved in the archived `cl_toyOrder66`,
 [toy_saved.rs](../crates/sjk-viewer/src/toy_saved.rs)). `order66` (Interaction > Execute
 Order 66, or the Toys page) gives the order; only a player whose own toy is on, alive in
-the match on a server, can give it.
+the match on a server, can give it. Switching the toy says "Order 66 ON" or "OFF"
+([Illuminate](#illuminate)).
 
 - **Who takes part:** the players whose toy is on. It is a toy in their look
   (`toys: ["order66"]`, [unlockables.md](unlockables.md); `looks::TOYS`), so every SJK
@@ -4769,7 +4793,8 @@ player who has it on hacks another who has it on, then steers them for a few sec
 Hax, unbound until a key is picked), from the quick wheel's [Toys page](#toys-page) or
 from the Collection's Toys tab ([SJK UI](sjk-ui.md#collection)). It stays as last
 switched, across maps, servers and restarts, until the player turns it off (saved in
-the archived `cl_toyHax`, as Order 66 in `cl_toyOrder66`).
+the archived `cl_toyHax`, as Order 66 in `cl_toyOrder66`). Switching it says "Hax ON" or "OFF"
+([Illuminate](#illuminate)).
 
 - **Who takes part:** the players whose toy is on. It is a toy in their look
   (`toys: ["hax"]`, [unlockables.md](unlockables.md); `looks::TOYS`), so the hacker's
@@ -5086,7 +5111,8 @@ close by. It works like emotes: the music is in pk3s, and SJK passes only its na
   away. `boombox` in the console lists the tracks; `boombox <id>`, `next`, `prev`, `play`
   and `stop` choose and play them (Settings > Key bindings > Interaction has "Boombox:
   next track"). When a track ends the next one plays, the first after the last. It is off
-  at every start and on every new server.
+  at every start and on every new server. Starting names the track on the centre of the
+  screen; putting it away says "Boombox OFF" in red.
 - **Verified players only** (Sol's rule, 25/10/2026): on a server only a player whose key
   the SJK hub verified may turn it on ("The boombox is for verified SJK players"), and every
   SJK client ignores the boombox, music and stereo, of a player the hub does not show as
@@ -5271,8 +5297,8 @@ onto it slips, cartoon style, and falls as a [ragdoll](#ragdoll).
   quick wheel's Toys group, Collection > Toys, "Slip on peels") is the switch, both the
   right to drop peels and the consent to slip on them (the Monitor's rule: always opt
   in). It stays as last switched, across maps, servers and restarts (`cl_toyBanana`,
-  archived), and says so on the centre of the screen. A player without it walks over
-  peels.
+  archived), and says "Banana peel ON" or "OFF" on the centre of the screen, as every
+  toy does ([Illuminate](#illuminate)). A player without it walks over peels.
 - **`banana_drop`** (Interaction > Drop banana peel, the Collection's Drop key, the quick
   wheel's Drop banana peel) drops one: standing (slower than 80 units a second along the
   floor) 20 units ahead of the feet the way the player looks, moving 72 units ahead the
@@ -5840,8 +5866,19 @@ the console's `path` command also lists it. The fallback uses the profile in
 that per-user folder; the per-user and portable profiles are not synced.
 See [platform.rs](../crates/sjk-viewer/src/platform.rs) and
 [storage.rs](../crates/sjk-viewer/src/platform/storage.rs).
-Edit settings through the client, or edit the file while the client is stopped
-so autosaving cannot overwrite your changes.
+Settings can be changed in the client, or `config.cfg` edited in a text editor, even
+while the client runs. The shell remembers the texts it loaded and wrote
+([config_watch.rs](../crates/sjk-shell/src/config_watch.rs)) and looks at the file's
+size and time once a second, and again before each save and at exit, once its own
+writes have landed. A file holding a text the client did not write was changed from
+outside: it is loaded as at start (its cvars, and its bindings replace the table), the
+console says so, and later saves build on it. A file deleted while the client runs
+stays deleted: nothing is written for the rest of that run, so the next start is on
+the defaults (the console says so, and settings changed before the restart are not
+kept); `writeconfig` still writes it on request. Until 29/10/2026 the client wrote
+the values it held over such an edit at its next save or at exit, so an edited or
+deleted config came back with the old name, field of view or camera at the next start
+(hub report #199, and Kushina's `autoexec.cfg` workaround for it).
 
 Autosaving writes `config.cfg` only when an archived cvar or a binding changed:
 key presses, `+`/`-` buttons and unarchived cvars never touch the file. A change
@@ -6997,6 +7034,22 @@ the server; the world draws its own shaders until the server sends new remaps (a
 shader-state change or a `remapShader` command) or a new map loads. As in
 EternalJK, destination time offsets are kept. See [rendering](rendering.md#server-shader-remaps)
 for scope and remaining limitations. These controls do not edit map geometry.
+
+### Incoming chat colour
+
+`cg_chatColor` forces only the game server's public **All** message bodies.
+Team chat, plain/encrypted whispers, admin chat and the separate SJK chat channel
+(including reward drops and official notices) retain their original colours,
+even when they appear together in the All feed. The setting is local and archived:
+it never changes sent text or the chat log. Sender names keep their own colours,
+and emoji pictures, channel marks, timestamps, centre prints and the composer
+keep their normal appearance. Existing public history changes without reconnecting.
+
+The default 0 keeps original colours; 1 red, 2 green, 3 yellow, 4 blue, 5 cyan,
+6 magenta, 7 white, 8 orange, 9 grey and 10 black force one colour, ignoring inline
+colour codes in the body while retaining message fading. Invalid values fall back
+to original colours. Settings > Chat offers the same named choices (also in classic
+HUD settings). It is independent of outgoing `cl_colorstring` and chat cleaning.
 
 ### Copying a server address
 

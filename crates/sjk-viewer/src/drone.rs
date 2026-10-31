@@ -325,14 +325,9 @@ impl GpuState {
         if !self.drone.on() {
             self.drone_send_away(self.drone.watchers);
         }
-        let words = if self.drone.on() {
-            "Drone: players may peek at you; their drone follows you"
-        } else {
-            "Drone: no drone may follow you"
-        };
         self.chat.receive(
             sjk_client::ServerEventKind::CenterPrint,
-            words.to_owned(),
+            crate::toy_switch_words::switched("Drone", self.drone.on()),
             None,
             Instant::now(),
         );

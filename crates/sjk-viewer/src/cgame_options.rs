@@ -38,6 +38,11 @@ pub(crate) fn register(cvars: &mut CvarRegistry) -> Result<(), sjk_shell::CvarEr
             "Show expired chat while the console is open",
         ),
         (
+            crate::chat::incoming_color::CVAR,
+            0,
+            "Incoming message colour: 0 original, 1-9 chat codes, 10 black; names and outgoing text unchanged",
+        ),
+        (
             "cg_cleanChatbox",
             0,
             "Clean body colours and suppress repeated messages",

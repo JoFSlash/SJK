@@ -24,6 +24,49 @@
 
 # ---- Console & chat ----
 
+[predict-legacy]
+area: Gameplay
+title: Prediction as in 2026.1028.1 (cg_predictLegacy, after Kushina's request)
+change: Settings > Game options > Prediction: Current (0) or As in 2026.1028.1 (255).
+change: Bits: 1 saber files, 2 lock facing, 4 respawn jump, 8 trigger box, 16 gesture, 32 held.
+change: 64 other players, 128 history gap. A server's own move ignores them.
+test: Settings > Game options > Prediction: As in 2026.1028.1 sets cg_predictLegacy 255.
+test: On a JA+ server with 255: strafe jumps, swings and dual jump attacks feel as on 1028.1.
+test: Respawn holding attack and jump with 4 set: you jump at once (the server may correct it).
+test: Back to Current: cg_predictLegacy 0, and the miss log (cg_showMiss 1) stays quiet.
+
+[pr-batch-1031]
+area: Gameplay
+title: PRs 31/10: chat colour, GIF hiding, Change name, melee kick, duel noclip, vehicle clips
+change: #315 cg_chatColor (Lumaya); #320 hide GIFs + Hidden tab (Creyon); #299 Change name (Slash).
+change: #322 held melee kick restarts each kick; #323 no fakenoclip/freecam in duels (Slash).
+change: #274 riders and vehicles each skip their own pilot or chassis in prediction (Lumaya).
+test: Settings > Chat > All chat colour: All chat turns that colour, team and SJK chat do not.
+test: SJK chat: Hide this GIF on a GIF message: reads GIF hidden; Hidden tab shows it again.
+test: Profile > SJK Profile > Change name: Character tab opens with the Name field ready.
+test: Hold melee kick: each kick plays from the start. In a duel, fakenoclip is refused.
+test: Ride a swoop and a shuttle on a siege map: no snag or jitter against your own vehicle.
+
+[slash-fixes-1030]
+area: Menus & settings
+title: Slash's fixes 30/10: config.cfg, settings search, Shaders wheel, vehicle away, Force templates
+change: #288 config.cfg edited while running is loaded; deleted, it is not written back that run.
+change: #290 typed values in every search result; #291 wheel past Shaders tier headings.
+change: #298 no away emote on a vehicle; #309 Force templates keep Speed on saber-only servers.
+test: Edit cg_fov in config.cfg while SJK runs, quit: the edit stays. Delete it, quit: not back.
+test: Settings search "chat": click a later result's value and type a number: it takes it.
+test: Collection > Shaders with Owned on: the wheel scrolls past every tier heading.
+test: Ride a vehicle, alt-tab out a while: no away emote. JoF Fullforce FFA template: Speed kept.
+
+[toy-switch-words]
+area: Gameplay
+title: Toys say ON and OFF in colour, toy_help lists every toy (Blep's idea, Creyon's #289)
+change: Switching a toy prints its name and ON in green or OFF in red on the centre of the screen.
+change: toy_help lists the eleven toys: name in yellow, command, what it does (Banana peel too).
+test: Switch each toy (box, Order 66, Hax, Drone, Monitor, Box hunt, Banana peel): name ON/OFF.
+test: Boombox: putting it away says Boombox OFF; starting it still names the track.
+test: A toy restored at start and a box lifted by someone else say nothing. Run toy_help.
+
 [day-pc-clock]
 area: Rendering & effects
 title: Day and night follow the PC's clock (r_dayClock), every preset, Creyon's #296

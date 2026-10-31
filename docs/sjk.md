@@ -21,9 +21,9 @@ general contributor rules.
 - A client mod's commands and settings start with its id and a dot
   (`japlus.guntele`, `jof.commands`), and its switch is `mod_<id>`
   ([mods.md](mods.md)).
-- Every toy is a `toy_<name>` command (`toy_illuminate`, `toy_box`, `toy_order66`,
-  `toy_hax`, `toy_ragdoll`, `toy_drone`, `toy_boombox`, `toy_monitor`, `toy_boxhunt`,
-  `toy_banana`); a
+- Every toy is a `toy_<name>` command (`toy_help` lists them all; `toy_illuminate`, `toy_box`,
+  `toy_order66`, `toy_hax`, `toy_ragdoll`, `toy_drone`, `toy_boombox`, `toy_monitor`,
+  `toy_boxhunt`, `toy_banana`); a
   toy has no Force wheel entry, and one with a setting names it `cg_toy<Name>...`.
   Illuminate, the cardboard box and Order 66 have none: they are always available and
   on only for the client's run. A toy others see has an id in the look's `toys`
@@ -50,6 +50,11 @@ general contributor rules.
   current when SJK gains notable work.
 
 ## Defaults
+
+New settings default to the stock base Jedi Academy experience (Sol's rule,
+30/10/2026; [AGENTS.md](../AGENTS.md)): what changes how the game looks, sounds or
+plays compared with stock JKA is opt-in, and only Sol moves a default away from stock
+(the table below). #292, server remaps on by default, was declined under it.
 
 A new profile starts with Sol's own choices. Defaults apply only to settings a
 `config.cfg` has not saved: an existing profile keeps its values and nothing is

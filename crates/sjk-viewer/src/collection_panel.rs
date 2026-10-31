@@ -3299,6 +3299,68 @@ mod tests {
         assert!(first > 0);
     }
 
+    /// Hub report #201: the wheel scrolls on over the tiers' headings, as each frame
+    /// draws in between, on the wall and the list, all shaders or the Owned ones.
+    #[test]
+    fn the_wheel_scrolls_past_the_headings_frame_after_frame() {
+        let held: Vec<Unlock> = unlockables::blade_skins()
+            .take(80)
+            .map(|skin| Unlock {
+                id: skin.id.into(),
+                count: 1,
+                ..sun()
+            })
+            .collect();
+        let fonts = crate::text::load_modern(1.0, None).expect("Inter");
+        let notch = |panel: &mut Panel, y: f32| {
+            let _ = panel.handle_pointer(
+                InputEvent::PointerWheel {
+                    position: sjk_ui::Vec2::new(500.0, 500.0),
+                    delta: sjk_ui::Vec2::new(0.0, y),
+                },
+                false,
+            );
+        };
+        for grid in [false, true] {
+            for owned in [false, true] {
+                let shown = Inputs {
+                    grid,
+                    ..inputs(Holdings::Known(&held), "")
+                };
+                let mut panel = drawn(Tab::Shaders, &shown);
+                if owned {
+                    let _ = panel.toggle_owned();
+                }
+                panel.build(&shown, &fonts.font, [1920.0, 1080.0]);
+                let lines = panel.shader_lines.len();
+                let mut tops = vec![panel.shader_first];
+                for _ in 0..lines {
+                    notch(&mut panel, -1.0);
+                    panel.build(&shown, &fonts.font, [1920.0, 1080.0]);
+                    tops.push(panel.shader_first);
+                }
+                let end = *tops.last().unwrap();
+                // The wheel reached the end: the last shader is drawn.
+                let last = SHADER_BASE + (panel.shader_count - 1) as u16;
+                assert!(
+                    panel.ui.rect_for(last).is_some(),
+                    "grid {grid}, owned {owned}: {tops:?}"
+                );
+                // Each notch moved on a line until the end.
+                let stop = tops.iter().position(|top| *top == end).unwrap();
+                assert!(
+                    tops[..=stop].windows(2).all(|pair| pair[1] == pair[0] + 1),
+                    "grid {grid}, owned {owned}: {tops:?}"
+                );
+                for _ in 0..lines {
+                    notch(&mut panel, 1.0);
+                    panel.build(&shown, &fonts.font, [1920.0, 1080.0]);
+                }
+                assert_eq!(panel.shader_first, 0, "grid {grid}, owned {owned}: back up");
+            }
+        }
+    }
+
     #[test]
     fn a_click_on_a_card_chooses_it() {
         let owned = [sun()];

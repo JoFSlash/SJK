@@ -39,6 +39,7 @@ impl GpuState {
             chat_gifs::set_enabled(console.bool_cvar(chat_gifs::CVAR) != Some(false));
             chat_gifs::set_video(console.bool_cvar(chat_gifs::VIDEO_CVAR) == Some(true));
             chat_gifs::favourites::load(console.config_directory());
+            chat_gifs::hidden::load(console.config_directory());
             crate::shader_marks::load(console.config_directory());
             chat_gifs::sources::load(console.config_directory());
             crate::jof_tag::set_shown(console.bool_cvar(crate::jof_tag::CVAR) != Some(false));

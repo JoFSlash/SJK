@@ -546,6 +546,10 @@ impl GpuState {
     /// `toy_order66`: turn the toy on or off.
     pub(crate) fn toggle_order66(&mut self) {
         self.order66.toggle();
+        self.order66_centre(crate::toy_switch_words::switched(
+            "Order 66",
+            self.order66.on(),
+        ));
     }
 
     /// Say `text` on the centre of the screen.

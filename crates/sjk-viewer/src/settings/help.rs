@@ -73,6 +73,7 @@ const SHORT_LABELS: &[(&str, &str)] = &[
     ("cg_thirdPersonTargetDamp", "Target damping"),
     ("cg_wallGrabLock", "Lock wall-grab camera"),
     (crate::held_view::LOOK_CVAR, "Free look when held"),
+    ("cg_predictLegacy", "Prediction"),
     ("cg_errorDecay", "Error smoothing"),
     (crate::ghost_replay::SHOWCASE_CVAR, "Showcase tools"),
     (crate::frame_target::aa::exposure::MIN_EV, "Max darken, EV"),
@@ -99,6 +100,61 @@ pub(super) fn classic_label<'a>(cvar: &str, label: &'a str) -> (&'a str, Timing)
 /// a code: each `(cvar, value, name)`. A value not listed is shown as it is
 /// written ([`super::classic_view::choice_label`]).
 const CHOICE_NAMES: &[(&str, &str, &str)] = &[
+    (
+        crate::chat::incoming_color::CVAR,
+        "0",
+        crate::chat::incoming_color::LABELS[0],
+    ),
+    (
+        crate::chat::incoming_color::CVAR,
+        "1",
+        crate::chat::incoming_color::LABELS[1],
+    ),
+    (
+        crate::chat::incoming_color::CVAR,
+        "2",
+        crate::chat::incoming_color::LABELS[2],
+    ),
+    (
+        crate::chat::incoming_color::CVAR,
+        "3",
+        crate::chat::incoming_color::LABELS[3],
+    ),
+    (
+        crate::chat::incoming_color::CVAR,
+        "4",
+        crate::chat::incoming_color::LABELS[4],
+    ),
+    (
+        crate::chat::incoming_color::CVAR,
+        "5",
+        crate::chat::incoming_color::LABELS[5],
+    ),
+    (
+        crate::chat::incoming_color::CVAR,
+        "6",
+        crate::chat::incoming_color::LABELS[6],
+    ),
+    (
+        crate::chat::incoming_color::CVAR,
+        "7",
+        crate::chat::incoming_color::LABELS[7],
+    ),
+    (
+        crate::chat::incoming_color::CVAR,
+        "8",
+        crate::chat::incoming_color::LABELS[8],
+    ),
+    (
+        crate::chat::incoming_color::CVAR,
+        "9",
+        crate::chat::incoming_color::LABELS[9],
+    ),
+    (
+        crate::chat::incoming_color::CVAR,
+        "10",
+        crate::chat::incoming_color::LABELS[10],
+    ),
     (crate::chat_sounds::MASTER_CVAR, "0", "Off"),
     (crate::chat_sounds::MASTER_CVAR, "1", "On"),
     (crate::chat_sounds::MASTER_CVAR, "2", "Distinct (EJK)"),
@@ -157,6 +213,8 @@ const CHOICE_NAMES: &[(&str, &str, &str)] = &[
     (crate::hud::lagometer::CVAR, "1", "Graph"),
     (crate::hud::lagometer::CVAR, "2", "Graph + speed"),
     (crate::hud::lagometer::CVAR, "3", "No backdrop"),
+    ("cg_predictLegacy", "0", "Current"),
+    ("cg_predictLegacy", "255", "As in 2026.1028.1"),
     (crate::audio::SKIN_SOUNDS_CVAR, "0", "Off"),
     (crate::audio::SKIN_SOUNDS_CVAR, "1", "With normal"),
     (crate::audio::SKIN_SOUNDS_CVAR, "2", "Only skin"),
@@ -717,6 +775,10 @@ const HELP: &[(&str, &str)] = &[
         "A dark band behind each chat line, so it reads over bright maps: how dark, in per cent. 0 shows none.",
     ),
     (
+        crate::chat::incoming_color::CVAR,
+        "Colour public All chat text. Names, team/admin chat, whispers and SJK chat keep their colours. 0 keeps originals.",
+    ),
+    (
         crate::chat::options::OUTLINE_CVAR,
         "Edges chat letters and what you type in a dark outline instead of a shadow, so they read over bright maps.",
     ),
@@ -987,6 +1049,10 @@ const HELP: &[(&str, &str)] = &[
     (
         "cg_wallGrabLock",
         "Off: stock locks; JA+ lets you look and aim the kick-off. On locks JA+ too, preventing aim during the hold.",
+    ),
+    (
+        "cg_predictLegacy",
+        "Current follows the server. As in 2026.1028.1 undoes the prediction changes made since; some moves get corrected.",
     ),
     (
         crate::held_view::LOOK_CVAR,

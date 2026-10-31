@@ -98,6 +98,7 @@ const CHAT_ROWS: &[&str] = &[
     "cg_chatBoxLetterSpacing",
     crate::chat::options::BACKDROP_CVAR,
     crate::chat::options::OUTLINE_CVAR,
+    crate::chat::incoming_color::CVAR,
     crate::chat::options::CARD_SCALE_CVAR,
     crate::text::charset::CVAR,
     "cl_sjkChat",
@@ -417,6 +418,7 @@ impl Group {
                 "cg_thirdPersonTargetDamp",
                 "cg_wallGrabLock",
                 crate::held_view::LOOK_CVAR,
+                "cg_predictLegacy",
                 "cg_errorDecay",
                 "mod_japlus",
                 #[cfg(feature = "mod-japlus")]
@@ -557,6 +559,7 @@ impl Group {
                 "cg_chatBoxLetterSpacing",
                 crate::chat::options::BACKDROP_CVAR,
                 crate::chat::options::OUTLINE_CVAR,
+                crate::chat::incoming_color::CVAR,
                 crate::chat::options::CARD_SCALE_CVAR,
             ],
             Self::Scoreboard => &[
@@ -1029,6 +1032,7 @@ mod tests {
             "cg_thirdPersonTargetDamp",
             "cg_wallGrabLock",
             crate::held_view::LOOK_CVAR,
+            "cg_predictLegacy",
             "cg_errorDecay",
         ];
         for group in [Group::GameOptions, Group::Advanced(Advanced::Gameplay)] {

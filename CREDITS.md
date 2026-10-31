@@ -413,7 +413,7 @@ includes:
 Creyon and Lumaya wear the SJK team's Contributor medal, shown on their
 cards of the in-game credits page.
 
-Creyon ([Creyon94](https://github.com/Creyon94)), contributor and tester, has 70
+Creyon ([Creyon94](https://github.com/Creyon94)), contributor and tester, has 73
 pull requests merged into SJK, most of them bringing SJK in line with EternalJK
 ([all of them](https://github.com/Sol-Vulpes/SJK/pulls?q=is%3Apr+author%3ACreyon94)):
 
@@ -527,8 +527,12 @@ pull requests merged into SJK, most of them bringing SJK in line with EternalJK
 - #296 day and night follow the PC's clock (`r_dayClock`): the sun moves with Sun and sky
   on; without it the world darkens and the sky turns to night, in the SJK and Vanilla
   presets too.
+- #289 every toy says its name and ON in green or OFF in red when switched, and `toy_help`
+  lists every toy with what it does, after Blep's idea.
+- #320 hide chosen chat GIFs on this PC, with a Hidden tab in the GIF picker to show them
+  again.
 
-Lumaya ([lumayaa](https://github.com/lumayaa)), contributor, has 81 pull requests
+Lumaya ([lumayaa](https://github.com/lumayaa)), contributor, has 83 pull requests
 merged into SJK
 ([all of them](https://github.com/Sol-Vulpes/SJK/pulls?q=is%3Apr+author%3Alumayaa)):
 
@@ -656,6 +660,8 @@ merged into SJK
   saber names follow the original game's file order.
 - #312 Copy IP in both server browsers (and Ctrl+C), and `copyServerIP` for the server you
   are on: the address and port only, never a password.
+- #315 All chat colour (`cg_chatColor`): public All chat in one colour of your choice.
+- #274 each predicted rider and vehicle leaves out its own pilot or chassis, as in OpenJK.
 
 Lukas ([LukasMoudry](https://github.com/LukasMoudry)), contributor, has 19 pull requests
 merged into SJK
@@ -702,7 +708,7 @@ merged into SJK
 - #304 a free spectator sees the name of the player under the crosshair and follows them
   with a left click; a click on nobody does what it did.
 
-Slash ([JoFSlash](https://github.com/JoFSlash)), contributor, has 71 pull requests merged
+Slash ([JoFSlash](https://github.com/JoFSlash)), contributor, has 79 pull requests merged
 into SJK ([all of them](https://github.com/Sol-Vulpes/SJK/pulls?q=is%3Apr+author%3AJoFSlash)):
 
 - #114 Tab completes the cfg file argument of `exec`, `execq`, `writeconfig` and `write`
@@ -837,6 +843,19 @@ into SJK ([all of them](https://github.com/Sol-Vulpes/SJK/pulls?q=is%3Apr+author
   and their trails out, after g0dchris' idea.
 - #293 the quick wheel's custom commands remembered under Your own in Settings > Quick
   wheel, kept when the default pages are restored, after Dante's idea.
+- #288 `config.cfg` edited or deleted while the game runs is no longer written over with
+  the old name, field of view and camera at exit (hub report #199).
+- #290 every Settings search result takes a typed value, not only the first hundred (hub
+  report #203).
+- #291 the mouse wheel in Collection > Shaders scrolls past the tiers' headings (hub report
+  #201).
+- #298 no away emote while riding a vehicle, which broke its animations (hub report #205).
+- #309 Force templates keep Force Speed on saber-only servers: free saber skills come from the
+  server's own word, as in the original game (hub report #206).
+- #299 a Change name button on the SJK Profile tab (hub report #202, Nib).
+- #322 holding the melee kick no longer freezes it on its last frame.
+- #323 no `fakenoclip` or `freecam` in duels, where JoF's servers spared the player all
+  damage (hub report #209).
 
 His Peek work in #199 (closed 24/10/2026, not merged) shaped the Drone toy: a player is
 asked before being peeked, told who watches, and can end it. His #206 (closed 25/10/2026,
@@ -885,6 +904,8 @@ players coming from EJK rely on: Sol built them as `cg_fleshSparks`, `in_mouseRe
 (29/10/2026). Her idea of a banana peel toy, peels that players slip on, Sol approved and
 built as the Banana peel (29/10/2026): opted-in players who walk onto a peel slip and fall
 as ragdolls.
+Kushina asked for a way back to 2026.1028.1's prediction for players who preferred it:
+Sol built it as Settings > Game options > Prediction and `cg_predictLegacy` (31/10/2026).
 
 Turin, a player, asked for private messages to be heard with the public chat sounds off:
 Sol built chat sounds by kind, each with its own sound (23/10/2026).
@@ -906,7 +927,9 @@ g0dchris, a player, asked for the dynamic glow on everything but the sabers, who
 hid the blades' details: Slash built it as No glow on sabers (#294, 30/10/2026).
 
 Blep, a player, asked for the player card to come only from the `inspect` key, not from
-looking at a player: Sol built it as Key only, `cg_playerCard 2` (29/10/2026).
+looking at a player: Sol built it as Key only, `cg_playerCard 2` (29/10/2026). Blep
+also asked for every toy to say when it is switched on or off: Creyon built it (#289,
+30/10/2026), each toy's name and ON in green or OFF in red.
 
 Atrosex, a player, asked for the Forge's Break down to mark the saber shader the player
 wears, and its last copy's card to say plainly that it is worn; Kushina asked for favourite
