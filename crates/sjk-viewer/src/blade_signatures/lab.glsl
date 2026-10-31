@@ -64,25 +64,48 @@ vec2 helix(float y, float r, float turns, float phase){
 // Round 23 (players' reports after the 2026.1021.1 release: hard-edged boxes and lines round
 // the tip when a blade pointed at the camera): it fades in and out softly; it used to switch
 // off at once when looking nearly along the blade.
+// 31/10/2026 (Sol: the top-tier blades cost too much): what of it depends on the ray alone (where
+// the ray passes the axis, how near, the tip's narrowing) is worked out once per ray and kept for
+// the ray it was worked out for (`bbRo`, `bbRd`), not again at every piece's point; a ray that
+// never passes behind the body hides nothing, so the rest is skipped. The same values as before.
+vec3 bbRo = vec3(1e9);
+vec3 bbRd = vec3(0.0);
+float bbTa = 0.0;
+float bbNear = 0.0;
+float bbAlong = 0.0;
 float behindBlade(vec3 ro, vec3 rd, float t){
-  float a = dot(rd.xz, rd.xz);
-  float along = smoothstep(0.01, 0.04, a);
-  if (along <= 0.0) return 0.0;
-  float ta = -dot(ro.xz, rd.xz)/a;
-  float y = ro.y + rd.y*ta;
-  vec2 off = ro.xz + rd.xz*ta;
-  float d = length(off);
+  if (ro.x != bbRo.x || ro.y != bbRo.y || ro.z != bbRo.z || rd.x != bbRd.x || rd.y != bbRd.y || rd.z != bbRd.z){
+    bbRo = ro;
+    bbRd = rd;
+    bbTa = 0.0;
+    bbNear = 0.0;
+    bbAlong = 0.0;
+    float a = dot(rd.xz, rd.xz);
+    float along = smoothstep(0.01, 0.04, a);
+    if (along > 0.0){
+      float ta = -dot(ro.xz, rd.xz)/a;
+      float y = ro.y + rd.y*ta;
+      vec2 off = ro.xz + rd.xz*ta;
+      float d = length(off);
+      // round 23: the body hiding narrows with the blade's rounded tip (a quarter circle over its
+      // last 1.4 units) down to the point, so what passes behind the tip is hidden too (Sol's review:
+      // ending the hiding before the tip let Exegol Rift's flare and Quasar's jet show through),
+      // without the dark round end past the tip that a full-width hiding drew seen end on
+      float into = clamp((y - (uLength - 1.4))/1.4, 0.0, 1.0);
+      float w = sqrt(max(1.0 - into*into, 0.0));
+      float onBlade = smoothstep(-0.8, -0.2, y)*(1.0 - smoothstep(uLength - 0.15, uLength + 0.05, y));
+      bbTa = ta;
+      bbNear = (1.0 - smoothstep(0.35*w, 0.8*w + 0.02, d))*onBlade;
+      bbAlong = along;
+    }
+  }
+  if (bbNear <= 0.0 || bbAlong <= 0.0) return 0.0;
   // what lies on the blade's own body (its axis, its glow) is never hidden by it
   vec3 p = ro + rd*t;
   float outside = smoothstep(0.5, 0.9, length(p.xz));
-  // round 23: the body hiding narrows with the blade's rounded tip (a quarter circle over its
-  // last 1.4 units) down to the point, so what passes behind the tip is hidden too (Sol's review:
-  // ending the hiding before the tip let Exegol Rift's flare and Quasar's jet show through),
-  // without the dark round end past the tip that a full-width hiding drew seen end on
-  float into = clamp((y - (uLength - 1.4))/1.4, 0.0, 1.0);
-  float w = sqrt(max(1.0 - into*into, 0.0));
-  float onBlade = smoothstep(-0.8, -0.2, y)*(1.0 - smoothstep(uLength - 0.15, uLength + 0.05, y));
-  return (1.0 - smoothstep(0.35*w, 0.8*w + 0.02, d))*onBlade*outside*smoothstep(ta + 0.15, ta + 0.7, t)*along;
+  // multiplied in the order it always was: hideD magnifies the last digit a thousandfold where
+  // a piece is nearly hidden
+  return bbNear*outside*smoothstep(bbTa + 0.15, bbTa + 0.7, t)*bbAlong;
 }
 // A distance d as seen when h (behindBlade) of it is hidden by the blade: unchanged at 0, out of
 // reach at 1, and in between the piece narrows and dims, so whatever passes behind the blade fades
