@@ -32,6 +32,7 @@ Add each release's notes here when it is tagged (docs/sjk.md "Releases").
 -->
 ## Unreleased
 
+- The switches on the what's-new card's Settings to review work for every setting: some (the dynamic glow's saber setting) did nothing and always showed Off _(Sol)_
 - Legendary and Mythical saber shaders draw faster, looking the same: about a quarter less GPU time over the 48 of them, and half or more on Bleeding Kyber, Abyssal Eye, Sith Holocron, Reactor and Felucia Spores _(Sol)_
 
 ## 2026.1031.1 (Alpha) | 31/10/2026

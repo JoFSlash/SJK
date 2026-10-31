@@ -942,6 +942,18 @@ fn reset_once(
     console.set_cvar(RESET_CVAR, installed);
 }
 
+/// Whether the setting to review `cvar` is on, as its Settings row reads it: a switch
+/// may be a number cvar (`r_dynamicGlowNoSabers` is), which is on when nonzero.
+fn switch_on(console: &crate::console::ViewerConsole, cvar: &str) -> bool {
+    console.cvar(cvar).is_some_and(crate::settings::switch_on)
+}
+
+/// Flip the setting to review `cvar`.
+fn flip(console: &mut crate::console::ViewerConsole, cvar: &str) {
+    let on = switch_on(console, cvar);
+    console.set_cvar(cvar, if on { "0" } else { "1" });
+}
+
 impl crate::GpuState {
     /// Read the marker once and put the recap of an update on the card; a new
     /// installation, and a build no release lists, show nothing. Then say whether the
@@ -1030,7 +1042,7 @@ impl crate::GpuState {
         );
         if let Some(console) = self.console.as_ref() {
             self.whats_new_card
-                .sync_switches(|cvar| console.bool_cvar(cvar) == Some(true));
+                .sync_switches(|cvar| switch_on(console, cvar));
         }
         self.whats_new_card.append(target, viewport);
     }
@@ -1044,8 +1056,7 @@ impl crate::GpuState {
         if let Choice::Switch(cvar) = &choice {
             // A setting to review flips; the card stays, and the update is not yet seen.
             if let Some(console) = self.console.as_mut() {
-                let on = console.bool_cvar(cvar) == Some(true);
-                console.set_cvar(cvar, if on { "0" } else { "1" });
+                flip(console, cvar);
             }
             return;
         }
@@ -1158,6 +1169,23 @@ mod tests {
         );
         assert_eq!(console.bool_cvar("cg_nameplate"), Some(false));
         assert_eq!(console.bool_cvar("cg_nameplateIcons"), Some(false));
+    }
+
+    /// A setting to review held in a number cvar flips both ways and reads as its
+    /// Settings row does (Sol's report, 31/10/2026: the switch did nothing, as it only
+    /// read true-or-false cvars).
+    #[test]
+    fn a_number_switch_flips_on_and_off() {
+        let directory = tempfile::tempdir().unwrap();
+        let mut console =
+            crate::console::ViewerConsole::new(directory.path().join("config.cfg")).unwrap();
+        let cvar = crate::frame_target::aa::glow::NO_SABERS_CVAR.to_ascii_lowercase();
+        assert!(!switch_on(&console, &cvar));
+        flip(&mut console, &cvar);
+        assert!(switch_on(&console, &cvar));
+        assert_eq!(console.integer_cvar(&cvar), Some(1));
+        flip(&mut console, &cvar);
+        assert!(!switch_on(&console, &cvar));
     }
 
     /// The reset applies once per version: a later start with the card still unanswered,

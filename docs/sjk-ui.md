@@ -2484,7 +2484,9 @@ same look in every menu style, on the 16:9 frame:
   right, and a row each with the heading's icon, "1." and the setting's Settings name
   (`settings::switch_label`) in gold, its switch at the right and the sentence under
   them. A click on the switch or the row's number key (1 to 9) flips the setting and
-  leaves the card up; the switches read the console each frame. A `reset` setting is
+  leaves the card up; the switches read the console each frame, as the Settings rows
+  do (a number cvar is on when nonzero; Sol's report, 31/10/2026: one held in a number
+  cvar did nothing and always showed Off). A `reset` setting is
   put back to its default when the card is offered, not in a preview (`whatsnew` shows
   "Unreleased"'s with working switches), once per version: `cl_whatsNewReset` records
   the version whose resets were applied as soon as they are, so a player who joins with
