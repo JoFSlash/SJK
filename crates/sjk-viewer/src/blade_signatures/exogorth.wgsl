@@ -318,7 +318,16 @@ fn r8_vol(ro: vec3<f32>, rd: vec3<f32>, px: f32) -> vec3<f32> {
     if top > 3.0 {
         for (var i = 0; i < 6; i++) {
             let fi = f32(i);
-            var prev = ex_strand(fi, 0.0);
+            // 31/10/2026: a strand keeps within half its chord, its sag (0.75) and sway (0.08) of its
+            // chord's middle, its drop 0.12 under it; its widest glow is 0.2 (and a pixel's): a ray
+            // further off than three of them skips its four pieces and its drop
+            let e0 = ex_strand(fi, 0.0);
+            let e1 = ex_strand(fi, 1.0);
+            var tm: f32;
+            if rayPtRaw(ro, rd, 0.5 * (e0 + e1), &tm) - 0.5 * length(e1 - e0) - 0.95 > 0.6 + 3.0 * px {
+                continue;
+            }
+            var prev = e0;
             var best: f32 = 1.0e3;
             for (var k = 1; k <= 4; k++) {
                 let nx = ex_strand(fi, f32(k) / 4.0);
