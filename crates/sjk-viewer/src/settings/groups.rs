@@ -417,6 +417,7 @@ impl Group {
                 "cg_thirdPersonTargetDamp",
                 "cg_wallGrabLock",
                 crate::held_view::LOOK_CVAR,
+                "cg_predictLegacy",
                 "cg_errorDecay",
                 "mod_japlus",
                 #[cfg(feature = "mod-japlus")]
@@ -1028,6 +1029,7 @@ mod tests {
             "cg_thirdPersonTargetDamp",
             "cg_wallGrabLock",
             crate::held_view::LOOK_CVAR,
+            "cg_predictLegacy",
             "cg_errorDecay",
         ];
         for group in [Group::GameOptions, Group::Advanced(Advanced::Gameplay)] {

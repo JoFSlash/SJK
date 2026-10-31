@@ -73,6 +73,7 @@ const SHORT_LABELS: &[(&str, &str)] = &[
     ("cg_thirdPersonTargetDamp", "Target damping"),
     ("cg_wallGrabLock", "Lock wall-grab camera"),
     (crate::held_view::LOOK_CVAR, "Free look when held"),
+    ("cg_predictLegacy", "Prediction"),
     ("cg_errorDecay", "Error smoothing"),
     (crate::ghost_replay::SHOWCASE_CVAR, "Showcase tools"),
     (crate::frame_target::aa::exposure::MIN_EV, "Max darken, EV"),
@@ -212,6 +213,8 @@ const CHOICE_NAMES: &[(&str, &str, &str)] = &[
     (crate::hud::lagometer::CVAR, "1", "Graph"),
     (crate::hud::lagometer::CVAR, "2", "Graph + speed"),
     (crate::hud::lagometer::CVAR, "3", "No backdrop"),
+    ("cg_predictLegacy", "0", "Current"),
+    ("cg_predictLegacy", "255", "As in 2026.1028.1"),
     (crate::audio::SKIN_SOUNDS_CVAR, "0", "Off"),
     (crate::audio::SKIN_SOUNDS_CVAR, "1", "With normal"),
     (crate::audio::SKIN_SOUNDS_CVAR, "2", "Only skin"),
@@ -1037,6 +1040,10 @@ const HELP: &[(&str, &str)] = &[
     (
         "cg_wallGrabLock",
         "Off: stock locks; JA+ lets you look and aim the kick-off. On locks JA+ too, preventing aim during the hold.",
+    ),
+    (
+        "cg_predictLegacy",
+        "Current follows the server. As in 2026.1028.1 undoes the prediction changes made since; some moves get corrected.",
     ),
     (
         crate::held_view::LOOK_CVAR,

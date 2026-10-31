@@ -1378,6 +1378,11 @@ pub(super) const GAME: &[Setting] = &[
         kind: ValueKind::Bool,
     },
     Setting {
+        label: "Prediction",
+        cvar: "cg_predictLegacy",
+        kind: ValueKind::Choice(&["0", "255"]),
+    },
+    Setting {
         label: "Prediction error smoothing (ms)",
         cvar: "cg_errorDecay",
         kind: ValueKind::Float {

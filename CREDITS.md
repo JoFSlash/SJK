@@ -904,6 +904,8 @@ players coming from EJK rely on: Sol built them as `cg_fleshSparks`, `in_mouseRe
 (29/10/2026). Her idea of a banana peel toy, peels that players slip on, Sol approved and
 built as the Banana peel (29/10/2026): opted-in players who walk onto a peel slip and fall
 as ragdolls.
+Kushina asked for a way back to 2026.1028.1's prediction for players who preferred it:
+Sol built it as Settings > Game options > Prediction and `cg_predictLegacy` (31/10/2026).
 
 Turin, a player, asked for private messages to be heard with the public chat sounds off:
 Sol built chat sounds by kind, each with its own sound (23/10/2026).
