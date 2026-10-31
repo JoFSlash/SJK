@@ -43,6 +43,7 @@ Nameplate styles, a day that follows your clock, toy achievements and many fixes
 = r_dynamicGlowNoSabers: New: the dynamic glow leaves saber blades and trails out, so each saber's details show while the rest still glows; off, sabers glow as before.
 = r_dayClock: New: day and night follow your PC's clock in every preset: with Sun and sky the sun moves, without it the sky turns to night and the world darkens.
 
+- Legendary and Mythical saber shaders draw faster, looking the same: about a fifth less GPU time over the 48 of them, and half on Bleeding Kyber, Abyssal Eye and Sith Holocron _(Sol)_
 - Nameplate styles: choose how nameplates look, Holo (today's), Capsule (your picture in a pill, the bars on a tray under it) or Classic (the name over a framed plate of bars, grey bars on players who do not share). Settings > Nameplate style or Collection > Nameplates, which shows yours (`cg_nameplateStyle`) _(Sol)_
 - Prediction as in 2026.1028.1: Settings > Game options > Prediction brings back how that release predicted your own movement, for players who preferred it; `cg_predictLegacy` turns the changes back off one by one (saber files, saber-lock facing, respawn jump, trigger box, gesture, held, other players, history gap). Current, the default, follows the server _(Sol, after Kushina's request)_
 - Toys reach the hub sooner: a toy you switch on or off is sent between the hub's regular calls, and a send the hub turned away for coming too fast is tried again a second later, so other players see it change sooner _(Sol)_

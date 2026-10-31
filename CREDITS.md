@@ -406,7 +406,8 @@ includes:
   (`cg_lagometer` 2 and 3);
 - blade cost ranking (31/10/2026): `scripts/blade_cost.py` times every Legendary and
   Mythical blade on the GPU and ranks them, and every blade change is timed against
-  `main` from now on;
+  `main` from now on; the top-tier blades then drawn about a fifth faster with the same
+  look (the blade's hiding worked out once per pixel, far lightning bolts skipped);
 - SJK Alpha (19/10/2026), the first collection of cards: the Mythical rarity, the
   Credits and Meme kinds, and card 1, "Bishop", honouring the author of JKR (art by
   Sol, AI-assisted: a rusted helmet portrait).

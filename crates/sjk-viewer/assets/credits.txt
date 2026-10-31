@@ -79,6 +79,7 @@ did: Blade cards craft their saber shader for less, and lead to it from the Card
 did: Perk marks on cards: a badge for each thing a card brings
 did: The Forge: shop, crafting and breaking any saber shader down, in one tab
 did: Blade cost ranking: every Legendary and Mythical blade timed on the GPU
+did: Top-tier saber shaders made faster with the same look
 did: The four holocrons: the Jedi cube, the Great Holocron, the Sith pyramid, the kyber prism
 did: Grand finds told in SJK chat: who opened a holocron and got a grand prize
 did: The holocron limit resets for everyone at 9:00, Paris time
