@@ -41,7 +41,8 @@ def main():
     parser.add_argument("--out", default=str(ROOT / "target" / "blade-cost"))
     args = parser.parse_args()
 
-    out = Path(args.out)
+    # absolute: the test runs from the crate's folder
+    out = Path(args.out).resolve()
     out.mkdir(parents=True, exist_ok=True)
     table = out / "blade-cost.csv"
     table.unlink(missing_ok=True)
