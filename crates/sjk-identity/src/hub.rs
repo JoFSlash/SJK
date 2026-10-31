@@ -1720,13 +1720,7 @@ impl Hub for HttpHub {
         bytes: &[u8],
         mime: &str,
     ) -> Result<crate::news::NewsImage, HubError> {
-        parse(self.send_bytes(
-            Some(identity),
-            "PUT",
-            "/v1/staff/news-image",
-            bytes,
-            mime,
-        )?)
+        parse(self.send_bytes(Some(identity), "PUT", "/v1/staff/news-image", bytes, mime)?)
     }
 
     fn news_image(&mut self, id: &str) -> Result<Vec<u8>, HubError> {

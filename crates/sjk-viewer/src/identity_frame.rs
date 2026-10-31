@@ -135,6 +135,7 @@ impl GpuState {
             ""
         };
         avatars::configure(Some(console.config_directory()), pictures_from);
+        crate::news_images::configure(Some(console.config_directory()), pictures_from);
         player_identity::apply(console.config_directory(), settings, name, location, chat);
         self.offer_installed_models();
         let (packs_revision, assets_note) = player_identity::packs();

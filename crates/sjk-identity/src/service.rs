@@ -2542,19 +2542,22 @@ impl Worker {
 
     fn upload_news_image(&mut self, bytes: &[u8], mime: &str) {
         let outcome = match (self.hub.as_mut(), self.registered) {
-            (Some(hub), true) => hub
-                .upload_news_image(&self.identity, bytes, mime)
-                .map_err(|error| match error {
-                    HubError::Rejected { code, message, .. } => match code.as_str() {
-                        "not_staff" | "not_registered" => {
-                            "Only the SJK team can upload news pictures".to_owned()
-                        }
-                        "image_quota" => "Thirty pictures an hour at most: wait a while".to_owned(),
-                        _ if message.is_empty() => format!("the hub refused it ({code})"),
-                        _ => message,
-                    },
-                    other => other.to_string(),
-                }),
+            (Some(hub), true) => {
+                hub.upload_news_image(&self.identity, bytes, mime)
+                    .map_err(|error| match error {
+                        HubError::Rejected { code, message, .. } => match code.as_str() {
+                            "not_staff" | "not_registered" => {
+                                "Only the SJK team can upload news pictures".to_owned()
+                            }
+                            "image_quota" => {
+                                "Thirty pictures an hour at most: wait a while".to_owned()
+                            }
+                            _ if message.is_empty() => format!("the hub refused it ({code})"),
+                            _ => message,
+                        },
+                        other => other.to_string(),
+                    })
+            }
             _ => Err(self.not_connected().to_string()),
         };
         self.update(|snapshot| {
@@ -3849,9 +3852,7 @@ impl Service {
     /// and size, or why it refused, arrive in [`Snapshot::news_image`]. The hub refuses
     /// anyone but the SJK team.
     pub fn upload_news_image(&self, bytes: Vec<u8>, mime: &'static str) {
-        let _ = self
-            .commands
-            .send(Command::UploadNewsImage(bytes, mime));
+        let _ = self.commands.send(Command::UploadNewsImage(bytes, mime));
     }
 
     /// Put `announcements` (oldest first, read from the hub: made while the player was

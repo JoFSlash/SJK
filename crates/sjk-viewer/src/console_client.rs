@@ -274,7 +274,11 @@ pub(super) const COMMANDS: &[(&str, &str)] = &[
     (crate::fps_help::COMMAND, crate::fps_help::HELP),
     (crate::emote_help::COMMAND, crate::emote_help::HELP),
     (crate::emote_picker::COMMAND, crate::emote_picker::HELP),
-    (crate::whats_new_card::COMMAND, crate::whats_new_card::HELP),
+    (crate::news_panel::COMMAND, crate::news_panel::HELP),
+    (
+        crate::news_panel::NEWS_COMMAND,
+        crate::news_panel::NEWS_HELP,
+    ),
     (crate::gameplay_fps::COMMAND, crate::gameplay_fps::HELP),
     (
         "snd_restart",
@@ -1272,10 +1276,11 @@ impl crate::GpuState {
             crate::fps_help::COMMAND => return self.fps_help_command(),
             crate::emote_help::COMMAND => return self.emote_help_command(),
             crate::emote_picker::COMMAND => return self.emote_picker_command(),
-            crate::whats_new_card::COMMAND => {
+            crate::news_panel::COMMAND => {
                 self.preview_whats_new();
                 return Ok(Vec::new());
             }
+            crate::news_panel::NEWS_COMMAND => return self.news_command(),
             crate::gameplay_fps::COMMAND => return self.gameplay_fps_command(args),
             crate::fs_restart::COMMAND => return self.fs_restart_command(),
             crate::chat_gifs::hidden::UNHIDE_ALL => {

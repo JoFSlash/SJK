@@ -89,7 +89,10 @@ pub fn cvar_ok(cvar: &str) -> bool {
 
 /// Whether `id` reads as a news picture's id: 16 lowercase hex digits.
 pub fn image_id_ok(id: &str) -> bool {
-    id.len() == 16 && id.bytes().all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
+    id.len() == 16
+        && id
+            .bytes()
+            .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
 }
 
 /// What line `raw` is.
@@ -328,7 +331,14 @@ mod tests {
             "pages are lowercase words"
         );
         assert_eq!(Target::parse("open:sith"), Some(Target::Open("sith")));
-        for bad in ["", "open:", "setting:", "run:quit", "setting:a b", "open:Sith"] {
+        for bad in [
+            "",
+            "open:",
+            "setting:",
+            "run:quit",
+            "setting:a b",
+            "open:Sith",
+        ] {
             assert_eq!(Target::parse(bad), None, "{bad}");
         }
     }
@@ -336,7 +346,10 @@ mod tests {
     #[test]
     fn picture_switch_and_bullet_lines() {
         assert_eq!(line(&format!(" [[image:{ID}]] ")), Line::Image(ID));
-        assert_eq!(line("[[switch:cg_nameplate]]"), Line::Switch("cg_nameplate"));
+        assert_eq!(
+            line("[[switch:cg_nameplate]]"),
+            Line::Switch("cg_nameplate")
+        );
         assert_eq!(
             line("- a point"),
             Line::Text {
@@ -360,7 +373,10 @@ mod tests {
     fn the_check_catches_broken_links_and_unknown_pictures() {
         let known = |id: &str| id == ID;
         assert_eq!(check("Fine [a](open:sith) and [b]", known), Ok(()));
-        assert_eq!(check("x\n[bad](run:quit)", known), Err(MarkupError::Link(2)));
+        assert_eq!(
+            check("x\n[bad](run:quit)", known),
+            Err(MarkupError::Link(2))
+        );
         assert_eq!(check("[](open:sith)", known), Err(MarkupError::Link(1)));
         assert_eq!(
             check(&format!("[{}](open:sith)", "a".repeat(61)), known),

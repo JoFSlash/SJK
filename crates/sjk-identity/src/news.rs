@@ -216,8 +216,9 @@ pub enum Official {
 pub struct NewsImage {
     /// Its id: 16 lowercase hex digits.
     pub image: String,
-    /// Its size as the hub wrote it, in pixels.
+    /// Its width as the hub wrote it, in pixels.
     pub width: u32,
+    /// Its height, in pixels.
     pub height: u32,
 }
 
@@ -277,7 +278,9 @@ impl AnnounceError {
             Self::Title => "The title is one line of 1 to 80 characters, without ^ codes.",
             Self::Text => "The text is 1 to 2000 characters on at most 30 lines, without ^ codes.",
             Self::Version => "A release needs its version, like 2026.1025.1.",
-            Self::Markup => "A link, picture or switch is not written as [Label](open:<page>),                              [[image:<id>]] or [[switch:<cvar>]].",
+            Self::Markup => {
+                "A link, picture or switch is not written as [Label](open:<page>),                              [[image:<id>]] or [[switch:<cvar>]]."
+            }
         }
     }
 }
