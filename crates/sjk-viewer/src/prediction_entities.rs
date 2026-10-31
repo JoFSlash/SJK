@@ -46,12 +46,24 @@ impl Entities {
             .map(|i| &self.bodies[i])
     }
 
+    #[cfg(test)]
     pub(super) fn predict(
         &self,
         predictor: &mut Predictor,
         ride: Option<&mut RidePrediction>,
         command: UserCommand,
         collision: &impl MovementCollision,
+    ) {
+        self.predict_with_collisions(predictor, ride, command, collision, collision);
+    }
+
+    pub(super) fn predict_with_collisions(
+        &self,
+        predictor: &mut Predictor,
+        ride: Option<&mut RidePrediction>,
+        command: UserCommand,
+        collision: &impl MovementCollision,
+        vehicle_collision: &impl MovementCollision,
     ) {
         let bodies = |number| self.body(number).map(|body| body.legs);
         let npcs = |number| self.body(number).is_some_and(|body| body.npc);
@@ -60,7 +72,14 @@ impl Entities {
             npcs: &npcs,
             ..MoveContext::CLIENT
         };
-        super::ride::predict(predictor, ride, command, collision, &context);
+        super::ride::predict(
+            predictor,
+            ride,
+            command,
+            collision,
+            vehicle_collision,
+            &context,
+        );
     }
 }
 

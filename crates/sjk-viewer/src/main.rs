@@ -34,6 +34,7 @@ mod camera;
 mod camera_uniform;
 mod capture;
 mod card_outline;
+mod card_scenes;
 mod cardboard_box;
 mod cards;
 mod cgame_options;
@@ -102,6 +103,7 @@ mod effect_geometry_gpu;
 mod vehicle_assets;
 mod vehicle_fire;
 mod vehicle_pose;
+mod vfs_lifetime;
 
 mod effect_library;
 mod effect_runtime;
@@ -228,6 +230,7 @@ mod team_sabers;
 mod toy_saved;
 mod toy_sight;
 mod toy_sounds;
+mod toy_switch_words;
 mod trade_window;
 mod trip_mine_lasers;
 mod video_memory;
@@ -292,6 +295,7 @@ mod rig_model;
 mod runtime_settings;
 mod saber;
 mod saber_clash_flare;
+mod saber_core;
 mod saber_defs;
 mod saber_ghosts;
 mod saber_gpu;
@@ -343,6 +347,7 @@ mod ui_target;
 mod unlock_toast;
 mod unlockables;
 mod update;
+mod use_prompt;
 mod version_overlay;
 mod wall_hold_pose;
 mod weapon_select;
@@ -416,6 +421,7 @@ use winit::keyboard::{KeyCode, PhysicalKey};
 use winit::window::{Window, WindowAttributes, WindowId};
 fn main() {
     log::init();
+    platform::raise_open_file_limit();
     crash_report::install();
     if let Err(error) = app_launch::run() {
         log::progress(format_args!("sjk: {error}"));
@@ -647,6 +653,8 @@ struct GpuState {
     entity_lighting: entity_lighting::EntityLighting,
     /// Live player model behind the Player screen.
     menu_stage: menu_stage::MenuStage,
+    /// Card pictures drawn from the game's models (`cards::scene`).
+    card_scenes: card_scenes::CardScenes,
     clientinfo_watch: clientinfo_refresh::ClientInfoWatch,
     config_string_refresh: config_string_refresh::ConfigStringRefresh,
     /// Black-blade server/clientinfo scan, redone on configstring changes.
@@ -663,6 +671,8 @@ struct GpuState {
     map_edits: map_edits::State,
     /// The mystery boxes standing on the loaded map (`mystery_box`).
     mystery_boxes: mystery_box::MysteryBoxes,
+    /// What the player's Use key does at what they face, by the crosshair (`use_prompt`).
+    use_prompt: use_prompt::UsePrompt,
     player_shadows: player_shadows::State,
     camera_buffer: wgpu::Buffer,
     camera_bind_group: wgpu::BindGroup,
@@ -760,6 +770,8 @@ struct GpuState {
     /// Collection's nameplate over the stage model).
     frame_view: Option<hud::identification::Camera>,
     pointer_captured: bool,
+    /// A primary press consumed by spectator aim-to-follow; consume its release too.
+    spectator_follow_click: bool,
     cursor_policy: pointer_input::CursorPolicy,
     cursor_position: [f32; 2],
     ui_epoch: Instant,
@@ -1614,6 +1626,7 @@ impl GpuState {
             bug_report_serial: 0,
             entity_lighting,
             menu_stage: menu_stage::MenuStage::default(),
+            card_scenes: card_scenes::CardScenes::default(),
             clientinfo_watch,
             config_string_refresh,
             black_sabers: Default::default(),
@@ -1623,6 +1636,7 @@ impl GpuState {
             decal_surfaces,
             map_edits: Default::default(),
             mystery_boxes: Default::default(),
+            use_prompt: Default::default(),
             player_shadows: player_shadows::State::default(),
             camera_buffer,
             camera_bind_group,
@@ -1693,6 +1707,7 @@ impl GpuState {
             profile_hub: profile_hub::Hub::default(),
             frame_view: None,
             pointer_captured: false,
+            spectator_follow_click: false,
             cursor_policy: pointer_input::CursorPolicy::new(),
             cursor_position: [0.0; 2],
             ui_epoch: Instant::now(),
@@ -2339,6 +2354,10 @@ impl GpuState {
             viewport,
             information_visible && intermission_view.is_none() && !scoreboard_held,
         );
+        self.append_use_prompt(
+            viewport,
+            information_visible && intermission_view.is_none() && !scoreboard_held,
+        );
         self.append_entity_view(
             viewport,
             information_visible && intermission_view.is_none() && !scoreboard_held,
@@ -2425,13 +2444,14 @@ impl GpuState {
             let team_sizes = self.live_session.as_ref().map_or([0, 0], |session| {
                 ingame_menu::team_sizes(session.game_state())
             });
+            let own_side = self.live_session.as_ref().map(|session| {
+                ingame_menu::OwnSide::of(session.game_state(), &session.latest_snapshot().player)
+            });
             let view = ingame_menu::View {
                 page: self.game_menu_page,
                 selected_row: self.game_menu_row,
-                team: self
-                    .live_session
-                    .as_ref()
-                    .map_or(3, |session| session.latest_snapshot().player.team()),
+                team: own_side.map_or(3, |own| own.team),
+                following: own_side.is_some_and(|own| own.following),
                 team_game: self.is_team_game(),
                 siege: self.is_siege_game(),
                 red_players: team_sizes[0],
@@ -2593,6 +2613,7 @@ impl GpuState {
             Some(&self.world_pings.list),
             Some(&self.drone.list),
             Some(self.mystery_boxes.labels()),
+            Some(self.use_prompt.list()),
             information_visible.then(|| &self.hud.team_logo.list),
             information_visible.then(|| &self.hud.nameplate.list),
             information_visible.then(|| &self.hud.identification.list),
@@ -3177,6 +3198,7 @@ impl GpuState {
         }
         self.encode_stage_preview(&mut encoder);
         self.encode_blade_pictures(&mut encoder);
+        self.draw_card_scenes();
         let (output, mut encoder) = match target.finish(self, encoder, timing) {
             Ok(output) => output,
             Err(status) => {

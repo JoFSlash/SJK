@@ -257,6 +257,7 @@ mod tests {
             page,
             selected_row: 0,
             team: 3,
+            following: false,
             team_game,
             siege,
             red_players: 0,

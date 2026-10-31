@@ -72,7 +72,13 @@ pub(crate) use view::{MODEL_AREA, SABER_AREA, row_labels};
 /// `duel6_sjk_forge_drawn_swatches_fit`).
 pub(crate) const DRAW_COMMANDS: usize = 4_096;
 const MEDAL_BASE: u16 = 1_200;
-const ACHIEVEMENT_BASE: u16 = 1_240;
+/// The achievements' medallions (6000 to 6199, room to grow; at 1240 they ran into the
+/// toys' tokens past 60) and the board's pages' switch.
+const ACHIEVEMENT_BASE: u16 = 6_000;
+const ACHIEVEMENT_PAGE_BASE: u16 = 6_200;
+const _: () = assert!(
+    ACHIEVEMENT_BASE as usize + crate::achievements::ALL.len() <= ACHIEVEMENT_PAGE_BASE as usize
+);
 /// The shaders' rows have a range of their own, 7000 to 7299, for a catalogue of up
 /// to 299 skins (the stock blade is row 0).
 const SHADER_BASE: u16 = 7_000;
@@ -589,6 +595,8 @@ pub(crate) struct Panel {
     /// The achievements on the wall as the last frame laid them out, in its reading
     /// order (`collection_achievements.rs`): the arrows and Tab follow it.
     achievement_slots: Vec<achievements::Slot>,
+    /// The achievements board's page on show.
+    achievement_page: crate::achievements::Page,
     shader: usize,
     /// The toy chosen on Toys: 0 Illuminate, 1 the cardboard box, 2 Order 66, 3 the Hax,
     /// 4 the Ragdoll, 5 the Drone, 6 the Boombox, 7 the Monitor, 8 Box hunt, 9 the Banana
@@ -778,6 +786,7 @@ impl Panel {
             // The first frame chooses the one nearest to unlocking.
             achievement: usize::MAX,
             achievement_slots: Vec::with_capacity(crate::achievements::ALL.len()),
+            achievement_page: crate::achievements::Page::General,
             shader: 0,
             toy: 0,
             tag: 0,
@@ -1110,6 +1119,15 @@ impl Panel {
             Tab::Toys => Some(&mut self.toy),
             Tab::Tags => Some(&mut self.tag),
             _ => None,
+        }
+    }
+
+    /// Show the achievements board's `page`, its nearest to unlocking chosen.
+    fn set_achievement_page(&mut self, page: crate::achievements::Page) {
+        if self.achievement_page != page {
+            self.achievement_page = page;
+            // Not on the new page's wall: the board chooses afresh.
+            self.achievement = usize::MAX;
         }
     }
 
@@ -1584,6 +1602,15 @@ impl Panel {
         match key {
             KeyCode::Escape => return PanelAction::Close,
             KeyCode::KeyV if self.tab == Tab::Shaders => return self.set_grid(!self.grid),
+            // F turns the achievements board's page: General, Fun.
+            KeyCode::KeyF if self.tab == Tab::Achievements => {
+                let fun = self.achievement_page == crate::achievements::Page::General;
+                self.set_achievement_page(if fun {
+                    crate::achievements::Page::Fun
+                } else {
+                    crate::achievements::Page::General
+                });
+            }
             // K waits for a key to bind to the chosen toy.
             KeyCode::KeyK if self.tab == Tab::Toys => self.bind_wait = Some(0),
             KeyCode::KeyR if self.tab == Tab::Cards => return self.reveal(),
@@ -1832,6 +1859,13 @@ impl Panel {
             }
             if token == TAG_CHOOSE_TOKEN {
                 return self.choose_tag();
+            }
+            if let Some(page) = token
+                .checked_sub(ACHIEVEMENT_PAGE_BASE)
+                .and_then(|index| crate::achievements::Page::ALL.get(usize::from(index)))
+            {
+                self.set_achievement_page(*page);
+                return PanelAction::None;
             }
             if let Some(toy) = token
                 .checked_sub(TOY_SWITCH_BASE)
@@ -3263,6 +3297,68 @@ mod tests {
         }
         assert_eq!(panel.shader_first, 0);
         assert!(first > 0);
+    }
+
+    /// Hub report #201: the wheel scrolls on over the tiers' headings, as each frame
+    /// draws in between, on the wall and the list, all shaders or the Owned ones.
+    #[test]
+    fn the_wheel_scrolls_past_the_headings_frame_after_frame() {
+        let held: Vec<Unlock> = unlockables::blade_skins()
+            .take(80)
+            .map(|skin| Unlock {
+                id: skin.id.into(),
+                count: 1,
+                ..sun()
+            })
+            .collect();
+        let fonts = crate::text::load_modern(1.0, None).expect("Inter");
+        let notch = |panel: &mut Panel, y: f32| {
+            let _ = panel.handle_pointer(
+                InputEvent::PointerWheel {
+                    position: sjk_ui::Vec2::new(500.0, 500.0),
+                    delta: sjk_ui::Vec2::new(0.0, y),
+                },
+                false,
+            );
+        };
+        for grid in [false, true] {
+            for owned in [false, true] {
+                let shown = Inputs {
+                    grid,
+                    ..inputs(Holdings::Known(&held), "")
+                };
+                let mut panel = drawn(Tab::Shaders, &shown);
+                if owned {
+                    let _ = panel.toggle_owned();
+                }
+                panel.build(&shown, &fonts.font, [1920.0, 1080.0]);
+                let lines = panel.shader_lines.len();
+                let mut tops = vec![panel.shader_first];
+                for _ in 0..lines {
+                    notch(&mut panel, -1.0);
+                    panel.build(&shown, &fonts.font, [1920.0, 1080.0]);
+                    tops.push(panel.shader_first);
+                }
+                let end = *tops.last().unwrap();
+                // The wheel reached the end: the last shader is drawn.
+                let last = SHADER_BASE + (panel.shader_count - 1) as u16;
+                assert!(
+                    panel.ui.rect_for(last).is_some(),
+                    "grid {grid}, owned {owned}: {tops:?}"
+                );
+                // Each notch moved on a line until the end.
+                let stop = tops.iter().position(|top| *top == end).unwrap();
+                assert!(
+                    tops[..=stop].windows(2).all(|pair| pair[1] == pair[0] + 1),
+                    "grid {grid}, owned {owned}: {tops:?}"
+                );
+                for _ in 0..lines {
+                    notch(&mut panel, 1.0);
+                    panel.build(&shown, &fonts.font, [1920.0, 1080.0]);
+                }
+                assert_eq!(panel.shader_first, 0, "grid {grid}, owned {owned}: back up");
+            }
+        }
     }
 
     #[test]

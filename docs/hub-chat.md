@@ -546,7 +546,8 @@ new GIPHY key allows 100 requests an hour, too few for every player to share.
   the 300 characters, the picker says so and nothing changes.
 - **Favourites**: the star in a tile's corner (shown on the tile under the pointer or
   the keyboard, gold on a favourite), or F on a tile, adds or removes it; the chosen
-  message has Add GIF to favourites (or Remove) under Mute when its line shows a GIF.
+  message has Add GIF to favourites (or Remove GIF favourite) under Mute when its line
+  shows a GIF, with Hide this GIF beside it ([Hidden GIFs](#hidden-gifs)).
   Kept in `gif-favourites.txt` beside `config.cfg`: one id a line, newest first, at
   most 500 (adding past that lets the oldest go), written through a temporary file at
   every change. Nothing is sent anywhere
@@ -588,6 +589,30 @@ new GIPHY key allows 100 requests an hour, too few for every player to share.
   says Enter pick, F favourite, PgUp/PgDn scroll, Esc close GIFs. The search field
   takes Ctrl+A (typing then replaces the words), Ctrl+V and a held Backspace as the
   message field does.
+
+## Hidden GIFs
+
+A player can hide a GIF they do not want to see (#ideas recap of 29/10/2026). The chosen
+message on the SJK chat page has **Hide this GIF** beside its favourites button, the two
+on one row as Staff's are (alone, as **Show this GIF again**, once hidden) for a message whose link is from a trusted source,
+while GIFs are on and its sender is not muted. A hidden GIF never shows
+(`chat_gifs::shows`): everywhere SJK chat shows GIFs (the SJK chat page, the menu docks,
+the chat feed, and the picker's Favourites, Search and Seen in chat) its line reads
+**GIF hidden** in place of the link (`link::HIDDEN_LABEL`), no picture is drawn, and it is
+never fetched for a line. Lines already worded follow at once
+(`chat_gifs::shown_revision`). Its favourites button is not offered while it is hidden.
+
+The picker's **Hidden** tab (between Seen in chat and Sources) lists the hidden GIFs,
+newest first, with their pictures (the one place they show, so a player can tell them
+apart; `chat_gifs::show_hidden_preview`): a click on a tile, or Enter on it, chooses it
+(a gold edge), and **Show this GIF again**, standing where Search's field does, shows
+that GIF again, the others staying hidden. Its tiles have no star. With none hidden it says
+how to hide one. `gif_unhideall` shows every hidden GIF again and says how many.
+
+The list is kept on this PC in `gif-hidden.txt` beside `config.cfg`, in the favourites'
+format (one id or approved-source link a line, newest first, at most 500, written
+through a temporary file at every change); nothing is sent anywhere
+([hidden.rs](../crates/sjk-viewer/src/chat_gifs/hidden.rs)).
 
 ## From a bind
 

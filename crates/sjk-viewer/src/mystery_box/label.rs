@@ -88,7 +88,7 @@ pub(super) fn box_label(
         return Label {
             headline: "MYSTERY BOX".to_owned(),
             line: if free {
-                "Free roll: press Use".to_owned()
+                "Free roll".to_owned()
             } else {
                 format!("{price} credits")
             },
@@ -131,7 +131,7 @@ fn came_out(opening: &Opening, pays: impl Fn(&str) -> Option<u64>) -> Label {
         .and_then(|prize| prize.holocron.as_deref())
         .and_then(crate::holocrons::name);
     let shards = opening.mine.as_ref().and_then(|prize| prize.shards);
-    let mut line = match opening.outcome.as_str() {
+    let line = match opening.outcome.as_str() {
         wire::EXPLODE => "It blew up".to_owned(),
         wire::HOLOCRON => tier.unwrap_or("A holocron").to_owned(),
         wire::SHARD_PILE | wire::BLADE if shards.is_some() => {
@@ -143,9 +143,6 @@ fn came_out(opening: &Opening, pays: impl Fn(&str) -> Option<u64>) -> Label {
         _ if won > 0 => format!("+{won} credits"),
         _ => "Nothing inside".to_owned(),
     };
-    if opening.mine.is_some() {
-        line.push_str(" - press Use to take it");
-    }
     Label {
         headline: headline.to_owned(),
         line,
@@ -373,6 +370,7 @@ mod tests {
             mine,
             opener: None,
             revealed: false,
+            blasted: false,
         }
     }
 
@@ -387,7 +385,7 @@ mod tests {
         );
         assert_eq!(
             box_label(&here(None), 100, true, pays, now).line,
-            "Free roll: press Use"
+            "Free roll"
         );
         let rolling = here(Some(opening("jackpot", None, now)));
         assert_eq!(
@@ -412,7 +410,7 @@ mod tests {
         let own = here(Some(opening("double", Some(mine), now)));
         assert_eq!(
             box_label(&own, 100, false, pays, later).line,
-            "+200 credits - press Use to take it"
+            "+200 credits"
         );
         let empty = here(Some(opening("empty", None, now)));
         let empty = box_label(&empty, 100, false, pays, later);
@@ -434,11 +432,7 @@ mod tests {
         let found = here(Some(opening(wire::HOLOCRON, Some(found), now)));
         let found = box_label(&found, 100, false, pays, later);
         assert_eq!(found.headline, "HOLOCRON!");
-        assert!(
-            found.line.starts_with("Rare Holocron - press Use"),
-            "{}",
-            found.line
-        );
+        assert!(found.line == "Rare Holocron", "{}", found.line);
     }
 
     #[test]

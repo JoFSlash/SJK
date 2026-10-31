@@ -16,6 +16,7 @@
 //! | the credits' mark | [`mark`] |
 //! | the loot table's odds, worked out | [`loot`] |
 //! | `debug_open` | [`rehearsal`] |
+//! | pictures the client draws from the game's models | [`scene`] |
 
 pub(crate) mod binder;
 pub(crate) mod faces;
@@ -23,6 +24,7 @@ pub(crate) mod look;
 pub(crate) mod loot;
 pub(crate) mod mark;
 pub(crate) mod rehearsal;
+pub(crate) mod scene;
 pub(crate) mod shard;
 
 use crate::holocrons::COUNT;

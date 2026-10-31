@@ -163,6 +163,7 @@ fn blade_card_shader() -> (&'static crate::unlockables::Unlockable, String) {
         art: String::new(),
         grants: None,
         blade: Some(skin.id.to_owned()),
+        scene: None,
     });
     let real = faces.list.len();
     crate::cards::faces::install_for_shot(list, |index| index.min(real.saturating_sub(1)));

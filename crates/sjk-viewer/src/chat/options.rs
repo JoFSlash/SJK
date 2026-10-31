@@ -66,6 +66,8 @@ pub(super) struct Options {
     pub(super) history: bool,
     /// Incoming body colour-cleaning mode.
     pub(super) clean: i64,
+    /// Local display-only message colour.
+    pub(super) incoming: Option<sjk_ui::Color>,
     /// Centre-print lifetime in milliseconds.
     pub(super) center_time: u64,
     /// Centre-print size multiplier.
@@ -117,6 +119,7 @@ impl Options {
             history: integer("cg_chatboxshowhistory", 0) != 0
                 && console.is_some_and(ViewerConsole::is_open),
             clean: integer("cg_cleanchatbox", 0),
+            incoming: super::incoming_color::read(console),
             center_time: (scalar(console, "cg_centertime", 3.0).clamp(0.0, 3600.0) * 1000.0) as u64,
             center_size: center_size(scalar(console, "cg_centersize", 1.0)),
             center_height: scalar(console, "cg_centerheight", 0.0).clamp(0.0, 480.0),

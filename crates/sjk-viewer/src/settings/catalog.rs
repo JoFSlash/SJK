@@ -891,6 +891,11 @@ pub(super) const HUD: &[Setting] = &[
         },
     },
     Setting {
+        label: "Incoming chat colour",
+        cvar: crate::chat::incoming_color::CVAR,
+        kind: ValueKind::Choice(crate::chat::incoming_color::CHOICES),
+    },
+    Setting {
         label: "Chat text outline",
         cvar: crate::chat::options::OUTLINE_CVAR,
         kind: ValueKind::Bool,
@@ -1022,6 +1027,15 @@ pub(super) const GAME: &[Setting] = &[
         kind: ValueKind::Float {
             min: 0.0,
             max: 2.0,
+            step: 0.1,
+        },
+    },
+    Setting {
+        label: "Blade core thickness",
+        cvar: crate::saber_core::CVAR,
+        kind: ValueKind::Float {
+            min: crate::saber_core::MIN as f64,
+            max: crate::saber_core::MAX as f64,
             step: 0.1,
         },
     },
@@ -1482,6 +1496,12 @@ pub(super) const GAME: &[Setting] = &[
     },
     #[cfg(feature = "mod-japro")]
     Setting {
+        label: "Force jumps (jaPRO)",
+        cvar: "japro.plugin 1",
+        kind: ValueKind::Bool,
+    },
+    #[cfg(feature = "mod-japro")]
+    Setting {
         label: "Respawn where you fell (jaPRO)",
         cvar: "japro.plugin 5",
         kind: ValueKind::Bool,
@@ -1793,6 +1813,11 @@ pub(super) const RENDER_IMAGE: &[Setting] = &[
         kind: ValueKind::Choice(&["0", "1", "2"]),
     },
     Setting {
+        label: "No glow on sabers",
+        cvar: crate::frame_target::aa::glow::NO_SABERS_CVAR,
+        kind: ValueKind::Bool,
+    },
+    Setting {
         label: "Glow style",
         cvar: "r_dynamicGlowStyle",
         kind: ValueKind::Choice(&["0", "1"]),
@@ -1941,6 +1966,11 @@ pub(super) const RENDER_LIGHTING: &[Setting] = &[
             max: 24.0,
             step: 0.5,
         },
+    },
+    Setting {
+        label: "Sun follows PC clock",
+        cvar: "r_dayClock",
+        kind: ValueKind::Bool,
     },
     Setting {
         label: "Day length, min (0 holds)",

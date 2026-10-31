@@ -245,7 +245,7 @@ pub fn refusal(error: &HubError) -> String {
     let words = match error {
         HubError::Rejected { code, message, .. } => match code.as_str() {
             "not_enough_credits" => "Not enough credits.",
-            "box_cooldown" => "The box is still closing.",
+            "box_cooldown" => "You opened a box a moment ago: let someone else roll.",
             "no_such_box" => "That box is not here any more.",
             "not_on_server" => "The hub does not see you on this server yet.",
             "opening_staff_only" => "Mystery boxes open with holocrons: soon.",

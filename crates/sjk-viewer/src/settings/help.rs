@@ -99,6 +99,61 @@ pub(super) fn classic_label<'a>(cvar: &str, label: &'a str) -> (&'a str, Timing)
 /// a code: each `(cvar, value, name)`. A value not listed is shown as it is
 /// written ([`super::classic_view::choice_label`]).
 const CHOICE_NAMES: &[(&str, &str, &str)] = &[
+    (
+        crate::chat::incoming_color::CVAR,
+        "0",
+        crate::chat::incoming_color::LABELS[0],
+    ),
+    (
+        crate::chat::incoming_color::CVAR,
+        "1",
+        crate::chat::incoming_color::LABELS[1],
+    ),
+    (
+        crate::chat::incoming_color::CVAR,
+        "2",
+        crate::chat::incoming_color::LABELS[2],
+    ),
+    (
+        crate::chat::incoming_color::CVAR,
+        "3",
+        crate::chat::incoming_color::LABELS[3],
+    ),
+    (
+        crate::chat::incoming_color::CVAR,
+        "4",
+        crate::chat::incoming_color::LABELS[4],
+    ),
+    (
+        crate::chat::incoming_color::CVAR,
+        "5",
+        crate::chat::incoming_color::LABELS[5],
+    ),
+    (
+        crate::chat::incoming_color::CVAR,
+        "6",
+        crate::chat::incoming_color::LABELS[6],
+    ),
+    (
+        crate::chat::incoming_color::CVAR,
+        "7",
+        crate::chat::incoming_color::LABELS[7],
+    ),
+    (
+        crate::chat::incoming_color::CVAR,
+        "8",
+        crate::chat::incoming_color::LABELS[8],
+    ),
+    (
+        crate::chat::incoming_color::CVAR,
+        "9",
+        crate::chat::incoming_color::LABELS[9],
+    ),
+    (
+        crate::chat::incoming_color::CVAR,
+        "10",
+        crate::chat::incoming_color::LABELS[10],
+    ),
     (crate::chat_sounds::MASTER_CVAR, "0", "Off"),
     (crate::chat_sounds::MASTER_CVAR, "1", "On"),
     (crate::chat_sounds::MASTER_CVAR, "2", "Distinct (EJK)"),
@@ -712,6 +767,10 @@ const HELP: &[(&str, &str)] = &[
         "A dark band behind each chat line, so it reads over bright maps: how dark, in per cent. 0 shows none.",
     ),
     (
+        crate::chat::incoming_color::CVAR,
+        "Colour public All chat text. Names, team/admin chat, whispers and SJK chat keep their colours. 0 keeps originals.",
+    ),
+    (
         crate::chat::options::OUTLINE_CVAR,
         "Edges chat letters and what you type in a dark outline instead of a shadow, so they read over bright maps.",
     ),
@@ -789,6 +848,10 @@ const HELP: &[(&str, &str)] = &[
     (
         crate::saber_clash_flare::SIZE_CVAR,
         "Size of the saber clash flare: 1 as in the original game, 0 to 2.",
+    ),
+    (
+        crate::saber_core::CVAR,
+        "How thick the white core down a lit blade is drawn: 1 as in the original game, 0.5 to 2. The glow around it stays the same.",
     ),
     (
         crate::impacts::FLESH_SPARKS_CVAR,
@@ -1330,6 +1393,10 @@ const HELP: &[(&str, &str)] = &[
         "The glow around sabers and glowing surfaces: on everything that glows, or on sabers only.",
     ),
     (
+        crate::frame_target::aa::glow::NO_SABERS_CVAR,
+        "Saber blades and trails get no glow halo, so each saber's details show; the rest still glows.",
+    ),
+    (
         "r_dynamicGlowStyle",
         "How the glow is blurred: like the original renderer, or like EternalJK's Vulkan one.",
     ),
@@ -1449,6 +1516,10 @@ const HELP: &[(&str, &str)] = &[
     (
         "r_dayHour",
         "The hour of the sun, 0 to 24, when the sun and sky are on.",
+    ),
+    (
+        "r_dayClock",
+        "Day and night follow your PC's clock; without Sun and sky the nights are darker.",
     ),
     (
         "r_dayMinutes",

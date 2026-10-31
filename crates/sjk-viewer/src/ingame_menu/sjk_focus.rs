@@ -172,6 +172,8 @@ pub(crate) struct Match {
     pub(crate) siege: bool,
     /// The player's team (`TEAM_FREE` 0, red 1, blue 2, spectator 3).
     pub(crate) team: u8,
+    /// The player follows someone: Spectate frees the camera, so it stays on offer.
+    pub(crate) following: bool,
     /// A vote is on.
     pub(crate) vote: bool,
 }
@@ -199,6 +201,8 @@ impl Controls {
             return controls;
         }
         let watching = game.team == 3;
+        // A follower's Spectate goes back to the free camera.
+        let free_camera = watching && !game.following;
         if game.vote {
             controls.push(Control::VoteYes, VOTE_LINE, true);
             controls.push(Control::VoteNo, VOTE_LINE, true);
@@ -222,7 +226,7 @@ impl Controls {
         controls.push(
             Control::Team(LegacyTeamChoice::Spectator),
             SIDE_LINE,
-            !watching,
+            !free_camera,
         );
         if !game.vote {
             controls.push(Control::CallVote, FOOT_LINE, true);
@@ -453,6 +457,7 @@ mod tests {
             team_game,
             siege: false,
             team,
+            following: false,
             vote,
         }
     }
@@ -492,6 +497,15 @@ mod tests {
         assert_eq!(
             labels(&Controls::for_match(game(false, 3, false)))[..2],
             [("Join", SIDE_LINE, true), ("Spectate", SIDE_LINE, false)]
+        );
+        // Following someone in an FFA: Join, and Spectate back to the free camera.
+        let following = Controls::for_match(Match {
+            following: true,
+            ..game(false, 3, false)
+        });
+        assert_eq!(
+            labels(&following)[..2],
+            [("Join", SIDE_LINE, true), ("Spectate", SIDE_LINE, true)]
         );
         // Siege: its class and side page, and Spectate.
         let siege = Controls::for_match(Match {

@@ -213,7 +213,8 @@ impl GpuState {
         sjk_client::legacy_global_vote(session.game_state(), time).active
             || sjk_client::legacy_team_vote(
                 session.game_state(),
-                session.latest_snapshot().player.team(),
+                ingame_menu::OwnSide::of(session.game_state(), &session.latest_snapshot().player)
+                    .team,
                 time,
             )
             .is_some_and(|vote| vote.active)

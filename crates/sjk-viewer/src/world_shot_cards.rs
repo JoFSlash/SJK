@@ -672,6 +672,7 @@ fn made_up_faces(
                 art: String::new(),
                 grants: None,
                 blade: None,
+                scene: None,
             });
         }
     }
@@ -1002,6 +1003,7 @@ fn duel6_sjk_blade_card() {
             art: String::new(),
             grants: None,
             blade: Some("saber_sun".to_owned()),
+            scene: None,
         });
         let real = packs.len();
         crate::cards::faces::install_for_shot(

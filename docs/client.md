@@ -755,8 +755,16 @@ filters the grid as the classic profile's search does (see above).
 `forcepowers` is the player's own profile. On a server, every userinfo sends it
 fitted to the server's rules from `CS_SERVERINFO` (`g_maxForceRank`, free saber
 skills when every other weapon is off, the game type), as stock
-`BG_LegalizedForcePowers` would fit it, but keeping team powers and the powers
-`g_forcePowerDisable` turns off: the server drops unavailable powers from its own
+`BG_LegalizedForcePowers` would fit it. Whether saber skills are free is then
+taken from the server's own `EV_SET_FREE_SABER` event, which stock cgame keeps in
+`ui_freeSaber` for the Force menu, once one arrives, and kept through the same
+server's map changes (a disconnect or another address forgets it):
+`CS_SERVERINFO` may lack `g_weaponDisable` (keys past `MAX_INFO_STRING` are
+dropped). Until either tells, a profile that only fits with free saber skills is
+sent fitted with them, so the first life is not cut by a guess; stock sends the
+profile unfitted and the server fits it. An event that alters the profile sent
+has it sent again with `forcechanged`. The fitting keeps team
+powers and the powers `g_forcePowerDisable` turns off: the server drops unavailable powers from its own
 copy without calling the profile illegal, so sending them never parks the player in
 spectator, and a mod that gives them back in a full Force duel finds them
 (jaPRO lets the powers its `g_forcePowerDisableFFA` holds back work in duels).
@@ -1091,6 +1099,16 @@ tauntaun rider holding attack, whose `BOTH_VT_ATR_S` restarts on both tracks eac
 many swing sounds (Slash, hub report #123). See
 [animation_selection.rs](../crates/sjk-client/src/animation_selection.rs).
 
+The local player's predicted animation also starts over when a held animation's timer
+ran out and came back up on the same clip and flip
+([local_actor_state.rs](../crates/sjk-viewer/src/local_actor_state.rs)). A frame shows
+the last command, so the one-command stand between two held melee kicks can go unseen,
+and a JA+ 2.5 server restarts the kick with no stand and no flip (a demo of 30/10/2026:
+`BOTH_A7_KICK_F` timer 4, then 692 a snapshot later, `legsFlip` never set). The torso
+then kept the finished kick's clock, the legs started their kick on its frame, and the
+kick stood frozen while the server kept kicking (Slash, 30/10/2026). Other players are
+shown the server's animation, which carries no timers, so this does not reach them.
+
 ## Tavion and Desann idle poses
 
 Tavion and Desann saber styles use their distinct JoF EJK standing poses by
@@ -1212,6 +1230,10 @@ the permanent ones the server sends only in its baselines, such as the `misc_bsp
 map pieces a server places in a map's void: stock `CG_BuildSolidList` adds them
 from `cg_permanents` (`cg_predict.c`), so the camera stops at their walls. The
 crosshair name trace uses the same list, so such a wall hides a player behind it.
+In a free spectator camera it still names the player under the crosshair, and a
+primary click while aimed at that player sends `follow <client>` to enter their
+view. The click is consumed instead of running the primary-button bind; a click
+with no visible player under the crosshair keeps its ordinary binding.
 Player and vehicle bodies do not obstruct this camera trace. When geometry
 collapses the camera onto its target, the view uses the intended forward direction
 instead of constructing an undefined look-at matrix.
@@ -1708,6 +1730,11 @@ switch copy, dropped there as the late one, gives back what it paid, so each
 put-away is paid once whichever comes first, and a staff weapon switch loop is
 capped like any other.
 
+Saber definitions are resolved in the game's file-list order, keeping the first
+case-insensitive name. Mounted replacements of the same `.sab` file still win
+through the VFS. The shared catalog supplies appearance, sounds and prediction;
+a later duplicate name must not replace its combat restrictions or special moves.
+
 `fd.saberAnimLevelBase` is no wire field, so the client works it out for every
 command it predicts, as `CG_PredictPlayerState` does before `Pmove`
 (`cg_predict.c:1335-1347` in EternalJK and JoF EJK): the current style, unless one
@@ -1974,6 +2001,16 @@ EternalJK's). Reduce bright flashes wins over both. The viewer reads them once a
 ([saber_clash_flare.rs](../crates/sjk-viewer/src/saber_clash_flare.rs)); the effect
 spawner and submission read the reduce switch from an atomic the frame sets.
 
+**Blade core thickness** (`cg_saberCoreSize`, archived, 0.5 to 2, default 1; Settings >
+Game options, under Clash flare size) draws the white core down a lit blade thinner or
+thicker: retail's core radius (a third of the blade's, with its flicker, `CG_DoSaber`)
+times the setting, for every blade in the world, held or thrown, plain or skinned. The
+glow, its hilt sprite and a skin's glints keep their size, and 2 still keeps the core
+inside the glow. Previews in menus (Profile, the Collection, the forge) keep retail's
+core. JoF EJK's nearest is `cg_shaderSaberCore` (not archived, 0.625), which scales
+the core of its SFX blades only; SJK draws no SFX blades, so the setting has a name of
+its own ([saber_core.rs](../crates/sjk-viewer/src/saber_core.rs)).
+
 **Saber hit sparks** (`cg_fleshSparks`, archived, 0 to 7, default 7; Settings > Game
 options, Effects) is EternalJK's count of the red sparks a saber hit on a body plays
 (JoF EJK `cg_event.c`, `EV_SABER_HIT`, each `FX_PlayEffectID` behind
@@ -2021,8 +2058,8 @@ of VIDEO is gone (10/10/2026). The groups are:
 
 | Tab | Settings |
 | --- | --- |
-| IMAGE | HDR scene and exposure, eye adaptation (`r_autoExposure`) and its range in EV, filmic tone curve, bloom, dynamic glow (`r_DynamicGlow` 0-3) and its blur style (`r_dynamicGlowStyle`), FXAA, supersampling (`r_superSample`), render scale (`r_renderScale`, also in the SJK UI's Simple Display; see [Render scale](rendering.md#render-scale-and-supersampling)), soft particles, ambient occlusion (`r_ssao`), sunbeam dust (`r_dustMotes`), per-pixel model lighting, reflection probes (`r_cubeMapping`), floor mirrors (`r_floorReflections`), normal and specular maps (`r_normalMapping`, `r_specularMapping`), parallax mapping (`r_parallaxMapping`) and its depth (`r_parallaxStrength`), emission maps (`r_emissiveMaps`), their strength (`r_emissionStrength`) and glow halo (`r_emissiveGlow`) |
-| LIGHTING | Sun and sky (`r_dayNight`), live lighting tier, time of day, day length, sunlight brightness, ambient fill and its corner shading, indirect boost, emission-map lights (`r_emissiveLights`), light shafts (`r_volumetrics`) and their clarity |
+| IMAGE | HDR scene and exposure, eye adaptation (`r_autoExposure`) and its range in EV, filmic tone curve, bloom, dynamic glow (`r_DynamicGlow` 0-3), No glow on sabers (`r_dynamicGlowNoSabers`) and the glow's blur style (`r_dynamicGlowStyle`), FXAA, supersampling (`r_superSample`), render scale (`r_renderScale`, also in the SJK UI's Simple Display; see [Render scale](rendering.md#render-scale-and-supersampling)), soft particles, ambient occlusion (`r_ssao`), sunbeam dust (`r_dustMotes`), per-pixel model lighting, reflection probes (`r_cubeMapping`), floor mirrors (`r_floorReflections`), normal and specular maps (`r_normalMapping`, `r_specularMapping`), parallax mapping (`r_parallaxMapping`) and its depth (`r_parallaxStrength`), emission maps (`r_emissiveMaps`), their strength (`r_emissionStrength`) and glow halo (`r_emissiveGlow`) |
+| LIGHTING | Sun and sky (`r_dayNight`), live lighting tier, time of day, time of day from the PC's clock (`r_dayClock`), day length, sunlight brightness, ambient fill and its corner shading, indirect boost, emission-map lights (`r_emissiveLights`), light shafts (`r_volumetrics`) and their clarity |
 | SHADOWS | World and character sun shadows, shadow resolution, sharp and close cascade distances, filter taps, slit closing, contact shadows |
 | WEATHER | Weather (`r_weather`), its density (`r_weatherDensity`), quality (`r_weatherQuality`), forced weather (`r_weatherForce`), ground fog (`r_weatherFog`) and volumetric clouds (`r_clouds`); see [Weather](rendering.md#weather) |
 
@@ -3342,6 +3379,22 @@ in every menu style, as the resolution list is ([sjk-ui.md](sjk-ui.md#settings))
 it was a boxed panel in retail's or the theme's colours. "Game HUD files" stays on the tab for lists the picker does not
 find.
 
+## Use prompt
+
+What the Use key does at what the player faces (Sol's idea, 30/10/2026), drawn to the
+right of the crosshair with a gap (56 pixels at 1080 lines; 34 at first), as many games show it
+([use_prompt.rs](../crates/sjk-viewer/src/use_prompt.rs)): a dark key cap naming the
+first key bound to `+use` as the key bindings show it ("E", "Mouse 2"; "Use" when none
+is), edged in gold, the key centred in it by its ink rather than its line box, then the action in white and a line under it in grey, each over a
+dark shadow, in the headline font (Fira Sans Condensed, as centre prints). A prompt that
+cannot be acted on now greys its cap and action. It follows the crosshair's middle
+(`cg_crosshairX`/`Y` and the dynamic crosshair) and stays on the screen at its edge; it
+is hidden with the words in the world (menus, console, scoreboard, intermission).
+
+A feature sets the prompt each frame it applies (`GpuState::want_use_prompt`); the frame
+draws the last one set and forgets it. The [mystery boxes](mystery-boxes.md#opening-one)
+are its first user, in place of their centre prints.
+
 ## Capture the flag HUD
 
 In Capture the Flag and Capture the Ysalamiri every HUD style shows the flags' state
@@ -4560,7 +4613,11 @@ list: the `toy_illuminate` command lights it or puts it out, from a bind
 (Settings > Key bindings > Interaction > Toy: Illuminate, unbound until a key is
 picked), from the quick wheel's [Toys page](#toys-page), or from the switch on the
 Collection's Toys tab ([SJK UI](sjk-ui.md#collection)). Every toy is a
-`toy_<name>` command ([sjk.md](sjk.md#names)).
+`toy_<name>` command ([sjk.md](sjk.md#names)). Switching any toy says so on the centre of
+the screen, its name and ON in green or OFF in red ("Illuminate ON"), and `toy_help` lists
+every toy in the console, its name in yellow and what it does and how in white
+([toy_switch_words.rs](../crates/sjk-viewer/src/toy_switch_words.rs)); a toy restored at
+start, or taken off by the game, says nothing.
 
 **Other players' toys, hidden on request** (Sol's request, 29/10/2026): each toy other
 players are seen with has a second switch on its card in the Collection's Toys tab, and
@@ -4624,7 +4681,8 @@ The cardboard box is a toy, SJK's own and free for every player (Sol's idea,
 takes it off, from a bind (Settings > Key bindings > Interaction > Toy: Cardboard box,
 unbound until a key is picked), from the quick wheel's [Toys page](#toys-page) or from
 the Collection's Toys tab ([SJK UI](sjk-ui.md#collection)). It is off at every start.
-Putting it on plays its sound (one's own at once, in both ears; another's where they
+Switching it says "Cardboard box ON" or "OFF" ([Illuminate](#illuminate)); a box lifted by
+another player goes without it. Putting it on plays its sound (one's own at once, in both ears; another's where they
 stand when their look gains the box, but not for the boxes already in the looks in the
 first 5 seconds on a server).
 
@@ -4701,7 +4759,8 @@ It stays as last switched, across deaths, maps, servers and restarts of the game
 the player turns it off (since 22/10/2026: saved in the archived `cl_toyOrder66`,
 [toy_saved.rs](../crates/sjk-viewer/src/toy_saved.rs)). `order66` (Interaction > Execute
 Order 66, or the Toys page) gives the order; only a player whose own toy is on, alive in
-the match on a server, can give it.
+the match on a server, can give it. Switching the toy says "Order 66 ON" or "OFF"
+([Illuminate](#illuminate)).
 
 - **Who takes part:** the players whose toy is on. It is a toy in their look
   (`toys: ["order66"]`, [unlockables.md](unlockables.md); `looks::TOYS`), so every SJK
@@ -4770,7 +4829,8 @@ player who has it on hacks another who has it on, then steers them for a few sec
 Hax, unbound until a key is picked), from the quick wheel's [Toys page](#toys-page) or
 from the Collection's Toys tab ([SJK UI](sjk-ui.md#collection)). It stays as last
 switched, across maps, servers and restarts, until the player turns it off (saved in
-the archived `cl_toyHax`, as Order 66 in `cl_toyOrder66`).
+the archived `cl_toyHax`, as Order 66 in `cl_toyOrder66`). Switching it says "Hax ON" or "OFF"
+([Illuminate](#illuminate)).
 
 - **Who takes part:** the players whose toy is on. It is a toy in their look
   (`toys: ["hax"]`, [unlockables.md](unlockables.md); `looks::TOYS`), so the hacker's
@@ -5087,7 +5147,8 @@ close by. It works like emotes: the music is in pk3s, and SJK passes only its na
   away. `boombox` in the console lists the tracks; `boombox <id>`, `next`, `prev`, `play`
   and `stop` choose and play them (Settings > Key bindings > Interaction has "Boombox:
   next track"). When a track ends the next one plays, the first after the last. It is off
-  at every start and on every new server.
+  at every start and on every new server. Starting names the track on the centre of the
+  screen; putting it away says "Boombox OFF" in red.
 - **Verified players only** (Sol's rule, 25/10/2026): on a server only a player whose key
   the SJK hub verified may turn it on ("The boombox is for verified SJK players"), and every
   SJK client ignores the boombox, music and stereo, of a player the hub does not show as
@@ -5272,8 +5333,8 @@ onto it slips, cartoon style, and falls as a [ragdoll](#ragdoll).
   quick wheel's Toys group, Collection > Toys, "Slip on peels") is the switch, both the
   right to drop peels and the consent to slip on them (the Monitor's rule: always opt
   in). It stays as last switched, across maps, servers and restarts (`cl_toyBanana`,
-  archived), and says so on the centre of the screen. A player without it walks over
-  peels.
+  archived), and says "Banana peel ON" or "OFF" on the centre of the screen, as every
+  toy does ([Illuminate](#illuminate)). A player without it walks over peels.
 - **`banana_drop`** (Interaction > Drop banana peel, the Collection's Drop key, the quick
   wheel's Drop banana peel) drops one: standing (slower than 80 units a second along the
   floor) 20 units ahead of the feet the way the player looks, moving 72 units ahead the
@@ -5313,8 +5374,10 @@ onto it slips, cartoon style, and falls as a [ragdoll](#ragdoll).
   slip: a player with the toy on and peels hidden still slips on the ones they walk onto.
   Settings > Sound > Toys, "Banana peel sounds" (`s_toyBananaSound`), silences them.
 
-No game server knows of it, and nothing goes in the hub's looks (they hold eight toy ids
-at most, all taken): every SJK client on the server learns of a peel through the
+No game server knows of it. While it is on, the player's look lists it, as the other
+toys' do (`toys: ["banana"]`, since 30/10/2026, when the hub's looks went from eight toy
+ids to 32; [unlockables.md](unlockables.md); `looks::TOYS`). The peels go otherwise:
+every SJK client on the server learns of a peel through the
 [toy relay](hub-chat.md#toy-relay). The dropper's client tells each SJK player in turn,
 the nearest first, one event every 50 ms, and the ones who come later while it lies:
 `drop_<number>_<moment>_<x>_<y>_<z>_<dx>_<dy>_<dz>_<yaw>` (the peel's number among the
@@ -5729,12 +5792,20 @@ returning to the row ([wheel_editor.rs](../crates/sjk-viewer/src/settings/wheel_
 - **Right column:** a live preview of the page's ring, the focused choice
   highlighted, then the page's key and bind (`+wheel <id>`) or what the choice
   runs. Picking a choice shows the catalogue there instead (Up and Down, Enter,
-  Escape; actions already on the page say so), Custom command last, with a
-  search field right of its title that has the keyboard as it opens: typing keeps the actions and
-  emotes whose name or group holds every word (Custom command always stays),
+  Escape; actions already on the page say so), then under Your own the custom
+  commands named before and Custom command last, with a
+  search field right of its title that has the keyboard as it opens: typing keeps the actions,
+  emotes and named commands whose name or group (a named command's command too)
+  holds every word (Custom command always stays),
   held letters and Backspace repeat, Ctrl+A, Ctrl+C and Ctrl+V work as in every
   field, Backspace on an empty search closes it; a custom
   choice's form has its name and command fields, Save and Cancel.
+- **Named commands** (after Dante's idea): a custom command saved from its form is
+  remembered and offered under Your own in every page's catalogue, newest first,
+  one per command (the same command saved again takes its new name and moves
+  first), 24 at most (the oldest go). Delete on the highlighted one, or its cross,
+  forgets it; choices already on pages keep it. They are kept in
+  `wheel_commands.json` beside `wheel.json` (see below).
 - The pointer: hovering a row focuses it (a page row without showing that page,
   which a click does), the focused row's small controls act (Rename, up, down,
   remove), a click on a choice or Add a choice opens the catalogue, a click on a
@@ -5782,6 +5853,19 @@ as version 3; a Toys page removed afterwards stays removed, a wheel of 8 pages i
 left alone (the file is not rewritten) and a page of the player's own called Toys
 keeps its id, the new one taking `toys2`.
 
+The named custom commands are kept apart, in `wheel_commands.json` in the same
+folder, so Restore the default pages (which removes `wheel.json`) keeps them:
+
+```json
+{ "version": 1, "commands": [ {"name": "Ready", "command": "ready"} ] }
+```
+
+Newest first, one per command, 24 at most; an entry that is not a complete
+`{name, command}` object is left out. Without the file, the custom choices already
+on the pages are remembered as it is first read (installed emotes, `sjkemote <id>`,
+aside: the catalogue lists them already) and the file is written; once it exists,
+even empty, it is what is remembered.
+
 ## Configuration and content
 
 The default writable client folder is `GameData/SJK/`, under the selected game
@@ -5796,6 +5880,7 @@ is independent of the executable's location and working directory. The client cr
 | `jakey` | Persistent client identity key |
 | `hud.json` | Optional custom HUD |
 | `wheel.json` | The quick wheel's pages, once changed ([Quick wheels](#kept-in-wheeljson)) |
+| `wheel_commands.json` | The quick wheel's named custom commands ([Quick wheels](#kept-in-wheeljson)) |
 | `screenshots/`, `demos/` | Screenshots and recordings |
 | `chatlogs/`, `qconsole.log` | Logs when enabled |
 
@@ -5817,8 +5902,19 @@ the console's `path` command also lists it. The fallback uses the profile in
 that per-user folder; the per-user and portable profiles are not synced.
 See [platform.rs](../crates/sjk-viewer/src/platform.rs) and
 [storage.rs](../crates/sjk-viewer/src/platform/storage.rs).
-Edit settings through the client, or edit the file while the client is stopped
-so autosaving cannot overwrite your changes.
+Settings can be changed in the client, or `config.cfg` edited in a text editor, even
+while the client runs. The shell remembers the texts it loaded and wrote
+([config_watch.rs](../crates/sjk-shell/src/config_watch.rs)) and looks at the file's
+size and time once a second, and again before each save and at exit, once its own
+writes have landed. A file holding a text the client did not write was changed from
+outside: it is loaded as at start (its cvars, and its bindings replace the table), the
+console says so, and later saves build on it. A file deleted while the client runs
+stays deleted: nothing is written for the rest of that run, so the next start is on
+the defaults (the console says so, and settings changed before the restart are not
+kept); `writeconfig` still writes it on request. Until 29/10/2026 the client wrote
+the values it held over such an edit at its next save or at exit, so an edited or
+deleted config came back with the old name, field of view or camera at the next start
+(hub report #199, and Kushina's `autoexec.cfg` workaround for it).
 
 Autosaving writes `config.cfg` only when an archived cvar or a binding changed:
 key presses, `+`/`-` buttons and unarchived cvars never touch the file. A change
@@ -6974,3 +7070,30 @@ the server; the world draws its own shaders until the server sends new remaps (a
 shader-state change or a `remapShader` command) or a new map loads. As in
 EternalJK, destination time offsets are kept. See [rendering](rendering.md#server-shader-remaps)
 for scope and remaining limitations. These controls do not edit map geometry.
+
+### Incoming chat colour
+
+`cg_chatColor` forces only the game server's public **All** message bodies.
+Team chat, plain/encrypted whispers, admin chat and the separate SJK chat channel
+(including reward drops and official notices) retain their original colours,
+even when they appear together in the All feed. The setting is local and archived:
+it never changes sent text or the chat log. Sender names keep their own colours,
+and emoji pictures, channel marks, timestamps, centre prints and the composer
+keep their normal appearance. Existing public history changes without reconnecting.
+
+The default 0 keeps original colours; 1 red, 2 green, 3 yellow, 4 blue, 5 cyan,
+6 magenta, 7 white, 8 orange, 9 grey and 10 black force one colour, ignoring inline
+colour codes in the body while retaining message fading. Invalid values fall back
+to original colours. Settings > Chat offers the same named choices (also in classic
+HUD settings). It is independent of outgoing `cl_colorstring` and chat cleaning.
+
+### Copying a server address
+
+The SJK and classic server browsers offer **Copy IP** for the selected server.
+Ctrl+C copies the selection while no text field or dialog is open; in a field it
+still copies that field. The copied endpoint includes the port (and brackets for
+IPv6), with no password or command. The browser reports success or clipboard failure.
+`copyServerIP` copies the connected server's endpoint from the console; disconnected
+clients report that no server is connected.
+
+[SJK browser with Copy IP](images/copy-server-ip.png).

@@ -253,7 +253,7 @@ fn panic_message(payload: &(dyn std::any::Any + Send)) -> String {
 impl Drop for WorldInstallTask {
     fn drop(&mut self) {
         self.cancelled
-            .store(true, std::sync::atomic::Ordering::Relaxed);
+            .store(true, std::sync::atomic::Ordering::Release);
     }
 }
 
@@ -601,6 +601,7 @@ impl GpuState {
             // The map transition is reported when the next map is in, not now.
             loaded.transition_report_pending = false;
         }
+        crate::vfs_lifetime::log("world attach", loaded.vfs.as_ref());
         loaded
     }
 
@@ -648,6 +649,35 @@ impl GpuState {
 #[cfg(test)]
 mod install_tests {
     use super::*;
+
+    #[test]
+    fn a_cancelled_install_worker_releases_its_vfs() {
+        let vfs = Arc::new(sjk_vfs::VirtualFileSystem::new());
+        let weak = Arc::downgrade(&vfs);
+        let cancelled = Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let worker_cancelled = Arc::clone(&cancelled);
+        let (sender, receiver) = mpsc::channel();
+        let worker = std::thread::spawn(move || {
+            while !worker_cancelled.load(std::sync::atomic::Ordering::Acquire) {
+                std::thread::yield_now();
+            }
+            drop(vfs);
+        });
+        let task = WorldInstallTask {
+            receiver,
+            cancelled,
+            result: None,
+            map_path: String::new(),
+            started: Instant::now(),
+            unload: false,
+        };
+
+        drop(task);
+        drop(sender);
+        worker.join().unwrap();
+
+        assert!(weak.upgrade().is_none());
+    }
 
     #[test]
     fn a_panicking_install_reports_what_it_said() {

@@ -438,6 +438,50 @@ not know is kept but named nowhere; `Face::blade` in
 - **Each card has one rarity** (Bishop is Mythical, the Toxiee card Legendary): the
   first set needs cards of every rarity before every copy can be revealed.
 
+### Scenes
+
+Since 30/10/2026 (Sol's idea) a card's file may name a `scene`: the client then draws
+the card's picture itself, from the player's own Jedi Academy data, instead of the
+pack's picture. Nothing of the game travels: no one ships, uploads or hosts it, each
+client draws its own copy once and keeps it as a JPEG in `card_scenes/` beside the
+packs' folder, named by the card and 16 hex of the scene's hash (and the drawing's
+version, `cards::scene::VERSION`), so a changed scene is drawn again. The pack's
+picture stays: older clients draw it, and this one shows it until the drawing is ready,
+or for good this session when the game data lacks a model or the drawing fails (named
+in the log). The JKA Characters and JKA Arsenal sets use scenes.
+
+A scene is one line of at most 200 ASCII characters: up to three figures joined by
+`+`, each a kind, a name and options, and the camera's options anywhere.
+
+| Part | Meaning |
+| --- | --- |
+| `player <model>[/<skin>]` | a player model of `models/players/`, the game's own whatever rig model a pack lays over it |
+| `anim=<NAME>` and `at=<0..1>` | the pose: an `animation.cfg` animation and how far through it (its idle at its start by default) |
+| `saber=<hilt>`, `saber2=<hilt>` | a `.sab` hilt (`single_1`, `dual_1` for a staff, `luke`) in the right and left hand |
+| `blade=<colour>`, `blade2=<colour>` | the blades' colours: red, orange, yellow, green, blue or purple (blue; the second as the first) |
+| `model <path>` | any `.md3` or `.glm` under `models/` (a weapon's world model, an item) |
+| `yaw`, `pitch`, `zoom` | the camera: turned round the figures from in front (-180 to 180, 25 by default), raised (-60 to 60, 8) and brought nearer (0.5 to 3, 1) |
+
+For example `player luke anim=BOTH_STAND2 saber=luke blade=green`,
+`player jedi_tf + player jedi_zf` or `model models/weapons2/disruptor/disruptor_w.glm`.
+Weapons draw from their world models (`_w.glm`): the first-person models of most are
+made of tagged parts and come out in pieces.
+
+The figures stand side by side, framed by their own camera so they fill most of the
+6:5 window, lit from the camera's upper left whatever the map, and drawn as the model
+preview draws (`menu_stage/preview.rs`'s encode, with the blades through its blade
+layer); the picture is read back and laid over the card's backdrop (a deep space
+gradient with a glow of the rarity's colour behind the figures and round their
+outline, so dark costumes stand out). Surfaces that write no depth (glass, a bacta
+tank's) come out clear. One drawing at a time, recorded and submitted on its own inside
+validation scopes, so a broken model fails that picture alone. Code:
+[cards/scene.rs](../crates/sjk-viewer/src/cards/scene.rs) (the grammar, the cache,
+the queue, the camera, the backdrop) and
+[card_scenes.rs](../crates/sjk-viewer/src/card_scenes.rs) (the drawing). World shot:
+`world_shot::card_scenes_shots::card_scenes_drawn_from_the_game_models`
+(`SJK_SCENE` draws one scene, `SJK_SCENES` a file of `name<TAB>scene` lines, as
+contact sheets of twelve).
+
 ## In the client
 
 | Piece | Where |

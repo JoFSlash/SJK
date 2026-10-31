@@ -514,8 +514,6 @@ impl LocalPrediction {
             return self.frozen_eye();
         }
         let predictor = self.predictor.as_mut()?;
-        let collision =
-            BspMovementCollision::with_movers(bsp, scratch, &self.physics_movers.colliders);
         if !self.fake_noclip {
             self.saber_lock_view.face(
                 predictor.state_mut(),
@@ -524,11 +522,18 @@ impl LocalPrediction {
                     .entity_origin(self.saber_lock_view.enemy()),
             );
         }
-        self.entities.predict(
+        let collision = BspMovementCollision::for_actor(
+            bsp,
+            scratch,
+            &self.physics_movers.colliders,
+            self.physics_movers.local_actor,
+        );
+        self.entities.predict_with_collisions(
             predictor,
             self.rides.committed.as_mut(),
             command,
             &collision,
+            &collision.chassis(self.physics_movers.vehicle_actor),
         );
         self.rides.preview = None;
         touch_triggers(
@@ -576,8 +581,6 @@ impl LocalPrediction {
             }
             None => self.preview.insert(committed.clone()),
         };
-        let collision =
-            BspMovementCollision::with_movers(bsp, scratch, &self.physics_movers.colliders);
         if !self.fake_noclip {
             self.saber_lock_view.face(
                 preview.state_mut(),
@@ -586,8 +589,19 @@ impl LocalPrediction {
                     .entity_origin(self.saber_lock_view.enemy()),
             );
         }
-        self.entities
-            .predict(preview, self.rides.begin_preview(), command, &collision);
+        let collision = BspMovementCollision::for_actor(
+            bsp,
+            scratch,
+            &self.physics_movers.colliders,
+            self.physics_movers.local_actor,
+        );
+        self.entities.predict_with_collisions(
+            preview,
+            self.rides.begin_preview(),
+            command,
+            &collision,
+            &collision.chassis(self.physics_movers.vehicle_actor),
+        );
         touch_triggers(
             preview,
             &self.physics_movers.triggers,

@@ -1128,6 +1128,15 @@ impl ClientMenu {
         let PhysicalKey::Code(key) = event.physical_key else {
             return MenuAction::None;
         };
+        if matches!(self.state.phase(), ClientPhase::Browser)
+            && !field_open
+            && control
+            && key == KeyCode::KeyC
+            && !self.classic_info
+        {
+            self.copy_selected_server_address();
+            return MenuAction::None;
+        }
         match self.state.phase() {
             ClientPhase::MainMenu if self.menu_style == MenuStyle::Sjk => {
                 self.sjk_home_key(key, console)
@@ -1407,6 +1416,13 @@ impl ClientMenu {
     /// Turn the player screen to page `index` (Character, Saber, Force).
     pub(crate) fn show_player_hub_page(&mut self, index: usize) {
         self.player.show_page(index);
+    }
+
+    /// The Profile screen's Character tab with its Name field open for typing.
+    pub(crate) fn edit_player_hub_name(&mut self) {
+        if self.player_hub_shown() {
+            self.player.open_name_field();
+        }
     }
 
     /// Whether a field of the Profile screen's player pages takes the keys, so Tab

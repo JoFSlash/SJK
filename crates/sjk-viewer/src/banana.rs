@@ -29,8 +29,10 @@
 //!   and its sounds in the world, everywhere. Neither changes who may slip: the switch
 //!   does, as for the Monitor.
 //!
-//! No game server knows of it, and nothing goes through the hub's looks: every SJK
-//! client on the server learns of a peel from its dropper's client through the toy relay
+//! No game server knows of it. While it is on, the player's hub look lists it
+//! ([`TOY`] in [`crate::looks::TOYS`]), as the other toys' do; the peels go otherwise:
+//! every SJK client on the server learns of a peel from its dropper's client through the
+//! toy relay
 //! (`PROTOCOL.md`, "Toy relay"), which tells each SJK player in turn, the nearest first,
 //! and the ones who come later: [`Event::Drop`], `drop_<number>_<moment>_<x>_<y>_<z>_
 //! <dx>_<dy>_<dz>_<yaw>`. The slipping player's client tells every one that the peel is

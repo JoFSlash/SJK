@@ -7,7 +7,7 @@ mod catalog;
 mod classic_view;
 mod icons;
 mod pointer;
-mod sjk_view;
+pub(crate) mod sjk_view;
 
 pub(crate) use catalog::{
     ACTIONS, CATEGORIES, Category, category_range, default_bindings, migrate_chat_default,
