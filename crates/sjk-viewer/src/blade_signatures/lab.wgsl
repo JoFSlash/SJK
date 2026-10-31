@@ -180,10 +180,6 @@ fn helix(y: f32, r: f32, turns: f32, phase: f32) -> vec2<f32> {
 // so the rest is skipped. A piece asking for another ray (a shifted one) works its own out. The
 // same values as before. behindBlade only reads what was kept (writing it there kept the shader
 // compiler from dropping calls whose result goes unused: World Shift drew at half speed).
-// Off for a signature whose header says `@raycache off` (blade_signatures.rs module_source): World
-// Shift, which drew at half speed reading what was kept, on an RTX 5080 (Vulkan) at least.
-const LAB_RAY_CACHE: bool = true;
-
 var<private> bbRo: vec3<f32> = vec3<f32>(1.0e9);
 
 var<private> bbRd: vec3<f32> = vec3<f32>(0.0);
@@ -194,19 +190,43 @@ var<private> bbNear: f32 = 0.0;
 
 var<private> bbAlong: f32 = 0.0;
 
-// The ray's part: returns how near it passes the body (0 to 1, with the tip's narrowing and the
-// body's length), ta where it passes the axis and along how far it is from looking down the axis.
-fn bbRayPart(ro: vec3<f32>, rd: vec3<f32>, ta: ptr<function, f32>, along: ptr<function, f32>) -> f32 {
-    (*ta) = 0.0;
+fn labRayPrepare(ro: vec3<f32>, rd: vec3<f32>) {
+    bbRo = ro;
+    bbRd = rd;
+    bbTa = 0.0;
+    bbNear = 0.0;
     let a = dot(rd.xz, rd.xz);
-    (*along) = smoothstep(0.01, 0.04, a);
-    if (*along) <= 0.0 {
+    bbAlong = smoothstep(0.01, 0.04, a);
+    if bbAlong <= 0.0 {
+        return;
+    }
+    let ta = -dot(ro.xz, rd.xz) / a;
+    let y = ro.y + rd.y * ta;
+    let off = ro.xz + rd.xz * ta;
+    let d = length(off);
+    let into = clamp((y - (uLength - 1.4)) / 1.4, 0.0, 1.0);
+    let w = sqrt(max(1.0 - into * into, 0.0));
+    let onBlade = smoothstep(-0.8, -0.2, y) * (1.0 - smoothstep(uLength - 0.15, uLength + 0.05, y));
+    bbTa = ta;
+    bbNear = (1.0 - smoothstep(0.35 * w, 0.8 * w + 0.02, d)) * onBlade;
+}
+
+// The whole of it, from the ray alone: what labRayPrepare keeps, and what a piece asking for
+// another ray (or a module without the cache) works out (written out twice rather than shared
+// through out parameters, which made World Shift draw at a third of its speed on an RTX 5080).
+fn behindBladeFull(ro: vec3<f32>, rd: vec3<f32>, t: f32) -> f32 {
+    let a = dot(rd.xz, rd.xz);
+    let along = smoothstep(0.01, 0.04, a);
+    if along <= 0.0 {
         return 0.0;
     }
-    (*ta) = -dot(ro.xz, rd.xz) / a;
-    let y = ro.y + rd.y * (*ta);
-    let off = ro.xz + rd.xz * (*ta);
+    let ta = -dot(ro.xz, rd.xz) / a;
+    let y = ro.y + rd.y * ta;
+    let off = ro.xz + rd.xz * ta;
     let d = length(off);
+    // what lies on the blade's own body (its axis, its glow) is never hidden by it
+    let p = ro + rd * t;
+    let outside = smoothstep(0.5, 0.9, length(p.xz));
     // round 23: the body hiding narrows with the blade's rounded tip (a quarter circle over its
     // last 1.4 units) down to the point, so what passes behind the tip is hidden too (Sol's review:
     // ending the hiding before the tip let Exegol Rift's flare and Quasar's jet show through),
@@ -214,35 +234,24 @@ fn bbRayPart(ro: vec3<f32>, rd: vec3<f32>, ta: ptr<function, f32>, along: ptr<fu
     let into = clamp((y - (uLength - 1.4)) / 1.4, 0.0, 1.0);
     let w = sqrt(max(1.0 - into * into, 0.0));
     let onBlade = smoothstep(-0.8, -0.2, y) * (1.0 - smoothstep(uLength - 0.15, uLength + 0.05, y));
-    return (1.0 - smoothstep(0.35 * w, 0.8 * w + 0.02, d)) * onBlade;
+    return (1.0 - smoothstep(0.35 * w, 0.8 * w + 0.02, d)) * onBlade * outside * smoothstep(ta + 0.15, ta + 0.7, t) * along;
 }
 
-fn labRayPrepare(ro: vec3<f32>, rd: vec3<f32>) {
-    bbRo = ro;
-    bbRd = rd;
-    var ta: f32;
-    var along: f32;
-    bbNear = bbRayPart(ro, rd, &ta, &along);
-    bbTa = ta;
-    bbAlong = along;
-}
-
+// For a signature whose header says `@raycache off`, its module calls behindBladeFull in its place
+// (blade_signatures.rs module_source): World Shift drew at a third of its speed reading what was
+// kept, or even with the reading switched off by a constant, on an RTX 5080 (Vulkan).
 fn behindBlade(ro: vec3<f32>, rd: vec3<f32>, t: f32) -> f32 {
-    var ta = bbTa;
-    var along = bbAlong;
-    var near = bbNear;
-    if !LAB_RAY_CACHE || ro.x != bbRo.x || ro.y != bbRo.y || ro.z != bbRo.z || rd.x != bbRd.x || rd.y != bbRd.y || rd.z != bbRd.z {
-        near = bbRayPart(ro, rd, &ta, &along);
+    if ro.x == bbRo.x && ro.y == bbRo.y && ro.z == bbRo.z && rd.x == bbRd.x && rd.y == bbRd.y && rd.z == bbRd.z {
+        if bbNear <= 0.0 || bbAlong <= 0.0 {
+            return 0.0;
+        }
+        let p = ro + rd * t;
+        let outside = smoothstep(0.5, 0.9, length(p.xz));
+        // multiplied in this order: hideD magnifies the last digit a thousandfold where a piece is
+        // nearly hidden
+        return bbNear * outside * smoothstep(bbTa + 0.15, bbTa + 0.7, t) * bbAlong;
     }
-    if near <= 0.0 || along <= 0.0 {
-        return 0.0;
-    }
-    // what lies on the blade's own body (its axis, its glow) is never hidden by it
-    let p = ro + rd * t;
-    let outside = smoothstep(0.5, 0.9, length(p.xz));
-    // multiplied in the order it always was: hideD magnifies the last digit a thousandfold where
-    // a piece is nearly hidden
-    return near * outside * smoothstep(ta + 0.15, ta + 0.7, t) * along;
+    return behindBladeFull(ro, rd, t);
 }
 
 // A distance d as seen when h (behindBlade) of it is hidden by the blade: unchanged at 0, out of

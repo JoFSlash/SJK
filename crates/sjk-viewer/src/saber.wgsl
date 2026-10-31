@@ -4333,9 +4333,9 @@ fn sig_edge(input: VertexOutput) -> f32 {
 }
 
 // @signature begin
-// The lab keeps what of its blade hiding depends on the view ray alone (`lab.glsl`,
-// behindBlade); a module with no signature has nothing to keep.
 fn labRayPrepare(ro: vec3<f32>, rd: vec3<f32>) {
+    // The lab keeps what of its blade hiding depends on the view ray alone (`lab.glsl`,
+    // behindBlade); a module with no signature has nothing to keep.
 }
 
 fn sig_glow(g: vec3<f32>, b: vec2<f32>, r: f32, px: f32) -> vec3<f32> {

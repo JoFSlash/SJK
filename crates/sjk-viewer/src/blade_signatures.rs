@@ -306,7 +306,7 @@ impl Signature {
 
     /// Whether its pieces read the view ray's part of the blade's hiding kept once per pixel
     /// (`lab.glsl` behindBlade, 31/10/2026); `@raycache off` works it out at every piece, as
-    /// before, for World Shift, which drew at half speed reading it (RTX 5080, Vulkan).
+    /// before, for World Shift, which drew at a third of its speed with it (RTX 5080, Vulkan).
     pub(crate) fn ray_cache(&self) -> bool {
         self.meta("raycache") != Some("off")
     }
@@ -491,11 +491,11 @@ impl Signature {
     pub(crate) fn module_source(&self) -> String {
         let mut source = slim(&module_source(include_str!("saber.wgsl"), self.wgsl));
         if !self.ray_cache() {
-            source = source.replacen(
-                "const LAB_RAY_CACHE: bool = true;",
-                "const LAB_RAY_CACHE: bool = false;",
-                1,
-            );
+            // Every piece calls the hiding worked out whole, as before (`lab.glsl`); the kept
+            // one is left unused.
+            source = source
+                .replace("fn behindBlade(", "fn behindBladeCached(")
+                .replace("behindBladeFull(", "behindBlade(");
         }
         // A mythical blade's awakening, breath and clash ring (round 19, `sig_mythic`), and a
         // Unique one's (25/10/2026, Sol: Mythical's level of effects), unless it draws its own
@@ -716,12 +716,16 @@ mod tests {
             let source = signature.module_source();
             let off = signature.id == "saber_world_shift";
             assert_eq!(signature.ray_cache(), !off, "{}", signature.id);
-            assert!(
-                source.contains(if off {
-                    "const LAB_RAY_CACHE: bool = false;"
-                } else {
-                    "const LAB_RAY_CACHE: bool = true;"
-                }),
+            // off: the kept one is defined but nothing calls it
+            assert_eq!(
+                source.matches("behindBladeCached(").count(),
+                usize::from(off),
+                "{}",
+                signature.id
+            );
+            assert_eq!(
+                source.contains("behindBladeFull("),
+                !off,
                 "{}",
                 signature.id
             );
