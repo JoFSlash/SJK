@@ -748,12 +748,16 @@ enum Command {
     PlaceMysteryBox(crate::mystery_box::MysteryBox),
     /// SJK's creator: remove mystery box `id`.
     RemoveMysteryBox(i64),
-    /// Read the box hunt on `server`.
-    BoxHunt(String),
+    /// Read the box hunt on `server`, the player away or not.
+    BoxHunt {
+        server: String,
+        away: bool,
+    },
     /// The player, the box hunt's mark on `server`, was killed by slot `by`.
     BoxHuntKilled {
         server: String,
         by: u8,
+        away: bool,
     },
     /// Staff: publish a map's edits.
     PublishMapEdits {
@@ -1644,8 +1648,10 @@ impl Worker {
                 hub.place_mystery_box(identity, &placed)
                     .map(|id| (BoxDone::Placed(id), None))
             }),
-            Command::BoxHunt(server) => self.box_hunt(&server, None),
-            Command::BoxHuntKilled { server, by } => self.box_hunt(&server, Some(by)),
+            Command::BoxHunt { server, away } => self.box_hunt(&server, None, away),
+            Command::BoxHuntKilled { server, by, away } => {
+                self.box_hunt(&server, Some(by), away);
+            }
             Command::RemoveMysteryBox(id) => self.mystery_box(now, |hub, identity| {
                 hub.remove_mystery_box(identity, id)
                     .map(|_| (BoxDone::Removed(id), None))
@@ -2855,16 +2861,19 @@ impl Worker {
     }
 
     /// Read the box hunt on `server` into [`Snapshot::box_hunt`], first saying the
-    /// player (the mark) was killed by slot `killed_by` when given. A failed read leaves
-    /// the last one.
-    fn box_hunt(&mut self, server: &str, killed_by: Option<u8>) {
+    /// player (the mark) was killed by slot `killed_by` when given (tried twice: a kill
+    /// lost is a hunter's free roll lost), and whether the player is `away`. A failed
+    /// read leaves the last one.
+    fn box_hunt(&mut self, server: &str, killed_by: Option<u8>, away: bool) {
         let (Some(hub), true) = (self.hub.as_mut(), self.registered) else {
             return;
         };
-        if let Some(by) = killed_by {
+        if let Some(by) = killed_by
+            && hub.box_hunt_killed(&self.identity, server, by).is_err()
+        {
             let _ = hub.box_hunt_killed(&self.identity, server, by);
         }
-        let Ok(state) = hub.box_hunt(&self.identity, server) else {
+        let Ok(state) = hub.box_hunt(&self.identity, server, away) else {
             return;
         };
         self.box_hunt_serial += 1;
@@ -3731,15 +3740,19 @@ impl Service {
         let _ = self.commands.send(Command::RemoveMysteryBox(id));
     }
 
-    /// Read the box hunt on `server`: it arrives in [`Snapshot::box_hunt`].
-    pub fn read_box_hunt(&self, server: String) {
-        let _ = self.commands.send(Command::BoxHunt(server));
+    /// Read the box hunt on `server`, saying whether the player is `away` (in the chat,
+    /// a menu, idle: the hub picks no mark among them): it arrives in
+    /// [`Snapshot::box_hunt`].
+    pub fn read_box_hunt(&self, server: String, away: bool) {
+        let _ = self.commands.send(Command::BoxHunt { server, away });
     }
 
     /// The player, the box hunt's mark on `server`, was killed by the player on slot
-    /// `by`; the hunt is read again after.
-    pub fn box_hunt_killed(&self, server: String, by: u8) {
-        let _ = self.commands.send(Command::BoxHuntKilled { server, by });
+    /// `by`; the hunt is read again after, the player `away` or not.
+    pub fn box_hunt_killed(&self, server: String, by: u8, away: bool) {
+        let _ = self
+            .commands
+            .send(Command::BoxHuntKilled { server, by, away });
     }
 
     /// Staff: publish `edits` for `map` and `checksum`; the answer lands in

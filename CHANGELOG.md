@@ -36,6 +36,9 @@ Add each release's notes here when it is tagged (docs/sjk.md "Releases").
 - The switches on the what's-new card's Settings to review work for every setting: some (the dynamic glow's saber setting) did nothing and always showed Off _(Sol)_
 - JoF content and the Sith cloud can update themselves: turn on Update automatically on their card (or Settings > JoF content auto-update, Sith cloud auto-update) and tick Auto on the groups you want; SJK checks at start and every hour, also during a match, downloads what changed and says so in a small card, the new files loading from the next map. Off by default (`jof.contentAuto`, `sith.cloudAuto`) _(Sol)_
 - Legendary and Mythical saber shaders draw faster, looking the same: about a quarter less GPU time over the 48 of them, and half or more on Bleeding Kyber, Abyssal Eye, Sith Holocron, Reactor and Felucia Spores _(Sol)_
+- Box hunt: a mark is picked only among players in play (not typing in the chat, in a menu, spectating or idle), only when at least 3 are, and a mark away for a minute hands it to another; hunters see an arrow to the mark through walls, or round the crosshair pointing their way _(Sol)_
+- Box hunt: the mark is no longer shown for up to 20 seconds after their time is up, when killing them won nothing; the mark's game tells a kill made in the first seconds and tries again if the hub missed it; a hunter who wins no free roll reads why in the centre _(Sol)_
+- Mystery boxes are open inside under their lid (the top was closed with planks and the iron bands crossed it) and a faint halo of light rises over them, to find them from afar _(Sol)_
 
 ## 2026.1031.1 (Alpha) | 31/10/2026
 

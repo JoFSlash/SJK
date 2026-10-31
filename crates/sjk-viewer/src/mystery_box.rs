@@ -297,7 +297,7 @@ macro_rules! bundled {
 
 /// The bundled files at their game paths (made by `scripts/mystery_box_assets.py` and
 /// `scripts/mystery_box_model.py`; the shader by hand).
-const FILES: [(&str, &[u8]); 9] = [
+const FILES: [(&str, &[u8]); 10] = [
     (ROLL_SOUND, bundled!("roll.wav")),
     (TAKE_SOUND, bundled!("take.wav")),
     (MODEL, bundled!("mystery_box.md3")),
@@ -308,6 +308,10 @@ const FILES: [(&str, &[u8]); 9] = [
     (
         "models/sjk/mystery_box_glow.jpg",
         bundled!("mystery_box_glow.jpg"),
+    ),
+    (
+        "models/sjk/mystery_box_halo.jpg",
+        bundled!("mystery_box_halo.jpg"),
     ),
     (
         "shaders/sjk_mystery_box.shader",

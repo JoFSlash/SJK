@@ -550,11 +550,13 @@ pub trait Hub: Send {
         ))
     }
 
-    /// The box hunt on `server` as the player reads it (`POST /v1/box-hunt`).
+    /// The box hunt on `server` as the player reads it (`POST /v1/box-hunt`), saying whether the player is
+    /// `away` (in the chat, a menu, idle: the hub picks no mark among them).
     fn box_hunt(
         &mut self,
         _identity: &Identity,
         _server: &str,
+        _away: bool,
     ) -> Result<crate::mystery_box::HuntState, HubError> {
         Err(HubError::Protocol(
             "this hub client does not read the box hunt".to_owned(),
@@ -1773,12 +1775,13 @@ impl Hub for HttpHub {
         &mut self,
         identity: &Identity,
         server: &str,
+        away: bool,
     ) -> Result<crate::mystery_box::HuntState, HubError> {
         parse(self.send(
             Some(identity),
             "POST",
             "/v1/box-hunt",
-            Some(json!({ "server": server })),
+            Some(json!({ "server": server, "away": away })),
         )?)
     }
 
