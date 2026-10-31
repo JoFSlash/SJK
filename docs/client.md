@@ -3502,8 +3502,44 @@ to read on busy backgrounds) chooses the edge: 0 Off, the drop shadow only
 halo at 38% and every other letter ringed by eight dark copies (0.45 opaque each)
 instead of its shadow (`Outlined`, `text::Edge`).
 
+**Styles** (31/10/2026, Sol's decision to let players choose among the designs SJK has
+had): `cg_nameplateStyle` (Settings "Nameplate style", and the Style row on the
+Collection's Nameplates tab, [sjk-ui.md](sjk-ui.md#collection)) picks the plates' look,
+`hud::nameplate::Style`: 0 Holo, the holo frame below (the default, the look since
+28/10/2026); 1 Capsule; 2 Classic. What a plate says is the same in all three (the
+name and its mark, the power icons, the duel badge, the bars and the sharing and duel
+rules below); only its shape differs, and the classic plate has no picture.
+
+- **Capsule** (design E of 28/10/2026, the look that morning,
+  [capsule.rs](../crates/sjk-viewer/src/hud/nameplate/capsule.rs)): every plate is a pill
+  26 design pixels tall (the design's name 13), dark navy 55% opaque, or the team's
+  colour made deep in team games (`capsule::team_fill`, 62%), edged gold for a sharer,
+  a pale grey otherwise, the duel's colour (1.5 pixels) in a duel, a paler gold on NPC
+  plates. Left to right it holds the round picture (20 design pixels near, smaller far;
+  the same pictures as the holo frame's), the name with its mark and, at its right end
+  in a duel, the duel badge. A sharer's bars stand on a tray 104 wide tucked under it
+  (shield 2, health 3 and Force 2 design pixels, rounded, on a faint track), the pill
+  widening and rising to hold it as the bars fade in; a player who does not share, and
+  a duellist, have the pill alone. Far away the pill fades, leaving the picture and the
+  name centred over the player. The power icons stand over the pill's middle in square
+  cells (22.5 design pixels).
+- **Classic** (the plates until 28/10/2026,
+  [classic.rs](../crates/sjk-viewer/src/hud/nameplate/classic.rs)): no picture. The
+  name is centred over the player, the duel badge before it and the mark after it,
+  level with its capitals. Nearer, a dark plate (62% opaque, 112 HUD pixels wide) fades
+  in under the name, which rises over it: rounded bars (shield 5, health 7, Force 4
+  pixels) on dark tracks, each outlined, the plate framed in gold for a sharer (a
+  team's colour as a thin line inside it) and in the team's colour otherwise. A player
+  who does not share gets grey bars the whole way, so they read as hidden rather than
+  empty, as before 28/10/2026; a duel opponent's bars never show. The power icons, as
+  tall as the name, stand over it. The weapon icon the classic plates had is not back:
+  it went in every style on 28/10/2026.
+
+The rest of this section describes the holo frame; the bars, badges, modes and rules
+hold in every style.
+
 **The holo frame** (28/10/2026, design C of the nameplate designs Sol chose from, in
-place of the capsule, design E, the same day): every plate, bars or not, is a hexagon
+place of the capsule, design E, the same day; `cg_nameplateStyle 0`): every plate, bars or not, is a hexagon
 holding the player's picture over the left end of a plate whose top-right corner is cut
 (`nameplate_math::Holo`), so a player who does not share still has a plate. The plate
 holds their name with its mark after it and, under it, the bars of a sharer, or a dim
@@ -3769,7 +3805,8 @@ seeing any of them means sharing your own, through the hub (Sol's rule, 15/10/20
   for everyone, bots and players without SJK too): no bars for any viewer, health,
   shield or Force. Nothing overrides it, not even a teammate's `tinfo`. Their plate
   stays, with its picture, name and power icons, and the dim dotted line under the name
-  instead of bars (until 28/10/2026 they had grey bars, full length and empty).
+  instead of bars (until 28/10/2026 they had grey bars, full length and empty, which
+  the classic style keeps; the capsule shows the pill alone).
   NPCs keep their bars.
 - **Sharers:** their health and shield bars are the estimates below, corrected with
   every value they share ([estimate.rs](../crates/sjk-viewer/src/hud/estimate.rs) `History`). A

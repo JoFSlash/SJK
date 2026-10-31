@@ -76,6 +76,7 @@ migrated, except where the table says so. Where each is documented:
 | `cg_shieldBrightness` | 2 passes, old defaults 1 and 4 moved to 2 once | [Client](client.md#launch) |
 | `cg_duelGhost` | on: duellists as JoF EJK's blue figures (off: dark under the bubble) | [Rendering](rendering.md#entity-render-effects) |
 | `cg_duelHideOthers` | 1, Auto: in a private duel, players outside it hidden on JA+ (unless `cp_pluginDisable` bit 1) and jaPRO, as JoF EJK | [Client](client.md#nameplates) |
+| `cg_nameplateStyle` | 0, Holo (the holo frame; 1 the capsule, 2 the classic plate) | [Nameplates](client.md#nameplates) |
 | `cg_dismember` | 2 | [Dismemberment](client.md#dismemberment-and-disintegration) |
 | `snaps` | 120 (slider to 125) | [status.md](status.md#gameplay-and-interface-defaults) |
 | `com_maxfpsUnfocused` | 30 | [Configuration](client.md#configuration-and-content) |

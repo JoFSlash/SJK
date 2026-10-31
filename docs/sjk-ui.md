@@ -1712,13 +1712,17 @@ for the run.
   Frame (round the plate), Trail (under the plate). Over the model's head (projected
   from the stage model's head with the last frame's view, `GpuState::frame_view`; over
   the preview's head without a stage) the player's nameplate as a match draws it near
-  (since 28/10/2026 the holo frame, [client.md](client.md#nameplates), drawn with the
-  match's layout at twice its size): their picture (or their initial on their colour) in
-  the hexagon, the name in its colours and, while See & share nameplates is on, the gold
-  corner and the shield, health and Force bars (else the dotted line), with
-  dashed marks at the three places (the crest's between the picture and the name).
+  (in the style chosen, `cg_nameplateStyle`, [client.md](client.md#nameplates), drawn
+  with the match's layout at twice its size). The holo frame: their picture (or their
+  initial on their colour) in the hexagon, the name in its colours and, while See &
+  share nameplates is on, the gold corner and the shield, health and Force bars (else the
+  dotted line). The capsule: the picture and the name in the pill, gold-edged with the
+  tray of bars under it while sharing. The classic plate: the name over the framed plate
+  of bars while sharing, alone otherwise. Dashed marks stand at the three places (the
+  crest's before the name).
   Its words stand on a dark card beside the model (x 1360 to 1824, its foot at y 990,
-  as tall as they need, since 25/10/2026). Under them, **See & share nameplates** (a switch; a click or Enter flips
+  as tall as they need, since 25/10/2026). Under them, **Style** (31/10/2026: Holo,
+  Capsule, Classic, segments whose click sets `cg_nameplateStyle`) and **See & share nameplates** (a switch; a click or Enter flips
   it, its row pulsing gold every 1.2 s, a ring round it and a glow behind the switch)
   puts `cg_nameplate` in plain view: the one setting for seeing other players'
   nameplates and sharing your health, shield and Force

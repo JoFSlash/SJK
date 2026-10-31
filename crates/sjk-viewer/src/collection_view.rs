@@ -162,6 +162,7 @@ pub(crate) fn row_labels(
         second: "",
         pair: crate::saber_skins::Pair::None,
         share: false,
+        nameplate_style: crate::hud::nameplate::Style::Holo,
         toy_keys: &[],
         toys_unseen: 0,
         tag: "",

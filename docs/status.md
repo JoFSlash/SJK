@@ -1,3 +1,23 @@
+## Nameplate styles
+
+31/10/2026, `personal/nameplate-styles`, based on `main` `1475cb58` (Sol's decision: bring
+back the earlier nameplate designs and let players choose): `cg_nameplateStyle` picks the
+plates' look, 0 the holo frame (the default, unchanged), 1 the capsule of 28/10/2026 morning
+(`hud/nameplate/capsule.rs`, its layout and drawing as of `abdc506a`), 2 the classic plate
+from before 28/10/2026 (`hud/nameplate/classic.rs`, as of `2f6aecb3^`, grey bars on players
+who do not share, without the weapon icon) ([client.md](client.md#nameplates)). Settings has a
+Nameplate style row; the Collection's Nameplates tab draws the chosen style and offers a
+Style row ([sjk-ui.md](sjk-ui.md#collection)). What a plate shows and the sharing and duel
+rules are shared by the three. No hub change.
+Verified: fmt, build, Clippy, the workspace's tests, the capsule's and the classic plate's
+layout tests (restored), each style drawing a sharer's bars and only the classic greying a
+non-sharer's, the Style row's clicks and fit; off screen with the game data: the nameplate
+snapshots in each style (`menu_snapshot::nameplate_snapshot`: `nameplates.png`,
+`nameplates-capsule.png`, `nameplates-classic.png`) and, on the GPU, the Collection's
+Nameplates tab in the capsule and classic styles
+(`world_shot::collection::duel6_sjk_collection`). Not verified: in a match (live pictures,
+teams and duels in the capsule and classic styles), or at 4K.
+
 ## Local incoming chat colour
 
 30/10/2026, `feat/chat-color`, based on `main` `82c8c185`: archived `cg_chatColor`

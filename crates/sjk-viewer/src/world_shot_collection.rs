@@ -2,7 +2,8 @@
 //! live duel6 in the SJK UI, on a made-up profile (two medals, the Sun blade owned and
 //! worn, some achievements): from the main page, every tab, the model on the menu map's
 //! stage behind Shaders (the Sun, then the locked Storm previewed on the saber), Toys
-//! (the Illuminate holocron by it) and Nameplates (the plate over its head); the same
+//! (the Illuminate holocron by it) and Nameplates (the plate over its head, in each
+//! style); the same
 //! in a 4:3 window; then from the game menu over a match, the model in the page's live
 //! preview; and the page on its own as the classic menus open it. Then the hover cards:
 //! one on a thing of each tab, and one on a tier of the Holocrons tab. The blade skins'
@@ -149,8 +150,21 @@ fn duel6_sjk_collection() {
                 println!("{}", shoot(&mut gpu, 60, name).display());
                 assert!(!overflowed(&gpu), "{name}");
             }
+            // The other styles (`cg_nameplateStyle`), sharing: the capsule, the classic.
+            for (style, name) in [
+                ("1", "duel6-collection-nameplates-capsule"),
+                ("2", "duel6-collection-nameplates-classic"),
+            ] {
+                if let Some(console) = gpu.console.as_mut() {
+                    let _ = console.set_cvar(crate::hud::nameplate::STYLE_CVAR, style);
+                }
+                gpu.ui_epoch -= std::time::Duration::from_millis(3_000);
+                println!("{}", shoot(&mut gpu, 60, name).display());
+                assert!(!overflowed(&gpu), "{name}");
+            }
             if let Some(console) = gpu.console.as_mut() {
                 let _ = console.set_cvar("cg_nameplate", "0");
+                let _ = console.set_cvar(crate::hud::nameplate::STYLE_CVAR, "0");
             }
             // A locked one, previewed on the saber. Rows are counted as a player holding no
             // Unique shader sees the list (the shots below hold none).

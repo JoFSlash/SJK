@@ -969,7 +969,8 @@ fn nameplate_snapshot() {
     nameplates(&mut shots, &vfs);
 }
 
-/// Nameplates over a match, as holo frames (design C, 28/10/2026): a verified player
+/// Nameplates over a match, in each style (holo frames, design C, 28/10/2026, in
+/// `nameplates.png`; `-capsule` and `-classic` the others): a verified player
 /// with a picture, just spawned (overheal, 125) with estimated Force (grey haze), a red
 /// enemy with no picture (their initial) whom the estimate cannot place
 /// (yellow "?"), a duelling staff player without SJK farther off (their model's head
@@ -978,7 +979,7 @@ fn nameplate_snapshot() {
 /// a large shield (199), and far away a player without SJK (a small grey hexagon and
 /// the name over a hairline).
 fn nameplates(shots: &mut Snapshot, vfs: &sjk_vfs::VirtualFileSystem) {
-    use crate::hud::nameplate::{PreviewPlate, State};
+    use crate::hud::nameplate::{PreviewPlate, State, Style};
     use sjk_ui::TextureId;
     let badge = RgbaImage::from_raw(128, 128, crate::ui_renderer::verified_badge_pixels())
         .expect("a full cell");
@@ -1170,20 +1171,28 @@ fn nameplates(shots: &mut Snapshot, vfs: &sjk_vfs::VirtualFileSystem) {
         "^0Qu^7iet",
         "Jaden",
     ];
-    let mut state = State::default();
-    let mut vertices = Vec::new();
     // The plates draw with the HUD font in game (`hud_runtime::append`).
     let hud = crate::text::load_classic().expect("build the HUD font");
     let menu = std::mem::replace(&mut shots.font, hud);
-    state.preview(
-        &plates,
-        &names,
-        &power_icons,
-        &shots.font.font,
-        &mut vertices,
-        VIEWPORT,
-    );
-    shots.save("nameplates", &state.list, &vertices, true);
+    // Each style (`cg_nameplateStyle`): the holo frame, the capsule, the classic plate.
+    for (name, style) in [
+        ("nameplates", Style::Holo),
+        ("nameplates-capsule", Style::Capsule),
+        ("nameplates-classic", Style::Classic),
+    ] {
+        let mut state = State::default();
+        state.set_style(style);
+        let mut vertices = Vec::new();
+        state.preview(
+            &plates,
+            &names,
+            &power_icons,
+            &shots.font.font,
+            &mut vertices,
+            VIEWPORT,
+        );
+        shots.save(name, &state.list, &vertices, true);
+    }
     shots.font = menu;
 }
 
