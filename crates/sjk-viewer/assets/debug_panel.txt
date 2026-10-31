@@ -7596,6 +7596,22 @@ test: Click a wall left of the panel: Selected shows its surface; type a shader,
 test: Place: search tree, click a row twice: a tree stands where you aimed; Turn right, Up, Bigger.
 test: Grab: the panel hides and the tree follows your aim; O puts it down and reopens the panel.
 test: Edits: choose one, Delete; Ctrl+Z undoes the newest; This server: new edits name it.
+
+[map-editor-ux]
+area: Rendering & effects
+title: Map editor made easier, and why Publish failed (staff)
+change: The live hub had no map edits (its map-edits branch was never merged): Publish says so.
+change: The world-note key opens the panel and puts a grabbed model down; a Map editor icon.
+change: Undo and redo every change; a shader search to remap; nudges, Shift fine, wheel turns.
+test: Escape menu, the globe icon (staff): the editor turns on and its panel opens.
+test: Aim at a fern, O: the panel opens on Map prop. Place: Grab, O puts the model down.
+test: Grab, then the wheel: the model turns 15 degrees a notch (Shift: 1); no weapon change.
+test: Place a model, Turn right twice, Ctrl+Z: it turns back once; Ctrl+Y turns it again.
+test: Select a wall: the shader list opens on its folder; pick one, Remap; Ctrl+Z takes it back.
+test: Place: Left, Right, Away, Closer move it along the floor; Shift-click moves 1 unit.
+test: Publish on the live hub before the hub deploy: "This SJK hub does not keep map edits yet".
+test: After the hub's map-edits branch is deployed: Publish says Published, with its revision.
+test: Log: "map edits: N maps on the hub, ..." (or "not in step with the hub: ...") at start.
 test: Esc while aiming shows the Map editor strip at the top; Editor off removes it.
 
 # ---- Bug reports, 19/10/2026 ----

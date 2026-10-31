@@ -744,10 +744,13 @@ Looks are public to every SJK player on the server, as badges are.
 ## Map edits
 
 Staff publish a map's edits to the hub, and the worker keeps every SJK player's copies
-in `map_edits` beside the key: the hub's list every 10 minutes once registered, each
-document newer than its copy downloaded, a copy the hub stopped listing removed, and a
-copy with unpublished changes left alone. What the edits do is in
-[map-edits.md](map-edits.md).
+in `map_edits` beside the key: the hub's list every 10 minutes once registered (at once
+on `Service::refresh_map_edits`, which the editor sends when it turns on, and after a
+publish), each document newer than its copy downloaded, a copy the hub stopped listing
+removed, and a copy with unpublished changes left alone. What the last look did lands in
+`Snapshot::map_edits_note` (a summary, or why it fell short), the publish's answer in
+`Snapshot::map_edits_published`, both worded by `map_edits::refusal` when the hub said
+no. What the edits do is in [map-edits.md](map-edits.md).
 
 ## Mystery boxes
 

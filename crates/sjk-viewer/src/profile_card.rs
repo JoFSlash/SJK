@@ -577,6 +577,7 @@ mod tests {
             look_outcome: None,
             packs_revision: 0,
             map_edits_revision: 0,
+            map_edits_note: None,
             map_edits_published: None,
             mystery_boxes: None,
             mystery_boxes_revision: 0,
