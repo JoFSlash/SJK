@@ -99,6 +99,10 @@ float ex_fangs(vec3 ro, vec3 rd, float px, out float th, out float k){
     vec3 p0 = around(r0, a, 0.2);
     vec3 pm = around(r0 + lean*0.5 - 0.12*len, a, 0.2 + len*0.55);
     vec3 p1 = around(r0 + lean, a, 0.2 + len);
+    // 31/10/2026: a fang covers only what lies within its thickness (0.2 at most) and half a
+    // pixel of its two pieces, all within reach of its middle point: a ray further off skips it
+    float tm;
+    if (rayPtRaw(ro, rd, pm, tm) - max(length(p0 - pm), length(p1 - pm)) > 0.25 + px) continue;
     float s0, s1;
     float d0 = raySeg(ro, rd, p0, pm, s0);
     float d1 = raySeg(ro, rd, pm, p1, s1);
@@ -208,7 +212,9 @@ vec3 r8_vol(vec3 ro, vec3 rd, float px){
     vec3 q = around(R + 0.5*(1.0 - f) + 0.05, a - 0.03, y + 1.5*(1.0 - f)*sin(fi));
     float dd = raySeg(ro, rd, p, q, s);
     fx += vec3(1.0, 0.75, 0.45)*halo(dd, max(0.05, px))*(0.9 + 1.2*h11(fi*7.7))*smoothstep(0.0, 0.3, f)*s;
-    fx += vec3(1.0, 0.7, 0.3)*halo(rayPt(ro, rd, around(ex_w(y) + 0.1, a, y), tq), 0.3)*smoothstep(0.9, 1.0, f)*1.4;
+    // 31/10/2026: its flash at the throat only shows in the last tenth of its way in, so it is
+    // only worked out then (the same picture)
+    if (f > 0.9) fx += vec3(1.0, 0.7, 0.3)*halo(rayPt(ro, rd, around(ex_w(y) + 0.1, a, y), tq), 0.3)*smoothstep(0.9, 1.0, f)*1.4;
   }
   // crushed rock: sparks spraying out of the throat where each rock is swallowed
   for (int i = 0; i < 12; i++){
