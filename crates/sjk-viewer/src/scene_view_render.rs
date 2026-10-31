@@ -57,6 +57,14 @@ impl GpuState {
             self.device.limits().max_texture_dimension_2d,
             if self.context.hdr.mode == 1 { 48 } else { 32 },
         );
+        // Without high DPI (`r_highDpi` 0) the percent counts the window's points.
+        let percent = crate::frame_target::scale::in_points(
+            percent,
+            self.context.high_dpi,
+            self.window
+                .as_ref()
+                .map_or(1.0, |window| window.scale_factor()),
+        );
         // Supersampling falls back a factor at a time; a render scale is tried as it is.
         let candidates = (2..=percent / NATIVE)
             .rev()

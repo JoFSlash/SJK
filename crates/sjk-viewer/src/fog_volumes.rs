@@ -85,6 +85,18 @@ impl Table {
         Ok(result)
     }
 
+    /// The map's global fog colour, unquantized: `R_LoadFogs` keeps the last
+    /// `brushNum == -1` fog as `globalFog` (tr_bsp.cpp:1717-1722), and the frame and
+    /// every world view clear to its `parms.color` (tr_backend.cpp:547-553,1812-1818),
+    /// so a sky with no box or clouds (`skyParms - 512 -`, `taspir1`) shows the fog.
+    pub(crate) fn global_color(&self) -> Option<[f32; 3]> {
+        self.entries[1..=self.count]
+            .iter()
+            .rev()
+            .find(|fog| fog.color[3] != 0.0 && fog.bounds_max[3] < 2.0)
+            .map(|fog| [fog.color[0], fog.color[1], fog.color[2]])
+    }
+
     /// First strictly overlapping volume, preserving BSP order, including global fog.
     pub(crate) fn at_sphere(&self, origin: [f32; 3], radius: f32) -> u32 {
         self.entries[1..=self.count]
@@ -138,3 +150,52 @@ pub(crate) const SHADER: &str = concat!(
     include_str!("surface_noise.wgsl"),
     include_str!("surface_sprites.wgsl"),
 );
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn table(fogs: &[([f32; 3], bool, bool)]) -> Table {
+        let mut table = Table {
+            entries: [GpuFog::zeroed(); FOG_SLOTS],
+            count: fogs.len(),
+        };
+        for (index, &(color, global, submodel)) in fogs.iter().enumerate() {
+            let volume = FogVolume {
+                bounds: [[-1.0; 3], [1.0; 3]],
+                surface: None,
+            };
+            let parms = sjk_shader::FogParms {
+                color,
+                depth_for_opaque: 4096.0,
+            };
+            table.entries[index + 1] = GpuFog::new(volume, parms, global);
+            if submodel {
+                table.entries[index + 1].bounds_max[3] = 2.0;
+            }
+        }
+        table
+    }
+
+    #[test]
+    fn the_last_global_fog_of_the_world_is_the_clear_colour() {
+        let lava = [1.0, 0.2, 0.0];
+        let taspir1 = [0.8, 0.7, 0.4];
+        assert_eq!(table(&[]).global_color(), None);
+        assert_eq!(table(&[(lava, false, false)]).global_color(), None);
+        // Unquantized, unlike the brush fogs' ColorBytes4 colours.
+        assert_eq!(
+            table(&[(lava, false, false), (taspir1, true, false)]).global_color(),
+            Some(taspir1)
+        );
+        assert_eq!(
+            table(&[(lava, true, false), (taspir1, true, false)]).global_color(),
+            Some(taspir1)
+        );
+        // An appended asset's fogs stay in model space and never replace the world's.
+        assert_eq!(
+            table(&[(taspir1, true, false), (lava, true, true)]).global_color(),
+            Some(taspir1)
+        );
+    }
+}

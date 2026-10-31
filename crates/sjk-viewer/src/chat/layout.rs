@@ -191,6 +191,25 @@ impl Wrapped {
     }
 }
 
+/// How wide a body row of `value` is drawn at `size` with `spacing` after each
+/// character: its text runs as they measure, each emoji mark the room of its picture
+/// (as `view::body_row` lays them out).
+pub(super) fn drawn_width(value: &str, font: &UiFont, size: f32, spacing: f32) -> f32 {
+    let scale = size / font.height.max(1.0);
+    let is_mark = |character: char| super::emoji::mark_index(character).is_some();
+    let mut width = 0.0;
+    let mut rest = value;
+    loop {
+        let (run, after) = rest.split_at(rest.find(is_mark).unwrap_or(rest.len()));
+        width += text::visible_text_width_style(font, run, scale, TextFace::Regular, spacing);
+        let Some(mark) = after.chars().next() else {
+            return width;
+        };
+        width += super::emoji::advance(size);
+        rest = &after[mark.len_utf8()..];
+    }
+}
+
 /// Work is linear in the bounded text length, with no temporary substring copies.
 pub(super) fn fitting_end(value: &str, font: &UiFont, width: f32, size: f32) -> usize {
     fitting_end_spaced(value, font, width, size, 0.0)

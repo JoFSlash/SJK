@@ -2,7 +2,8 @@
 //! live duel6 in the SJK UI, on a made-up profile (two medals, the Sun blade owned and
 //! worn, some achievements): from the main page, every tab, the model on the menu map's
 //! stage behind Shaders (the Sun, then the locked Storm previewed on the saber), Toys
-//! (the Illuminate holocron by it) and Nameplates (the plate over its head); the same
+//! (the Illuminate holocron by it) and Nameplates (the plate over its head, in each
+//! style); the same
 //! in a 4:3 window; then from the game menu over a match, the model in the page's live
 //! preview; and the page on its own as the classic menus open it. Then the hover cards:
 //! one on a thing of each tab, and one on a tier of the Holocrons tab. The blade skins'
@@ -135,6 +136,36 @@ fn duel6_sjk_collection() {
                 shoot(&mut gpu, 60, "duel6-collection-toys-lit").display()
             );
             gpu.illuminate.set_on(false);
+            // The nameplate over the model's head (the holo frame), without and with See
+            // and share nameplates: the dotted line, then the gold corner and the bars.
+            gpu.profile_hub_show_for_shot(Tab::Nameplates);
+            for (share, name) in [
+                ("0", "duel6-collection-nameplates"),
+                ("1", "duel6-collection-nameplates-shared"),
+            ] {
+                if let Some(console) = gpu.console.as_mut() {
+                    let _ = console.set_cvar("cg_nameplate", share);
+                }
+                gpu.ui_epoch -= std::time::Duration::from_millis(3_000);
+                println!("{}", shoot(&mut gpu, 60, name).display());
+                assert!(!overflowed(&gpu), "{name}");
+            }
+            // The other styles (`cg_nameplateStyle`), sharing: the capsule, the classic.
+            for (style, name) in [
+                ("1", "duel6-collection-nameplates-capsule"),
+                ("2", "duel6-collection-nameplates-classic"),
+            ] {
+                if let Some(console) = gpu.console.as_mut() {
+                    let _ = console.set_cvar(crate::hud::nameplate::STYLE_CVAR, style);
+                }
+                gpu.ui_epoch -= std::time::Duration::from_millis(3_000);
+                println!("{}", shoot(&mut gpu, 60, name).display());
+                assert!(!overflowed(&gpu), "{name}");
+            }
+            if let Some(console) = gpu.console.as_mut() {
+                let _ = console.set_cvar("cg_nameplate", "0");
+                let _ = console.set_cvar(crate::hud::nameplate::STYLE_CVAR, "0");
+            }
             // A locked one, previewed on the saber. Rows are counted as a player holding no
             // Unique shader sees the list (the shots below hold none).
             gpu.profile_hub_show_for_shot(Tab::Shaders);
@@ -888,6 +919,126 @@ fn duel6_sjk_collection_tags() {
         }
         assert_eq!(gpu.profile_hub_tab(), Some(Tab::Tags));
         println!("{}", shoot(&mut gpu, 20, "duel6-collection-tags").display());
+        assert!(!overflowed(&gpu));
+    });
+}
+
+/// The History tab (31/10/2026) on made-up lines: an Open all of five gathered (opened on
+/// its lines), single openings with a card and a shader, drops, a purchase, a shatter, a
+/// mystery box and a trade, then Load older.
+#[test]
+#[ignore = "renders with the GPU and the installed game data named by JKA_GAME_DATA"]
+fn duel6_sjk_collection_history() {
+    use crate::console::collection_panel::history::tests::{came, ledger, opened};
+    use sjk_identity::history::{BoxLine, HistoryCard, HistoryLine, OpenedLine, TradeLine};
+    on_big_stack(|| {
+        let cvars = [
+            ("ui_menuStyle", "sjk"),
+            (crate::settings::quick::HIDE_CVAR, "1"),
+            (crate::discord_presence::CVAR, "0"),
+        ];
+        let Some((mut gpu, _profile)) = open(
+            "maps/mp/duel6.bsp",
+            [1920, 1080],
+            Some(menu::ClientMenu::new(true, String::new())),
+            &cvars,
+        ) else {
+            return;
+        };
+        let _ = frame(&mut gpu, 10);
+        let now = 1_793_440_000;
+        let mut lines = vec![
+            HistoryLine::Opened(OpenedLine {
+                at: now,
+                tier: "legendary".into(),
+                credits: 240,
+                card: Some(HistoryCard {
+                    card: Some("sjk_alpha_000".into()),
+                    rarity: "legendary".into(),
+                    finish: "holo".into(),
+                }),
+                unlock: "saber_sun".into(),
+                ..OpenedLine::default()
+            }),
+            {
+                let HistoryLine::Came(mut bought) = came(now - 60, "rare", "bought") else {
+                    unreachable!()
+                };
+                bought.price = 400;
+                HistoryLine::Came(bought)
+            },
+        ];
+        lines.extend((0..5).map(|index| {
+            opened(
+                now - 3_600,
+                ["uncommon", "rare", "uncommon", "mythical", "rare"][index],
+                40 + index as i64 * 15,
+                if index == 3 { 12 } else { 0 },
+            )
+        }));
+        lines.extend([
+            HistoryLine::Shards(ledger(now - 7_200, 15, "shatter", "saber_sun")),
+            HistoryLine::Box(BoxLine {
+                at: now - 9_000,
+                outcome: "double".into(),
+                price: 100,
+                won: 200,
+                shards: 0,
+            }),
+            HistoryLine::Box(BoxLine {
+                at: now - 9_100,
+                outcome: "explode".into(),
+                price: 100,
+                ..BoxLine::default()
+            }),
+            HistoryLine::Trade(TradeLine {
+                at: now - 86_400,
+                trade: 3,
+                with: sjk_identity::history::HistoryPartner {
+                    name: "^1Nib^7bles".into(),
+                    verified: true,
+                },
+                gave: vec![sjk_identity::TradeItem {
+                    kind: "holocron".into(),
+                    tier: "rare".into(),
+                    ..Default::default()
+                }],
+                got: vec![sjk_identity::TradeItem {
+                    kind: "shader".into(),
+                    id: Some("saber_sun".into()),
+                    tier: "mythical".into(),
+                    ..Default::default()
+                }],
+            }),
+            came(now - 90_000, "kyber_rare", "achievement"),
+            came(now - 100_000, "rare", "play"),
+            came(now - 100_000, "uncommon", "play"),
+            HistoryLine::Credits(ledger(now - 120_000, 500, "reward", "Bug hunting week")),
+            came(now - 130_000, "mythical", "staff"),
+        ]);
+        let state = sjk_identity::HistoryState {
+            serial: 1,
+            lines,
+            more: true,
+            before: now - 130_000,
+            message: String::new(),
+        };
+        if let Some(console) = gpu.console.as_mut() {
+            console.preview_profile(preview());
+            console.preview_collection(Some(vec![sun()]), 0.8);
+            console.preview_history(Some(std::sync::Arc::new(state)));
+            console.open_profile_hub_page(Tab::History, ReturnTarget::MainMenu);
+        }
+        assert_eq!(gpu.profile_hub_tab(), Some(Tab::History));
+        let _ = frame(&mut gpu, 2);
+        // Open the gathered row (the fourth) and choose it.
+        if let Some(console) = gpu.console.as_mut() {
+            console.history_activate_for_shot(3);
+        }
+        println!(
+            "{}",
+            shoot(&mut gpu, 20, "duel6-collection-history").display()
+        );
         assert!(!overflowed(&gpu));
     });
 }

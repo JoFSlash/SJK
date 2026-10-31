@@ -57,7 +57,7 @@ impl Count {
 }
 
 /// Each tab's count, in the row's order.
-pub(super) fn counts(inputs: &Inputs<'_>) -> [Count; 9] {
+pub(super) fn counts(inputs: &Inputs<'_>) -> [Count; 10] {
     let medals = medals::held(inputs);
     // Out of the ones the player sees: a retired one not held is not counted.
     let (achievements, achievements_total) = crate::achievements::tally(inputs.standings);
@@ -129,6 +129,11 @@ pub(super) fn counts(inputs: &Inputs<'_>) -> [Count; 9] {
             held: cards::held(inputs),
             total: 0,
         },
+        // The history counts nothing.
+        Count {
+            held: None,
+            total: 0,
+        },
     ]
 }
 
@@ -154,6 +159,7 @@ pub(crate) fn row_labels(
         boombox: false,
         monitor: false,
         box_hunt: false,
+        banana: false,
         name: "",
         stock: color::HOLO,
         grid: false,
@@ -161,7 +167,9 @@ pub(crate) fn row_labels(
         second: "",
         pair: crate::saber_skins::Pair::None,
         share: false,
+        nameplate_style: crate::hud::nameplate::Style::Holo,
         toy_keys: &[],
+        toys_unseen: 0,
         tag: "",
     };
     counts(&inputs).iter().map(|count| count.label()).collect()
@@ -280,7 +288,9 @@ impl Panel {
         self.boombox_on = inputs.boombox;
         self.monitor_on = inputs.monitor;
         self.box_hunt_on = inputs.box_hunt;
+        self.banana_on = inputs.banana;
         self.share_on = inputs.share;
+        self.toys_unseen = inputs.toys_unseen;
         let seconds = self.epoch.elapsed().as_secs_f32();
         #[cfg(test)]
         let seconds = self.shot_seconds.unwrap_or(seconds);
@@ -305,6 +315,10 @@ impl Panel {
                 texture: crate::ui_renderer::PREVIEW_TEXTURE,
                 color: Color::new(1.0, 1.0, 1.0, 1.0),
             });
+        }
+        if self.tab != Tab::History {
+            // Not on show: shown again, the History tab reads the newest lines.
+            self.history.shown = false;
         }
         let counts = counts(inputs);
         let mut labels: Vec<String> = counts.iter().map(|count| count.label()).collect();
@@ -337,6 +351,7 @@ impl Panel {
             Tab::Toys => self.toys(&frame, inputs),
             Tab::Tags => self.tags(&frame, inputs),
             Tab::Cards => self.cards(&frame, inputs, seconds),
+            Tab::History => self.history_tab(&frame, inputs),
             Tab::Forge => {
                 self.grid = inputs.grid;
                 self.forge(&frame, inputs, seconds, viewport);
@@ -351,7 +366,7 @@ impl Panel {
     /// How many of all the things the player holds, at the top right: the words, and a
     /// bar under them, a stretch to a tab in the tabs' order, each filled as far as its
     /// share held (one tick a thing no longer fits two hundred things, 21/10/2026).
-    fn tally(&mut self, frame: &Frame, counts: &[Count; 9]) {
+    fn tally(&mut self, frame: &Frame, counts: &[Count; 10]) {
         let s = frame.s;
         // Only the things with a set total: the holocrons are opened, not collected.
         let total: usize = counts.iter().map(|count| count.total).sum();
@@ -426,9 +441,25 @@ impl Panel {
     fn keys(&mut self, frame: &Frame, inputs: &Inputs<'_>) {
         let s = frame.s;
         let next_tab = crate::terms::say(self.tab.next(true).label());
-        let mut keys: Vec<(&[&str], &str)> = Vec::with_capacity(6);
+        let mut keys: Vec<(&[&str], &str)> = Vec::with_capacity(10);
         match self.tab {
             Tab::Medals => keys.push((&["Left", "Right"], "choose")),
+            Tab::History => {
+                keys.push((&["Left", "Right"], "filter"));
+                keys.push((&["Up", "Down"], "choose"));
+                let chosen = self.history.chosen;
+                if self.history.more_row(chosen) {
+                    keys.push((&["Enter"], "load older"));
+                } else if self
+                    .history
+                    .rows
+                    .get(chosen)
+                    .is_some_and(|row| row.group.is_some())
+                {
+                    keys.push((&["Enter"], "open, close"));
+                }
+                keys.push((&["R"], "refresh"));
+            }
             Tab::Cards if self.card_inspect => {
                 if self.cards_shown > 1 {
                     keys.push((&["Left", "Right"], "previous, next"));
@@ -450,7 +481,10 @@ impl Panel {
                     keys.push((&["R"], "reveal"));
                 }
             }
-            Tab::Achievements => keys.push((&["Arrows"], "choose")),
+            Tab::Achievements => {
+                keys.push((&["Arrows"], "choose"));
+                keys.push((&["F"], "General or Fun"));
+            }
             Tab::Forge if self.forge.ask.is_some() => {
                 keys.push((&["Tab"], "switch"));
                 keys.push((&["Enter"], "answer"));
@@ -467,6 +501,12 @@ impl Panel {
                         keys.push((&["Arrows"], "choose"));
                         keys.push((&["V"], if self.grid { "list" } else { "grid" }));
                         keys.push((&["/"], "search"));
+                        // The marks (29/10/2026): the star, and the padlock on what is held.
+                        if self.marks.kept && section == forge::Section::Break {
+                            keys.push((&["F", "L"], "star, lock"));
+                        } else if self.marks.kept {
+                            keys.push((&["F"], "star"));
+                        }
                         if section == forge::Section::Break && self.forge.data.all {
                             keys.push((&["B"], "all duplicates"));
                         }
@@ -492,6 +532,13 @@ impl Panel {
                 }
                 keys.push((&["T"], "tier"));
                 keys.push((&["/"], "search"));
+                // The marks (29/10/2026): the star and the padlock, and every New one seen.
+                if self.marks.kept && self.shader > 0 {
+                    keys.push((&["F", "L"], "star, lock"));
+                }
+                if self.marks.new_count() > 0 {
+                    keys.push((&["N"], "all seen"));
+                }
                 let worn = self.shader_rows.get(self.shader).and_then(|row| row.wear);
                 match worn {
                     Some("") if self.shader > 0 => keys.push((&["Enter"], "unequip")),
@@ -528,6 +575,8 @@ impl Panel {
                     (7, _, _) => "turn on",
                     (8, _, _) if inputs.box_hunt => "turn off",
                     (8, _, _) => "turn on",
+                    (9, _, _) if inputs.banana => "turn off",
+                    (9, _, _) => "turn on",
                     (_, true, _) => "put out",
                     _ => "light",
                 },

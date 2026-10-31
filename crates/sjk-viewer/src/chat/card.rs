@@ -28,6 +28,17 @@ pub(super) const CARD_REPORT: u16 = 125;
 pub(super) const CARD_TRADE: u16 = 126;
 pub(super) const CARD_MAP_BLOCK: u16 = 127;
 pub(super) const CARD_STAFF_BLOCK: u16 = 128;
+/// Every button on the card, which a press must find before the card under them.
+pub(super) const BUTTONS: [u16; 8] = [
+    CARD_TRADE,
+    CARD_WHISPER,
+    CARD_REPORT,
+    CARD_SAFETY,
+    CARD_BAN,
+    CARD_MUTE,
+    CARD_MAP_BLOCK,
+    CARD_STAFF_BLOCK,
+];
 /// How long the card stays once the pointer is off the name and the card.
 pub(super) const GRACE_MS: u64 = 400;
 
@@ -81,11 +92,16 @@ impl ChatOverlay {
             self.card = None;
             return;
         }
+        // A name hovered as this frame lays it out: the canvas keeps the widget that was
+        // under the pointer when it last moved, which is another one once the feed
+        // changed (a chat tab chosen with the pointer still on its button).
+        let pointer = self.pointer_at;
         let hovered = (0..MAX_VISIBLE).find_map(|token| {
             let who = self.visible_people[token]?;
-            self.ui
-                .token_hovered(token as u16)
-                .then(|| (who, self.ui.rect_for(token as u16)))
+            let rect = self.ui.rect_for(token as u16);
+            (self.ui.token_hovered(token as u16)
+                && rect.zip(pointer).is_none_or(|(rect, at)| rect.contains(at)))
+            .then_some((who, rect))
         });
         // A pinned card stays, following its name while the name is in view.
         if let Some(card) = self.card.as_mut().filter(|card| card.pinned) {
@@ -134,19 +150,9 @@ impl ChatOverlay {
                     }
                 }
             }
-            None if [
-                CARD,
-                CARD_MUTE,
-                CARD_BAN,
-                CARD_SAFETY,
-                CARD_WHISPER,
-                CARD_REPORT,
-                CARD_TRADE,
-                CARD_MAP_BLOCK,
-                CARD_STAFF_BLOCK,
-            ]
-            .into_iter()
-            .any(|token| self.ui.token_hovered(token)) =>
+            None if std::iter::once(CARD)
+                .chain(BUTTONS)
+                .any(|token| self.ui.token_hovered(token)) =>
             {
                 if let Some(card) = &mut self.card {
                     card.left_ms = None;
@@ -644,6 +650,28 @@ mod tests {
         assert!(chat.lines.iter().all(|line| !line.muted));
     }
 
+    /// A blocked player's chat stays out of the console as it stays out of the chat
+    /// box, attributed by the server or not (hub report #191); others' chat does not.
+    #[test]
+    fn a_muted_slots_chat_stays_out_of_the_console() {
+        let mut chat = ChatOverlay::new();
+        let mut game = sjk_protocol::GameState::empty_local(0);
+        game.replace_config_string(1_131 + 3, b"n\\^1Dark^7Lord\\t\\0".to_vec())
+            .expect("a player");
+        chat.update_roster(&game);
+        assert!(
+            !chat.sent_by_muted("^1Dark^7Lord^7: one", Some(3)),
+            "nobody blocked"
+        );
+        chat.set_muted_slots(1 << 3);
+        assert!(chat.sent_by_muted("^1Dark^7Lord^7: one", Some(3)));
+        assert!(
+            chat.sent_by_muted("DarkLord^7: two", None),
+            "a JA+ line by its name"
+        );
+        assert!(!chat.sent_by_muted("Fox: three", None));
+    }
+
     /// The composer open over game lines, with "Fox" in slot 3 and us in slot 0.
     fn game_chat(players: &[(usize, &str)]) -> ChatOverlay {
         let mut chat = ChatOverlay::new();
@@ -812,6 +840,42 @@ mod tests {
         click(&mut chat, centre(trade));
         assert_eq!(chat.take_trade_request(), Some(3));
         assert!(chat.card.is_none(), "the card makes way for the request");
+    }
+
+    /// Block for this map and, for staff, for everyone are buttons of their own: a click
+    /// asks to block (before 29/10/2026 the press was taken for the card's, as Trade's
+    /// once was, and the click was lost).
+    #[test]
+    fn a_click_on_the_block_buttons_asks_to_block() {
+        for (token, everyone) in [(CARD_MAP_BLOCK, false), (CARD_STAFF_BLOCK, true)] {
+            let mut chat = game_chat(&[(0, "Me"), (3, "Fox")]);
+            let fox = chat.roster.target(Some(3)).expect("Fox");
+            chat.open(false);
+            chat.card = Some(Card {
+                who: Who::Player(fox),
+                person: Person {
+                    name: "Fox".to_owned(),
+                    place: Place::Slot(3),
+                    map_block: Some(sender_card::MapBlockRow {
+                        own: false,
+                        staff: Some(false),
+                    }),
+                    ..Person::default()
+                },
+                muted: false,
+                anchor: Rect::new(10.0, 300.0, 40.0, 10.0),
+                left_ms: None,
+                pinned: true,
+            });
+            build(&mut chat);
+            let button = chat.ui.rect_for(token).expect("block button");
+            click(&mut chat, centre(button));
+            let request = chat.take_map_block_request().expect("a block request");
+            assert_eq!(
+                (request.slot, request.everyone, request.blocked),
+                (3, everyone, true)
+            );
+        }
     }
 
     #[test]

@@ -16,6 +16,7 @@ pub mod chat;
 pub mod crash;
 pub mod emoji;
 pub mod feed;
+pub mod history;
 pub mod hub;
 mod keys;
 pub mod logs;
@@ -23,6 +24,7 @@ pub mod map_edits;
 pub mod mystery_box;
 pub mod name_emoji;
 pub mod news;
+pub mod news_markup;
 pub mod relay;
 pub mod report;
 pub mod service;
@@ -37,6 +39,7 @@ pub use assets::Pack;
 pub use ban::{BanOutcome, ChatBan};
 pub use crash::CrashReport;
 pub use feed::{ChatState, ReceivedLooks};
+pub use history::{HistoryLine, HistoryPage, HistoryState};
 pub use hub::{HttpHub, Hub, HubError, valid_base_url};
 pub use keys::{Identity, KeyError};
 pub use logs::{LogRequest, LogUpload};
@@ -64,9 +67,10 @@ pub use wire::{
     Achievement, Bought, BuyAnswer, CardStack, ChatMessage, CraftAnswer, Crafted, DropEvent,
     DropMark, EconomyTables, Emote, Feed, FindEvent, FindMark, HOLOCRONS_LISTED, Holocron,
     HolocronBought, HolocronBuyAnswer, HolocronCounts, HolocronState, KyberPity, KyberTables,
-    KyberTier, Look, LookEvent, LootTier, MEDAL_RANK_MAX, MEDAL_RANK_MIN, MapBlock, Medal,
-    OPEN_MAX, Offer, OpenAnswer, Opened, OpenedCard, OpenedUnlock, People, Person, Ping, PlacedTag,
-    Presence, Profile, RelayBatch, RevealAnswer, Revealed, SealedWhisper, SharedVitals,
-    ShatterAllAnswer, ShatterAnswer, Shattered, ShatteredCopies, ShopDay, Tick, ToyEvent, Trust,
-    Unlock, Vitals, WornName, names_match, normal_form,
+    KyberTier, Look, LookEvent, LootTier, MARKS_ABILITY, MEDAL_RANK_MAX, MEDAL_RANK_MIN, MapBlock,
+    Mark, MarksAnswer, Medal, OPEN_MAX, Offer, OpenAnswer, Opened, OpenedCard, OpenedUnlock,
+    People, Person, Ping, PlacedTag, Presence, Profile, RelayBatch, RevealAnswer, Revealed,
+    SealedWhisper, SharedVitals, ShatterAllAnswer, ShatterAnswer, Shattered, ShatteredCopies,
+    ShopDay, Tick, ToyEvent, Trust, Unlock, UnlockMarks, Vitals, WornName, names_match,
+    normal_form,
 };

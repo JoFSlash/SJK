@@ -27,8 +27,8 @@ use std::fmt::Write as _;
 use winit::keyboard::KeyCode;
 
 /// The rows' wheel target over the panel and the scrollbar beside it, clear
-/// of the row (0-499), tab (500), slider value (700), chrome (800) and back
-/// (900) tokens.
+/// of the row (0-499), tab (500), chrome (800), back (900) and slider value
+/// (`VALUE_BASE`) tokens.
 pub(super) const CLASSIC_SCROLL_TOKEN: u16 = 911;
 pub(super) const CLASSIC_SCROLLBAR_TOKEN: u16 = 912;
 /// Choice `i` of an open dropdown answers to `DROPDOWN_BASE + i`.
@@ -70,7 +70,9 @@ impl RowControl {
                     index: offset % MAX_SEGMENTS,
                 })
             }
-            RESET_BASE.. => Some(Self::Reset(usize::from(token - RESET_BASE))),
+            RESET_BASE..crate::menu_widgets::numeric::VALUE_BASE => {
+                Some(Self::Reset(usize::from(token - RESET_BASE)))
+            }
             _ => None,
         }
     }
@@ -475,8 +477,8 @@ impl SettingsMenu {
         } else if let Some(default) = crate::graphics_quality::row_default(console, setting.cvar) {
             console.set_cvar(setting.cvar, default);
         } else if let Some(switch) = super::derived_switch(setting.cvar) {
-            if (switch.on)(console) {
-                (switch.toggle)(console);
+            if (switch.on)(console, setting.cvar) != (switch.on_by_default)(setting.cvar) {
+                (switch.toggle)(console, setting.cvar);
             }
         } else if let Some(default) = console.cvar_default(setting.cvar).map(CvarValue::as_text) {
             console.set_cvar(setting.cvar, &default);
@@ -653,7 +655,7 @@ impl SettingsMenu {
                 | ValueKind::IdentityPage
                 | ValueKind::ImportPage
                 | ValueKind::AssetBrowser
-                | ValueKind::JofContent
+                | ValueKind::ContentCard
                 | ValueKind::SoundPreview
                 | ValueKind::GameplayFps
                 | ValueKind::Quality => {
@@ -881,7 +883,7 @@ impl SettingsMenu {
             ValueKind::AssetBrowser => {
                 "ENTER to enable or disable installed PK3 packs for the next start"
             }
-            ValueKind::JofContent => "ENTER to choose and download JoF's content",
+            ValueKind::ContentCard => "ENTER to choose and download",
             ValueKind::SoundPreview => "ENTER or a click to hear the sound chosen above",
         });
         if self
@@ -1029,9 +1031,10 @@ pub(super) fn row_default(console: &ViewerConsole, setting: &Setting) -> RowDefa
         };
     }
     if let Some(switch) = super::derived_switch(setting.cvar) {
+        let on_by_default = (switch.on_by_default)(setting.cvar);
         return RowDefault {
-            text: Some("Off".to_owned()),
-            changed: (switch.on)(console),
+            text: Some(if on_by_default { "On" } else { "Off" }.to_owned()),
+            changed: (switch.on)(console, setting.cvar) != on_by_default,
         };
     }
     // The HUD row names a HUD that two cvars select together; the quick
@@ -1045,7 +1048,7 @@ pub(super) fn row_default(console: &ViewerConsole, setting: &Setting) -> RowDefa
             | ValueKind::IdentityPage
             | ValueKind::ImportPage
             | ValueKind::AssetBrowser
-            | ValueKind::JofContent
+            | ValueKind::ContentCard
             | ValueKind::SoundPreview
     ) {
         return RowDefault::default();
@@ -1287,13 +1290,24 @@ mod tests {
         }
         // Rows, tabs, values, chrome, footer, search and dropdown choices are not
         // controls.
-        for token in [0, 499, 500, 700, 800, 911, 913, DROPDOWN_BASE + 5] {
+        let value = crate::menu_widgets::numeric::VALUE_BASE;
+        for token in [
+            0,
+            499,
+            500,
+            800,
+            911,
+            913,
+            DROPDOWN_BASE + 5,
+            value,
+            value + 300,
+        ] {
             assert_eq!(RowControl::of(token), None, "{token}");
         }
         // Every searchable row's segments fit below the reset buttons.
         let rows = search::rows().len();
         assert!(SEGMENT_BASE as usize + rows * MAX_SEGMENTS <= RESET_BASE as usize);
-        assert!(RESET_BASE as usize + rows <= usize::from(u16::MAX));
+        assert!(RESET_BASE as usize + rows <= usize::from(value));
     }
 
     #[test]

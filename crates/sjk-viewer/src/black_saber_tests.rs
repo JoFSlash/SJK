@@ -249,3 +249,31 @@ fn a_team_colour_replaces_a_black_blade_per_hand() {
         BladeColor::Black
     );
 }
+
+/// Dave's test (27/10/2026): JoF EJK shows black on its own devmap, where JoF's JA+-based
+/// game module runs; SJK's devmap runs SJK's server, which says so in its serverinfo
+/// (`sjk\1`), and [`FAMILIES`] lets it carry black blades. A base server without the key
+/// still keeps colour 11's ordinary fallback.
+#[test]
+fn sjks_own_server_carries_black_blades() {
+    let fallback = BladeColor::Retail(Color::Purple);
+    let sjk = game(r"\gamename\basejka\sjk\1", r"\c1\11");
+    assert_eq!(
+        Policy::new(Some(&sjk), true, 0, 0).color(1, 0, fallback),
+        BladeColor::Black
+    );
+    assert_eq!(
+        Policy::new(Some(&sjk), false, 0, 0).color(1, 0, fallback),
+        BladeColor::Retail(Color::Orange),
+        "cg_blackSabers 0 still turns it orange"
+    );
+    let base = game(r"\gamename\basejka", r"\c1\11");
+    assert_eq!(
+        Policy::new(Some(&base), true, 0, 0).color(1, 0, fallback),
+        fallback
+    );
+    for (id, why) in FAMILIES {
+        assert!(sjk_mod::KNOWN_SERVERS.iter().any(|family| family.id == *id));
+        assert!(!why.is_empty());
+    }
+}

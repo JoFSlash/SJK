@@ -34,6 +34,11 @@ fn lock() -> MutexGuard<'static, Option<Arc<LoadedSkins>>> {
         .unwrap_or_else(|poisoned| poisoned.into_inner())
 }
 
+/// The cache folder, once [`mount_at_start`] has named it.
+pub(crate) fn directory() -> Option<&'static Path> {
+    DIRECTORY.get().map(PathBuf::as_path)
+}
+
 /// The cache folder beside `identity.key` in `config_directory`.
 pub(crate) fn directory_in(config_directory: &Path) -> PathBuf {
     config_directory.join(sjk_identity::assets::FOLDER)

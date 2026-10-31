@@ -61,6 +61,19 @@ pub(crate) struct State {
     pub(crate) shot: Option<(View, bool)>,
 }
 
+impl State {
+    /// The state the next map's world takes over (`GpuState::hand_shell_to`): what the
+    /// window and the toast already said goes on, so the hub's last refusal is not shown
+    /// again (Creyon's screenshot, 26/10/2026). The game menu does not go on (the new
+    /// world starts with it closed), so the window no longer counts as having opened it:
+    /// else Esc after the map change brought the window back and Close shut the menu the
+    /// player opened themselves (Sol's review of #211, 27/10/2026).
+    pub(crate) fn handed_over(mut self) -> Self {
+        self.opened_menu = false;
+        self
+    }
+}
+
 /// What the views were built from: the trades' read and step counts, the own profile's
 /// and the known players' revisions, whether the window's parts (the player's items,
 /// the limits) were built, and the minute (the tiles' resale countdowns) while they are.
@@ -72,6 +85,10 @@ struct Source {
     players: u64,
     full: bool,
     minute: i64,
+    /// The collection marks' revisions (the hub's, the seen-list's) and the blades worn
+    /// (29/10/2026).
+    marks: (u64, u64),
+    worn: [Option<&'static str>; 2],
 }
 
 /// The views built from one [`Source`], kept between builds.
@@ -92,13 +109,16 @@ struct Built {
 
 /// The player's own items that may go in a trade, from their profile: unopened
 /// holocrons found by play and not traded within the hub's lock, and one copy of each
-/// shader of the trade held twice or more. Most worth first; those already offered left
+/// shader of the trade held twice or more, with its collection marks (`marks`). Those that
+/// may go in first (a locked shader waits with the holocrons in their lock), the
+/// favourites first among them, then the most worth first; those already offered left
 /// out.
 fn own_items(
     me: &sjk_identity::Profile,
     list: &sjk_identity::TradesAnswer,
     offered: &[Item],
     hub_now: i64,
+    marks: &crate::shader_marks::Marks,
 ) -> Vec<Item> {
     let rules = &list.rules;
     let lock = rules.resale_lock;
@@ -134,16 +154,22 @@ fn own_items(
                         .get(skin.tier as usize)
                         .copied()
                         .unwrap_or(0);
-                    Item::shader(&unlock.id, None, value)
+                    let mut item = Item::shader(&unlock.id, None, value);
+                    item.favourite = marks.favourite(skin.id);
+                    item.locked = marks.locked(skin.id);
+                    item.new = marks.is_new(skin.id);
+                    item.worn = marks.worn(skin.id);
+                    item
                 })
             }),
     );
     items.retain(|item| !offered.iter().any(|offered| offered.what == item.what));
-    // Those that may go in first, most worth first; then those that wait.
+    // Those that may go in first, the favourites first, most worth first; then those
+    // that wait.
     items.sort_by(|a, b| {
-        a.locked_for
-            .is_some()
-            .cmp(&b.locked_for.is_some())
+        (!a.offerable())
+            .cmp(&!b.offerable())
+            .then(b.favourite.cmp(&a.favourite))
             .then(b.value.cmp(&a.value))
             .then(a.name.cmp(&b.name))
     });
@@ -291,11 +317,14 @@ fn build(
     me: Option<&sjk_identity::Profile>,
     players: &[sjk_identity::Presence],
     hub_now: i64,
+    marks: &crate::shader_marks::Marks,
 ) -> View {
     let mine: Vec<Item> = trade.mine.items.iter().map(Item::from_wire).collect();
     let theirs = trade.theirs.items.iter().map(Item::from_wire).collect();
     let full = me.is_some();
-    let own = me.map_or_else(Vec::new, |me| own_items(me, &state.list, &mine, hub_now));
+    let own = me.map_or_else(Vec::new, |me| {
+        own_items(me, &state.list, &mine, hub_now, marks)
+    });
     let shown = partner_shown(&trade.with, players);
     View {
         partner: crate::medals::plain_note(&shown),
@@ -319,6 +348,8 @@ fn build(
         holocrons: state.list.rules.holocrons,
         resets_in: None,
         confirming_gift: false,
+        marks_kept: marks.kept,
+        favourites_only: false,
         problem: String::new(),
         trade: trade.clone(),
     }
@@ -530,12 +561,30 @@ impl crate::GpuState {
     /// none to read (no identity, or no list yet).
     fn read_player_trades(&mut self, now: Instant) -> bool {
         let full = self.trade_window_may_show();
+        // The blades worn, for the items' marks.
+        let worn_settings = self.console.as_ref().map(|console| {
+            let text = |name| console.text_cvar(name).unwrap_or_default().to_owned();
+            (
+                text(crate::unlockables::SABER_SKIN_CVAR),
+                text(crate::looks::SECOND_CVAR),
+            )
+        });
+        let seen_revision = crate::shader_marks::revision();
         let trades = &self.trades;
         let seen = [trades.live_seen, trades.ended.map(|(id, _)| id)];
         let last = trades.built.as_ref().map(|built| built.source);
         let read = player_identity::with_snapshot(|snapshot| {
             let state = snapshot.trades.as_ref()?;
             let hub_now = state.hub_now(now);
+            let owned = snapshot
+                .me
+                .as_ref()
+                .map_or(&[][..], |me| me.unlocks.as_slice());
+            let worn = worn_settings
+                .as_ref()
+                .map_or([None, None], |(first, second)| {
+                    crate::shader_marks::worn_of(first, second, owned)
+                });
             let source = Source {
                 serial: state.serial,
                 steps: state.steps,
@@ -543,14 +592,31 @@ impl crate::GpuState {
                 players: snapshot.revision,
                 full,
                 minute: if full { hub_now.div_euclid(60) } else { 0 },
+                marks: (snapshot.marks_revision, seen_revision),
+                worn,
             };
             if last == Some(source) {
                 return Some(None);
             }
             let me = snapshot.me.as_ref().filter(|_| full);
+            let kept = snapshot
+                .economy
+                .as_ref()
+                .is_some_and(|economy| economy.can(sjk_identity::MARKS_ABILITY));
+            let debug = owned.iter().any(crate::debug_collectibles::added);
+            let marks = crate::shader_marks::with_seen(|seen| {
+                crate::shader_marks::Marks::of(
+                    snapshot.marks.as_ref(),
+                    kept,
+                    owned,
+                    seen,
+                    debug,
+                    worn,
+                )
+            });
             let live = state
                 .live()
-                .map(|trade| build(trade, state, me, &snapshot.players, hub_now));
+                .map(|trade| build(trade, state, me, &snapshot.players, hub_now, &marks));
             let ended = seen
                 .iter()
                 .flatten()
@@ -561,7 +627,7 @@ impl crate::GpuState {
                         .iter()
                         .find(|trade| !trade.is_live() && trade.id == *id)
                 })
-                .map(|trade| build(trade, state, None, &snapshot.players, hub_now));
+                .map(|trade| build(trade, state, None, &snapshot.players, hub_now, &marks));
             Some(Some(Built {
                 source,
                 live,
@@ -882,6 +948,31 @@ pub(crate) fn trading_open() -> bool {
 mod tests {
     use super::*;
 
+    /// At a map change the refusal already shown stays shown, and the window no longer
+    /// owns a game menu the new world does not have (Sol's review of #211, 27/10/2026).
+    #[test]
+    fn a_map_change_keeps_the_shown_refusal_and_drops_the_menu_it_opened() {
+        let mut state = State {
+            opened_menu: true,
+            ..State::default()
+        };
+        state.problem = Some((
+            4,
+            "Two accounts on one connection cannot trade with each other.".to_owned(),
+            Instant::now(),
+        ));
+        let next = state.handed_over();
+        assert!(
+            !next.opened_menu,
+            "the new world's menu is the player's own"
+        );
+        assert_eq!(
+            next.problem.as_ref().map(|(steps, _, _)| *steps),
+            Some(4),
+            "the refusal counts as shown"
+        );
+    }
+
     /// The trade window (a request, an open trade with both sides in each of the three
     /// sizes, both ready, a gift's question) and the toast over play, over duel6 at
     /// 1080p: `JKA_GAME_DATA=<GameData> cargo test -p sjk-viewer trade_shots --
@@ -1028,10 +1119,11 @@ mod tests {
             steps: 0,
         };
         let trade = crate::trade_window::tests::open_view().trade;
-        let toast = build(&trade, &state, None, &[], 604_905);
+        let none = crate::shader_marks::Marks::default();
+        let toast = build(&trade, &state, None, &[], 604_905, &none);
         assert!(toast.own.is_empty() && toast.limits.is_empty());
         let me = profile();
-        let window = build(&trade, &state, Some(&me), &[], 604_905);
+        let window = build(&trade, &state, Some(&me), &[], 604_905, &none);
         assert!(!window.own.is_empty() && !window.limits.is_empty());
         // The name is read once and kept both ways.
         assert_eq!(
@@ -1053,7 +1145,9 @@ mod tests {
             ],
             "unlocks": [
                 {"id": "saber_tidal", "granted": 1, "count": 2},
-                {"id": "saber_circuit", "granted": 1, "count": 1}
+                {"id": "saber_circuit", "granted": 1, "count": 1},
+                {"id": "saber_aurora", "granted": 1, "count": 3},
+                {"id": "saber_sakura", "granted": 1, "count": 2}
             ]
         }))
         .unwrap()
@@ -1073,7 +1167,8 @@ mod tests {
 
     #[test]
     fn only_unopened_found_holocrons_and_spare_copies_are_offered() {
-        let items = own_items(&profile(), &list(), &[], 604_905);
+        let none = crate::shader_marks::Marks::default();
+        let items = own_items(&profile(), &list(), &[], 604_905, &none);
         let whats: Vec<_> = items.iter().map(|item| item.what.clone()).collect();
         // The Mythical first (most worth); the staff gift, the opened one and the one
         // traded within the week stay out; a single copy is no duplicate.
@@ -1101,8 +1196,32 @@ mod tests {
         );
         // What is already offered is not offered twice.
         let offered = [Item::holocron(2, "mythical", 51)];
-        let items = own_items(&profile(), &list(), &offered, 604_905);
+        let items = own_items(&profile(), &list(), &offered, 604_905, &none);
         assert!(items.iter().all(|item| item.what != offered[0].what));
+    }
+
+    /// Collection marks (29/10/2026): a shader's marks reach its item; a favourite leads
+    /// what may go in, a locked one waits at the end with the holocrons in their lock.
+    #[test]
+    fn marked_shaders_are_ordered_and_a_locked_one_waits() {
+        let marks = crate::shader_marks::Marks::shown(
+            &["saber_sakura"],
+            &["saber_aurora"],
+            &["saber_sakura"],
+            Some("saber_sakura"),
+        );
+        let items = own_items(&profile(), &list(), &[], 604_905, &marks);
+        let shader = |id: &str| crate::trade_window::What::Shader(id.into());
+        assert_eq!(items[0].what, shader("saber_sakura"), "the favourite first");
+        assert!(items[0].favourite && items[0].new && items[0].worn && !items[0].locked);
+        let aurora = items
+            .iter()
+            .position(|item| item.what == shader("saber_aurora"))
+            .expect("listed");
+        assert!(items[aurora].locked && !items[aurora].offerable());
+        let first_waiting = items.iter().position(|item| !item.offerable()).unwrap();
+        assert!(aurora >= first_waiting, "with those that wait");
+        assert!(items[first_waiting..].iter().all(|item| !item.offerable()));
     }
 
     #[test]

@@ -50,8 +50,8 @@ impl GpuState {
             self.quick_wheel.cancel();
             return;
         }
-        // A modern composer must be able to type `~`, unlike stock, where the
-        // console key precedes the message catcher (`cl_keys.cpp:1318`).
+        // The console key precedes the message catcher as in stock (`cl_keys.cpp:1318`);
+        // `console_key_leaves_chat` says which keys the composer keeps.
         let console_open = self
             .console
             .as_ref()
@@ -61,6 +61,11 @@ impl GpuState {
         // announcement read from the chat page or a command).
         if self.official.window.is_open() {
             self.official_key(&event);
+            return;
+        }
+        // And the News panel, over the console too when it was asked for.
+        if self.news.is_open() {
+            self.news_key(&event);
             return;
         }
         if !console_open && self.text_dialog.is_open() {
@@ -137,17 +142,22 @@ impl GpuState {
             self.log_request_card_choice(choice);
             return;
         }
-        // And the what's-new card.
-        if !console_open && self.whats_new_card.is_open() {
-            let choice = self.whats_new_card.handle_key(&event);
-            self.whats_new_card_choice(choice);
-            return;
-        }
         // Ctrl+Tab changes the Profile screen's tab, whichever screen shows it.
         if self.profile_hub_key(&event) {
             return;
         }
         if !console_open && typed && self.chat.is_typing() {
+            // The console key opens the console over the composer, which keeps its
+            // draft for when the console closes, as stock's message field does.
+            if self
+                .console
+                .as_ref()
+                .is_some_and(|console| console.leaves_chat_for_console(&event))
+            {
+                self.route_console_key(&event);
+                self.sync_cursor_policy();
+                return;
+            }
             self.chat_key(&event);
             return;
         }

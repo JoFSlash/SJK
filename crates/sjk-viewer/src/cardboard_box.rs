@@ -29,6 +29,7 @@ use crate::actor_instance::ActorInstance;
 use glam::{Quat, Vec2, Vec3};
 use sjk_protocol::{EntityState, PlayerState, UserCommand};
 use sjk_vfs::{VfsError, VirtualFileSystem};
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{Duration, Instant};
 
 /// The toy's console command (a toy is a `toy_<name>` command).
@@ -195,6 +196,10 @@ pub(crate) struct CardboardBox {
     on: bool,
     /// The user commands hold crouch: the box is on and the player plays.
     crouching: bool,
+    /// The player flies the free camera or `fakenoclip` (hub report #152): the
+    /// commands' `upmove` steers the flight, so the box leaves it alone, and the
+    /// player's own carton stays with the body the server holds.
+    flying: bool,
     /// Whether the player was alive at the last frame (`None` out of a game).
     own_alive: Option<bool>,
     /// `+use` went down in a user command since the last frame.
@@ -203,6 +208,8 @@ pub(crate) struct CardboardBox {
     use_held: bool,
     /// Other players' boxes lifted here, and when.
     lifted: [Option<Instant>; SLOTS],
+    /// Who lifted the player's own box last, and when that was heard (Surprise!).
+    lifted_by: Option<(u16, Instant)>,
     /// The slots seen dead in the last snapshot (bits).
     dead: u64,
     /// The way a lifted box is pushed, by slot, until it falls.
@@ -236,10 +243,12 @@ impl Default for CardboardBox {
         Self {
             on: false,
             crouching: false,
+            flying: false,
             own_alive: None,
             use_pressed: false,
             use_held: false,
             lifted: [None; SLOTS],
+            lifted_by: None,
             dead: 0,
             pushed: [None; SLOTS],
             shown: [None; SLOTS],
@@ -276,7 +285,7 @@ impl CardboardBox {
     /// Whether the player hides in their box: on, alive and playing (Tactical
     /// Espionage counts this time, `achievements/tracker.rs`).
     pub(crate) fn hiding(&self) -> bool {
-        self.crouching
+        self.crouching && !self.flying
     }
 
     /// Hold crouch in `command` while the box is on and the player plays, as a held
@@ -287,15 +296,24 @@ impl CardboardBox {
             self.use_pressed = true;
         }
         self.use_held = using;
-        if self.crouching {
+        if self.crouching && !self.flying {
             command.up_move = CROUCH;
         }
+    }
+
+    /// Whether the player flies the free camera or `fakenoclip` (hub report #152).
+    /// While flying, [`Self::shape_command`] holds no crouch: a held crouch was the
+    /// flight's `upmove` and sank the camera. The server stands the body up while
+    /// flying (the free camera's talk balloon); SJK clients draw it crouched in the
+    /// box all the same ([`crouched_in_box`]).
+    pub(crate) fn set_flying(&mut self, flying: bool) {
+        self.flying = flying;
     }
 
     /// Hold crouch in a command that is only shown, never sent (the prediction's
     /// preview between commands).
     pub(crate) fn shape_preview(&self, command: &mut UserCommand) {
-        if self.crouching {
+        if self.crouching && !self.flying {
             command.up_move = CROUCH;
         }
     }
@@ -308,6 +326,11 @@ impl CardboardBox {
     /// The music on boxed players this frame.
     pub(crate) fn music(&self) -> &[Music] {
         &self.music
+    }
+
+    /// Who lifted the player's own box last, and when that was heard.
+    pub(crate) fn lifted_by(&self) -> Option<(u16, Instant)> {
+        self.lifted_by
     }
 
     /// Whether the box of `slot` (not the player's own) was lifted here and is hidden
@@ -558,6 +581,40 @@ fn alive(player: &PlayerState) -> bool {
     player.health() > 0 && !matches!(player.movement_type(), 4 | 5 | 7 | 8)
 }
 
+/// Whether `camera` is in a carton on a player standing at `origin`: within its
+/// width either way of any yaw, from its open bottom to a little over its top.
+fn inside_carton(camera: [f32; 3], origin: [f32; 3]) -> bool {
+    let reach = HALF_WIDTH * std::f32::consts::SQRT_2 + 4.0;
+    let [dx, dy, dz] = [0, 1, 2].map(|axis| camera[axis] - origin[axis]);
+    dx.hypot(dy) <= reach && (FEET..=FEET + 48.0).contains(&dz)
+}
+
+/// The slots whose player is in a drawn carton, set once a frame by
+/// [`GpuState::note_boxed_players`] before the actor poses read it.
+static BOXED: AtomicU64 = AtomicU64::new(0);
+
+/// Whether the player in `slot` is in a drawn carton, so standing there is drawn
+/// crouched. The box asks the server to crouch, but `PmoveSingle` zeroes a talking
+/// player's moves, `upmove` included (EternalJK `codemp/game/bg_pmove.c:12441-12448` at
+/// a40e793; JoF EJK `bg_pmove.c:13108-13115` at 390f756), so the server stands up a
+/// boxed player who opens the chat or flies the free camera; the balloon stays (it keeps
+/// them from being attacked), and every SJK client poses a boxed player who stands as
+/// crouching (`BOTH_CROUCH1IDLE`, `actor_pose_steps.rs`; Dave's test of #152,
+/// 28/10/2026). Any other move (a lunge, a kick, a roll, a knockdown) plays as sent. A
+/// crouch keeps the player's origin, so the pose sits where a real crouch would.
+pub(crate) fn crouched_in_box(slot: usize) -> bool {
+    slot < SLOTS && BOXED.load(Ordering::Relaxed) & (1 << slot) != 0
+}
+
+/// `CROUCH_VIEWHEIGHT` (`bg_public.h`): a crouching player's eye above the origin.
+const CROUCH_VIEWHEIGHT: f32 = 12.0;
+
+/// How far a boxed player's eye at `view_height` drops to crouch height, if it is
+/// above it ([`GpuState::keep_boxed_eye`]).
+fn eye_drop(view_height: f32) -> Option<f32> {
+    (view_height > CROUCH_VIEWHEIGHT).then_some(view_height - CROUCH_VIEWHEIGHT)
+}
+
 /// The carton over a player standing at `origin` (their entity's), facing `yaw`
 /// (radians).
 fn carton(origin: [f32; 3], yaw: f32) -> ActorInstance {
@@ -572,6 +629,12 @@ impl GpuState {
     /// `toy_box`: put the box on, or take it off.
     pub(crate) fn toggle_cardboard_box(&mut self) {
         self.cardboard_box.toggle();
+        self.chat.receive(
+            sjk_client::ServerEventKind::CenterPrint,
+            crate::toy_switch_words::switched("Cardboard box", self.cardboard_box.on()),
+            None,
+            Instant::now(),
+        );
     }
 
     /// The frame's toy logic, after the looks: the own life, the hub's events (`events`,
@@ -629,6 +692,9 @@ impl GpuState {
             let toward = origin_of(usize::from(event.slot))
                 .zip(at)
                 .and_then(|(from, at)| level_way(from, at));
+            if Some(event.target) == own && self.cardboard_box.on {
+                self.cardboard_box.lifted_by = Some((u16::from(event.slot), now));
+            }
             self.cardboard_box
                 .spotted(event.target, own, origin_of(target), shows, toward, now);
         }
@@ -649,6 +715,13 @@ impl GpuState {
             {
                 self.cardboard_box.lift(target, at.to_array(), from, now);
                 crate::player_identity::toy_event(TOY, EVENT_SPOTTED, target);
+                // Alert!: the boxes of different players lifted, by the name shown.
+                if self.toys_count()
+                    && let Some(name) =
+                        crate::player_identity::shown_name(game_state, usize::from(target))
+                {
+                    crate::achievements::note_name(crate::achievements::Counter::BoxSpotted, &name);
+                }
             }
         }
         // Deaths in the box, of the players in this snapshot.
@@ -670,6 +743,74 @@ impl GpuState {
             |slot| origin_of(slot).unwrap_or_default(),
         );
         self.cardboard_box.expire_lifts(boxed, now);
+    }
+
+    /// Keep one's own eye at crouch height while hidden in the box. The server stands a
+    /// talking player up (the menu, the chat or the console open; [`crouched_in_box`]),
+    /// and the view rose with them, a jump Dave saw on Escape (28/10/2026). The eye and
+    /// the view height drop together, so the body's root (the eye less the view height)
+    /// stays put. Run each frame after the prediction presented the eye.
+    pub(crate) fn keep_boxed_eye(&mut self) {
+        if self.live_session.is_none() || !self.cardboard_box.hiding() {
+            return;
+        }
+        if let Some(drop) = eye_drop(self.local_prediction.view_height()) {
+            self.camera_position.z -= drop;
+            self.local_prediction.set_view_height(CROUCH_VIEWHEIGHT);
+        }
+    }
+
+    /// Note which players are in a carton this frame ([`crouched_in_box`]), before the
+    /// actors are posed, by the rules [`Self::submit_cardboard_boxes`] draws the cartons
+    /// by: noted while drawing them, the pose read the previous frame's set (one
+    /// crouched frame after leaving the box, one standing frame on entering it).
+    pub(crate) fn note_boxed_players(&self) {
+        let Some(session) = self
+            .live_session
+            .as_ref()
+            .filter(|session| !session.is_local())
+        else {
+            BOXED.store(0, Ordering::Relaxed);
+            return;
+        };
+        let snapshot = session.latest_snapshot();
+        let slots = crate::looks::ViewSlots::of(session.game_state(), &snapshot.player);
+        let followed = slots.followed().filter(|&slot| slot < SLOTS);
+        let own = slots.own.filter(|&slot| slot < SLOTS);
+        let shows = |slot: usize| {
+            Some(slot) != slots.own
+                && self.looks.toy(slot, TOY)
+                && self.cardboard_box.lifted[slot].is_none()
+        };
+        let mut boxed = 0_u64;
+        if let Some(own) = own
+            && self.cardboard_box.crouching
+            && self.cardboard_box.own_alive == Some(true)
+        {
+            boxed |= 1 << own;
+        }
+        if let Some(slot) = followed
+            && shows(slot)
+            && alive(&snapshot.player)
+        {
+            boxed |= 1 << slot;
+        }
+        for entity in &snapshot.entities {
+            let slot = usize::from(entity.number());
+            if slot < SLOTS
+                && Some(slot) != followed
+                && Some(slot) != own
+                && drawn(entity)
+                && shows(slot)
+                && self
+                    .live_world
+                    .entity(sjk_runtime::EntityId::new(slot as u64 + 1))
+                    .is_some()
+            {
+                boxed |= 1 << slot;
+            }
+        }
+        BOXED.store(boxed, Ordering::Relaxed);
     }
 
     /// Add this frame's cartons, and note the music: the player's own (drawn in mirrors
@@ -716,10 +857,15 @@ impl GpuState {
         let mut seen = [Seen::default(); SLOTS];
         let own = slots.own.filter(|&slot| slot < SLOTS);
         if let Some(own) = own {
-            let origin = self
-                .local_prediction
-                .predicted_state()
-                .map_or_else(|| snapshot.player.origin(), |state| state.origin);
+            // Flying the free camera, the predicted state is the camera's: the
+            // carton stays on the body the server holds (hub report #152).
+            let origin = if self.local_prediction.fake_noclip() {
+                snapshot.player.origin()
+            } else {
+                self.local_prediction
+                    .predicted_state()
+                    .map_or_else(|| snapshot.player.origin(), |state| state.origin)
+            };
             seen[own].worn = self.cardboard_box.on;
             seen[own].drawn = (self.cardboard_box.own_alive == Some(true)).then_some(origin);
         }
@@ -727,9 +873,20 @@ impl GpuState {
             && let Some(own) = own
             && let Some(origin) = seen[own].drawn
         {
-            seen[own].carton = Some((origin, self.camera_yaw));
-            let mut instance = carton(origin, self.camera_yaw);
-            if first_person {
+            // Flying, the camera turns on its own: the carton keeps the body's facing,
+            // which the server holds (Dave's test of #152, 28/10/2026).
+            let yaw = if self.local_prediction.fake_noclip() {
+                snapshot.player.view_angles()[1].to_radians()
+            } else {
+                self.camera_yaw
+            };
+            seen[own].carton = Some((origin, yaw));
+            let mut instance = carton(origin, yaw);
+            // A free camera starting in the body looks out of the carton, not at its
+            // walls from inside (as the body is hidden while the camera is in its head).
+            let camera_inside = self.local_prediction.fake_noclip()
+                && inside_carton(self.camera_position.to_array(), origin);
+            if first_person || camera_inside {
                 instance.view_flags |= 1;
             }
             cartons[own] = Some((own, instance));
@@ -901,6 +1058,60 @@ mod tests {
         command.buttons = BUTTON_USE;
         toy.shape_command(&mut command);
         assert!(toy.use_pressed);
+    }
+
+    #[test]
+    fn flying_the_free_camera_the_box_holds_no_crouch_and_hides_nobody() {
+        // Hub report #152: the box's crouch steered the free camera down.
+        let mut toy = CardboardBox::default();
+        toy.set_on(true);
+        toy.own_life(Some(true), Some(2));
+        toy.set_flying(true);
+        let mut command = UserCommand {
+            up_move: 127,
+            ..UserCommand::default()
+        };
+        toy.shape_command(&mut command);
+        assert_eq!(command.up_move, 127, "flying: up goes up");
+        command.up_move = 0;
+        toy.shape_preview(&mut command);
+        assert_eq!(command.up_move, 0, "nor in the preview");
+        assert!(!toy.hiding(), "flying is not hiding");
+        assert!(toy.on(), "the box stays on");
+        toy.set_flying(false);
+        toy.shape_command(&mut command);
+        assert_eq!(command.up_move, CROUCH, "back on foot: crouch again");
+        assert!(toy.hiding());
+    }
+
+    /// Dave's test: opening the menu in the box stood the view up (36) from the crouch
+    /// (12); the eye drops back, once, and a crouching eye stays.
+    #[test]
+    fn a_boxed_eye_stays_at_crouch_height() {
+        assert_eq!(eye_drop(36.0), Some(24.0));
+        assert_eq!(eye_drop(CROUCH_VIEWHEIGHT), None);
+        assert_eq!(eye_drop(8.0), None);
+    }
+
+    /// Dave's test of #152: a boxed player is drawn crouching until they leave the
+    /// box, also while the server stands them up (talking).
+    #[test]
+    fn a_boxed_player_is_drawn_crouching() {
+        BOXED.store(1 << 3, Ordering::Relaxed);
+        assert!(crouched_in_box(3) && !crouched_in_box(4) && !crouched_in_box(SLOTS));
+        BOXED.store(0, Ordering::Relaxed);
+    }
+
+    /// A free camera that starts in the body is inside the carton; once it has flown
+    /// out of it, it is not.
+    #[test]
+    fn a_camera_in_the_carton_is_inside_it() {
+        let origin = [100.0, 200.0, 50.0];
+        let eye = [100.0, 200.0, 50.0 + 26.0 - 24.0];
+        assert!(inside_carton(eye, origin), "at the crouched eye");
+        assert!(inside_carton([120.0, 220.0, 40.0], origin), "a corner");
+        assert!(!inside_carton([100.0, 260.0, 50.0], origin), "beside it");
+        assert!(!inside_carton([100.0, 200.0, 120.0], origin), "above it");
     }
 
     #[test]

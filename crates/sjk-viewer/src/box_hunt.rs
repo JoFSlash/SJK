@@ -1,6 +1,6 @@
-//! Box hunt, SJK's mystery box game (`toy_boxhunt`; Sol's design, 27/10/2026): every
-//! few minutes the SJK hub picks one player who has the toy on as the mark; another
-//! player with it on who kills the mark wins a free mystery box roll.
+//! Box hunt, SJK's mystery box game (`toy_boxhunt`; Sol's design, 27/10/2026): once
+//! every 10 minutes at most the SJK hub picks one player who has the toy on as the mark;
+//! another player with it on who kills the mark wins a free mystery box roll.
 //!
 //! - **Opt-in:** the switch (`toy_boxhunt`, the Collection's Toys tab, the key bindings)
 //!   is the consent to take part: only players with it on see the mark or can be it. It
@@ -58,14 +58,9 @@ impl GpuState {
     /// `toy_boxhunt`: on or off, said on the centre of the screen.
     pub(crate) fn toggle_box_hunt(&mut self) {
         self.box_hunt.toggle();
-        let text = if self.box_hunt.on() {
-            "Box hunt: you may become the mark; kill the mark to win a free mystery box roll"
-        } else {
-            "Box hunt off: you are out of the hunt"
-        };
         self.chat.receive(
             sjk_client::ServerEventKind::CenterPrint,
-            text.to_owned(),
+            crate::toy_switch_words::switched("Box hunt", self.box_hunt.on()),
             None,
             Instant::now(),
         );

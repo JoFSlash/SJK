@@ -22,6 +22,7 @@ use crate::menu_widgets::{MenuCanvas, TextFamily};
 use crate::sjk_chat_look::Measure;
 use crate::text::TextFace;
 use sjk_ui::{Color, DrawCommand, FontWeight, TextAlign};
+use std::time::Instant;
 
 /// The categories down the rail, as the menu lists them: each one's name and
 /// settings icon (`settings_icons`), and the one on show (none while a search
@@ -154,17 +155,29 @@ impl SettingsMenu {
             self.append_wheel_sjk(target, viewport, reveal, rail);
             return;
         }
+        // A held slider over a match: the rest of the screen fades away
+        // (`slider_peek`), its row stays.
+        let peek = self.peek_world.then(|| self.peek.show(Instant::now()));
+        self.peek_draw = peek
+            .flatten()
+            .filter(|(row, _)| *row < self.rows().len() && self.shows(*row));
+        let rest = self.peek_draw.map_or(1.0, |(_, faded)| 1.0 - faded);
         self.ui.begin_transparent(viewport);
         self.ui.push_opacity(reveal);
+        self.ui.push_opacity(rest);
         backdrop(&mut self.ui, viewport);
         self.top_bar(&frame, rail.back, rail.mode);
         draw_rail(&mut self.ui, &frame, rail);
+        self.ui.pop_opacity();
         let measure = target.body_measure();
         let slots = self.sjk_rows(&frame, &measure, VISIBLE, LIST_BOTTOM);
+        self.ui.push_opacity(rest);
         self.sjk_detail(&frame, rail);
         self.sjk_keys(&frame);
         self.sjk_dropdown(&frame, &slots, VISIBLE, LIST_BOTTOM);
         self.ui.pop_opacity();
+        self.ui.pop_opacity();
+        self.peek_draw = None;
         self.ui.finish(self.selected as u16);
         target.append(&self.ui, viewport);
         self.sjk_controls = Some(frame.point(CONTROL_LEFT, 0.0)[0]);
@@ -237,17 +250,31 @@ impl SettingsMenu {
         let mut slots = Vec::with_capacity(visible);
         for (index, line) in lines[shown.clone()].iter().enumerate() {
             let top = ROWS_TOP + index as f32 * LINE;
-            let row = match *line {
+            // While a slider peeks, every line but its row fades.
+            let faded = self
+                .peek_draw
+                .filter(|(peeking, _)| *line != Line::Row(*peeking))
+                .map(|(_, faded)| 1.0 - faded);
+            if let Some(opacity) = faded {
+                self.ui.push_opacity(opacity);
+            }
+            match *line {
                 Line::Heading(heading) => {
                     kit::heading(&mut self.ui, frame, ROWS_X, top + 36.0, ROWS_WIDTH, heading);
-                    continue;
                 }
-                Line::Row(row) => row,
-            };
-            slots.push((row, top));
-            let open = self.dropdown.as_ref().is_some_and(|open| open.row == row);
-            let under_list = covered.is_some_and(|list| list_covers(list, top, open));
-            self.sjk_row(frame, measure, row, top, under_list);
+                Line::Row(row) => {
+                    slots.push((row, top));
+                    let open = self.dropdown.as_ref().is_some_and(|open| open.row == row);
+                    let under_list = covered.is_some_and(|list| list_covers(list, top, open));
+                    self.sjk_row(frame, measure, row, top, under_list);
+                }
+            }
+            if faded.is_some() {
+                self.ui.pop_opacity();
+            }
+        }
+        if let Some((_, faded)) = self.peek_draw {
+            self.ui.push_opacity(1.0 - faded);
         }
         if lines.len() > visible {
             self.ui.scrollbar(
@@ -262,6 +289,9 @@ impl SettingsMenu {
                 visible,
                 lines.len(),
             );
+        }
+        if self.peek_draw.is_some() {
+            self.ui.pop_opacity();
         }
         slots
     }
@@ -404,7 +434,7 @@ impl SettingsMenu {
             ValueKind::IdentityPage
             | ValueKind::ImportPage
             | ValueKind::AssetBrowser
-            | ValueKind::JofContent
+            | ValueKind::ContentCard
             | ValueKind::GameplayFps => kit::field(
                 &mut self.ui,
                 frame,
@@ -839,7 +869,7 @@ impl SettingsMenu {
                     ValueKind::IdentityPage => (&["Enter"][..], "open"),
                     ValueKind::ImportPage => (&["Enter"][..], "choose"),
                     ValueKind::GameplayFps => (&["Enter"][..], "explain"),
-                    ValueKind::AssetBrowser | ValueKind::JofContent => (&["Enter"][..], "browse"),
+                    ValueKind::AssetBrowser | ValueKind::ContentCard => (&["Enter"][..], "browse"),
                     ValueKind::SoundPreview => (&["Enter"][..], "play"),
                     ValueKind::Text => (&["Enter"][..], "type"),
                     _ => (&["Left", "Right"][..], "change"),

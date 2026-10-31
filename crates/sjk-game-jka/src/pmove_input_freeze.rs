@@ -1,7 +1,7 @@
 //! Command filtering performed near the head of `PmoveSingle`.
 //!
 //! The branch order and timer boundaries mirror OpenJK
-//! `codemp/game/bg_pmove.c:10224-10430`. Vehicle, held-client and
+//! `codemp/game/bg_pmove.c:10224-10430`. Vehicle and
 //! rocket-trooper branches require state the bounded predictor does not carry
 //! and remain snapshot-authoritative. A JA+ server's medium flip over and taunts
 //! follow [`JaPlusRules`].
@@ -32,6 +32,77 @@ const FORCE_INPUTS: u16 =
 const HAND_EXTEND_NONE: u8 = 0;
 const HAND_EXTEND_TAUNT: u8 = 10;
 const BOTH_MEDITATE_END: u16 = 1_190;
+
+#[cfg(test)]
+mod held_tests {
+    use super::*;
+    use crate::pmove::{MovementConfig, MovementTrace, Predictor};
+    use sjk_protocol::PlayerState;
+
+    struct Void;
+    impl MovementCollision for Void {
+        fn trace(
+            &self,
+            _: [f32; 3],
+            _: [f32; 3],
+            _: [f32; 3],
+            end: [f32; 3],
+            _: u32,
+        ) -> MovementTrace {
+            MovementTrace::miss(end)
+        }
+    }
+
+    #[test]
+    fn snapshot_held_client_freezes_movement_but_not_look_or_attack() {
+        for step in [8, 7, 4, 3] {
+            let mut player = PlayerState::default();
+            player.stats[0] = 100;
+            player.set_raw_field(121, 2);
+            let mut predictor = Predictor::from_player_state(&player, MovementConfig::default());
+            assert_eq!(predictor.state().held_by_client, 2);
+            let mut command = UserCommand {
+                server_time: step,
+                forward_move: 127,
+                right_move: -127,
+                up_move: 127,
+                buttons: 1,
+                angles: [0, 1234, 0],
+                ..UserCommand::default()
+            };
+            apply(
+                predictor.state_mut(),
+                &mut command,
+                step,
+                &Void,
+                None,
+                JaPlusRules::default(),
+            );
+            assert_eq!(
+                (command.forward_move, command.right_move, command.up_move),
+                (0, 0, 0)
+            );
+            assert_eq!(command.buttons, 1);
+            assert_eq!(command.angles, [0, 1234, 0]);
+            assert!(predictor.state().input_freeze_active);
+            // Movement does not own or overwrite the game-owned wire field.
+            predictor.state().write_player_state(&mut player);
+            assert_eq!(player.raw_field(121), Some(2));
+            player.set_raw_field(121, 0);
+            let mut released = predictor.reseeded(&player);
+            command.forward_move = 127;
+            apply(
+                released.state_mut(),
+                &mut command,
+                step,
+                &Void,
+                None,
+                JaPlusRules::default(),
+            );
+            assert_eq!(command.forward_move, 127);
+        }
+    }
+}
 
 /// Rewrite one user command using codemp's authored full-body move rules.
 pub(crate) fn apply(
@@ -71,6 +142,8 @@ pub(crate) fn apply(
         // `bg_pmove.c:10267-10271`: the roll-stab legs clip also locks the view.
         stiffened = true;
         lock_view = true;
+    } else if !stiffened && state.held_by_client != 0 {
+        stiffened = true;
     } else if !stiffened && (kick_move(state.saber_move) || kicking_animation(state.legs_anim)) {
         stiffened = true;
     } else if !stiffened && grapple_animation(state.torso_anim) {

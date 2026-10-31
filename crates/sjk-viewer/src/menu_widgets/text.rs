@@ -227,12 +227,14 @@ impl MenuCanvas {
 
     /// Append retained text, each command in the game font `font_of` names for
     /// it when that font is on (see [`GameFonts::append_routed`]), the rest to
-    /// `vertices` with `font`. Routed surfaces (chat, scoreboard) are not menus,
-    /// so they draw as laid out ([`TextStyle::NEUTRAL`]).
+    /// `vertices` with `font`, its colour codes in the palette `palette_of` gives
+    /// for it. Routed surfaces (chat, scoreboard) are not menus, so they draw as
+    /// laid out ([`TextStyle::NEUTRAL`]).
     pub(crate) fn append_text_routed(
         &self,
         fonts: &mut GameFonts,
         font_of: impl Fn(TextId, &str) -> Option<RetailFont> + Copy,
+        palette_of: impl Fn(TextId) -> crate::text::CodePalette + Copy,
         vertices: &mut Vec<TextVertex>,
         font: &UiFont,
         viewport: [f32; 2],
@@ -241,6 +243,7 @@ impl MenuCanvas {
             &self.draw,
             |id| self.resolve(id),
             font_of,
+            palette_of,
             (vertices, font),
             viewport,
             TextStyle::NEUTRAL,

@@ -10,6 +10,8 @@ pub(super) const GLOBAL: u16 = 100;
 pub(super) const TEAM: u16 = 101;
 pub(super) const LATEST: u16 = 102;
 pub(super) const SJK: u16 = 103;
+pub(super) const ADMIN: u16 = 104;
+pub(super) const PM: u16 = 105;
 
 /// Keys the composer acts on itself rather than typing their text.
 fn handled_key(key: KeyCode) -> bool {
@@ -76,18 +78,17 @@ impl ChatOverlay {
             KeyCode::PageDown | KeyCode::ArrowDown => self.scroll_by(-3),
             KeyCode::Tab => {
                 let channel = self.input.as_ref().expect("active input").channel;
-                match channel {
-                    Channel::Global => self.activate(TEAM),
-                    Channel::Team => self.activate(SJK),
-                    // The last whisperer comes after SJK (`chat/reply.rs`).
-                    Channel::Sjk if self.reply_target().is_ok() => {
+                // The row's channels in turn (`chat/tabs.rs`), then the last whisperer
+                // (`chat/reply.rs`), then All.
+                match self.next_channel(channel) {
+                    Some(next) => self.choose(next),
+                    None => {
                         let target = self.reply_target().ok();
                         let input = self.input.as_mut().expect("active input");
                         input.channel = Channel::Whisper;
                         input.recipient = target;
                         self.notice = "";
                     }
-                    Channel::Sjk | Channel::Whisper => self.activate(GLOBAL),
                 }
             }
             _ => {
@@ -105,7 +106,7 @@ impl ChatOverlay {
         ChatInputResult::None
     }
 
-    fn submit(&mut self) -> ChatInputResult {
+    pub(super) fn submit(&mut self) -> ChatInputResult {
         let input = self.input.as_ref().expect("active input");
         if input.channel == Channel::Sjk {
             let text = input.text.trim().to_owned();
@@ -123,6 +124,7 @@ impl ChatOverlay {
             Channel::Sjk => unreachable!("sent to the hub above"),
             Channel::Global => ChatDestination::Global,
             Channel::Team => ChatDestination::Team,
+            Channel::Admin => ChatDestination::Admin,
             Channel::Whisper => {
                 let Some(target) = input
                     .recipient
@@ -149,12 +151,31 @@ impl ChatOverlay {
         if !self.is_typing() {
             return;
         }
+        if let InputEvent::PointerMove(position)
+        | InputEvent::PointerPress { position, .. }
+        | InputEvent::PointerRelease { position, .. } = event
+        {
+            self.pointer_at = Some(position);
+        }
         // The profile card lies over the feed and may reach the composer: a press on
         // it is the card's.
         let on_card = matches!(event, InputEvent::PointerPress { position, .. }
             if self.card.is_some()
                 && self.ui.rect_for(card::CARD).is_some_and(|rect| rect.contains(position)));
         if !on_card && self.edit_pointer(event) {
+            return;
+        }
+        // A right click on PM steps back to the previous whisperer (`chat/tabs.rs`).
+        if let InputEvent::PointerRelease {
+            position,
+            button: PointerButton::Secondary,
+        } = event
+            && self
+                .ui
+                .rect_for(PM)
+                .is_some_and(|rect| rect.contains(position))
+        {
+            self.step_pm(-1);
             return;
         }
         if let InputEvent::PointerPress {
@@ -165,23 +186,15 @@ impl ChatOverlay {
             // Match the canvas's reverse paint order: the card covers the
             // composer, which covers the feed. Otherwise release activates a
             // different widget than the one recorded here and is discarded.
-            self.pressed_action = [
-                card::CARD_TRADE,
-                card::CARD_WHISPER,
-                card::CARD_REPORT,
-                card::CARD_SAFETY,
-                card::CARD_BAN,
-                card::CARD_MUTE,
-                card::CARD,
-            ]
-            .into_iter()
-            .chain([LATEST, SJK, TEAM, GLOBAL])
-            .chain(0..MAX_VISIBLE as u16)
-            .find(|token| {
-                self.ui
-                    .rect_for(*token)
-                    .is_some_and(|rect| rect.contains(position))
-            });
+            self.pressed_action = card::BUTTONS
+                .into_iter()
+                .chain([card::CARD, LATEST, PM, ADMIN, SJK, TEAM, GLOBAL])
+                .chain(0..MAX_VISIBLE as u16)
+                .find(|token| {
+                    self.ui
+                        .rect_for(*token)
+                        .is_some_and(|rect| rect.contains(position))
+                });
             // A sender's name: whose it is, so a release on another never pins theirs.
             self.pressed_who = self
                 .pressed_action
@@ -215,7 +228,7 @@ impl ChatOverlay {
         self.scroll = self.scroll.saturating_add_signed(delta).min(
             self.lines
                 .iter()
-                .filter(|line| self.pm_visible(line))
+                .filter(|line| self.shown(line))
                 .count()
                 .saturating_sub(1),
         );
@@ -227,19 +240,22 @@ impl ChatOverlay {
         }
     }
 
+    /// Put the composer on `channel`, away from any whisper.
+    pub(super) fn choose(&mut self, channel: Channel) {
+        if let Some(input) = &mut self.input {
+            input.channel = channel;
+            input.recipient = None;
+            self.notice = "";
+        }
+    }
+
     pub(super) fn activate(&mut self, token: u16) {
         match token {
-            GLOBAL | TEAM | SJK => {
-                if let Some(input) = &mut self.input {
-                    input.channel = match token {
-                        GLOBAL => Channel::Global,
-                        TEAM => Channel::Team,
-                        _ => Channel::Sjk,
-                    };
-                    input.recipient = None;
-                    self.notice = "";
-                }
-            }
+            GLOBAL => self.choose(Channel::Global),
+            TEAM => self.choose(Channel::Team),
+            SJK => self.choose(Channel::Sjk),
+            ADMIN => self.choose(Channel::Admin),
+            PM => self.step_pm(1),
             LATEST => {
                 self.scroll = 0;
                 self.unread = 0;

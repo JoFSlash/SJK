@@ -43,6 +43,16 @@ pub const KNOWN_SERVERS: &[KnownServer] = &[
         key: "V",
         value: "2.5B0",
     },
+    // SJK's own server (`sjk-server`, devmap and Create game) says so in its serverinfo
+    // (`sjk-dedicated` `cvars::SJK_SERVER`, 27/10/2026); its game module is SJK's, which
+    // reports `gamename` basejka.
+    KnownServer {
+        id: "sjk",
+        name: "SJK",
+        kind: ServerKind::BaseJka,
+        key: "sjk",
+        value: "1",
+    },
 ];
 
 /// The family `server` belongs to, if SJK knows it.
@@ -72,6 +82,13 @@ mod tests {
         assert!(identify(&server(ServerKind::JaPlus, r"\V\2.4B7")).is_none());
         assert!(identify(&server(ServerKind::JaPro, r"\V\2.5B0")).is_none());
         assert!(identify(&server(ServerKind::JaPlus, r"\v\ 2.5b0 ")).is_some());
+    }
+
+    #[test]
+    fn sjks_own_server_is_told_by_its_serverinfo_key() {
+        let sjk = identify(&server(ServerKind::BaseJka, r"\gamename\basejka\sjk\1"));
+        assert_eq!(sjk.map(|family| family.id), Some("sjk"));
+        assert!(identify(&server(ServerKind::BaseJka, r"\gamename\basejka")).is_none());
     }
 
     #[test]

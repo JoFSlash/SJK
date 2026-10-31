@@ -429,6 +429,8 @@ mod tests {
             art: String::new(),
             grants: None,
             blade: blade.map(str::to_owned),
+            scene: None,
+            rank: None,
         };
         let faces = crate::cards::faces::Faces::of_list(vec![
             face("sun", Some("saber_sun")),

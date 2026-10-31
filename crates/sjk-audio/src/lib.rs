@@ -481,6 +481,9 @@ pub struct Mixer {
     protected_channels: &'static [ChannelId],
 }
 
+/// The loudest a channel's bus ([`Mixer::set_channel_gain`]) plays its sounds.
+pub const MAX_CHANNEL_GAIN: f32 = 4.0;
+
 impl Mixer {
     /// Whether `channel` is one of [`MixerConfig::protected_channels`].
     fn protected(&self, channel: ChannelId) -> bool {
@@ -853,11 +856,13 @@ impl Mixer {
 
     /// Give the one-shot voices of `channel` the gain `gain` in place of the master
     /// gain (a separate volume bus, as a game's voice volume); `None` ends it. Each
-    /// channel keeps its own bus. Loops and music are not affected.
+    /// channel keeps its own bus, from 0 to [`MAX_CHANNEL_GAIN`] (above 1 louder than
+    /// recorded, as the emotes' own volume). Loops and music are not affected.
     pub fn set_channel_gain(&mut self, channel: ChannelId, gain: Option<f32>) {
         self.channel_gains.retain(|(bus, _)| *bus != channel);
         if let Some(gain) = gain {
-            self.channel_gains.push((channel, gain.clamp(0.0, 1.0)));
+            self.channel_gains
+                .push((channel, gain.clamp(0.0, MAX_CHANNEL_GAIN)));
         }
     }
 

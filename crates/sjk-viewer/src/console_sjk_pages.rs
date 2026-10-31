@@ -69,8 +69,8 @@ impl ViewerConsole {
             return;
         }
         #[cfg(feature = "mod-jof")]
-        if self.jof_content.open {
-            self.jof_content.append(target, viewport);
+        if let Some(cloud) = self.open_cloud() {
+            self.content_card(cloud).append(target, viewport);
             return;
         }
         if self.asset_browser.open {

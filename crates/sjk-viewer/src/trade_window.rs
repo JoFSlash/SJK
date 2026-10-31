@@ -16,6 +16,11 @@
 //! Every number shown comes from the hub (its rules, today's counts, each item's worth):
 //! nothing here decides what may trade. The window builds a step and the frame sends it
 //! (`trades.rs`).
+//!
+//! Since 29/10/2026 the player's shaders carry their collection marks
+//! (`crate::shader_marks`): a New sticker, the star of a favourite (listed first; a
+//! Favourites chip shows them alone) and the lightsaber of one worn; a locked one is shown
+//! dimmed with its padlock and answers no click, since the hub would refuse it.
 
 use crate::menu::sjk::{Frame, TextTarget, color, key_hint, key_hint_width, kit, text, wrap};
 use crate::menu_widgets::{MenuCanvas, TextFamily};
@@ -29,6 +34,8 @@ use winit::keyboard::{KeyCode, PhysicalKey};
 const MAIN_TOKEN: u16 = 1;
 const OTHER_TOKEN: u16 = 2;
 const CANCEL_TOKEN: u16 = 3;
+/// The Favourites chip over the player's own items (29/10/2026).
+const FAVOURITES_TOKEN: u16 = 4;
 /// The player's offered items (a click takes one back), then their own items (a click
 /// offers one).
 const OFFERED_FIRST: u16 = 10;
@@ -73,6 +80,12 @@ pub(crate) struct Item {
     /// Seconds until a holocron received in a trade may be traded again (the hub's
     /// resale lock); `None` when it may now.
     pub(crate) locked_for: Option<i64>,
+    /// A shader's collection marks (29/10/2026): a favourite, locked by the player (it
+    /// may not go in), New, worn.
+    pub(crate) favourite: bool,
+    pub(crate) locked: bool,
+    pub(crate) new: bool,
+    pub(crate) worn: bool,
 }
 
 /// What an item is.
@@ -106,6 +119,10 @@ impl Item {
             colour: found.map_or(color::HOLO, |tier| tier.colour),
             value,
             locked_for: None,
+            favourite: false,
+            locked: false,
+            new: false,
+            worn: false,
         }
     }
 
@@ -123,7 +140,17 @@ impl Item {
             colour: found.map_or(color::HOLO, |skin| skin.tier.colour()),
             value,
             locked_for: None,
+            favourite: false,
+            locked: false,
+            new: false,
+            worn: false,
         }
+    }
+
+    /// Whether the player may put it in now: not waiting for the hub's resale lock, not
+    /// locked by the player.
+    pub(crate) fn offerable(&self) -> bool {
+        self.locked_for.is_none() && !self.locked
     }
 }
 
@@ -166,6 +193,10 @@ pub(crate) struct View {
     /// The player pressed Ready on a gift: the window asks once more (the window sets
     /// it).
     pub(crate) confirming_gift: bool,
+    /// The hub keeps collection marks: the Favourites chip shows (29/10/2026).
+    pub(crate) marks_kept: bool,
+    /// Only the favourites among the player's own items show (the window sets it).
+    pub(crate) favourites_only: bool,
 }
 
 /// One kind's daily limits: (done, most) received and given.
@@ -301,6 +332,8 @@ pub(crate) struct Window {
     gift_asked: Option<(i64, i64)>,
     /// How big the window draws ([`Size`], the player's setting).
     size: Size,
+    /// The Favourites chip is on: only the favourites among the player's items show.
+    favourites_only: bool,
 }
 
 /// The window's size, the player's choice (`cl_tradeWindowSize`): the card scales about
@@ -346,11 +379,13 @@ impl Size {
 impl Default for Window {
     fn default() -> Self {
         Self {
-            ui: MenuCanvas::with_capacities(200, 160, 800),
+            // The marks (29/10/2026) add a sticker and a run of marks to a tile at most.
+            ui: MenuCanvas::with_capacities(240, 160, 1_000),
             view: None,
             open: false,
             gift_asked: None,
             size: Size::default(),
+            favourites_only: false,
         }
     }
 }
@@ -362,6 +397,7 @@ impl Window {
             view.confirming_gift = self.gift_asked == Some((view.trade.id, view.trade.rev))
                 && view.gives_gift()
                 && !view.trade.mine.ready;
+            view.favourites_only = self.favourites_only && view.marks_kept;
             view
         });
         if !self.view.as_ref().is_some_and(|view| view.confirming_gift) {
@@ -443,9 +479,17 @@ impl Window {
                 (index < view.mine.len())
                     .then(|| Choice::Step(id, view.offer_with(None, Some(index))))
             }
+            FAVOURITES_TOKEN if view.marks_kept => {
+                self.favourites_only = !view.favourites_only;
+                let on = self.favourites_only;
+                if let Some(view) = self.view.as_mut() {
+                    view.favourites_only = on;
+                }
+                None
+            }
             token if token >= OWN_FIRST && view.trade.is_open() => {
                 let item = view.own.get(usize::from(token - OWN_FIRST))?;
-                (view.mine.len() < view.items_max && view.room.takes(item))
+                (view.mine.len() < view.items_max && view.room.takes(item) && item.offerable())
                     .then(|| Choice::Step(id, view.offer_with(Some(item), None)))
             }
             _ => None,
@@ -929,6 +973,14 @@ fn own_items(ui: &mut MenuCanvas, frame: &Frame, view: &View, own_y: f32) {
         FontWeight::Semibold,
         TextAlign::Start,
     );
+    if view.marks_kept {
+        favourites_chip(
+            ui,
+            frame,
+            view.favourites_only,
+            [LEFT_X + COLUMN_W, own_y - 2.0],
+        );
+    }
     let tiles_y = own_y + 36.0;
     if view.own.is_empty() {
         let words = "Nothing to offer yet: unopened holocrons you found by playing, and \
@@ -946,12 +998,20 @@ fn own_items(ui: &mut MenuCanvas, frame: &Frame, view: &View, own_y: f32) {
         }
     }
     let full = view.mine.len() >= view.items_max;
-    let shown = view.own.len().min(TILES_ROW * OWN_ROWS);
-    for (index, item) in view.own.iter().take(shown).enumerate() {
-        let (column, row) = (index % TILES_ROW, index / TILES_ROW);
+    // The Favourites chip shows the favourites alone; each tile keeps its own token.
+    let listed = || {
+        view.own
+            .iter()
+            .enumerate()
+            .filter(|(_, item)| !view.favourites_only || item.favourite)
+    };
+    let count = listed().count();
+    let shown = count.min(TILES_ROW * OWN_ROWS);
+    for (slot, (index, item)) in listed().take(shown).enumerate() {
+        let (column, row) = (slot % TILES_ROW, slot / TILES_ROW);
         let x = LEFT_X + column as f32 * (TILE + TILE_GAP);
         let y = tiles_y + row as f32 * (TILE + TILE_GAP);
-        let live = !full && view.room.takes(item);
+        let live = !full && view.room.takes(item) && !item.locked;
         tile(
             ui,
             frame,
@@ -961,9 +1021,20 @@ fn own_items(ui: &mut MenuCanvas, frame: &Frame, view: &View, own_y: f32) {
             Some(OWN_FIRST + index as u16),
         );
     }
+    if count == 0 && !view.own.is_empty() {
+        line(
+            ui,
+            frame,
+            LEFT_X,
+            tiles_y,
+            COLUMN_W,
+            "No favourite to offer: star shaders in the Collection.",
+            color::QUIET,
+        );
+    }
     let rows = shown.div_ceil(TILES_ROW).max(1) as f32;
     let mut under = tiles_y + rows * (TILE + TILE_GAP) + 2.0;
-    if view.own.len() > shown {
+    if count > shown {
         line(
             ui,
             frame,
@@ -972,9 +1043,21 @@ fn own_items(ui: &mut MenuCanvas, frame: &Frame, view: &View, own_y: f32) {
             COLUMN_W,
             &format!(
                 "{} more not shown: the most worth come first",
-                view.own.len() - shown
+                count - shown
             ),
             color::QUIET,
+        );
+        under += 24.0;
+    }
+    if listed().any(|(_, item)| item.locked) {
+        line(
+            ui,
+            frame,
+            LEFT_X,
+            under,
+            COLUMN_W,
+            "Locked shaders stay out of trades: unlock them in the Collection.",
+            color::GOLD_BRIGHT,
         );
         under += 24.0;
     }
@@ -1381,6 +1464,7 @@ fn tile(
         );
         return;
     }
+    item_marks(ui, frame, [x, y], item);
     let label = match item.holocron_slot {
         Some(_) => item.tier.clone(),
         None => item.name.clone(),
@@ -1398,6 +1482,135 @@ fn tile(
     if let Some(token) = token.filter(|_| live) {
         ui.hit_region(token, rect);
     }
+}
+
+/// A shader tile's collection marks at its top (29/10/2026), drawn from shapes and plain
+/// ASCII (the window's font draws bytes): the star of a favourite and the padlock of a
+/// locked one at the left, "Worn" at the right, the New sticker over the top edge.
+fn item_marks(ui: &mut MenuCanvas, frame: &Frame, [x, y]: [f32; 2], item: &Item) {
+    let s = frame.s;
+    let mut left = x + 11.0;
+    if item.favourite {
+        star(ui, frame, [left, y + 11.0], 6.5, color::GOLD_BRIGHT);
+        left += 15.0;
+    }
+    if item.locked {
+        padlock(ui, frame, [left, y + 11.0], color::GOLD_BRIGHT);
+    }
+    if item.worn {
+        text(
+            ui,
+            TextFamily::Body,
+            format_args!("Worn"),
+            frame.rect(x + 4.0, y + 4.0, TILE - 9.0, 14.0),
+            10.5 * s,
+            color::GOLD_BRIGHT,
+            FontWeight::Semibold,
+            TextAlign::End,
+        );
+    }
+    if item.new {
+        let rect = frame.rect(x + TILE * 0.5 - 19.0, y - 8.0, 38.0, 15.0);
+        let _ = ui.draw_list_mut().push(DrawCommand::RoundedRect {
+            rect,
+            radius: 7.5 * s,
+            color: color::GOLD_BRIGHT,
+        });
+        text(
+            ui,
+            TextFamily::Display,
+            format_args!("New"),
+            frame.rect(x + TILE * 0.5 - 19.0, y - 7.0, 38.0, 13.0),
+            10.5 * s,
+            Color::new(0.078, 0.063, 0.02, 1.0),
+            FontWeight::Semibold,
+            TextAlign::Center,
+        );
+    }
+}
+
+/// A five-pointed star centred on `[cx, cy]` (frame pixels), its points `radius` out: a
+/// pentagon and a triangle a point, as the renderer fills convex shapes.
+fn star(ui: &mut MenuCanvas, frame: &Frame, [cx, cy]: [f32; 2], radius: f32, colour: Color) {
+    let inner = radius * 0.42;
+    let at = |r: f32, step: usize| {
+        let angle = -std::f32::consts::FRAC_PI_2 + step as f32 * std::f32::consts::PI / 5.0;
+        frame.point(cx + r * angle.cos(), cy + r * angle.sin())
+    };
+    let mut push = |points: &[[f32; 2]]| {
+        let mut corners = [[0.0; 2]; sjk_ui::POLYGON_POINTS];
+        for (corner, point) in corners.iter_mut().zip(points) {
+            *corner = *point;
+        }
+        let _ = ui.draw_list_mut().push(DrawCommand::Polygon {
+            points: corners,
+            count: points.len() as u8,
+            color: colour,
+            texture: None,
+        });
+    };
+    let middle: [[f32; 2]; 5] = std::array::from_fn(|n| at(inner, n * 2 + 1));
+    push(&middle);
+    for n in 0..5 {
+        push(&[
+            at(inner, (n * 2 + 9) % 10),
+            at(radius, n * 2),
+            at(inner, n * 2 + 1),
+        ]);
+    }
+}
+
+/// A small padlock whose body is centred on `[cx, cy]` (frame pixels): a rounded body and
+/// its shackle over it.
+fn padlock(ui: &mut MenuCanvas, frame: &Frame, [cx, cy]: [f32; 2], colour: Color) {
+    let s = frame.s;
+    let _ = ui.draw_list_mut().push(DrawCommand::Border {
+        rect: frame.rect(cx - 3.5, cy - 7.5, 7.0, 9.0),
+        radius: 3.5 * s,
+        width: 1.6 * s,
+        color: colour,
+    });
+    let _ = ui.draw_list_mut().push(DrawCommand::RoundedRect {
+        rect: frame.rect(cx - 5.5, cy - 2.0, 11.0, 8.0),
+        radius: 1.8 * s,
+        color: colour,
+    });
+}
+
+/// The Favourites chip, its right edge at `right` (frame pixels, from `y`): its star and
+/// word, lit gold while `on`.
+fn favourites_chip(ui: &mut MenuCanvas, frame: &Frame, on: bool, [right, y]: [f32; 2]) {
+    let s = frame.s;
+    let words = "Favourites";
+    let width = crate::text::display_width(words, 15.0) + 50.0;
+    let rect = frame.rect(right - width, y, width, 28.0);
+    let hovered = ui.token_hovered(FAVOURITES_TOKEN);
+    if on || hovered {
+        let _ = ui.draw_list_mut().push(DrawCommand::RoundedRect {
+            rect,
+            radius: 14.0 * s,
+            color: color::alpha(color::GOLD, if on { 0.22 } else { 0.09 }),
+        });
+    }
+    let _ = ui.draw_list_mut().push(DrawCommand::Border {
+        rect,
+        radius: 14.0 * s,
+        width: 1.2 * s,
+        color: color::alpha(color::GOLD, if on { 1.0 } else { 0.45 }),
+    });
+    let ink = if on { color::GOLD_BRIGHT } else { color::MUTED };
+    star(ui, frame, [right - width + 17.0, y + 14.0], 6.5, ink);
+    text(
+        ui,
+        TextFamily::Display,
+        format_args!("{words}"),
+        frame.rect(right - width + 28.0, y + 4.0, width - 34.0, 20.0),
+        15.0 * s,
+        ink,
+        FontWeight::Semibold,
+        TextAlign::Center,
+    );
+    ui.hit_region(FAVOURITES_TOKEN, rect);
 }
 
 /// The badge between the two sides: a gold ring with one chevron each way, drawn
@@ -1893,6 +2106,8 @@ pub(crate) mod tests {
             room: Room::OPEN,
             problem: String::new(),
             confirming_gift: false,
+            marks_kept: true,
+            favourites_only: false,
         }
     }
 
@@ -2008,6 +2223,54 @@ pub(crate) mod tests {
                 }
             ))
         );
+    }
+
+    /// Collection marks (29/10/2026): a locked shader answers no click and says why, the
+    /// Favourites chip shows the favourites alone (each keeping its own token), and a hub
+    /// without marks shows no chip.
+    #[test]
+    fn a_locked_shader_waits_and_the_favourites_chip_filters() {
+        let mut view = open_view();
+        let mut star = Item::shader("saber_tidal", Some("Tidal"), 5);
+        star.favourite = true;
+        star.new = true;
+        view.own[1].locked = true;
+        view.own.push(star);
+        let mut window = window(view.clone());
+        let texts = drawn(&mut window);
+        assert!(
+            texts
+                .iter()
+                .any(|text| text.contains("Locked shaders stay out")),
+            "{texts:?}"
+        );
+        assert!(texts.iter().any(|text| text == "New"));
+        assert!(
+            window.ui.rect_for(OWN_FIRST + 1).is_none(),
+            "the locked Haze"
+        );
+        assert_eq!(window.press(OWN_FIRST + 1), None);
+        assert!(window.press(OWN_FIRST + 2).is_some(), "the starred Tidal");
+        // The chip: only Tidal shows, under its own token.
+        assert_eq!(window.press(FAVOURITES_TOKEN), None);
+        let texts = drawn(&mut window);
+        assert!(
+            window.ui.rect_for(OWN_FIRST).is_none(),
+            "the holocron is hidden"
+        );
+        assert!(window.ui.rect_for(OWN_FIRST + 2).is_some());
+        assert!(
+            !texts
+                .iter()
+                .any(|text| text.contains("Locked shaders stay out"))
+        );
+        // It stays on for the next view, as long as the hub keeps marks.
+        window.set_view(Some(view.clone()));
+        assert!(window.view.as_ref().unwrap().favourites_only);
+        view.marks_kept = false;
+        let mut window = super::tests::window(view);
+        let _ = drawn(&mut window);
+        assert!(window.ui.rect_for(FAVOURITES_TOKEN).is_none());
     }
 
     #[test]

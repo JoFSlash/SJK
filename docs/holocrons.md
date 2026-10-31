@@ -164,7 +164,8 @@ The client's list is [kyber.rs](../crates/sjk-viewer/src/kyber.rs) (`kyber::TIER
   `kills_100`, `saber_kills_100`, `streak_10`, `dark_side_25`, `arsenal`, `maps_25`,
   `surveyor` (retired 26/10/2026: its holders keep their crystal), `decorated`,
   `holocrons_50`, `mythical_find`, `craft_finishes`, `duel_flawless`, `duel_partners_25`,
-  `thermal_return`; Legendary for `duel_wins_100`, `hours_100`, `holocrons_200`,
+  `thermal_return`, the five style masters (`style_blue_50`, `style_yellow_50`,
+  `style_red_50`, `style_dual_50`, `style_staff_50`); Legendary for `duel_wins_100`, `hours_100`, `holocrons_200`,
   `full_set`; Mythical for `kills_1000`. A hub
   that sends `reward` on an achievement replaces the client's word for it
   (`kyber::follow_rewards`, lock-free, read by the boards every frame). The hub grants a
@@ -234,7 +235,8 @@ Every card, per holocron found:
 | Mythical (0.18%) | 0.0815% (1 in 1 228) | 0.0173% (1 in 5 770) | 0.0008% (1 in 119 581) |
 
 The page: over the darkened tab, the title, what it is and the hub's pace ("One holocron
-about every 30 minutes of active play on a server, at most 8 in 24 hours", once the hub has said;
+about every 30 minutes of active play on a server, at most 8 a day (it resets at 9:00, Paris
+time)", once the hub has said;
 else "Holocrons are found by playing on a server."); "Per holocron", the first table, each
 tier's row in its colour with its picture, the row for any holocron found in gold under a
 rule, credits as the range with the average under it, a chance of none quiet; "Every card,
@@ -273,17 +275,24 @@ the person's own count) and where crystals come from.
   the rest. Progress persists in the hub's database across sessions. A hub started with
   `--holocron-every <secs>` drops sooner, for tests; the caps stay.
 - The tier is rolled by the hub from a system random source.
-- Caps, all the hub's: at most 8 drops in a rolling 24 hours per key (staff gifts excluded);
-  at most 1 mythical per key in 24 hours (another becomes legendary); at most 16 per
-  address in 24 hours across all keys. A drop a cap holds back waits (the active time stays
-  at 1800) and happens at the first renewal after the cap frees; nothing is lost.
+- Caps, all the hub's, per day: at most 8 drops per key (staff gifts excluded); at most 1
+  mythical per key (another becomes legendary); at most 16 per address across all keys.
+  Since 29/10/2026 (Sol's decision) the day runs from 09:00 to 09:00 in Paris, summer time
+  included, and every count starts again at 09:00; before, the caps looked back a rolling
+  24 hours, so each drop freed its room 24 hours after it dropped. A drop a cap holds back
+  waits (the active time stays at 1800) and happens at the first renewal after the cap
+  frees, so a player who reached the limit and kept playing finds one at their first
+  renewal after 09:00; nothing is lost.
 - A staff gift (`source: "staff"`) counts toward no cap and is not announced.
 
 The client reads the progress with `GET /v1/holocrons` (`progress_secs`, `every_secs`, the
-day's `today` and `daily_cap`) at the registration, every five minutes, soon after a drop
+day's `today` and `daily_cap`, and since 29/10/2026 `resets_at`, when the hub's next day
+begins) at the registration, every five minutes, soon after a drop
 of its own and when a screen asks ([`holocrons::refresh`](../crates/sjk-viewer/src/holocrons.rs),
-at most once every 30 seconds). A hub from before holocrons refuses it; it is asked again
-in an hour and the identity's status never shows it. The remaining time is as the hub last
+at most once every 30 seconds). A hub from before holocrons refuses it (404); it is asked again
+in an hour and the identity's status never shows it. Any other failure (unreachable, too
+many requests, a restart) is tried again after two minutes (before 29/10/2026 it also
+waited an hour, and the Esc menu's reading could not bring it forward). The remaining time is as the hub last
 said and does not count down by itself.
 
 ## What the hub stores, and privacy
@@ -434,11 +443,13 @@ gem, the tier in its colour and how many are held, chosen like a row; its hover 
 "Earned from achievements. Always a saber shader.", that each achievement brings one, the
 pity and how many are held), what the chosen tier is (for a crystal what opening one gives,
 by shader tier), "Next holocron in about N minutes of play" with a bar
-and "n of 8 in 24 h" (once the cap is reached, "Limit reached: next one in about 5 h 20 min",
-the time until the 8th newest play drop the profile lists turns a day old and the hub's
-rolling 24 hours let a drop through again, counted from the hub's clock when it answered;
-"Limit reached for the last 24 hours" when the list does not show those drops; a player's
-report (#77, 19/10/2026) read "8 of 8 today" as a calendar day that had not reset), the newest eight holocrons (ten until the crystals took a row; tier, `dd/mm/yyyy HH:MM` in UTC, and for a gift
+and "n of 8 today" (once the cap is reached, "Limit reached: resets in about 5 h 20 min",
+the time until the hub's `resets_at`, counted from the hub's clock when it answered;
+"Limit reached for today" from a hub that does not say it. Before 29/10/2026 the page
+worked the end of the hub's rolling 24 hours out of the play drops the profile lists, and
+a holocron received in a trade, listed as a play drop but not counted by the hub, put it
+off: the page could say hours while the next one came at once. A player's
+report (#77, 19/10/2026) had read "8 of 8 today" as a calendar day that had not reset), the newest eight holocrons (ten until the crystals took a row; tier, `dd/mm/yyyy HH:MM` in UTC, and for a gift
 "Gift from the SJK team" with the note) and, when the identity is off, no hub is set or the
 hub has not answered, the reason ("Holocrons need the SJK identity"). Since 12/10/2026 the
 counts are the holocrons not opened yet, the player's credits (and since 17/10/2026 their
@@ -505,8 +516,8 @@ client reads; the Collection's Holocrons tab is built on it.
   in `holocrons_panel::Data::of`.
 - `refresh()` (ask the hub again when a tab opens)
   and `next_text(&progress, lifts_in)` ("Next holocron in about 20 minutes of play", or
-  "Limit reached: next one in about 5 h 20 min" with `lifts_in` from
-  `cap_lifts_in(&progress, &list, now)`, else "Limit reached for the last 24 hours").
+  "Limit reached: resets in about 5 h 20 min" with `lifts_in` from
+  `cap_lifts_in(&progress, now)`, else "Limit reached for today").
 - `icons::texture(index)` is the atlas cell of a tier's picture, uploaded with the HUD's
   pictures; `hud.holocron_icons` says which loaded (`icons::is_loaded(index)` for the pages the
   console draws). `gem::draw(list, centre, half, colour, alpha, rows)` draws the fallback.

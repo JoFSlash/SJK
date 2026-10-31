@@ -5,9 +5,11 @@ use sjk_vfs::VirtualFileSystem;
 use std::error::Error;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{OnceLock, RwLock};
+use std::sync::{Arc, RwLock};
 
-static STARTUP: OnceLock<Options> = OnceLock::new();
+/// The settings every mount reads: frozen at startup ([`initialize`]), save for the
+/// pack choices, which `fs_restart` takes again ([`reload_pack_choices`]).
+static STARTUP: RwLock<Option<Arc<Options>>> = RwLock::new(None);
 
 /// Further content roots that stand in for files installed in the game's own
 /// folders, by owner: SJK's JoF content folder while its switch is on
@@ -69,7 +71,8 @@ const COSMETIC_FOLDERS: [&str; 2] = ["models/cosmetics/hats", "models/cosmetics/
 /// servers play, such as `sound/jof/repulse.mp3`.
 const JOF_CLIENT_FOLDER: &str = "gfx/jof";
 
-/// Immutable startup settings shared by world-loading workers.
+/// Startup settings shared by world-loading workers.
+#[derive(Clone)]
 pub(crate) struct Options {
     game: String,
     basegame: String,
@@ -104,7 +107,7 @@ pub(crate) fn register(cvars: &mut CvarRegistry) -> Result<(), sjk_shell::CvarEr
             pack_policy::CVAR,
             "[]",
             CvarFlags::ARCHIVE,
-            "Disabled installed PK3 packs (JSON list); edit in assetbrowser; client restart required",
+            "Disabled installed PK3 packs (JSON list); edit in assetbrowser; applies at fs_restart",
         ),
         CvarDefinition::new(
             "fs_game",
@@ -156,18 +159,44 @@ pub(crate) fn register(cvars: &mut CvarRegistry) -> Result<(), sjk_shell::CvarEr
 
 /// Freeze settings once before the first native world load; evidence defaults stay isolated.
 pub(crate) fn initialize(console: &ViewerConsole) -> Result<(), Box<dyn Error>> {
-    STARTUP
-        .set(Options::from_console(console)?)
-        .map_err(|_| "asset startup settings already initialized")?;
+    let options = Options::from_console(console)?;
+    let mut startup = STARTUP.write().unwrap_or_else(|error| error.into_inner());
+    if startup.is_some() {
+        return Err("asset startup settings already initialized".into());
+    }
+    *startup = Some(Arc::new(options));
     Ok(())
 }
 
-/// Snapshot shared by all subsequent mounts without locks or config reads.
-pub(crate) fn startup() -> &'static Options {
-    STARTUP.get_or_init(Options::default)
+/// Snapshot shared by all subsequent mounts without config reads.
+pub(crate) fn startup() -> Arc<Options> {
+    if let Some(options) = &*STARTUP.read().unwrap_or_else(|error| error.into_inner()) {
+        return Arc::clone(options);
+    }
+    let mut startup = STARTUP.write().unwrap_or_else(|error| error.into_inner());
+    Arc::clone(startup.get_or_insert_with(|| Arc::new(Options::default())))
+}
+
+/// `fs_restart`: take the pack choices (`fs_disabledPaks`) again for the mounts from
+/// now on. The other settings keep their startup values, as their help says.
+pub(crate) fn reload_pack_choices(console: &ViewerConsole) -> Result<(), Box<dyn Error>> {
+    let disabled =
+        pack_policy::Disabled::parse(console.text_value(pack_policy::CVAR).unwrap_or("[]"))?;
+    let current = startup();
+    let mut startup = STARTUP.write().unwrap_or_else(|error| error.into_inner());
+    *startup = Some(Arc::new(current.with_pack_choices(disabled)));
+    Ok(())
 }
 
 impl Options {
+    /// These settings with `disabled` as the pack choices.
+    fn with_pack_choices(&self, disabled: pack_policy::Disabled) -> Self {
+        Self {
+            disabled,
+            ..self.clone()
+        }
+    }
+
     pub(crate) fn from_console(console: &ViewerConsole) -> Result<Self, Box<dyn Error>> {
         let game = console.text_value("fs_game").unwrap_or("").to_owned();
         let basegame = console.text_value("fs_basegame").unwrap_or("").to_owned();
@@ -300,6 +329,80 @@ impl Options {
             .collect()
     }
 
+    /// EternalJK's black saber pictures, `gfx/effects/sabers/blackglow`, `blackcore` and
+    /// `blacktrail`, from the highest-priority PK3 in `install/EternalJK` that has each
+    /// (jaPRO's `japro-assets.pk3`), as `(archive, path, image bytes)`: JoF EJK draws its
+    /// black blades with them (`cg_main.c`, `blackSaberGlowShader` and the others), so
+    /// SJK's look the same where they are installed (Dave's test, 27/10/2026). Only these
+    /// pictures, nothing else from the pack. Empty when the folder is a game directory.
+    pub(crate) fn eternaljk_black_sabers(&self, install: &Path) -> Vec<(PathBuf, String, Vec<u8>)> {
+        let Some(directory) = self.eternaljk_directory(install) else {
+            return Vec::new();
+        };
+        let archives: Vec<(PathBuf, VirtualFileSystem)> = sjk_vfs::pk3_search_order(&directory)
+            .unwrap_or_default()
+            .into_iter()
+            .rev()
+            .filter(|archive| self.disabled.allows(archive))
+            .filter_map(|archive| {
+                let mut probe = VirtualFileSystem::new();
+                probe.mount_pk3(&archive).ok()?;
+                Some((archive, probe))
+            })
+            .collect();
+        ["glow", "core", "trail"]
+            .iter()
+            .filter_map(|kind| {
+                archives.iter().find_map(|(archive, probe)| {
+                    ["png", "tga", "jpg"].iter().find_map(|extension| {
+                        let path = format!("gfx/effects/sabers/black{kind}.{extension}");
+                        let asset = probe.read(&path).ok()??;
+                        Some((archive.clone(), path, asset.bytes))
+                    })
+                })
+            })
+            .collect()
+    }
+
+    /// jaPRO's movement key pictures, `gfx/hud/keys/<key>_on` and `_off`, from the
+    /// highest-priority PK3 in `install/EternalJK` that has each (jaPRO's
+    /// `japro-assets.pk3`), as `(archive, path, image bytes)`: JoF EJK's
+    /// `cg_movementKeys` draws them (`cg_main.c`, `keyJumpOnShader` and the others), so
+    /// SJK's keys look the same where they are installed ([`crate::hud::movement_keys`]).
+    /// Only these pictures, nothing else from the pack. Empty when the folder is a game
+    /// directory.
+    pub(crate) fn eternaljk_movement_keys(
+        &self,
+        install: &Path,
+    ) -> Vec<(PathBuf, String, Vec<u8>)> {
+        let Some(directory) = self.eternaljk_directory(install) else {
+            return Vec::new();
+        };
+        let archives: Vec<(PathBuf, VirtualFileSystem)> = sjk_vfs::pk3_search_order(&directory)
+            .unwrap_or_default()
+            .into_iter()
+            .rev()
+            .filter(|archive| self.disabled.allows(archive))
+            .filter_map(|archive| {
+                let mut probe = VirtualFileSystem::new();
+                probe.mount_pk3(&archive).ok()?;
+                Some((archive, probe))
+            })
+            .collect();
+        crate::hud::movement_keys::PICTURES
+            .iter()
+            .filter_map(|name| {
+                archives.iter().find_map(|(archive, probe)| {
+                    ["tga", "png", "jpg"].iter().find_map(|extension| {
+                        let path = format!("{name}.{extension}");
+                        let asset = probe.read(&path).ok()??;
+                        Some((archive.clone(), path, asset.bytes))
+                    })
+                })
+            })
+            .collect()
+    }
+
     /// JoF EternalJK's chat emoji pictures, every `gfx/emoji/*.png` in the PK3s of
     /// `install/EternalJK` (jaPRO's `japro-assets.pk3` ships 175), as `(path as the
     /// archive stores it, image bytes)`, the highest-priority archive's copy of each
@@ -372,6 +475,7 @@ impl Options {
         crate::boombox::mount(&mut vfs)?;
         crate::monitor::mount(&mut vfs)?;
         crate::box_hunt::mount(&mut vfs)?;
+        crate::banana::mount(&mut vfs)?;
         crate::tags::mount(&mut vfs)?;
         crate::mystery_box::mount(&mut vfs)?;
         crate::saber_petals::mount(&mut vfs)?;
@@ -443,6 +547,37 @@ impl Options {
             vfs.mount_memory(
                 "EternalJK crosshairs",
                 crosshairs.into_iter().map(|(_, path, bytes)| (path, bytes)),
+            )?;
+        }
+        // EternalJK's black saber pictures, likewise only those.
+        let black = self.eternaljk_black_sabers(install);
+        if !black.is_empty() {
+            if log {
+                for (archive, path, _) in &black {
+                    crate::log::progress(format_args!(
+                        "black saber picture {path} from {}",
+                        archive.display(),
+                    ));
+                }
+            }
+            vfs.mount_memory(
+                "EternalJK black sabers",
+                black.into_iter().map(|(_, path, bytes)| (path, bytes)),
+            )?;
+        }
+        // jaPRO's movement key pictures, likewise only those.
+        let keys = self.eternaljk_movement_keys(install);
+        if !keys.is_empty() {
+            if log {
+                crate::log::progress(format_args!(
+                    "{} movement key pictures from {}",
+                    keys.len(),
+                    install.join(COSMETICS_GAME).display(),
+                ));
+            }
+            vfs.mount_memory(
+                "EternalJK movement keys",
+                keys.into_iter().map(|(_, path, bytes)| (path, bytes)),
             )?;
         }
         // JoF EternalJK's chat emojis, likewise only those pictures from the folder.
@@ -649,6 +784,26 @@ mod tests {
     }
 
     #[test]
+    fn fs_restart_takes_new_pack_choices_and_keeps_the_rest() {
+        let install = tempfile::tempdir().unwrap();
+        let base = install.path().join("base");
+        std::fs::create_dir_all(&base).unwrap();
+        pk3(&base.join("zzz.pk3"), &["models/fixture.md3"]);
+        let started = Options {
+            game: "mymod".into(),
+            protect_shaders: false,
+            ..Options::default()
+        };
+        let mut disabled = pack_policy::Disabled::default();
+        disabled.toggle("base/zzz.pk3");
+        let restarted = started.with_pack_choices(disabled);
+        assert_eq!(restarted.game, "mymod");
+        assert!(!restarted.protect_shaders);
+        assert!(!restarted.disabled.allows(&base.join("zzz.pk3")));
+        assert!(started.disabled.allows(&base.join("zzz.pk3")));
+    }
+
+    #[test]
     fn disabled_eternaljk_packs_do_not_reenter_as_supplemental_assets() {
         let install = tempfile::tempdir().unwrap();
         let folder = install.path().join("EternalJK");
@@ -669,6 +824,47 @@ mod tests {
         assert!(options.cosmetic_packs(install.path()).is_empty());
         assert!(options.eternaljk_crosshairs(install.path()).is_empty());
         assert!(options.eternaljk_emojis(install.path()).is_empty());
+    }
+
+    #[test]
+    fn eternaljk_black_saber_pictures_are_mounted_alone() {
+        let install = tempfile::tempdir().unwrap();
+        let folder = install.path().join("EternalJK");
+        std::fs::create_dir_all(&folder).unwrap();
+        pk3(
+            &folder.join("japro-assets.pk3"),
+            &[
+                "gfx/effects/sabers/blackglow.png",
+                "gfx/effects/sabers/blackcore.png",
+                "gfx/effects/sabers/blacktrail.png",
+                "gfx/effects/sabers/red_glow2.png",
+            ],
+        );
+        let options = Options::default();
+        assert_eq!(options.eternaljk_black_sabers(install.path()).len(), 3);
+        let vfs = options.mount(install.path()).unwrap();
+        assert!(vfs.contains("gfx/effects/sabers/blacktrail.png").unwrap());
+        assert!(!vfs.contains("gfx/effects/sabers/red_glow2.png").unwrap());
+    }
+
+    #[test]
+    fn eternaljk_movement_key_pictures_are_mounted_alone() {
+        let install = tempfile::tempdir().unwrap();
+        let folder = install.path().join("EternalJK");
+        std::fs::create_dir_all(&folder).unwrap();
+        let mut entries: Vec<String> = crate::hud::movement_keys::PICTURES
+            .iter()
+            .map(|name| format!("{name}.tga"))
+            .collect();
+        entries.push("gfx/hud/speedometer.tga".to_owned());
+        let entries: Vec<&str> = entries.iter().map(String::as_str).collect();
+        pk3(&folder.join("japro-assets.pk3"), &entries);
+        let options = Options::default();
+        assert_eq!(options.eternaljk_movement_keys(install.path()).len(), 12);
+        let vfs = options.mount(install.path()).unwrap();
+        assert!(vfs.contains("gfx/hud/keys/jump_on.tga").unwrap());
+        assert!(vfs.contains("gfx/hud/keys/right_off.tga").unwrap());
+        assert!(!vfs.contains("gfx/hud/speedometer.tga").unwrap());
     }
 
     #[test]

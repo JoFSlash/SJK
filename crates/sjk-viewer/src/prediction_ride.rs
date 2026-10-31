@@ -9,7 +9,7 @@
 //! configstring gives it (`$swoop_mp`), as the cgame's `BG_VehicleGetIndex` finds it.
 //!
 //! The pilot sits on the vehicle model's `*driver` tag (`AttachRidersGeneric`): the client
-//! poses the model as the server does ([`sjk_game_jka::vehicle_skeleton`]) — the root on
+//! poses the model as the server does ([`sjk_game_jka::vehicle_skeleton`]) â€” the root on
 //! the vehicle's legs animation, installed when a snapshot shows it change, read at the
 //! snapshot's time for replay. Presentation resamples that bolt at cgame time,
 //! as `AttachRidersGeneric` does, so the camera does not hold a network-rate pose. It reads
@@ -17,13 +17,16 @@
 //! a new animation starts, blended, once presentation reaches the snapshot that brought it.
 //! Read from the replay skeleton, whose animation starts at the newest snapshot's time
 //! (ahead of presentation), the seat jumped to the new animation's first frame and back
-//! at every walk, run and stand change — the AT-ST pilot's camera jumped when it started
+//! at every walk, run and stand change â€” the AT-ST pilot's camera jumped when it started
 //! or stopped (Kushina, 21/10/2026).
 //!
 //! Presentation reads this same predicted vehicle root for its model and rider seat
 //! (`cg_ents.c`, `CG_AddPacketEntities` and `CG_CalcEntityLerpPositions`).
 
 use std::sync::Arc;
+
+#[path = "prediction_vehicle_models.rs"]
+mod collision_models;
 
 use sjk_client::pmove::{MovementCollision, MovementConfig, MovementState, Predictor};
 use sjk_game_jka::vehicle::Vehicle;
@@ -43,6 +46,7 @@ const ES_LEGS_FLIP: usize = 62;
 /// The rides this client can predict and the one it predicts now.
 pub(crate) struct Rides {
     table: VehicleTable,
+    collision_models: collision_models::Models,
     /// Vehicle definitions met, by name: a fresh vehicle of each (`None` for a name the
     /// table does not know).
     templates: Vec<(Vec<u8>, Option<Vehicle>)>,
@@ -67,6 +71,14 @@ pub(crate) struct Rides {
 }
 
 impl Rides {
+    /// Definition geometry cached by model slot; changes only when an encountered
+    /// vehicle's model configstring changes, never during command replay.
+    pub(super) fn collision_bounds(
+        &self,
+    ) -> (u64, &[Option<sjk_game_jka::vehicle_bounds::VehicleBounds>]) {
+        self.collision_models.bounds()
+    }
+
     /// Read the animated seat at cgame time for presentation only. Snapshot-time
     /// offsets remain in command replay; gait bob must not become prediction error.
     pub(super) fn present_pilot(&mut self, pilot: &mut MovementState, time: i32) {
@@ -122,6 +134,7 @@ impl Rides {
         );
         Self {
             table: VehicleTable::new(Arc::new(files), VehicleCapacity::REFERENCE),
+            collision_models: collision_models::Models::new(),
             templates: Vec::new(),
             piloting: None,
             fighter_alt_control: false,
@@ -138,6 +151,8 @@ impl Rides {
     /// Which vehicle, if any, the local player pilots in `snapshot` (`CG_Piloting`), and
     /// its definition from its model's configstring in `game_state`.
     pub(crate) fn resolve(&mut self, snapshot: &Snapshot, game_state: &GameState) {
+        self.collision_models
+            .refresh(snapshot, game_state, &mut self.table);
         self.piloting = None;
         // `CS_SYSTEMINFO` carries `bg_fighterAltControl` (`CVAR_SYSTEMINFO`).
         self.fighter_alt_control = game_state
@@ -365,10 +380,14 @@ pub(super) fn predict(
     ride: Option<&mut RidePrediction>,
     command: UserCommand,
     collision: &impl MovementCollision,
+    vehicle_collision: &impl MovementCollision,
+    context: &sjk_game_jka::pmove::MoveContext,
 ) {
     match ride {
-        Some(ride) => ride.predict(predictor, command, collision),
-        None => predictor.predict_command(command, collision),
+        Some(ride) => {
+            ride.predict_with_collisions(predictor, command, collision, vehicle_collision, context)
+        }
+        None => predictor.predict_command_in(command, collision, context),
     }
 }
 

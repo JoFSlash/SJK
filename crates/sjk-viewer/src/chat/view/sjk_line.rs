@@ -20,6 +20,13 @@ const LOGO_SIDE: f32 = 1.35;
 /// The channel label's size against the text size (10 pixels beside 16, as the name
 /// rows' labels were).
 const LABEL_SIZE: f32 = 0.625;
+/// What a muted sender's line says in place of their message.
+pub(in crate::chat) const MUTED_NOTE: &str = "Messages hidden on this client";
+
+/// The size [`MUTED_NOTE`] is drawn at in geometry `g`.
+pub(in crate::chat) fn muted_size(g: &Geometry) -> f32 {
+    15.0 * g.scale
+}
 
 /// What the first row shows of a line's sender.
 #[derive(Clone, Copy, Default)]
@@ -170,6 +177,7 @@ pub(in crate::chat) struct Line<'a> {
     /// The message's colour: the SJK chat's gold, a holocron tier's, or a game line's
     /// white under its own colour codes.
     pub(in crate::chat) colour: Color,
+    pub(in crate::chat) forced: Option<Color>,
     /// The channel label's colour (`view::tint`).
     pub(in crate::chat) label_colour: Color,
 }
@@ -276,9 +284,9 @@ pub(in crate::chat) fn draw(
     let indent = prefix.width();
     if line.muted {
         ui.text(
-            "Messages hidden on this client",
+            MUTED_NOTE,
             Rect::new(x + indent, y, (g.width - indent).max(1.0), row_box(g)),
-            15.0 * g.scale,
+            muted_size(g),
             Color::new(0.821, 0.854, 0.886, alpha * 0.853),
             FontWeight::Regular,
             0.0,
@@ -294,6 +302,7 @@ pub(in crate::chat) fn draw(
         body_row(
             ui,
             BodyRow {
+                forced: line.forced,
                 text: &line.body[range.clone()],
                 carry: line.wrap.carry[row],
                 marks: line.marks,
@@ -410,6 +419,74 @@ mod tests {
 
     fn rgb(color: Color) -> [f32; 3] {
         [color.r, color.g, color.b]
+    }
+
+    #[test]
+    fn incoming_colour_changes_displayed_history_but_not_names_or_stored_text() {
+        let mut chat = feed(
+            &["^1server text"],
+            vec![message(1, "^3Sol", "hello", false)],
+        );
+        let stored = chat
+            .lines
+            .iter()
+            .map(|l| l.body.clone())
+            .collect::<Vec<_>>();
+        chat.options.incoming = Some(Color::new(0.0, 1.0, 0.0, 1.0));
+        chat.build(true, &crate::text::test_font(), VIEWPORT, 1_000);
+        let shown = texts(&chat);
+        drawn(&shown, "^3Sol");
+        let (_, _, colour) = drawn(&shown, "server text");
+        assert_eq!(rgb(*colour), [0.0, 1.0, 0.0]);
+        assert_eq!(
+            chat.lines
+                .iter()
+                .map(|l| l.body.clone())
+                .collect::<Vec<_>>(),
+            stored
+        );
+        chat.options.incoming = None;
+        chat.build(true, &crate::text::test_font(), VIEWPORT, 1_000);
+        assert_eq!(rgb(drawn(&texts(&chat), "hello").2), rgb(GOLD));
+    }
+
+    #[test]
+    fn incoming_colour_preserves_special_channels_and_notice_colours() {
+        use crate::chat::Channel;
+        let mut chat = feed(
+            &["^5public"],
+            (1..=8)
+                .map(|id| message(id, "Fox", &format!("^5body{id}"), false))
+                .collect(),
+        );
+        chat.options.lines = crate::chat::MAX_VISIBLE;
+        for (index, line) in chat.lines.iter_mut().skip(1).enumerate() {
+            line.body = format!("^5body{}", index + 1);
+            line.wrap = Default::default();
+        }
+        chat.lines[1].channel = Channel::Team;
+        chat.lines[2].channel = Channel::Whisper;
+        chat.lines[3].channel = Channel::Admin;
+        chat.lines[4].channel = Channel::Global;
+        chat.lines[4].encrypted = true;
+        chat.lines[5].channel = Channel::Global;
+        chat.lines[5].server_private = true;
+        chat.lines[6].hub.as_mut().unwrap().official = true;
+        chat.lines[7].hub.as_mut().unwrap().tier = Some(&crate::holocrons::TIERS[0]);
+        chat.build(true, &crate::text::test_font(), VIEWPORT, 1_000);
+        let before = texts(&chat);
+        chat.options.incoming = Some(Color::new(0.0, 1.0, 0.0, 1.0));
+        chat.build(true, &crate::text::test_font(), VIEWPORT, 1_000);
+        let after = texts(&chat);
+        assert_eq!(rgb(drawn(&after, "public").2), [0.0, 1.0, 0.0]);
+        for id in 1..=8 {
+            let body = format!("^5body{id}");
+            assert_eq!(
+                rgb(drawn(&before, &body).2),
+                rgb(drawn(&after, &body).2),
+                "{body}"
+            );
+        }
     }
 
     #[test]

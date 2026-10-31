@@ -46,10 +46,16 @@ impl ApplicationHandler for ViewerApplication {
         } else {
             "SJK world viewer"
         };
+        // Counted as `r_resolution` will be, so a window of the default size is not
+        // resized on the first frame.
+        let high_dpi = self
+            .console
+            .as_ref()
+            .map_or(crate::settings::HIGH_DPI_DEFAULT, crate::settings::high_dpi);
         let attributes = window_icon::with_icons(
             WindowAttributes::default()
                 .with_title(title)
-                .with_inner_size(PhysicalSize::new(1280, 720)),
+                .with_inner_size(crate::settings::window_size([1280, 720], high_dpi)),
         );
         let result = (|| -> Result<GpuState, Box<dyn Error>> {
             let window = Arc::new(event_loop.create_window(attributes)?);
@@ -109,6 +115,7 @@ impl ApplicationHandler for ViewerApplication {
                 if let Some(address) = self.initial_connect.take() {
                     gpu.begin_address_join(address);
                 }
+                crate::vfs_lifetime::log("initial world attach", gpu.vfs.as_ref());
                 self.gpu = Some(gpu);
             }
             Err(error) => {

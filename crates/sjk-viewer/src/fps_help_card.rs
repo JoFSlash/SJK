@@ -1,13 +1,17 @@
 //! The low-FPS card (`docs/sjk-ui.md`, "Low FPS help"): an SJK pop-up card over the
 //! darkened screen, as the graphics reload card, that says what SJK's lighting costs
 //! on this map and offers Vanilla graphics (gold, Enter) or Not now (Escape), with a
-//! "Don't suggest this again" tick (D) for the card that comes by itself. Vanilla graphics
-//! is the Settings renderer choice: it keeps the player's settings and `vid_restart` applies
-//! it; with Vanilla on, the same button turns it off and the settings come back.
+//! "Don't suggest this again" tick (a click) for the card that comes by itself. Vanilla
+//! graphics is the Settings renderer choice: it keeps the player's settings and
+//! `vid_restart` applies it; with Vanilla on, the same button turns it off and the
+//! settings come back. The card comes in the middle of play, so no key a player plays
+//! with chooses on it (Space jumped into Vanilla graphics, hub report #194) and it takes
+//! no input for a moment after it opens.
 
 use crate::menu::sjk::{Frame, TextTarget, color, key_hint, key_hint_width, kit, text, wrap};
 use crate::menu_widgets::{MenuCanvas, TextFamily};
 use sjk_ui::{FontWeight, InputEvent, TextAlign, UiEventKind};
+use std::time::{Duration, Instant};
 use winit::event::{ElementState, KeyEvent};
 use winit::keyboard::{KeyCode, PhysicalKey};
 
@@ -34,6 +38,9 @@ const PRIMARY_WIDTH: f32 = 260.0;
 const CLOSE_WIDTH: f32 = 150.0;
 const KEYS_Y: f32 = 992.0;
 const KEYS_RIGHT: f32 = 1824.0;
+/// How long the card takes no input after it opens: a key or click meant for the game
+/// at that moment does not choose on it.
+const SETTLE: Duration = Duration::from_millis(600);
 
 /// Why the card shows.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -67,6 +74,8 @@ pub(crate) struct Card {
     mode: Option<Mode>,
     /// Shown this frame.
     open: bool,
+    /// When the card last opened, for [`SETTLE`].
+    opened_at: Option<Instant>,
     ui: MenuCanvas,
 }
 
@@ -75,6 +84,7 @@ impl Default for Card {
         Self {
             mode: None,
             open: false,
+            opened_at: None,
             ui: MenuCanvas::with_capacities(24, 220, 80),
         }
     }
@@ -91,17 +101,26 @@ impl Card {
     }
 
     pub(crate) fn set_open(&mut self, open: bool) {
+        if open && !self.open {
+            self.opened_at = Some(Instant::now());
+        }
         self.open = open;
+    }
+
+    /// Whether the card has been open long enough to take input.
+    fn settled(&self, now: Instant) -> bool {
+        self.opened_at
+            .is_none_or(|opened| now.saturating_duration_since(opened) >= SETTLE)
     }
 
     pub(crate) fn is_open(&self) -> bool {
         self.open
     }
 
-    /// Enter or Space switch, Escape or Backspace close, D ticks; every other key is
-    /// swallowed while the card shows.
+    /// Enter switches, Escape or Backspace close; every other key, Space and the
+    /// movement keys among them, is swallowed while the card shows.
     pub(crate) fn handle_key(&mut self, event: &KeyEvent) -> Option<Choice> {
-        if event.state != ElementState::Pressed || event.repeat {
+        if event.state != ElementState::Pressed || event.repeat || !self.settled(Instant::now()) {
             return None;
         }
         let PhysicalKey::Code(code) = event.physical_key else {
@@ -112,9 +131,8 @@ impl Card {
 
     fn key(&mut self, code: KeyCode) -> Option<Choice> {
         let choice = match code {
-            KeyCode::Enter | KeyCode::NumpadEnter | KeyCode::Space => Choice::Switch,
+            KeyCode::Enter | KeyCode::NumpadEnter => Choice::Switch,
             KeyCode::Escape | KeyCode::Backspace => Choice::Close,
-            KeyCode::KeyD => Choice::Tick,
             _ => return None,
         };
         Some(self.choose(choice))
@@ -122,7 +140,7 @@ impl Card {
 
     pub(crate) fn handle_pointer(&mut self, event: InputEvent) -> Option<Choice> {
         let event = self.ui.pointer(event)?;
-        if event.kind != UiEventKind::Activate {
+        if event.kind != UiEventKind::Activate || !self.settled(Instant::now()) {
             return None;
         }
         let choice = match event.token {
@@ -285,8 +303,7 @@ impl Card {
             CLOSE_TOKEN,
         );
         let [right, keys_y] = frame.point(KEYS_RIGHT, KEYS_Y);
-        let hints: [(&[&str], &str); 3] = [
-            (&["D"], "don't suggest"),
+        let hints: [(&[&str], &str); 2] = [
             (&["Esc"], "not now"),
             (
                 &["Enter"],
@@ -421,14 +438,36 @@ mod tests {
         let mut card = Card::default();
         assert!(!card.wants());
         card.show(Mode::Offered);
-        assert_eq!(card.key(KeyCode::KeyD), Some(Choice::Tick));
+        assert_eq!(card.choose(Choice::Tick), Choice::Tick);
         assert!(card.wants());
-        assert_eq!(card.key(KeyCode::KeyA), None);
+        // Keys a player plays with never choose (hub report #194: Space switched).
+        for code in [KeyCode::Space, KeyCode::KeyW, KeyCode::KeyA, KeyCode::KeyD] {
+            assert_eq!(card.key(code), None, "{code:?}");
+        }
+        assert!(card.wants());
         assert_eq!(card.key(KeyCode::Escape), Some(Choice::Close));
         assert!(!card.wants());
         card.show(Mode::Asked);
         assert_eq!(card.key(KeyCode::Enter), Some(Choice::Switch));
         assert!(!card.wants());
+    }
+
+    #[test]
+    fn the_card_takes_no_input_just_after_it_opens() {
+        let mut card = Card::default();
+        assert!(card.settled(Instant::now()));
+        card.show(Mode::Offered);
+        card.set_open(true);
+        let opened = card.opened_at.expect("opened");
+        assert!(!card.settled(opened));
+        assert!(!card.settled(opened + SETTLE / 2));
+        assert!(card.settled(opened + SETTLE));
+        // Staying open does not restart the wait; opening again does.
+        card.set_open(true);
+        assert_eq!(card.opened_at, Some(opened));
+        card.set_open(false);
+        card.set_open(true);
+        assert!(card.opened_at.is_some_and(|again| again >= opened));
     }
 
     #[test]

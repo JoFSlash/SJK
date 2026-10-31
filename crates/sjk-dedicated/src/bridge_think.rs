@@ -90,6 +90,18 @@ impl NativeGame {
             let flags = peer.state.raw_field(EFLAGS).unwrap_or(0);
             peer.state.set_raw_field(EFLAGS, flags & !EF_INVULNERABLE);
         }
+        // A held jetpack shows on the player's back (`g_active.c`, `EF_JETPACK`).
+        let flags = peer.state.raw_field(EFLAGS).unwrap_or(0);
+        let held =
+            peer.state.stats[STAT_HOLDABLE_ITEMS] & (1 << sjk_game_jka::holdables::HI_JETPACK) != 0;
+        peer.state.set_raw_field(
+            EFLAGS,
+            if held {
+                flags | EF_JETPACK
+            } else {
+                flags & !EF_JETPACK
+            },
+        );
         // `client->noclip` heads the chain (`g_active.c`): `PM_NOCLIP` while it is on,
         // the type the rest of the chain picks once it is off. A spectator has none.
         if peer.playing()
@@ -116,6 +128,25 @@ impl NativeGame {
             && peer.state.movement_type() != PM_NOCLIP
         {
             peer.state.set_movement_type(PM_NOCLIP);
+            peer.movement = peer.movement.reseeded(&peer.state);
+        }
+        // Death, a grip and a fall to death turn the jetpack off; then `ClientThink_real`
+        // flies a player whose jetpack is on (`PM_JETPACK`) and lands one whose is off.
+        let wearer = super::bridge_holdables::wearer_of(peer, level_time);
+        sjk_game_jka::holdables::jetpack_forced_off(&mut peer.gear.packs, &wearer);
+        let (kind, flags) = sjk_game_jka::holdables::jetpack_movement(
+            peer.gear.packs.jetpack_on,
+            peer.state.movement_type(),
+            peer.state.raw_field(EFLAGS).unwrap_or(0),
+        );
+        if (kind, flags)
+            != (
+                peer.state.movement_type(),
+                peer.state.raw_field(EFLAGS).unwrap_or(0),
+            )
+        {
+            peer.state.set_movement_type(kind);
+            peer.state.set_raw_field(EFLAGS, flags);
             peer.movement = peer.movement.reseeded(&peer.state);
         }
         let others = crate::peer::Others {

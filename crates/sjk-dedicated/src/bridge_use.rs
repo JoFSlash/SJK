@@ -2,7 +2,8 @@
 //! `TryUse`, `g_utils.c:1594-1760`): while the key is held, every 100 ms (`ps.useDelay`),
 //! a player not busy reaches for what is in front of its eyes — or, on a vehicle, gets off
 //! it. A vehicle it reaches it boards; a button is pressed, a `func_usable` fires, a siege
-//! objective is taken.
+//! objective is taken. Reaching nothing, it switches a held jetpack on in the air
+//! (`tryJetPack`), and while the jetpack burns it only switches it off.
 
 use super::*;
 use sjk_game_jka::npc_spawn::NpcHost;
@@ -20,6 +21,8 @@ const HANDEXTEND_DRAGGING: u8 = 15;
 const PMF_FOLLOW: u16 = 4_096;
 /// `s.eFlags`' entity field (`msg.cpp`).
 const USABLE_EFLAGS: usize = 19;
+/// `ENTITYNUM_NONE`: the ground entity of a player in the air.
+const ENTITYNUM_NONE: u16 = 1_023;
 
 impl NativeGame {
     /// The `func_usable` brushes a map places, as the entities the use key reaches for,
@@ -102,7 +105,16 @@ impl NativeGame {
             });
             return;
         }
+        // A switched-on jetpack takes the key before anything in front of the eyes.
+        if self
+            .peer(client)
+            .is_some_and(|peer| peer.gear.packs.jetpack_on)
+        {
+            self.try_jetpack(client, level_time);
+            return;
+        }
         let Some(found) = self.use_target(client) else {
+            self.try_jetpack(client, level_time);
             return;
         };
         if self.use_vehicle(client, found, level_time) || self.use_gun(client, found, level_time) {
@@ -135,6 +147,23 @@ impl NativeGame {
             .position(|(number, usable)| number.legacy_number() == found && usable.answers_use())
         {
             self.use_usable(index, client, level_time);
+            return;
+        }
+        self.try_jetpack(client, level_time);
+    }
+
+    /// `tryJetPack` (`g_utils.c:2040-2048`): the use key, having used nothing else,
+    /// switches a held jetpack on in the air, or off while it burns. Stock flies only
+    /// this way: `G_ItemUsable` refuses the jetpack's own `use_jetpack`.
+    fn try_jetpack(&mut self, client: usize, level_time: i32) {
+        let Some(peer) = self.peer(client) else {
+            return;
+        };
+        let held =
+            peer.state.stats[STAT_HOLDABLE_ITEMS] & (1 << sjk_game_jka::holdables::HI_JETPACK) != 0;
+        let airborne = peer.state.ground_entity_num() == ENTITYNUM_NONE;
+        if sjk_game_jka::holdables::try_jetpack(held, peer.gear.packs.jetpack_on, airborne) {
+            self.use_jetpack(client, level_time);
         }
     }
 

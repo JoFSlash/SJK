@@ -3,12 +3,13 @@
 //! chat is said in All chat on JoF servers (`sjk-mod-jof`, `sjk_chat.rs`). The mod gives
 //! the words and an archived on/off setting; the card shows once the player is in a
 //! match on such a server, over the game menu, in the SJK UI's look in every menu style,
-//! and Got it (Enter, Space or Escape) turns the setting off for good. The core has no
+//! and Got it (Enter or Escape) turns the setting off for good. The core has no
 //! words of its own here: without a mod asking, the card never shows.
 
 use crate::menu::sjk::{Frame, TextTarget, color, key_hint, key_hint_width, kit, text, wrap};
 use crate::menu_widgets::{MenuCanvas, TextFamily};
 use sjk_ui::{FontWeight, InputEvent, TextAlign, UiEventKind};
+use std::time::{Duration, Instant};
 use winit::event::{ElementState, KeyEvent};
 use winit::keyboard::{KeyCode, PhysicalKey};
 
@@ -40,6 +41,10 @@ const BUTTON_HEIGHT: f32 = 46.0;
 const CLOSE_WIDTH: f32 = 150.0;
 const KEYS_Y: f32 = 992.0;
 const KEYS_RIGHT: f32 = 1824.0;
+/// How long the card takes no input after it opens. It opens by itself in the middle of
+/// a match, so a key or click meant for the game at that moment (a jump) must not close
+/// it for good, as on the low-FPS card (hub report #194).
+const SETTLE: Duration = Duration::from_millis(600);
 
 /// What the player chose on the card.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -59,6 +64,8 @@ pub(crate) struct Card {
     notice: Option<Notice>,
     /// Shown this frame.
     open: bool,
+    /// When the card last opened, for [`SETTLE`].
+    opened_at: Option<Instant>,
     ui: MenuCanvas,
 }
 
@@ -67,6 +74,7 @@ impl Default for Card {
         Self {
             notice: None,
             open: false,
+            opened_at: None,
             ui: MenuCanvas::with_capacities(32, 1024, 64),
         }
     }
@@ -97,16 +105,26 @@ impl Card {
     }
 
     pub(crate) fn set_open(&mut self, open: bool) {
+        if open && !self.open {
+            self.opened_at = Some(Instant::now());
+        }
         self.open = open;
+    }
+
+    /// Whether the card has been open long enough to take input.
+    fn settled(&self, now: Instant) -> bool {
+        self.opened_at
+            .is_none_or(|opened| now.saturating_duration_since(opened) >= SETTLE)
     }
 
     pub(crate) fn is_open(&self) -> bool {
         self.open
     }
 
-    /// Enter, Space or Escape close; every other key is swallowed while the card shows.
+    /// Enter or Escape close once the card has settled; every other key, Space among
+    /// them, is swallowed while the card shows.
     pub(crate) fn handle_key(&mut self, event: &KeyEvent) -> Option<Choice> {
-        if event.state != ElementState::Pressed || event.repeat {
+        if event.state != ElementState::Pressed || event.repeat || !self.settled(Instant::now()) {
             return None;
         }
         let PhysicalKey::Code(code) = event.physical_key else {
@@ -117,16 +135,17 @@ impl Card {
 
     fn key(&mut self, code: KeyCode) -> Option<Choice> {
         match code {
-            KeyCode::Enter | KeyCode::NumpadEnter | KeyCode::Space | KeyCode::Escape => {
-                self.close()
-            }
+            KeyCode::Enter | KeyCode::NumpadEnter | KeyCode::Escape => self.close(),
             _ => None,
         }
     }
 
     pub(crate) fn handle_pointer(&mut self, event: InputEvent) -> Option<Choice> {
         let event = self.ui.pointer(event)?;
-        if event.kind == UiEventKind::Activate && event.token == Some(CLOSE_TOKEN) {
+        if event.kind == UiEventKind::Activate
+            && event.token == Some(CLOSE_TOKEN)
+            && self.settled(Instant::now())
+        {
             self.close()
         } else {
             None
@@ -321,12 +340,23 @@ mod tests {
         assert_eq!(card.key(KeyCode::Enter), None, "nothing to close");
         card.show(NOTICE);
         assert_eq!(card.key(KeyCode::KeyA), None);
+        assert_eq!(card.key(KeyCode::Space), None, "a jump does not close it");
         assert!(card.wants());
         assert_eq!(
             card.key(KeyCode::Escape),
             Some(Choice::Close("test.notice"))
         );
         assert!(!card.wants());
+    }
+
+    #[test]
+    fn the_card_takes_no_input_until_it_has_settled() {
+        let mut card = Card::default();
+        card.show(NOTICE);
+        card.set_open(true);
+        let opened = card.opened_at.expect("opened");
+        assert!(!card.settled(opened + SETTLE / 2));
+        assert!(card.settled(opened + SETTLE));
     }
 
     #[cfg(feature = "mod-jof")]

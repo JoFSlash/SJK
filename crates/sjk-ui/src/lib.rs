@@ -27,7 +27,8 @@ pub use document::{
     ArcStyle, HudLayoutDocument, HudWidget, HudWidgetKind, StyleOverrides, VisibilityCondition,
 };
 pub use draw::{
-    DrawCommand, DrawList, FontWeight, Gradient, TextAlign, TextId, TextOverflow, TextureId,
+    DrawCommand, DrawList, FontWeight, Gradient, POLYGON_POINTS, TextAlign, TextId, TextOverflow,
+    TextureId,
 };
 pub use geometry::{Color, Insets, Rect, Vec2};
 pub use input::{AbstractAction, InputEvent, InputRouter, PointerButton, UiEvent, UiEventKind};

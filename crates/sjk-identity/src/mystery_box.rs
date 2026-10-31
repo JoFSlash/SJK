@@ -10,6 +10,20 @@ use serde::{Deserialize, Serialize};
 
 /// The toy id of the feed event the hub makes when a box is opened.
 pub const TOY: &str = "mystery_box";
+/// The outcome that blows the opener up and hands what they paid to a random hunter on
+/// their server (since 28/10/2026).
+pub const EXPLODE: &str = "explode";
+/// The outcome that gives a holocron (since 28/10/2026).
+pub const HOLOCRON: &str = "holocron";
+/// The outcome that gives a pile of kyber shards (since 29/10/2026).
+pub const SHARD_PILE: &str = "shards";
+/// The outcome that gives a free opening, spent on the next one (since 29/10/2026).
+pub const AGAIN: &str = "again";
+/// The outcome that gives the boxes' own saber shader, [`BLADE_ID`], or shards for a
+/// player who holds it (since 29/10/2026).
+pub const BLADE: &str = "blade";
+/// The boxes' own saber shader, found nowhere else.
+pub const BLADE_ID: &str = "saber_mystery";
 
 /// One placed box.
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
@@ -88,6 +102,42 @@ pub struct Opened {
     pub won: u64,
     /// The opener's credits after.
     pub balance: u64,
+    /// A box that blew up: the hunter who got what the opener paid, when one was there.
+    #[serde(default)]
+    pub gift: Option<Gift>,
+    /// The holocron the box gave.
+    #[serde(default)]
+    pub holocron: Option<BoxHolocron>,
+    /// The kyber shards the box gave (since 29/10/2026).
+    #[serde(default)]
+    pub shards: Option<u64>,
+    /// The saber shader the box gave, its unlock id (since 29/10/2026).
+    #[serde(default)]
+    pub blade: Option<String>,
+    /// The free openings left after this one (since 29/10/2026; an older hub leaves it
+    /// out).
+    #[serde(default)]
+    pub free: Option<u64>,
+}
+
+/// Where a blown up box's price went.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
+pub struct Gift {
+    /// The hunter's slot.
+    pub slot: u8,
+    /// The hunter's worn name.
+    pub name: String,
+    /// What they got (0 for a free opening).
+    pub credits: u64,
+}
+
+/// The holocron a box gave: its id and tier.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
+pub struct BoxHolocron {
+    /// The holocron's id among the player's.
+    pub id: i64,
+    /// Its tier (`rare`, ...).
+    pub tier: String,
 }
 
 /// `POST /v1/mystery-box/open`'s answer.
@@ -150,12 +200,34 @@ pub enum HuntEvent {
         /// Whether it won them a free opening.
         won: bool,
     },
+    /// The box the player on `opener` opened blew up, and `credits` went to the hunter
+    /// on `to` (`None`: nobody else hunted there, they were lost)
+    /// (`laugh_<opener>_<to>_<credits>`, `to` 255 for nobody).
+    Laugh {
+        /// The opener's slot.
+        opener: u8,
+        /// The slot of the hunter who got the credits.
+        to: Option<u8>,
+        /// What they got.
+        credits: u64,
+    },
 }
 
 /// Read a feed event of [`HUNT_TOY`].
 pub fn parse_hunt_event(event: &str) -> Option<HuntEvent> {
     if let Some(slot) = event.strip_prefix("mark_") {
         return Some(HuntEvent::Mark(slot.parse().ok()?));
+    }
+    if let Some(rest) = event.strip_prefix("laugh_") {
+        let mut parts = rest.split('_');
+        let opener = parts.next()?.parse().ok()?;
+        let to: u8 = parts.next()?.parse().ok()?;
+        let credits = parts.next()?.parse().ok()?;
+        return parts.next().is_none().then_some(HuntEvent::Laugh {
+            opener,
+            to: (to != 255).then_some(to),
+            credits,
+        });
     }
     let (slot, won) = event.strip_prefix("hunted_")?.split_once('_')?;
     Some(HuntEvent::Hunted {
@@ -173,7 +245,7 @@ pub fn refusal(error: &HubError) -> String {
     let words = match error {
         HubError::Rejected { code, message, .. } => match code.as_str() {
             "not_enough_credits" => "Not enough credits.",
-            "box_cooldown" => "The box is still closing.",
+            "box_cooldown" => "You opened a box a moment ago: let someone else roll.",
             "no_such_box" => "That box is not here any more.",
             "not_on_server" => "The hub does not see you on this server yet.",
             "opening_staff_only" => "Mystery boxes open with holocrons: soon.",
@@ -209,7 +281,32 @@ mod tests {
                 won: false
             })
         );
-        for bad in ["mark_", "mark_x", "hunted_3", "hunted_3_2", "open_1_empty"] {
+        assert_eq!(
+            parse_hunt_event("laugh_2_4_100"),
+            Some(HuntEvent::Laugh {
+                opener: 2,
+                to: Some(4),
+                credits: 100
+            })
+        );
+        assert_eq!(
+            parse_hunt_event("laugh_2_255_0"),
+            Some(HuntEvent::Laugh {
+                opener: 2,
+                to: None,
+                credits: 0
+            })
+        );
+        for bad in [
+            "mark_",
+            "mark_x",
+            "hunted_3",
+            "hunted_3_2",
+            "open_1_empty",
+            "laugh_2_4",
+            "laugh_2_4_100_1",
+            "laugh_x_4_100",
+        ] {
             assert_eq!(parse_hunt_event(bad), None, "{bad}");
         }
         let state: HuntState = serde_json::from_str(
@@ -240,6 +337,30 @@ mod tests {
         assert!(one.stands_on("mp/ffa3", -1234, Some("1.2.3.4:29070")));
         assert!(!one.stands_on("mp/ffa3", -1234, Some("5.6.7.8:29070")));
         assert!(!one.stands_on("mp/ffa3", -1234, None));
+    }
+
+    #[test]
+    fn an_opening_reads_its_gift_and_holocron_when_the_hub_sends_them() {
+        let plain: Opened = serde_json::from_str(
+            r#"{"id":1,"box":3,"outcome":"double","price":100,"won":200,"balance":5}"#,
+        )
+        .unwrap();
+        assert_eq!((plain.gift, plain.holocron), (None, None));
+        let blown: Opened = serde_json::from_str(
+            r#"{"id":2,"box":3,"outcome":"explode","price":100,"won":0,"balance":5,
+                "gift":{"slot":4,"name":"Kyle","credits":100}}"#,
+        )
+        .unwrap();
+        assert_eq!(
+            blown.gift.map(|gift| (gift.slot, gift.credits)),
+            Some((4, 100))
+        );
+        let found: Opened = serde_json::from_str(
+            r#"{"id":3,"box":3,"outcome":"holocron","price":100,"won":0,"balance":5,
+                "holocron":{"id":77,"tier":"rare"}}"#,
+        )
+        .unwrap();
+        assert_eq!(found.holocron.map(|h| h.tier), Some("rare".to_owned()));
     }
 
     #[test]

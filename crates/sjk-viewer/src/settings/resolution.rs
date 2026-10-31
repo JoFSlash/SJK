@@ -355,6 +355,7 @@ mod tests {
             sizes: sizes.to_vec(),
             desktop: Some(desktop),
             exclusive: true,
+            scale: 1.0,
         }
     }
 

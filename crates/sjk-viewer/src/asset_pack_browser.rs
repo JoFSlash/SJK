@@ -121,7 +121,7 @@ impl Browser {
             return Action::None;
         }
         self.disabled.toggle(&pack.key);
-        self.status = "Saved. Restart SJK to apply your pack choices.".into();
+        self.status = "Saved. Type fs_restart (or restart SJK) to apply your pack choices.".into();
         Action::Changed
     }
 

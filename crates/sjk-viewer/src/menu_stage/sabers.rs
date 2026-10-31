@@ -23,11 +23,13 @@ use crate::saber_rgb::BladeColor;
 pub(super) struct Request {
     hilts: [Option<String>; 2],
     colors: [[u8; 3]; 2],
+    black: [bool; 2],
 }
 
 impl Request {
     pub(super) fn matches(&self, wanted: &StageSabers<'_>) -> bool {
         self.colors == wanted.colors
+            && self.black == wanted.black
             && self
                 .hilts
                 .iter()
@@ -39,6 +41,7 @@ impl Request {
         Self {
             hilts: wanted.hilts.map(|name| name.map(str::to_owned)),
             colors: wanted.colors,
+            black: wanted.black,
         }
     }
 }
@@ -87,7 +90,11 @@ impl GpuState {
     /// its hand empty.
     pub(super) fn sync_stage_sabers(&mut self, request: Request) {
         for hand in 0..2 {
-            let color = BladeColor::from_rgb(request.colors[hand]);
+            let color = if request.black[hand] {
+                BladeColor::Black
+            } else {
+                BladeColor::from_rgb(request.colors[hand])
+            };
             self.menu_stage.sabers[hand] = request.hilts[hand].as_deref().and_then(|name| {
                 self.build_stage_saber(name, color)
                     .inspect_err(|error| {

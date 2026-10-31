@@ -4,7 +4,7 @@
 //! jetpack and cloak batteries and the seeker drone. The rules are
 //! `sjk_game_jka::holdables` and `seeker_drone`, held to `holdables.c`.
 //!
-//! Not yet: the sentry, the E-Web and the jetpack's flight. Used, each says
+//! Not yet: the sentry and the E-Web. Used, each says
 //! so once and is given back (the movement had used it up), so no item is lost.
 
 use super::*;
@@ -52,13 +52,14 @@ const GENERIC_TAGS: [i32; 12] = [
     HI_CLOAK,
 ];
 /// The holdables this server cannot use yet.
-const UNPORTED: [i32; 3] = [HI_SENTRY_GUN, HI_JETPACK, HI_EWEB];
+const UNPORTED: [i32; 2] = [HI_SENTRY_GUN, HI_EWEB];
 /// `EV_PLAY_EFFECT`, `EFFECT_SPARK_EXPLOSION`, `s.angles`, `s.origin`.
 const EV_PLAY_EFFECT: u32 = 68;
 const EFFECT_SPARK_EXPLOSION: u32 = 4;
 const ES_ANGLES: [usize; 3] = [25, 9, 24];
 const ES_ORIGIN: [usize; 3] = [11, 12, 13];
 /// `CHAN_WEAPON`, `CHAN_ITEM`, `CHAN_BODY`, `CHAN_AUTO`, carried in `saberEntityNum`.
+const CHAN_AUTO: u32 = 0;
 const CHAN_WEAPON: u32 = 2;
 const CHAN_ITEM: u32 = 4;
 const CHAN_BODY: u32 = 5;
@@ -214,12 +215,12 @@ impl NativeGame {
                 peer.movement = peer.movement.reseeded(&peer.state);
             }
             HI_CLOAK => {
-                let wearer = wearer_of(peer);
+                let wearer = wearer_of(peer, level_time);
                 let toggled = holdables::use_cloak(&mut peer.gear.packs, &wearer, level_time);
                 self.cloak_toggled(client, toggled, level_time);
             }
             HI_SHIELD => self.place_shield(client, level_time),
-            HI_JETPACK | HI_SENTRY_GUN | HI_EWEB => {
+            HI_SENTRY_GUN | HI_EWEB => {
                 // Given back: the movement used a sentry up.
                 if moved && tag == HI_SENTRY_GUN {
                     peer.state.stats[STAT_HOLDABLE_ITEMS] |= 1 << tag;
@@ -229,6 +230,20 @@ impl NativeGame {
                 self.told_unported_holdable(tag);
             }
             _ => {}
+        }
+    }
+
+    /// `ItemUse_Jetpack` for `client`, which the use key reaches (`TryUse`'s
+    /// `tryJetPack`); the think flies the player while it is on.
+    pub(super) fn use_jetpack(&mut self, client: usize, level_time: i32) {
+        let Some(peer) = self.peer_mut(client) else {
+            return;
+        };
+        let wearer = wearer_of(peer, level_time);
+        let toggled = holdables::use_jetpack(&mut peer.gear.packs, &wearer, level_time);
+        if toggled == Toggled::JetpackOn {
+            let origin = peer.state.origin();
+            self.holdable_sound(b"sound/boba/JETON", origin, CHAN_AUTO, level_time);
         }
     }
 
@@ -445,16 +460,16 @@ fn holder_of(peer: &Peer) -> Holder {
     }
 }
 
-/// The jetpack's and cloak's view of a player.
-fn wearer_of(peer: &Peer) -> Wearer {
+/// The jetpack's and cloak's view of a player at `level_time`.
+pub(super) fn wearer_of(peer: &Peer, level_time: i32) -> Wearer {
     Wearer {
         health: peer.health,
         dead: peer.state.raw_field(PS_EFLAGS).unwrap_or(0) & holdables::EF_DEAD != 0,
         jetpack_fuel: peer.state.raw_field(PS_JETPACK_FUEL).unwrap_or(0) as i32,
         cloak_fuel: peer.state.raw_field(PS_CLOAK_FUEL).unwrap_or(0) as i32,
         cloaked: peer.state.powerups[PW_CLOAKED] != 0,
-        gripped: false,
-        falling_to_death: false,
+        gripped: peer.force.grip_being_gripped >= level_time as f32,
+        falling_to_death: peer.state.falling_to_death() != 0,
     }
 }
 

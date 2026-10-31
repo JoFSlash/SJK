@@ -3339,6 +3339,8 @@ const MOD_TELEFRAG: u32 = 37;
 const EF_INVULNERABLE: u32 = 1 << 27;
 /// `EF_BODYPUSH`: a player a Force push struck, shown for 600 ms.
 const EF_BODYPUSH: u32 = 1 << 19;
+/// `EF_JETPACK`: a player holding a jetpack, which the client bolts to its back.
+const EF_JETPACK: u32 = 1 << 29;
 /// A standing player's box (`playerMins`, `playerMaxs`).
 const PLAYER_BOX: ([f32; 3], [f32; 3]) = ([-15.0, -15.0, -24.0], [15.0, 15.0, 40.0]);
 /// `CONTENTS_BODY`: what a living player is made of.

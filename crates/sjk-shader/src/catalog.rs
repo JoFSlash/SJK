@@ -22,10 +22,24 @@ impl ShaderCatalog {
     /// Unreadable files are reported once. Valid override scripts retain `.oshader` priority.
     pub fn load_with_warnings(
         vfs: &VirtualFileSystem,
-        mut warning: impl FnMut(&VirtualPath, &ShaderError),
+        warning: impl FnMut(&VirtualPath, &ShaderError),
     ) -> Self {
+        Self::load_with_warnings_until(vfs, || false, warning)
+            .expect("an uncancelled shader load completes")
+    }
+
+    /// Loads usable definitions, stopping before the next script read when
+    /// `cancelled` reports that the owner no longer needs the catalogue.
+    pub fn load_with_warnings_until(
+        vfs: &VirtualFileSystem,
+        mut cancelled: impl FnMut() -> bool,
+        mut warning: impl FnMut(&VirtualPath, &ShaderError),
+    ) -> Option<Self> {
         let mut catalog = Self::default();
         for path in shader_paths(vfs) {
+            if cancelled() {
+                return None;
+            }
             match vfs.read(path.as_str()) {
                 Ok(Some(asset)) => {
                     let definitions =
@@ -42,7 +56,7 @@ impl ShaderCatalog {
                 Err(error) => warning(&path, &ShaderError::Vfs(error)),
             }
         }
-        catalog
+        Some(catalog)
     }
 
     fn load_script(
@@ -91,10 +105,21 @@ fn script_kind(path: &VirtualPath) -> Option<bool> {
     }
 }
 
+/// A script's definitions in insertion order for our last-wins map. Only the first of
+/// a name in one script is kept, as rd-vanilla's `FindShaderInShaderText` finds the
+/// first in the text: `maps/oot.bsp`'s `shaders/oot.shader` names its sand floor twice,
+/// the second an unfinished copy without its lightmap stage that drew the floor as a
+/// dark see-through plane (Sol's hub reports, 27/10/2026). Override scripts are then
+/// reversed, so their first definition is inserted last.
 fn definition_order(
-    mut definitions: Vec<ShaderDefinition>,
+    definitions: Vec<ShaderDefinition>,
     path: &VirtualPath,
 ) -> impl Iterator<Item = ShaderDefinition> {
+    let mut seen = std::collections::HashSet::new();
+    let mut definitions: Vec<_> = definitions
+        .into_iter()
+        .filter(|definition| seen.insert(normalize_name(&definition.name)))
+        .collect();
     if script_kind(path) == Some(true) {
         definitions.reverse();
     }

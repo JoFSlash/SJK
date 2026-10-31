@@ -245,6 +245,8 @@ def smoke_check(package, platform, source, packaged, profile="SJK", client="sjk"
             env.pop(name, None)
         env["XDG_CONFIG_HOME"] = str(root / "profile")
         env["APPDATA"] = str(root / "profile")
+        # The start-failure dialog would wait for a click on a runner with a desktop.
+        env["SJK_NO_START_DIALOG"] = "1"
         run = subprocess.run([str(game / client)], cwd=root,
                              env=env, capture_output=True, text=True, timeout=60)
         assert run.returncode == 1, run.stderr

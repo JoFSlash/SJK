@@ -9,6 +9,10 @@
 //! team counts as the viewer's), nor a dead, cloaked or mind-tricking player. Each
 //! outlined player costs one more draw of their body into a one-channel mask and the
 //! ring's lookups inside a box around them, so a full server stays cheap.
+//!
+//! The box hunt's mark (Sol's request, 29/10/2026) is ringed in the enemies' red for
+//! a hunter who sees them, in every game type and whatever `cg_teamOutline` says
+//! ([`crate::mystery_box`]).
 use super::identification::{Camera, info_number};
 use crate::card_outline::Group;
 use glam::Vec3;
@@ -149,7 +153,9 @@ impl State {
     }
 
     /// Find this frame's outlined players: everyone on a side in view of the
-    /// rendered `camera`, unless `hidden` (menus, the scoreboard, intermission).
+    /// rendered `camera`, and the box hunt's `mark` in red, unless `hidden` (menus, the
+    /// scoreboard, intermission).
+    #[allow(clippy::too_many_arguments)]
     pub(crate) fn update(
         &mut self,
         snapshot: &Snapshot,
@@ -158,16 +164,22 @@ impl State {
         now: i64,
         camera: Camera,
         hidden: bool,
+        mark: Option<u16>,
     ) {
         #[cfg(test)]
         if let Some(shot) = self.shot.take() {
             let input = (snapshot, &shot.game, shot.local_team, world, now);
-            self.collect(input, camera, hidden);
+            self.collect(input, camera, hidden, mark);
             self.shot = Some(shot);
             return;
         }
         let local_team = i32::from(snapshot.player.team());
-        self.collect((snapshot, game, local_team, world, now), camera, hidden);
+        self.collect(
+            (snapshot, game, local_team, world, now),
+            camera,
+            hidden,
+            mark,
+        );
     }
 
     /// [`Self::update`] for a viewer on `local_team`.
@@ -182,14 +194,13 @@ impl State {
         ),
         camera: Camera,
         hidden: bool,
+        mark: Option<u16>,
     ) {
         self.clear();
-        if !self.enabled || hidden {
-            return;
-        }
         let mode = info_number(game.config_string(0), "g_gametype");
         let local = snapshot.player.client_num();
-        if side(mode, local_team, local_team).is_none() {
+        let teams = self.enabled && side(mode, local_team, local_team).is_some();
+        if hidden || !(teams || mark.is_some()) {
             return;
         }
         for entity in &snapshot.entities {
@@ -204,7 +215,12 @@ impl State {
                 continue;
             }
             let team = info_number(game.config_string(CS_PLAYERS + usize::from(number)), "t");
-            let Some(group) = side(mode, local_team, team) else {
+            let group = if mark == Some(number) {
+                Some(Group::Enemy)
+            } else {
+                side(mode, local_team, team).filter(|_| teams)
+            };
+            let Some(group) = group else {
                 continue;
             };
             let Some(presented) = world.entity(sjk_runtime::EntityId::new(u64::from(number) + 1))
@@ -251,6 +267,68 @@ mod tests {
         assert_eq!(side(8, 3, TEAM_RED), None);
         assert_eq!(side(8, TEAM_RED, 3), None);
         assert_eq!(side(8, 0, TEAM_RED), None);
+    }
+
+    /// The box hunt's mark is ringed red in a free-for-all, with the team outlines off
+    /// too; nobody else is, and nobody while the plates are hidden.
+    #[test]
+    fn the_box_hunt_mark_is_ringed_red_in_any_game() {
+        use sjk_protocol::{EntityState, LEGACY_ENTITY_FIELDS, PlayerState};
+        use sjk_runtime::{EntityId, EntityKind, MotionSample, Transform, World, WorldId};
+
+        let mut player = PlayerState::zero();
+        player.set_client_num(0);
+        let mut entities = Vec::new();
+        let mut world = World::new(WorldId::new(1));
+        for number in [3_u16, 4] {
+            let mut entity = EntityState::zero(number, &LEGACY_ENTITY_FIELDS);
+            entity.set_raw_field(8, u32::from(ET_PLAYER));
+            entities.push(entity);
+            world.upsert(
+                EntityId::new(u64::from(number) + 1),
+                EntityKind::Actor,
+                MotionSample {
+                    time_millis: 1_000,
+                    transform: Transform {
+                        translation: [200.0, f32::from(number) * 10.0 - 35.0, 0.0],
+                        ..Transform::IDENTITY
+                    },
+                },
+            );
+        }
+        let snapshot = Snapshot {
+            message_sequence: 0,
+            reliable_acknowledge: 0,
+            server_commands: Vec::new(),
+            server_time: 1_000,
+            delta_from: None,
+            flags: 0,
+            area_mask: Vec::new(),
+            player,
+            vehicle_player: None,
+            entities,
+            consumed_bits: 0,
+        };
+        let game = GameState::empty_local(0);
+        let camera = Camera {
+            eye: Vec3::ZERO,
+            target: Vec3::X,
+            up: Vec3::Z,
+            fov: 90.0,
+            viewport: [1920.0, 1080.0],
+        };
+        let mut state = State::default();
+        for enabled in [true, false] {
+            state.enabled = enabled;
+            state.update(&snapshot, &game, &world, 1_000, camera, false, Some(3));
+            assert_eq!(state.groups().group(3), Some(Group::Enemy), "{enabled}");
+            assert_eq!(state.groups().group(4), None);
+            assert_eq!(state.areas().len(), 1);
+        }
+        state.update(&snapshot, &game, &world, 1_000, camera, true, Some(3));
+        assert_eq!(state.groups().group(3), None, "hidden");
+        state.update(&snapshot, &game, &world, 1_000, camera, false, None);
+        assert_eq!(state.groups().group(3), None, "no mark");
     }
 
     #[test]

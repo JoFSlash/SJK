@@ -2,10 +2,11 @@
 //! (`Cmd_TargetUse_f`, `g_cmds.c`), which fires a name as the player
 //! (`G_UseTargets2(ent, ent, name)`), as mappers test a map's targets and scripts;
 //! `noclip` (`Cmd_Noclip_f`), which lets the player fly through the world
-//! ([`sjk_game_jka::noclip`]; the think applies it); and `god` and `notarget`
+//! ([`sjk_game_jka::noclip`]; the think applies it); `god` and `notarget`
 //! (`Cmd_God_f`, `Cmd_Notarget_f`, [`sjk_game_jka::client_commands`]), which `G_Damage`
-//! and the enemy checks read. (`setviewpos` is `bridge_teleport`'s, `give`
-//! `bridge_commands`'.)
+//! and the enemy checks read; and SJK's own `jetpack`, which gives or takes away the
+//! jetpack ([`sjk_game_jka::give::toggle_jetpack`]). (`setviewpos` is
+//! `bridge_teleport`'s, `give` `bridge_commands`'.)
 
 use super::*;
 
@@ -16,11 +17,12 @@ enum Cheat {
     God,
     Notarget,
     TargetUse,
+    Jetpack,
 }
 
 impl NativeGame {
-    /// `ClientCommand` for `t_use`, `noclip`, `god` and `notarget`: whether `text` was
-    /// one of them.
+    /// `ClientCommand` for `t_use`, `noclip`, `god`, `notarget` and `jetpack`: whether
+    /// `text` was one of them.
     pub(super) fn cheat_command(&mut self, client: usize, text: &[u8]) -> bool {
         let mut words = text
             .split(|byte| byte.is_ascii_whitespace())
@@ -33,6 +35,7 @@ impl NativeGame {
             (b"god", Cheat::God),
             (b"notarget", Cheat::Notarget),
             (b"t_use", Cheat::TargetUse),
+            (b"jetpack", Cheat::Jetpack),
         ]
         .into_iter()
         .find_map(|(name, cheat)| command.eq_ignore_ascii_case(name).then_some(cheat)) else {
@@ -61,6 +64,16 @@ impl NativeGame {
             if let Some(name) = words.next() {
                 let name = String::from_utf8_lossy(name).into_owned();
                 self.fire_targets(&name, client, self.last_frame_time);
+            }
+            return true;
+        }
+        if cheat == Cheat::Jetpack {
+            // The think puts the pack on the player (`EF_JETPACK`) or takes it off.
+            if let Some(peer) = self.peer_mut(client) {
+                let message =
+                    sjk_game_jka::give::toggle_jetpack(&mut peer.state, &mut peer.gear.packs);
+                peer.movement = peer.movement.reseeded(&peer.state);
+                self.told.push(Told::One(client, message.to_vec()));
             }
             return true;
         }

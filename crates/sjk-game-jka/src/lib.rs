@@ -118,6 +118,7 @@ pub mod vehicle;
 pub mod vehicle_auto_board;
 mod vehicle_blast;
 pub mod vehicle_board;
+pub mod vehicle_bounds;
 pub mod vehicle_damage;
 pub mod vehicle_death;
 pub mod vehicle_drive;
@@ -262,6 +263,7 @@ pub mod pmove_debug_melee;
 pub mod pmove_dir;
 pub mod pmove_input_freeze;
 pub mod pmove_japlus;
+pub mod pmove_japro;
 pub mod pmove_locomotion;
 pub mod pmove_posture;
 pub mod pmove_roll;
@@ -323,6 +325,12 @@ pub use weapon_data::{
     LEGACY_WEAPON_COUNT, LEGACY_WEAPON_DATA, LegacyWeaponData, legacy_weapon_data,
 };
 
+/// `pmtype_t::PM_NORMAL` (`bg_public.h`): walks.
+pub const PM_NORMAL: u8 = 0;
+/// `pmtype_t::PM_JETPACK`: flies on a switched-on jetpack.
+pub const PM_JETPACK: u8 = 1;
+/// `pmtype_t::PM_FLOAT`: hangs in a grip.
+pub const PM_FLOAT: u8 = 2;
 /// `pmtype_t::PM_SPECTATOR` (`bg_public.h:430`): flies, still runs into walls.
 pub const PM_SPECTATOR: u8 = 4;
 

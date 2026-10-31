@@ -29,6 +29,55 @@ pub const ORIGIN: Source = Source {
     files: "https://jofhub.eu/apps/cloud/repository",
 };
 
+/// Where a collection's hosts are listed: the SJK hub's `GET /v1/content-sources`
+/// (`PROTOCOL.md` in the hub, "Content sources"), so SJK can move a collection to
+/// another host, or switch it off, without a release.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Directory {
+    /// The hub's address (`cl_hubUrl`); empty when the player has none.
+    pub hub: String,
+    /// The collection's key in the hub's answer: `jof` or `sith`.
+    pub collection: &'static str,
+    /// Keep only the host of this name (the player's choice, `jof.contentSource`), while
+    /// the hub still lists it.
+    pub only: Option<String>,
+}
+
+/// The hosts of `collection` in the hub's answer (`{"jof":[{"name","manifest",
+/// "files"}],..}`), in its order; `None` when the answer does not say. An empty list
+/// means the collection is off.
+pub fn listed(answer: &[u8], collection: &str) -> Option<Vec<Source>> {
+    let answer: serde_json::Value = serde_json::from_slice(answer).ok()?;
+    let mut sources = Vec::new();
+    for host in answer.get(collection)?.as_array()? {
+        let text = |key: &str| host.get(key).and_then(serde_json::Value::as_str);
+        let (name, manifest, files) = (text("name")?, text("manifest")?, text("files")?);
+        let web = |url: &str| url.starts_with("https://") || url.starts_with("http://");
+        if name.is_empty() || !web(manifest) || !web(files) {
+            return None;
+        }
+        sources.push(Source {
+            name: interned(name),
+            manifest: interned(manifest),
+            files: interned(files.trim_end_matches('/')),
+        });
+    }
+    Some(sources)
+}
+
+/// `text` kept for the program's life; the same text is kept once, so asking the hub
+/// again does not grow it.
+fn interned(text: &str) -> &'static str {
+    static KEPT: std::sync::Mutex<Vec<&'static str>> = std::sync::Mutex::new(Vec::new());
+    let mut kept = KEPT.lock().unwrap_or_else(|error| error.into_inner());
+    if let Some(known) = kept.iter().find(|known| **known == text) {
+        return known;
+    }
+    let leaked: &'static str = Box::leak(text.to_owned().into_boxed_str());
+    kept.push(leaked);
+    leaked
+}
+
 /// Every known host, in the order `auto` tries them.
 pub const SOURCES: &[Source] = &[MIRROR, ORIGIN];
 

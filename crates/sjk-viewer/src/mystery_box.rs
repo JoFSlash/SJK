@@ -22,6 +22,8 @@ use std::time::{Duration, Instant};
 /// The box's chest and its lid (bundled, `scripts/mystery_box_model.py`).
 pub(crate) const MODEL: &str = "models/sjk/mystery_box.md3";
 const LID_MODEL: &str = "models/sjk/mystery_box_lid.md3";
+/// What the roll stops on when the box blows up (bundled, `scripts/teddy_bear_model.py`).
+const TEDDY_MODEL: &str = "models/sjk/teddy_bear.md3";
 /// The chest's height and depth (across its front), and how far the lid reaches past it.
 const HEIGHT: f32 = 24.0;
 const DEPTH: f32 = 26.0;
@@ -30,10 +32,26 @@ const LID_OVERHANG: f32 = 1.0;
 const LID_OPEN: f32 = 75.0;
 const LID_OPENING: Duration = Duration::from_millis(450);
 const LID_CLOSING: Duration = Duration::from_millis(700);
-/// Played when a box opens, for the opener and everyone near.
+/// Played when a box opens, for the opener and everyone near: [`EXTRAS_OPEN`] when the
+/// SJK extras pack has it.
 const OPEN: &str = "sound/effects/crate_slide.mp3";
-/// The roll's music box tune, its last chord at [`ROLL`] (bundled).
+/// The roll's music box tune, its last chord at [`ROLL`] (bundled): [`EXTRAS_ROLL`] when
+/// the SJK extras pack has it.
 const ROLL_SOUND: &str = "sound/sjk/mystery_box/roll.wav";
+/// The box's opening, roll and closing in the optional SJK extras pack
+/// (`unofficial_sjk_extras.pk3`, the Sith cloud's `extras`; Sol's sounds of 30/10/2026,
+/// the roll's last note at [`ROLL`]). Without the pack, [`OPEN`], [`ROLL_SOUND`] and no
+/// sound as the lid closes.
+const EXTRAS_OPEN: &str = "sound/sjk/mystery_box/extras_open.mp3";
+const EXTRAS_ROLL: &str = "sound/sjk/mystery_box/extras_roll.mp3";
+const EXTRAS_CLOSE: &str = "sound/sjk/mystery_box/extras_close.mp3";
+/// The extras pack's sounds and what plays without the pack.
+const EXTRAS: [(&str, Option<&str>); 4] = [
+    (EXTRAS_OPEN, Some(OPEN)),
+    (EXTRAS_ROLL, Some(ROLL_SOUND)),
+    (EXTRAS_CLOSE, None),
+    (LAUGH, Some(LAUGH_FALLBACK)),
+];
 /// The opener taking what came out (bundled).
 const TAKE_SOUND: &str = "sound/sjk/mystery_box/take.wav";
 /// Played as the roll stops on credits.
@@ -42,6 +60,21 @@ const WIN: &str = "sound/player/holocron.wav";
 const JACKPOT: &str = "sound/items/respawn1.wav";
 /// Played as the roll stops on nothing.
 const EMPTY: &str = "sound/movers/doors/door_locked.mp3";
+/// Played to every hunter, the mark too, when the box hunt picks a new mark (Sol's
+/// pick, 28/10/2026).
+const HUNT_MARK: &str = "sound/effects/mpalarm.wav";
+/// Played, with [`BLAST_EFFECT`], where a box's opener stands when it blows up.
+const BLAST_SOUND: &str = "sound/weapons/detpack/explode.mp3";
+const BLAST_EFFECT: &str = "detpack/explosion";
+/// Played at a box that blows up as its roll stops on the teddy bear, before the blast: a
+/// ghost having fun, after Call of Duty zombies (Sol, 28/10/2026; 30/10/2026: at the
+/// box, once the bear shows, rather than to every hunter at the opening). Sol's laugh of
+/// 29/10/2026, in the optional SJK extras pack (`unofficial_sjk_extras.pk3`, the Sith
+/// cloud's `extras`); without the pack, [`LAUGH_FALLBACK`], a retail gloat.
+const LAUGH: &str = "sound/sjk/mystery_box/laugh.mp3";
+const LAUGH_FALLBACK: &str = "sound/chars/alora/misc/gloat1.mp3";
+/// How long the teddy bear shows, laughing, before the box blows up.
+const BLAST_DELAY: Duration = Duration::from_millis(1_500);
 /// `BUTTON_USE`, `+use`.
 const BUTTON_USE: u16 = 32;
 /// Farthest a player may stand from a box to open it, across the floor.
@@ -50,8 +83,9 @@ const REACH: f32 = 80.0;
 const REACH_UP: f32 = 96.0;
 /// Widest angle between the player's facing and the box, in radians (60 degrees).
 const FACING: f32 = std::f32::consts::FRAC_PI_3;
-/// How long the roll lasts, to the tune's last chord (`scripts/mystery_box_assets.py`).
-const ROLL: Duration = Duration::from_millis(5_500);
+/// How long the roll lasts, to the tune's last chord (`scripts/mystery_box_assets.py`)
+/// and the extras pack's roll's last note (Sol, 30/10/2026; 5.5 s before).
+const ROLL: Duration = Duration::from_millis(5_200);
 /// How long what came out waits for its opener before it is taken by itself.
 const HOLD: Duration = Duration::from_secs(10);
 /// How long the roll's first thing takes to rise out of the box.
@@ -60,68 +94,177 @@ const RISE: Duration = Duration::from_millis(700);
 const FLOAT: f32 = 44.0;
 /// How many times the roll changes what it shows; it slows to a stop on the last.
 const SWAPS: f32 = 30.0;
+/// How far apart the opener's client tells each other SJK player that they took what
+/// came out (the toy relay, one player an event).
+const TAKE_GAP: Duration = Duration::from_millis(50);
+
+/// The toy relay's event the opener's client sends when they take what came out of box
+/// `id` (Sol, 30/10/2026: the others saw it float on for the hold's 10 seconds).
+fn take_event(id: i64) -> String {
+    format!("take_{id}")
+}
+
+/// The box a relayed take event names.
+fn parse_take(event: &str) -> Option<i64> {
+    event.strip_prefix("take_")?.parse().ok()
+}
+
 /// How long an opening waits for the hub before the player may ask again.
 const ASK_TIMEOUT: Duration = Duration::from_secs(10);
 /// Farthest a box `mysterybox_remove` takes without an id may stand.
 const REMOVE_REACH: f32 = 256.0;
 
-/// A thing the roll shows: a model and how much it is grown to read at a box's size.
+/// A thing the roll shows: a model and how much it is grown to read at a box's size,
+/// or a tier's holocron, every part of its form (`crate::holocrons::stage::FORMS`, by
+/// slot) posed as the Holocrons tab poses it.
 #[derive(Clone, Copy, Debug, PartialEq)]
 struct Item {
     model: &'static str,
     scale: f32,
+    form: Option<usize>,
+    /// How many copies are drawn, gathered round the centre (a pile of shards).
+    copies: u8,
 }
 
 const fn item(model: &'static str, scale: f32) -> Item {
-    Item { model, scale }
+    Item {
+        model,
+        scale,
+        form: None,
+        copies: 1,
+    }
 }
 
+/// `copies` of `model`, grown by `scale`, gathered round the centre.
+const fn pile(model: &'static str, scale: f32, copies: u8) -> Item {
+    Item {
+        model,
+        scale,
+        form: None,
+        copies,
+    }
+}
+
+/// Tier `slot`'s holocron (0 Uncommon to 3 Mythical), grown by `scale`.
+const fn holocron(slot: usize, scale: f32) -> Item {
+    Item {
+        model: FORMS[slot].parts[0].model,
+        scale,
+        form: Some(slot),
+        copies: 1,
+    }
+}
+
+use crate::holocrons::stage::FORMS;
+
+impl Item {
+    /// The models it is drawn with.
+    fn models(self) -> impl Iterator<Item = &'static str> {
+        let parts = self.form.map_or(&[][..], |slot| FORMS[slot].parts);
+        std::iter::once(self.model)
+            .filter(move |_| parts.is_empty())
+            .chain(parts.iter().map(|part| part.model))
+    }
+}
+
+/// The four tiers' holocrons as the roll shows them (Sol, 29/10/2026: the real ones, not
+/// one for all), each about the Illuminate holocron's size over the box.
+const HOLOCRONS: [Item; 4] = [
+    holocron(0, 2.0),
+    holocron(1, 2.3),
+    holocron(2, 2.0),
+    holocron(3, 1.8),
+];
+
+/// The kyber crystal a pile of shards is drawn with: the Rare kyber's, the shards' cyan.
+const SHARD_MODEL: &str = "models/sjk/holocron_kyber_rare_crystal.md3";
+
 /// What the roll stops on, by outcome: bolts (empty), a blue crystal (refund), a green
-/// one (double), a red one (jackpot).
-const PRIZES: [Item; 4] = [
+/// one (double), a red one (jackpot), a teddy bear (it blows up; Sol, 30/10/2026, after
+/// Call of Duty zombies' boxes: a thermal detonator before), SJK's holocron
+/// (a holocron of a tier not told: another player's; the opener's stops on its tier's,
+/// [`HOLOCRONS`]), and since 29/10/2026 a pile of kyber shards (shards; [`BIG_PILE`] for
+/// a big one), a little mystery box (a free opening) and a saber hilt (the boxes' blade).
+const PRIZES: [Item; 9] = [
     item("models/items/metallic_bolts.md3", 1.5),
     item("models/map_objects/mp/crystal_blue.md3", 0.8),
     item("models/map_objects/mp/crystal_green.md3", 0.8),
     item("models/map_objects/mp/crystal_red.md3", 1.0),
+    item(TEDDY_MODEL, 1.6),
+    item(crate::illuminate::MODEL, 3.0),
+    pile(SHARD_MODEL, 1.5, 3),
+    item(MODEL, 0.45),
+    item("models/weapons2/saber/saber_w.md3", 2.6),
 ];
 
-/// What rolls over an opened box before it stops: the game's weapons and the prizes.
-const REEL: [Item; 16] = [
-    item("models/weapons2/blaster_pistol/blaster_pistol.md3", 2.0),
-    item("models/weapons2/blaster_r/blaster.md3", 0.9),
-    item("models/weapons2/bowcaster/bowcaster.md3", 1.2),
-    item("models/weapons2/briar_pistol/briar_pistol.md3", 1.8),
-    item("models/weapons2/concussion/c_rifle.md3", 0.9),
-    item("models/weapons2/disruptor/disruptor.md3", 1.0),
-    item("models/weapons2/golan_arms/golan_arms.md3", 0.9),
-    item("models/weapons2/heavy_repeater/heavy_repeater.md3", 1.0),
-    item("models/weapons2/detpack/det_pack.md3", 2.2),
-    item("models/weapons2/saber/saber_w.md3", 1.4),
-    item("models/weapons2/thermal/thermal.md3", 3.0),
-    item("models/weapons2/tusken_rifle/tusken_rifle.md3", 0.35),
+/// A big pile of shards: more than [`BIG_PILE_FROM`] (the boxes' blade for a player who
+/// holds it pays 60).
+const BIG_PILE: Item = pile(SHARD_MODEL, 1.7, 7);
+const BIG_PILE_FROM: u64 = 15;
+
+/// What rolls over an opened box before it stops: only what a box can give (Sol,
+/// 29/10/2026: the game's weapons rolled before, which no box gave), the four tiers'
+/// holocrons and both piles of shards among them; not the teddy bear, which only comes
+/// at the end.
+const REEL: [Item; 13] = [
     PRIZES[0],
     PRIZES[1],
     PRIZES[2],
     PRIZES[3],
+    PRIZES[6],
+    PRIZES[7],
+    PRIZES[8],
+    BIG_PILE,
+    HOLOCRONS[0],
+    HOLOCRONS[1],
+    HOLOCRONS[2],
+    HOLOCRONS[3],
+    PRIZES[5],
 ];
 
-/// The prize the roll stops on for `outcome`; a newer hub's outcome by whether it pays.
-fn prize(outcome: &str, pays: bool) -> Item {
+/// The prize the roll stops on for `outcome` (a holocron of `tier`, when the player
+/// knows it); a newer hub's outcome by whether it pays.
+fn prize(outcome: &str, pays: bool, tier: Option<&str>) -> Item {
     match outcome {
         "empty" => PRIZES[0],
         "refund" => PRIZES[1],
         "double" => PRIZES[2],
         "jackpot" => PRIZES[3],
+        wire::EXPLODE => PRIZES[4],
+        wire::SHARD_PILE => PRIZES[6],
+        wire::AGAIN => PRIZES[7],
+        wire::BLADE => PRIZES[8],
+        wire::HOLOCRON => tier
+            .and_then(|tier| {
+                FORMS[..HOLOCRONS.len()]
+                    .iter()
+                    .position(|form| form.id == tier)
+            })
+            .map_or(PRIZES[5], |slot| HOLOCRONS[slot]),
         _ if pays => PRIZES[2],
         _ => PRIZES[0],
     }
 }
 
 /// Every model the boxes draw: the box, its lid, then [`REEL`] (which holds the prizes).
+/// Each once: a holocron's motes share a model, and the prizes roll too.
 fn models() -> impl Iterator<Item = &'static str> {
-    [MODEL, LID_MODEL]
-        .into_iter()
-        .chain(REEL.iter().map(|item| item.model))
+    static MODELS: std::sync::OnceLock<Vec<&'static str>> = std::sync::OnceLock::new();
+    MODELS
+        .get_or_init(|| {
+            let mut models: Vec<&'static str> = Vec::new();
+            let every = [MODEL, LID_MODEL]
+                .into_iter()
+                .chain(PRIZES.iter().chain(&REEL).flat_map(|item| item.models()));
+            for model in every {
+                if !models.contains(&model) {
+                    models.push(model);
+                }
+            }
+            models
+        })
+        .iter()
+        .copied()
 }
 
 /// The creator's console commands, with their help.
@@ -154,11 +297,13 @@ macro_rules! bundled {
 
 /// The bundled files at their game paths (made by `scripts/mystery_box_assets.py` and
 /// `scripts/mystery_box_model.py`; the shader by hand).
-const FILES: [(&str, &[u8]); 7] = [
+const FILES: [(&str, &[u8]); 9] = [
     (ROLL_SOUND, bundled!("roll.wav")),
     (TAKE_SOUND, bundled!("take.wav")),
     (MODEL, bundled!("mystery_box.md3")),
     (LID_MODEL, bundled!("mystery_box_lid.md3")),
+    (TEDDY_MODEL, bundled!("teddy_bear.md3")),
+    ("models/sjk/teddy_bear.jpg", bundled!("teddy_bear.jpg")),
     ("models/sjk/mystery_box.jpg", bundled!("mystery_box.jpg")),
     (
         "models/sjk/mystery_box_glow.jpg",
@@ -177,11 +322,19 @@ pub(crate) fn mount(vfs: &mut sjk_vfs::VirtualFileSystem) -> Result<(), sjk_vfs:
 }
 
 /// What the opener gets, told when they take it.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq)]
 struct Prize {
     price: u64,
     won: u64,
     balance: u64,
+    /// A box that blew up: the hunter who got the price.
+    gift: Option<wire::Gift>,
+    /// The tier of the holocron it gave.
+    holocron: Option<String>,
+    /// The kyber shards it gave.
+    shards: Option<u64>,
+    /// The saber shader it gave.
+    blade: Option<String>,
 }
 
 /// A box's opening under way: the roll, then what came out waiting to be taken.
@@ -195,8 +348,12 @@ struct Opening {
     seed: u32,
     /// The player's own opening: what they get.
     mine: Option<Prize>,
+    /// The slot of the player who opened it, blown up if it blows up.
+    opener: Option<u8>,
     /// The roll has stopped (its sound played).
     revealed: bool,
+    /// A box that blew up has blown up, [`BLAST_DELAY`] after the roll stopped.
+    blasted: bool,
 }
 
 impl Opening {
@@ -262,9 +419,10 @@ impl Lid {
 /// A sound to play once.
 struct Cue {
     path: &'static str,
-    origin: [f32; 3],
-    /// The box it comes from, whose own sound source it plays on ([`source`]).
-    id: i64,
+    /// Where it plays; `None` for the player alone, wherever they are.
+    origin: Option<[f32; 3]>,
+    /// The box it comes from's own sound source ([`source`]), or the hunt's.
+    source: sjk_audio::SourceId,
 }
 
 /// The first of the boxes' sound sources: past the game's entity numbers, which the
@@ -277,6 +435,9 @@ const SOURCE_BASE: u32 = 0x5200_0000;
 fn source(id: i64) -> sjk_audio::SourceId {
     sjk_audio::SourceId(SOURCE_BASE | (id as u32 & 0xFFFF))
 }
+
+/// The box hunt's sound source, past every box's.
+const HUNT_SOURCE: sjk_audio::SourceId = sjk_audio::SourceId(SOURCE_BASE | 0x1_0000);
 
 /// The player took what came out of their box (`by_itself`: after [`HOLD`]).
 #[derive(Debug, PartialEq)]
@@ -295,6 +456,12 @@ enum Moment {
         prize: Prize,
     },
     Taken(Taken),
+    /// A box that blew up at the roll's end, for everyone who sees it: the opener's slot
+    /// and the box's place.
+    Blast {
+        opener: Option<u8>,
+        at: Vec3,
+    },
 }
 
 /// A number to vary a roll by.
@@ -321,6 +488,10 @@ pub(crate) struct MysteryBoxes {
     here: Vec<Here>,
     /// What opening one costs, as the hub said.
     price: u64,
+    /// The seconds between two of the player's openings, as the hub said.
+    cooldown: u64,
+    /// When the player's own last opening started, for the cooldown.
+    last_mine: Option<Instant>,
     /// The rigid meshes of [`models`] once loaded, in its order, and the mesh count
     /// they were looked up at.
     meshes: Vec<Option<usize>>,
@@ -331,17 +502,24 @@ pub(crate) struct MysteryBoxes {
     asked: Option<(i64, Instant)>,
     /// The last hub answer read.
     answer_seen: u64,
-    /// The box the player was last told about, while they stay at it.
-    hinted: Option<i64>,
     pending_place: Option<PendingPlace>,
     cues: Vec<Cue>,
+    /// Where boxes that blew up flung their openers this frame, for their explosions.
+    blasts: Vec<Vec3>,
     sounds_registered: Option<u64>,
     /// What an outcome pays, by the hub's list (for other players' openings).
     outcomes: Vec<(String, u64)>,
     /// Free openings the player won in the box hunt and has not spent.
     free: u64,
     hunt: hunt::Hunt,
+    /// Boxes whose prize the player took, and the slots of the SJK players still to tell
+    /// (a bit a slot), and when the next may be told.
+    takes: Vec<(i64, u64)>,
+    tell_at: Option<Instant>,
     labels: label::Labels,
+    /// A world shot's boxes, kept without a session.
+    #[cfg(test)]
+    shot: bool,
 }
 
 impl MysteryBoxes {
@@ -385,7 +563,6 @@ impl MysteryBoxes {
         self.taken = None;
         self.here.clear();
         self.asked = None;
-        self.hinted = None;
         self.use_pressed = false;
     }
 
@@ -393,6 +570,7 @@ impl MysteryBoxes {
     fn take(&mut self, boxes: &wire::Boxes, map: &str, checksum: i32, server: Option<&str>) {
         let mut old = std::mem::take(&mut self.here);
         self.price = boxes.price;
+        self.cooldown = boxes.cooldown;
         self.outcomes = boxes
             .outcomes
             .iter()
@@ -417,38 +595,54 @@ impl MysteryBoxes {
                     .unwrap_or_default(),
             })
             .collect();
-        if self.here.is_empty() {
-            self.hinted = None;
-        }
     }
 
-    /// Box `id` opened at `now` on `outcome`: the roll starts. `mine` is what the player
-    /// gets from their own opening; `seed` varies what the roll shows.
-    fn opened(&mut self, id: i64, outcome: &str, mine: Option<Prize>, seed: u32, now: Instant) {
+    /// Box `id` opened at `now` on `outcome` by the player on slot `opener`: the roll
+    /// starts. `mine` is what the player gets from their own opening; `seed` varies what
+    /// the roll shows.
+    fn opened(
+        &mut self,
+        id: i64,
+        outcome: &str,
+        mine: Option<Prize>,
+        opener: Option<u8>,
+        seed: u32,
+        now: Instant,
+    ) {
         let Some(here) = self.here.iter_mut().find(|here| here.id == id) else {
             return;
         };
         let pays = outcome != "empty" && mine.as_ref().is_none_or(|prize| prize.won > 0);
+        let tier = mine.as_ref().and_then(|prize| prize.holocron.as_deref());
+        let mut stops = prize(outcome, pays, tier);
+        // The opener's pile of shards as big as it is (the boxes' blade, held already,
+        // pays a pile too).
+        if let Some(shards) = mine.as_ref().and_then(|prize| prize.shards) {
+            stops = if shards > BIG_PILE_FROM {
+                BIG_PILE
+            } else {
+                PRIZES[6]
+            };
+        }
         here.opening = Some(Opening {
             started: now,
             outcome: outcome.to_owned(),
-            prize: prize(outcome, pays),
+            prize: stops,
             seed,
             mine,
+            opener,
             revealed: false,
+            blasted: false,
         });
         here.lid.set(true, now);
         let (origin, id) = (here.origin.to_array(), here.id);
-        self.cues.push(Cue {
-            path: OPEN,
-            origin,
-            id,
-        });
-        self.cues.push(Cue {
-            path: ROLL_SOUND,
-            origin,
-            id,
-        });
+        for path in [EXTRAS_OPEN, EXTRAS_ROLL] {
+            self.cues.push(Cue {
+                path,
+                origin: Some(origin),
+                source: source(id),
+            });
+        }
     }
 
     /// Move the openings on to `now`: a roll that stops plays what it stopped on, and
@@ -460,17 +654,39 @@ impl MysteryBoxes {
                 continue;
             };
             let elapsed = now.saturating_duration_since(opening.started);
+            let explodes = opening.outcome == wire::EXPLODE;
             if !opening.revealed && elapsed >= ROLL {
                 opening.revealed = true;
+                // A box that blows up stops on the teddy bear and laughs; it blows up
+                // [`BLAST_DELAY`] later.
                 let path = match opening.outcome.as_str() {
-                    "jackpot" => JACKPOT,
+                    "jackpot" | wire::BLADE => JACKPOT,
+                    wire::EXPLODE => LAUGH,
                     _ if opening.prize == PRIZES[0] => EMPTY,
                     _ => WIN,
                 };
                 self.cues.push(Cue {
                     path,
-                    origin: here.origin.to_array(),
-                    id: here.id,
+                    origin: Some(here.origin.to_array()),
+                    source: source(here.id),
+                });
+                if let Some(prize) = opening.mine.as_ref().filter(|_| !explodes) {
+                    moments.push(Moment::Stopped {
+                        outcome: opening.outcome.clone(),
+                        prize: prize.clone(),
+                    });
+                }
+            }
+            if explodes && !opening.blasted && elapsed >= ROLL + BLAST_DELAY {
+                opening.blasted = true;
+                moments.push(Moment::Blast {
+                    opener: opening.opener,
+                    at: here.origin,
+                });
+                self.cues.push(Cue {
+                    path: BLAST_SOUND,
+                    origin: Some(here.origin.to_array()),
+                    source: source(here.id),
                 });
                 if let Some(prize) = &opening.mine {
                     moments.push(Moment::Stopped {
@@ -481,6 +697,11 @@ impl MysteryBoxes {
             }
             if elapsed >= ROLL + HOLD {
                 here.lid.set(false, now);
+                self.cues.push(Cue {
+                    path: EXTRAS_CLOSE,
+                    origin: Some(here.origin.to_array()),
+                    source: source(here.id),
+                });
             }
             if elapsed >= ROLL + HOLD
                 && let Some(opening) = here.opening.take()
@@ -496,6 +717,51 @@ impl MysteryBoxes {
         moments
     }
 
+    /// The player on slot `slot` took what came out of their box `id` (the toy relay): it
+    /// goes, the lid closes, as for the opener. Only from the player who opened it.
+    fn taken_by(&mut self, id: i64, slot: u8, now: Instant) {
+        let Some(here) = self.here.iter_mut().find(|here| here.id == id) else {
+            return;
+        };
+        let theirs = here
+            .opening
+            .as_ref()
+            .is_some_and(|opening| opening.mine.is_none() && opening.opener == Some(slot));
+        if !theirs {
+            return;
+        }
+        here.opening = None;
+        here.lid.set(false, now);
+        for path in [TAKE_SOUND, EXTRAS_CLOSE] {
+            self.cues.push(Cue {
+                path,
+                origin: Some(here.origin.to_array()),
+                source: source(here.id),
+            });
+        }
+    }
+
+    /// The next take to relay, at `now`, to one of `others` (bits a slot): the box and
+    /// the slot; none while the gap since the last one runs or none is left.
+    fn next_take(&mut self, others: u64, now: Instant) -> Option<(i64, u8)> {
+        if self.tell_at.is_some_and(|at| now < at) {
+            return None;
+        }
+        while let Some((id, slots)) = self.takes.first_mut() {
+            *slots &= others;
+            if *slots == 0 {
+                self.takes.remove(0);
+                continue;
+            }
+            let slot = slots.trailing_zeros() as u8;
+            *slots &= !(1 << slot);
+            let id = *id;
+            self.tell_at = Some(now + TAKE_GAP);
+            return Some((id, slot));
+        }
+        None
+    }
+
     /// The player takes what came out of box `id`, when it is theirs and waiting.
     fn take_prize(&mut self, id: i64) -> Option<Taken> {
         let here = self.here.iter_mut().find(|here| here.id == id)?;
@@ -508,11 +774,13 @@ impl MysteryBoxes {
         }
         let opening = here.opening.take()?;
         here.lid.set(false, Instant::now());
-        self.cues.push(Cue {
-            path: TAKE_SOUND,
-            origin: here.origin.to_array(),
-            id: here.id,
-        });
+        for path in [TAKE_SOUND, EXTRAS_CLOSE] {
+            self.cues.push(Cue {
+                path,
+                origin: Some(here.origin.to_array()),
+                source: source(here.id),
+            });
+        }
         Some(Taken {
             outcome: opening.outcome,
             prize: opening.mine?,
@@ -537,6 +805,98 @@ fn pick_box<'a>(from: Vec3, yaw: f32, boxes: impl IntoIterator<Item = &'a Here>)
         })
         .min_by(|a, b| a.1.total_cmp(&b.1))
         .map(|(id, _)| id)
+}
+
+/// What opening a box costs the player: the price, their free openings and their
+/// credits (when known).
+struct Wallet {
+    price: u64,
+    free: u64,
+    credits: Option<u64>,
+}
+
+/// What the Use prompt says at box `here`: open it (for its price, or free), take what
+/// came out of the player's own, or why Use does nothing now (`cooldown`: the seconds
+/// the player still waits; `asked`: the hub has not answered yet; another player's
+/// roll; too few credits). None while the player's own roll runs, and for a box that
+/// blows up.
+fn box_prompt(
+    here: &Here,
+    wallet: &Wallet,
+    cooldown: Option<u64>,
+    asked: bool,
+    now: Instant,
+) -> Option<crate::use_prompt::Prompt> {
+    use crate::use_prompt::Prompt;
+    let prompt = |action: &str, line: Option<String>, ready: bool| Prompt {
+        action: action.to_owned(),
+        line,
+        ready,
+    };
+    if let Some(opening) = &here.opening {
+        let rolled = now.saturating_duration_since(opening.started) >= ROLL;
+        return match (&opening.mine, rolled) {
+            _ if opening.outcome == wire::EXPLODE => None,
+            (Some(_), true) => Some(prompt("Take it", None, true)),
+            (Some(_), false) => None,
+            (None, _) => Some(prompt("Someone is opening it", None, false)),
+        };
+    }
+    let open = "Open mystery box";
+    Some(if asked {
+        prompt("Opening...", None, false)
+    } else if let Some(left) = cooldown {
+        prompt(open, Some(format!("Your turn again in {left} s")), false)
+    } else if wallet.free > 0 {
+        prompt(open, Some("Free roll".to_owned()), true)
+    } else if wallet.credits.is_some_and(|credits| credits < wallet.price) {
+        prompt(
+            open,
+            Some(format!("{} credits: not enough", wallet.price)),
+            false,
+        )
+    } else {
+        prompt(open, Some(format!("{} credits", wallet.price)), true)
+    })
+}
+
+/// The whole seconds left before the player may open another box, their last opening
+/// at `last` and `cooldown` seconds between two; none once they have passed.
+fn cooldown_left(last: Option<Instant>, cooldown: u64, now: Instant) -> Option<u64> {
+    let since = now.saturating_duration_since(last?);
+    let wait = Duration::from_secs(cooldown).checked_sub(since)?;
+    (!wait.is_zero()).then(|| wait.as_secs_f32().ceil() as u64)
+}
+
+/// How an opening reads for the opener: [`result_text`], or for a box that blew up or
+/// gave a holocron, what became of it.
+fn prize_text(outcome: &str, prize: &Prize) -> String {
+    match (outcome, &prize.gift, &prize.holocron) {
+        (wire::EXPLODE, Some(gift), _) if gift.credits > 0 => format!(
+            "BOOM! The box blew up: your {} credits went to {}^7",
+            gift.credits, gift.name
+        ),
+        (wire::EXPLODE, None, _) if prize.price > 0 => {
+            format!("BOOM! The box blew up: -{} credits", prize.price)
+        }
+        (wire::EXPLODE, ..) => "BOOM! The box blew up: your free roll is spent".to_owned(),
+        (wire::HOLOCRON, _, Some(tier)) => {
+            let name = crate::holocrons::name(tier).unwrap_or("A holocron");
+            format!("{name}! In your Collection")
+        }
+        (wire::BLADE, ..) if prize.blade.is_some() => {
+            "The Mystery blade! In your Collection".to_owned()
+        }
+        (wire::BLADE, ..) if prize.shards.is_some() => format!(
+            "The Mystery blade, again: +{} kyber shards",
+            prize.shards.unwrap_or(0)
+        ),
+        (wire::SHARD_PILE, ..) if prize.shards.is_some() => {
+            format!("+{} kyber shards", prize.shards.unwrap_or(0))
+        }
+        (wire::AGAIN, ..) => "A box in the box: your next roll is free".to_owned(),
+        _ => result_text(outcome, prize.price, prize.won),
+    }
 }
 
 /// How an opening reads for the opener.
@@ -574,6 +934,26 @@ fn float(elapsed: Duration, yaw: f32) -> (f32, f32) {
     (height, yaw + 90.0 + turn)
 }
 
+/// Where each of `copies` stands round the centre (units, before the item's scale) and
+/// how it leans: one alone stands upright at the centre; more stand in a ring, leaning
+/// out, every other one lower and smaller-looking.
+fn pile_spots(copies: u8) -> impl Iterator<Item = (Vec3, Quat)> {
+    let count = copies.max(1);
+    (0..count).map(move |index| {
+        if count == 1 {
+            return (Vec3::ZERO, Quat::IDENTITY);
+        }
+        let around = index as f32 / count as f32 * std::f32::consts::TAU + 0.4;
+        let (sin, cos) = around.sin_cos();
+        let low = if index % 2 == 1 { -2.0 } else { 1.0 };
+        let reach = if count > 4 { 6.0 } else { 4.0 };
+        let at = Vec3::new(cos * reach, sin * reach, low);
+        let lean =
+            Quat::from_axis_angle(Vec3::new(-sin, cos, 0.0), 0.35) * Quat::from_rotation_z(around);
+        (at, lean)
+    })
+}
+
 /// `pmtype_t`: the player plays (not dead, spectating or in intermission).
 fn plays(player: &PlayerState) -> bool {
     /// `PMF_FOLLOW`: the player state is that of the player being followed.
@@ -593,6 +973,41 @@ impl GpuState {
         );
     }
 
+    /// A box at `at` blew up on the player on slot `opener`: an explosion where they
+    /// stand, and when they are this client's player, it kills them (Sol, 30/10/2026: the
+    /// game's `kill`, which the server carries out, so everyone sees them die; a ragdoll
+    /// thrown up and away from the box before). Not where the Ragdoll could not strike
+    /// them either (dead, in a duel, with the flag).
+    fn mystery_box_blast(&mut self, opener: Option<u8>, at: Vec3) {
+        let own = self
+            .live_session
+            .as_ref()
+            .and_then(|session| u8::try_from(session.game_state().client_num).ok());
+        let mine = opener.is_some() && opener == own;
+        let stands = if mine {
+            self.local_prediction
+                .predicted_state()
+                .map(|state| Vec3::from_array(state.origin))
+        } else {
+            opener.and_then(|slot| {
+                let time = self.presentation_clock.sample(Instant::now());
+                let presented = self
+                    .live_world
+                    .entity(sjk_runtime::EntityId::new(u64::from(slot) + 1))?;
+                Some(Vec3::from_array(presented.sample(time).translation))
+            })
+        };
+        let stands = stands.unwrap_or(at);
+        self.mystery_boxes.blasts.push(stands);
+        if mine
+            && self.ragdoll.strikable()
+            && let Some(session) = self.live_session.as_mut()
+            && let Err(error) = session.send_reliable_command(b"kill")
+        {
+            crate::log::progress(format_args!("mystery box: kill not sent: {error}"));
+        }
+    }
+
     fn mystery_box_centre(&mut self, text: String) {
         self.chat.receive(
             sjk_client::ServerEventKind::CenterPrint,
@@ -605,7 +1020,30 @@ impl GpuState {
     /// The frame's mystery box logic, after the looks: the boxes of the loaded map,
     /// the hub's answers, a `+use` press, the hint and other players' openings
     /// (`events`, this server's toy events).
-    pub(crate) fn update_mystery_boxes(&mut self, events: &[sjk_identity::ToyEvent]) {
+    /// Find the boxes' models among the loaded ones, when more have loaded.
+    fn find_mystery_box_meshes(&mut self) {
+        if self.mystery_boxes.meshes_seen != self.object_meshes.len() {
+            self.mystery_boxes.meshes_seen = self.object_meshes.len();
+            self.mystery_boxes.meshes = models()
+                .map(|model| {
+                    self.object_meshes.iter().position(|mesh| {
+                        mesh.appearance.variant.is_empty() && mesh.appearance.model == model
+                    })
+                })
+                .collect();
+        }
+    }
+
+    pub(crate) fn update_mystery_boxes(
+        &mut self,
+        events: &[sjk_identity::ToyEvent],
+        relay_events: &[sjk_identity::ToyEvent],
+    ) {
+        #[cfg(test)]
+        if self.mystery_boxes.shot {
+            self.find_mystery_box_meshes();
+            return;
+        }
         let now = Instant::now();
         self.read_mystery_box_answer(now);
         let Some(session) = self
@@ -657,16 +1095,7 @@ impl GpuState {
                 .take(&boxes, &map, checksum, Some(&server));
             self.mystery_boxes.taken = Some((revision, map, checksum, Some(server.clone())));
         }
-        if self.mystery_boxes.meshes_seen != self.object_meshes.len() {
-            self.mystery_boxes.meshes_seen = self.object_meshes.len();
-            self.mystery_boxes.meshes = models()
-                .map(|model| {
-                    self.object_meshes.iter().position(|mesh| {
-                        mesh.appearance.variant.is_empty() && mesh.appearance.model == model
-                    })
-                })
-                .collect();
-        }
+        self.find_mystery_box_meshes();
         for moment in self.mystery_boxes.tick(now) {
             self.mystery_box_moment(moment);
         }
@@ -680,7 +1109,24 @@ impl GpuState {
                 continue;
             }
             if let Some((id, outcome)) = wire::parse_event(&event.event) {
-                self.mystery_boxes.opened(id, outcome, None, seed(), now);
+                self.mystery_boxes
+                    .opened(id, outcome, None, Some(event.slot), seed(), now);
+            }
+        }
+        // Their takes: the opener's client says so through the toy relay.
+        for event in relay_events {
+            if event.toy != wire::TOY || Some(event.slot) == own {
+                continue;
+            }
+            if let Some(id) = parse_take(&event.event) {
+                self.mystery_boxes.taken_by(id, event.slot, now);
+            }
+        }
+        // The player's own takes, told to every other SJK player here, one at a time.
+        if let Some(own) = own {
+            let others = self.looks.sjk_slots() & !(1_u64 << own);
+            if let Some((id, slot)) = self.mystery_boxes.next_take(others, now) {
+                crate::player_identity::relay_toy_event(wire::TOY, take_event(id), slot, false);
             }
         }
         if self.mystery_boxes.here.is_empty() {
@@ -690,7 +1136,6 @@ impl GpuState {
         let player = &session.latest_snapshot().player;
         if !plays(player) {
             self.mystery_boxes.use_pressed = false;
-            self.mystery_boxes.hinted = None;
             return;
         }
         let from = self
@@ -703,28 +1148,40 @@ impl GpuState {
             &self.mystery_boxes.here,
         );
         let pressed = std::mem::take(&mut self.mystery_boxes.use_pressed);
-        if at != self.mystery_boxes.hinted {
-            self.mystery_boxes.hinted = at;
-            let idle = at.is_some_and(|id| {
-                self.mystery_boxes
-                    .here
-                    .iter()
-                    .any(|here| here.id == id && here.opening.is_none())
+        let credits = crate::player_identity::with_snapshot(|snapshot| {
+            snapshot.me.as_ref().map(|me| me.credits)
+        })
+        .flatten();
+        // What Use does at the box faced, by the crosshair (`use_prompt`).
+        let boxes = &self.mystery_boxes;
+        let prompt = at
+            .and_then(|id| boxes.here.iter().find(|here| here.id == id))
+            .and_then(|here| {
+                box_prompt(
+                    here,
+                    &Wallet {
+                        price: boxes.price,
+                        free: boxes.free,
+                        credits,
+                    },
+                    cooldown_left(boxes.last_mine, boxes.cooldown, now),
+                    boxes
+                        .asked
+                        .is_some_and(|(_, asked)| now.duration_since(asked) < ASK_TIMEOUT),
+                    now,
+                )
             });
-            if idle && self.mystery_boxes.free > 0 {
-                self.mystery_box_centre("Mystery box: press Use for your free roll".to_owned());
-            } else if idle {
-                let price = self.mystery_boxes.price;
-                self.mystery_box_centre(format!(
-                    "Mystery box: press Use to open it ({price} credits)"
-                ));
-            }
+        if let Some(prompt) = prompt {
+            self.want_use_prompt(prompt);
         }
         let (Some(id), true) = (at, pressed) else {
             return;
         };
         if let Some(taken) = self.mystery_boxes.take_prize(id) {
             self.mystery_box_moment(Moment::Taken(taken));
+            // Told to the other SJK players here, whose box would float on till the hold
+            // ends.
+            self.mystery_boxes.takes.push((id, u64::MAX));
             return;
         }
         let busy = self
@@ -733,10 +1190,9 @@ impl GpuState {
             .iter()
             .find(|here| here.id == id)
             .and_then(|here| here.opening.as_ref());
-        if let Some(opening) = busy {
-            if opening.mine.is_none() {
-                self.mystery_box_centre("Someone is opening this box".to_owned());
-            }
+        // The prompt says why Use does nothing now: the box is busy, the player waits out
+        // the cooldown or lacks the credits.
+        if busy.is_some() {
             return;
         }
         if self
@@ -746,17 +1202,19 @@ impl GpuState {
         {
             return;
         }
-        let credits = crate::player_identity::with_snapshot(|snapshot| {
-            snapshot.me.as_ref().map(|me| me.credits)
-        })
-        .flatten();
+        // One opening a player every `cooldown` seconds, so another may take a turn.
+        if cooldown_left(
+            self.mystery_boxes.last_mine,
+            self.mystery_boxes.cooldown,
+            now,
+        )
+        .is_some()
+        {
+            return;
+        }
         if self.mystery_boxes.free == 0
             && credits.is_some_and(|credits| credits < self.mystery_boxes.price)
         {
-            self.mystery_box_centre(format!(
-                "Not enough credits: the box costs {}",
-                self.mystery_boxes.price
-            ));
             return;
         }
         if crate::player_identity::with_service(|service| service.open_mystery_box(id, server))
@@ -783,16 +1241,40 @@ impl GpuState {
         let asked = self.mystery_boxes.asked.take();
         match outcome {
             Ok(BoxDone::Opened(opened)) => {
-                if opened.price == 0 {
-                    self.mystery_boxes.free = self.mystery_boxes.free.saturating_sub(1);
+                // The hub says the free openings left (a box may give one); an older hub
+                // does not, and a free opening was spent.
+                match opened.free {
+                    Some(free) => self.mystery_boxes.free = free,
+                    None if opened.price == 0 => {
+                        self.mystery_boxes.free = self.mystery_boxes.free.saturating_sub(1);
+                    }
+                    None => {}
                 }
                 let mine = Prize {
                     price: opened.price,
                     won: opened.won,
                     balance: opened.balance,
+                    gift: opened.gift.clone(),
+                    holocron: opened
+                        .holocron
+                        .as_ref()
+                        .map(|holocron| holocron.tier.clone()),
+                    shards: opened.shards,
+                    blade: opened.blade.clone(),
                 };
-                self.mystery_boxes
-                    .opened(opened.box_id, &opened.outcome, Some(mine), seed(), now);
+                let own = self
+                    .live_session
+                    .as_ref()
+                    .and_then(|session| u8::try_from(session.game_state().client_num).ok());
+                self.mystery_boxes.last_mine = Some(now);
+                self.mystery_boxes.opened(
+                    opened.box_id,
+                    &opened.outcome,
+                    Some(mine),
+                    own,
+                    seed(),
+                    now,
+                );
             }
             Ok(BoxDone::Placed(id)) => {
                 self.mystery_box_print(format!("Mystery box {id} placed"));
@@ -808,15 +1290,13 @@ impl GpuState {
     /// Tell the player their roll stopped, or that they took what came out.
     fn mystery_box_moment(&mut self, moment: Moment) {
         match moment {
+            Moment::Blast { opener, at } => self.mystery_box_blast(opener, at),
             Moment::Stopped { outcome, prize } => {
-                let text = result_text(&outcome, prize.price, prize.won);
-                self.mystery_box_centre(format!(
-                    "{text}
-Press Use to take it"
-                ));
+                // The Use prompt says to take it.
+                self.mystery_box_centre(prize_text(&outcome, &prize));
             }
             Moment::Taken(taken) => {
-                let text = result_text(&taken.outcome, taken.prize.price, taken.prize.won);
+                let text = prize_text(&taken.outcome, &taken.prize);
                 let how = if taken.by_itself {
                     " (taken for you)"
                 } else {
@@ -986,19 +1466,42 @@ Press Use to take it"
                 continue;
             };
             let item = opening.showing(elapsed);
+            let (height, yaw) = float(elapsed, here.yaw);
+            let rotation = sjk_client::legacy_angles_to_quaternion([0.0, yaw, 0.0]);
+            // A holocron: each part of its form about its own centre, moving as it does.
+            if let Some(slot) = item.form {
+                let turn = Quat::from_array(rotation);
+                let centre = here.origin + Vec3::Z * height;
+                for part in FORMS[slot].parts {
+                    let Some(mesh) = boxes.mesh_of(part.model) else {
+                        continue;
+                    };
+                    let (at, turned) = part.pose(elapsed.as_secs_f32());
+                    self.object_groups[mesh].push(ActorInstance::new(
+                        (centre + turn * (at * item.scale)).to_array(),
+                        (turn * turned).to_array(),
+                        [item.scale; 3],
+                    ));
+                }
+                continue;
+            }
             let Some(mesh) = boxes.mesh_of(item.model) else {
                 continue;
             };
-            let (height, yaw) = float(elapsed, here.yaw);
-            let rotation = sjk_client::legacy_angles_to_quaternion([0.0, yaw, 0.0]);
-            // The model's own centre over the box, whatever its origin.
+            // The model's own centre over the box, whatever its origin; a pile's copies
+            // round it, each leaning its own way.
             let centre = Vec3::from_array(self.object_meshes[mesh].center) * item.scale;
-            let origin = here.origin + Vec3::Z * height - Quat::from_array(rotation) * centre;
-            self.object_groups[mesh].push(ActorInstance::new(
-                origin.to_array(),
-                rotation,
-                [item.scale; 3],
-            ));
+            let turn = Quat::from_array(rotation);
+            for (at, lean) in pile_spots(item.copies) {
+                let turned = turn * lean;
+                let origin =
+                    here.origin + Vec3::Z * height + turn * (at * item.scale) - turned * centre;
+                self.object_groups[mesh].push(ActorInstance::new(
+                    origin.to_array(),
+                    turned.to_array(),
+                    [item.scale; 3],
+                ));
+            }
         }
     }
 
@@ -1012,19 +1515,63 @@ Press Use to take it"
         if self.mystery_boxes.cues.is_empty() {
             return;
         }
+        // The explosions of boxes that blew up; their sound is the box's own cue, so
+        // "Mystery box sounds" silences it.
+        if let Some(vfs) = self.vfs.clone() {
+            for stands in self.mystery_boxes.blasts.drain(..) {
+                crate::effect_runtime::spawn_effect(
+                    &mut self.particles,
+                    &mut self.effect_aux,
+                    &mut self.effects,
+                    &vfs,
+                    BLAST_EFFECT,
+                    stands + Vec3::Z * 8.0,
+                    Instant::now(),
+                    seed(),
+                    0,
+                    &mut None,
+                    crate::combat_effects::rotation_from_direction([0.0, 0.0, 1.0]),
+                );
+            }
+        }
         if self.mystery_boxes.sounds_registered != Some(audio.generation())
             && let Some(vfs) = self.vfs.as_deref()
         {
-            audio.register_effect_paths(vfs, [OPEN, ROLL_SOUND, TAKE_SOUND, WIN, JACKPOT, EMPTY]);
+            audio.register_effect_paths(
+                vfs,
+                [
+                    OPEN,
+                    ROLL_SOUND,
+                    EXTRAS_OPEN,
+                    EXTRAS_ROLL,
+                    EXTRAS_CLOSE,
+                    TAKE_SOUND,
+                    WIN,
+                    JACKPOT,
+                    EMPTY,
+                    HUNT_MARK,
+                    BLAST_SOUND,
+                    LAUGH,
+                    LAUGH_FALLBACK,
+                ],
+            );
             self.mystery_boxes.sounds_registered = Some(audio.generation());
         }
         for cue in self.mystery_boxes.cues.drain(..) {
+            // The extras pack's sounds: without the pack, what stands in for them.
+            let path = match EXTRAS.iter().find(|(extra, _)| *extra == cue.path) {
+                Some((extra, fallback)) if !audio.has_sound(extra) => match fallback {
+                    Some(fallback) => fallback,
+                    None => continue,
+                },
+                _ => cue.path,
+            };
             audio.play_toy(
                 crate::toy_sounds::Toy::MysteryBox,
-                cue.path,
+                path,
                 1.0,
-                Some(cue.origin),
-                source(cue.id),
+                cue.origin,
+                cue.source,
                 // `CHAN_AUTO`: the crate's slide, the tune and what came out overlap
                 // rather than cut each other off.
                 sjk_audio::ChannelId(0),
@@ -1032,6 +1579,69 @@ Press Use to take it"
         }
     }
 }
+
+#[cfg(test)]
+impl GpuState {
+    /// For the world shots: a box at each of `boxes` (origin and yaw), opened `since` ago
+    /// on a holocron of tier `n % 4` for the `n`th: the roll shows its tier's holocron once
+    /// `since` passes the roll.
+    pub(crate) fn shot_mystery_boxes(&mut self, boxes: &[([f32; 3], f32)], since: Duration) {
+        self.shot_mystery_box_prizes(boxes, since, &HOLOCRONS);
+    }
+
+    /// [`Self::shot_mystery_boxes`], stopped on the prizes of 29/10/2026: a pile of
+    /// shards, a big one, a free opening and the boxes' blade.
+    pub(crate) fn shot_mystery_box_loot(&mut self, boxes: &[([f32; 3], f32)], since: Duration) {
+        self.shot_mystery_box_prizes(boxes, since, &[PRIZES[6], BIG_PILE, PRIZES[7], PRIZES[8]]);
+    }
+
+    /// For the world shots: the first of `boxes` closed, the others stopped on the teddy
+    /// bear of a box that blows up (30/10/2026).
+    pub(crate) fn shot_mystery_box_teddy(&mut self, boxes: &[([f32; 3], f32)], since: Duration) {
+        self.shot_mystery_box_prizes(boxes, since, &[PRIZES[4]]);
+        if let Some(first) = self.mystery_boxes.here.first_mut() {
+            first.opening = None;
+            first.lid = Lid::default();
+        }
+    }
+
+    fn shot_mystery_box_prizes(
+        &mut self,
+        boxes: &[([f32; 3], f32)],
+        since: Duration,
+        prizes: &[Item],
+    ) {
+        let started = Instant::now() - since;
+        self.mystery_boxes.shot = true;
+        self.mystery_boxes.here = boxes
+            .iter()
+            .enumerate()
+            .map(|(index, (origin, yaw))| Here {
+                id: index as i64 + 1,
+                origin: Vec3::from_array(*origin),
+                yaw: *yaw,
+                opening: Some(Opening {
+                    started,
+                    outcome: wire::HOLOCRON.to_owned(),
+                    prize: prizes[index % prizes.len()],
+                    seed: index as u32,
+                    mine: None,
+                    opener: None,
+                    revealed: true,
+                    blasted: false,
+                }),
+                lid: Lid {
+                    open: true,
+                    since: Some(started),
+                },
+            })
+            .collect();
+    }
+}
+
+/// How long the roll takes, for the world shots.
+#[cfg(test)]
+pub(crate) const SHOT_ROLL: Duration = ROLL;
 
 #[cfg(test)]
 mod tests {
@@ -1052,6 +1662,7 @@ mod tests {
             price: 100,
             won,
             balance: 900,
+            ..Prize::default()
         }
     }
 
@@ -1110,7 +1721,11 @@ mod tests {
         // The box, its lid and everything the roll shows, each once.
         let wanted: Vec<&str> = state.wanted_models().collect();
         assert_eq!(wanted[..2], [MODEL, LID_MODEL]);
-        assert_eq!(wanted.len(), 2 + REEL.len());
+        assert_eq!(wanted.len(), models().count());
+        let mut unique = wanted.clone();
+        unique.sort_unstable();
+        unique.dedup();
+        assert_eq!(unique.len(), wanted.len(), "each once");
         state.meshes = vec![Some(0); wanted.len()];
         assert_eq!(state.wanted_models().count(), 0);
     }
@@ -1120,10 +1735,12 @@ mod tests {
         let opening = Opening {
             started: Instant::now(),
             outcome: "jackpot".to_owned(),
-            prize: prize("jackpot", true),
+            prize: prize("jackpot", true, None),
             seed: 12345,
             mine: None,
+            opener: None,
             revealed: false,
+            blasted: false,
         };
         // Changing often early on, the prize over the last second and after.
         let early: std::collections::HashSet<&str> = (0..20)
@@ -1133,8 +1750,36 @@ mod tests {
         for ms in [ROLL.as_millis() as u64 - 700, 5_500, 12_000] {
             assert_eq!(opening.showing(Duration::from_millis(ms)), PRIZES[3]);
         }
-        assert_eq!(prize("empty", false), PRIZES[0]);
-        assert_eq!(prize("newer_thing", true), PRIZES[2]);
+        assert_eq!(prize("empty", false, None), PRIZES[0]);
+        assert_eq!(prize("newer_thing", true, None), PRIZES[2]);
+        // The prizes of 29/10/2026; the roll shows nothing a box cannot give.
+        assert_eq!(prize(wire::SHARD_PILE, false, None), PRIZES[6]);
+        assert_eq!(prize(wire::AGAIN, false, None), PRIZES[7]);
+        assert_eq!(prize(wire::BLADE, false, None), PRIZES[8]);
+        for item in REEL {
+            assert!(
+                PRIZES.contains(&item) || HOLOCRONS.contains(&item) || item == BIG_PILE,
+                "{}",
+                item.model
+            );
+        }
+        assert_eq!(pile_spots(1).count(), 1);
+        assert_eq!(pile_spots(BIG_PILE.copies).count(), 7);
+        // A holocron stops on its tier's own, the plain one when the tier is not told.
+        assert_eq!(
+            prize(wire::HOLOCRON, false, Some("legendary")),
+            HOLOCRONS[2]
+        );
+        assert_eq!(prize(wire::HOLOCRON, false, None), PRIZES[5]);
+        assert_eq!(prize(wire::HOLOCRON, false, Some("later_tier")), PRIZES[5]);
+        // Every part of every tier's holocron is among the models the boxes load.
+        for item in HOLOCRONS {
+            assert_eq!(FORMS[item.form.unwrap()].parts[0].model, item.model);
+            for model in item.models() {
+                assert!(models().any(|known| known == model), "{model}");
+            }
+        }
+        assert!(models().any(|known| known == crate::illuminate::MODEL));
         // Rising out of the box, then floating over it.
         assert!(float(Duration::ZERO, 0.0).0 < 33.0);
         assert!((float(Duration::from_secs(3), 0.0).0 - FLOAT).abs() <= 1.5);
@@ -1147,19 +1792,24 @@ mod tests {
             ..Default::default()
         };
         let now = Instant::now();
-        state.opened(7, "double", Some(prize_of(200)), 1, now);
+        state.opened(7, "double", Some(prize_of(200)), Some(3), 1, now);
         // Each at the box, on the box's own source: never an entity's, which the audio
         // moves to where that entity is (#185).
         assert!(
             state
                 .cues
                 .iter()
-                .all(|cue| cue.origin == [0.0; 3] && cue.id == 7)
+                .all(|cue| cue.origin == Some([0.0; 3]) && cue.source == source(7))
         );
         assert_ne!(source(7), sjk_audio::SourceId(0));
         assert!(source(7).0 >= SOURCE_BASE && source(7) != source(8));
+        // The hunt's source is no box's.
+        assert!((0..=0xFFFF).all(|id| source(id) != HUNT_SOURCE));
         let paths: Vec<&str> = state.cues.drain(..).map(|cue| cue.path).collect();
-        assert_eq!(paths, [OPEN, ROLL_SOUND]);
+        // The extras pack's opening and roll, or the bundled ones without it.
+        assert_eq!(paths, [EXTRAS_OPEN, EXTRAS_ROLL]);
+        assert!(EXTRAS.contains(&(EXTRAS_OPEN, Some(OPEN))));
+        assert!(EXTRAS.contains(&(EXTRAS_ROLL, Some(ROLL_SOUND))));
         // The lid swings open, and stays open while it rolls.
         assert_eq!(state.here[0].lid.angle(now), 0.0);
         assert_eq!(state.here[0].lid.angle(now + LID_OPENING), LID_OPEN);
@@ -1180,7 +1830,8 @@ mod tests {
         let taken = state.take_prize(7).expect("taken");
         assert!(!taken.by_itself);
         assert_eq!(taken.prize.won, 200);
-        assert_eq!(state.cues[0].path, TAKE_SOUND);
+        let paths: Vec<&str> = state.cues.drain(..).map(|cue| cue.path).collect();
+        assert_eq!(paths, [TAKE_SOUND, EXTRAS_CLOSE]);
         assert!(state.here[0].opening.is_none());
         assert!(!state.here[0].lid.open);
         assert!(state.tick(now + ROLL + HOLD).is_empty());
@@ -1193,9 +1844,9 @@ mod tests {
             ..Default::default()
         };
         let now = Instant::now();
-        state.opened(7, "empty", Some(prize_of(0)), 1, now);
+        state.opened(7, "empty", Some(prize_of(0)), Some(3), 1, now);
         // Another player's opening: rolls and goes, nothing taken for the player.
-        state.opened(8, "jackpot", None, 2, now);
+        state.opened(8, "jackpot", None, Some(5), 2, now);
         let moments = state.tick(now + ROLL);
         assert_eq!(moments.len(), 1);
         let stops: Vec<&str> = state.cues[4..].iter().map(|cue| cue.path).collect();
@@ -1228,5 +1879,245 @@ mod tests {
             result_text("newer_thing", 100, 0),
             "Nothing inside: -100 credits"
         );
+    }
+
+    #[test]
+    fn shards_a_free_roll_and_the_blade_say_what_they_gave() {
+        let got = |shards: Option<u64>, blade: Option<&str>| Prize {
+            price: 100,
+            shards,
+            blade: blade.map(str::to_owned),
+            ..Prize::default()
+        };
+        assert_eq!(
+            prize_text(wire::SHARD_PILE, &got(Some(18), None)),
+            "+18 kyber shards"
+        );
+        assert_eq!(
+            prize_text(wire::AGAIN, &got(None, None)),
+            "A box in the box: your next roll is free"
+        );
+        assert_eq!(
+            prize_text(wire::BLADE, &got(None, Some(wire::BLADE_ID))),
+            "The Mystery blade! In your Collection"
+        );
+        assert_eq!(
+            prize_text(wire::BLADE, &got(Some(60), None)),
+            "The Mystery blade, again: +60 kyber shards"
+        );
+    }
+
+    #[test]
+    fn a_box_that_blew_up_or_gave_a_holocron_says_what_became_of_it() {
+        let paid = |gift: Option<wire::Gift>| Prize {
+            price: 100,
+            gift,
+            ..Prize::default()
+        };
+        let gift = wire::Gift {
+            slot: 4,
+            name: "^1Jan".to_owned(),
+            credits: 100,
+        };
+        assert_eq!(
+            prize_text(wire::EXPLODE, &paid(Some(gift))),
+            "BOOM! The box blew up: your 100 credits went to ^1Jan^7"
+        );
+        assert_eq!(
+            prize_text(wire::EXPLODE, &paid(None)),
+            "BOOM! The box blew up: -100 credits"
+        );
+        assert_eq!(
+            prize_text(wire::EXPLODE, &Prize::default()),
+            "BOOM! The box blew up: your free roll is spent"
+        );
+        let found = Prize {
+            holocron: Some("legendary".to_owned()),
+            ..paid(None)
+        };
+        assert_eq!(
+            prize_text(wire::HOLOCRON, &found),
+            "Legendary Holocron! In your Collection"
+        );
+        // The others read as before.
+        assert_eq!(
+            prize_text(
+                "double",
+                &Prize {
+                    won: 200,
+                    ..paid(None)
+                }
+            ),
+            "Double! +200 credits"
+        );
+        // What the roll stops on, and the models it loads.
+        assert_eq!(prize(wire::EXPLODE, false, None), PRIZES[4]);
+        assert_eq!(prize(wire::HOLOCRON, false, None), PRIZES[5]);
+        assert!(models().any(|model| model == PRIZES[4].model));
+        assert!(models().any(|model| model == PRIZES[5].model));
+    }
+
+    #[test]
+    fn a_box_that_blows_up_shows_the_teddy_bear_laughs_then_blows_up() {
+        let mut state = MysteryBoxes {
+            here: vec![here(7, [0.0; 3])],
+            ..Default::default()
+        };
+        let now = Instant::now();
+        let paid = Prize {
+            price: 100,
+            balance: 400,
+            ..Prize::default()
+        };
+        state.opened(7, wire::EXPLODE, Some(paid.clone()), Some(3), 1, now);
+        state.cues.clear();
+        // The bear only comes at the end: the roll never shows it before.
+        assert!(!REEL.contains(&PRIZES[4]));
+        assert_eq!(PRIZES[4].model, TEDDY_MODEL);
+        let opening = state.here[0].opening.clone().unwrap();
+        assert_eq!(opening.showing(ROLL), PRIZES[4]);
+        // The roll stops on the bear: the laugh, and nothing blows up yet.
+        assert!(state.tick(now + ROLL).is_empty());
+        let paths: Vec<&str> = state.cues.drain(..).map(|cue| cue.path).collect();
+        assert_eq!(paths, [LAUGH]);
+        assert!(state.tick(now + ROLL + BLAST_DELAY / 2).is_empty());
+        // Then it blows up, once, and the opener is told.
+        let moments = state.tick(now + ROLL + BLAST_DELAY);
+        assert_eq!(
+            moments,
+            [
+                Moment::Blast {
+                    opener: Some(3),
+                    at: Vec3::ZERO,
+                },
+                Moment::Stopped {
+                    outcome: wire::EXPLODE.to_owned(),
+                    prize: paid,
+                },
+            ]
+        );
+        assert_eq!(
+            state.cues.drain(..).map(|cue| cue.path).collect::<Vec<_>>(),
+            [BLAST_SOUND]
+        );
+        assert!(state.tick(now + ROLL + BLAST_DELAY * 2).is_empty());
+        // The laugh is the extras pack's, the retail gloat without it.
+        assert!(EXTRAS.contains(&(LAUGH, Some(LAUGH_FALLBACK))));
+        // The lid closing sounds only with the extras pack.
+        assert!(EXTRAS.contains(&(EXTRAS_CLOSE, None)));
+        state.tick(now + ROLL + HOLD);
+        assert!(state.cues.iter().any(|cue| cue.path == EXTRAS_CLOSE));
+    }
+
+    #[test]
+    fn the_use_prompt_says_what_use_does_at_the_box() {
+        let now = Instant::now();
+        let wallet = Wallet {
+            price: 100,
+            free: 0,
+            credits: Some(500),
+        };
+        let at = |here: &Here, wallet: &Wallet, cooldown, asked| {
+            box_prompt(here, wallet, cooldown, asked, now)
+                .map(|prompt| (prompt.action, prompt.line, prompt.ready))
+        };
+        let idle = here(1, [0.0; 3]);
+        let open = "Open mystery box".to_owned();
+        assert_eq!(
+            at(&idle, &wallet, None, false),
+            Some((open.clone(), Some("100 credits".to_owned()), true))
+        );
+        let free = Wallet { free: 1, ..wallet };
+        assert_eq!(
+            at(&idle, &free, None, false),
+            Some((open.clone(), Some("Free roll".to_owned()), true))
+        );
+        let poor = Wallet {
+            credits: Some(40),
+            ..wallet
+        };
+        assert_eq!(
+            at(&idle, &poor, None, false),
+            Some((
+                open.clone(),
+                Some("100 credits: not enough".to_owned()),
+                false
+            ))
+        );
+        assert_eq!(
+            at(&idle, &wallet, Some(9), false),
+            Some((open, Some("Your turn again in 9 s".to_owned()), false))
+        );
+        assert_eq!(
+            at(&idle, &wallet, None, true),
+            Some(("Opening...".to_owned(), None, false))
+        );
+        // Another player's roll; the player's own, rolling, then waiting to be taken.
+        let mut state = MysteryBoxes {
+            here: vec![here(1, [0.0; 3]), here(2, [0.0; 3]), here(3, [0.0; 3])],
+            ..Default::default()
+        };
+        let started = now - ROLL;
+        state.opened(1, "double", None, Some(5), 1, now);
+        state.opened(2, "double", Some(prize_of(200)), Some(3), 1, now);
+        state.opened(3, "double", Some(prize_of(200)), Some(3), 1, started);
+        assert_eq!(
+            at(&state.here[0], &wallet, None, false),
+            Some(("Someone is opening it".to_owned(), None, false))
+        );
+        assert_eq!(at(&state.here[1], &wallet, None, false), None);
+        assert_eq!(
+            at(&state.here[2], &wallet, None, false),
+            Some(("Take it".to_owned(), None, true))
+        );
+        // A box that blows up says nothing: the player is about to die.
+        state.opened(1, wire::EXPLODE, Some(prize_of(0)), Some(3), 1, started);
+        assert_eq!(at(&state.here[0], &wallet, None, false), None);
+    }
+
+    #[test]
+    fn a_take_is_told_to_each_other_player_and_closes_their_box() {
+        let now = Instant::now();
+        // The opener's side: one other player at a time, the gap between.
+        let mut opener = MysteryBoxes::default();
+        opener.takes.push((7, u64::MAX));
+        let others = 0b1010;
+        assert_eq!(opener.next_take(others, now), Some((7, 1)));
+        assert_eq!(opener.next_take(others, now), None);
+        assert_eq!(opener.next_take(others, now + TAKE_GAP), Some((7, 3)));
+        assert_eq!(opener.next_take(others, now + TAKE_GAP * 2), None);
+        assert!(opener.takes.is_empty());
+        assert_eq!(parse_take(&take_event(7)), Some(7));
+        assert_eq!(parse_take("open_7_double"), None);
+        // A watcher's side: only the opener's take closes the box.
+        let mut watcher = MysteryBoxes {
+            here: vec![here(7, [0.0; 3])],
+            ..Default::default()
+        };
+        watcher.opened(7, "double", None, Some(5), 1, now);
+        watcher.cues.clear();
+        watcher.taken_by(7, 6, now + ROLL);
+        assert!(watcher.here[0].opening.is_some(), "not the opener");
+        watcher.taken_by(7, 5, now + ROLL);
+        assert!(watcher.here[0].opening.is_none());
+        assert!(!watcher.here[0].lid.open);
+        let paths: Vec<&str> = watcher.cues.drain(..).map(|cue| cue.path).collect();
+        assert_eq!(paths, [TAKE_SOUND, EXTRAS_CLOSE]);
+    }
+
+    #[test]
+    fn the_player_waits_out_the_cooldown_between_two_openings() {
+        let now = Instant::now();
+        assert_eq!(cooldown_left(None, 15, now), None);
+        assert_eq!(cooldown_left(Some(now), 15, now), Some(15));
+        assert_eq!(
+            cooldown_left(Some(now), 15, now + Duration::from_millis(5_500)),
+            Some(10)
+        );
+        assert_eq!(
+            cooldown_left(Some(now), 15, now + Duration::from_secs(15)),
+            None
+        );
+        assert_eq!(cooldown_left(Some(now), 0, now), None);
     }
 }

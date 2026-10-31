@@ -22,6 +22,9 @@ const CARD_WIDTH: f32 = super::view::RIGHT_X - CARD_X;
 const CARD_TOP: f32 = 304.0;
 const CARD_BOTTOM: f32 = 990.0;
 const CARD_PAD: f32 = 28.0;
+/// Where new tags come from: proposals on SJK's Discord, which Sol picks from
+/// (`docs/client.md`, "Tag").
+const PROPOSE: &str = "New tag ideas: SJK's Discord, #tag-proposals";
 
 /// How many copies of tag `tag` the player holds: the free ones count one, a dropped one
 /// as many as the hub lists (0 when not held, or when the hub is not known).
@@ -303,6 +306,7 @@ impl Panel {
         for (words, colour) in [
             (tag.how_to_get().to_owned(), color::TEXT),
             (held_line, color::MUTED),
+            (PROPOSE.to_owned(), color::QUIET),
         ] {
             text(
                 &mut self.ui,

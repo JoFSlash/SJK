@@ -89,11 +89,11 @@ an owned local game with cheats on.
 
 Players type these in the client console. Without cheats the server answers
 with the stock "cheats are not enabled" message (`@@@NOCHEATS`). `give`, `t_use`,
-`npc`, `noclip`, `god`, `notarget`, `giveother`, `killother`, `levelshot`,
+`npc`, `noclip`, `god`, `notarget`, `jetpack`, `giveother`, `killother`, `levelshot`,
 `thedestroyer` and `debugBMove_*` also need a living player in the game
 (`@@@MUSTBEALIVE`), as in OpenJK's `ClientCommand`; `setviewpos` also works for
-spectators. `give`, `noclip`, `god`, `notarget`, `giveother` and `levelshot` are
-refused during intermission.
+spectators. `give`, `noclip`, `god`, `notarget`, `jetpack`, `giveother` and `levelshot`
+are refused during intermission.
 
 | Command | Effect |
 | --- | --- |
@@ -114,6 +114,7 @@ refused during intermission.
 | `levelshot` | For a player on the server's own machine (`localhost` or a loopback address, `pers.localClient`): the intermission begins and the client is sent `clientLevelShot`, which the SJK client does not act on |
 | `thedestroyer` | Light the saber in hand when it is holstered (`Cmd_ToggleSaber_f`) |
 | `debugBMove_Forward BOT` (also `_Back`, `_Left`, `_Right`, `_Up`) | Toggle a forced move for the bot in slot `BOT` (`Bot_SetForcedMovement`); it only moves the bot while `bot_forgimmick` is set, as in OpenJK |
+| `jetpack` | SJK's own: give the jetpack with a full tank, or take it away (switched off, the tank full again, so the HUD's fuel bar goes too). Fly it as stock does: the use key in the air lights it (`tryJetPack`), jump to climb, use again to put it out |
 
 A spawn (respawn or team change) clears `noclip`, `god` and `notarget`, as
 `ClientSpawn` clears `client->noclip` and `ent->flags`; `kill` ends god mode too

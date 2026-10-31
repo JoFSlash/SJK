@@ -11,9 +11,9 @@ pub(super) fn contents(bsp: &Bsp, mover: &Collider, point: [f32; 3]) -> u32 {
     let Some(model) = bsp.render().models().get(mover.model) else {
         return 0;
     };
-    let mut local = std::array::from_fn(|i| point[i] - mover.origin[i]);
-    if mover.rotated {
-        local = rotate(local, mover.axes);
+    let mut local = std::array::from_fn(|i| point[i] - mover.contents_origin[i]);
+    if let Some(axes) = mover.contents_axes {
+        local = rotate(local, axes);
     }
     let mut contents = 0;
     for brush in &bsp.brushes()[model.brushes.clone()] {

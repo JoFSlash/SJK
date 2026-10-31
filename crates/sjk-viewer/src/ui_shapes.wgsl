@@ -274,6 +274,18 @@ fn card_shine(input: VertexOutput) -> vec4<f32> {
 
 @fragment
 fn fragment_main(input: VertexOutput) -> @location(0) vec4<f32> {
+    if input.parameters.y > 6.5 {
+        // Convex polygon, a fan of triangles from its middle: local.x is the distance in
+        // pixels to the triangle's outer edge, so coverage fades across the last pixel
+        // inside the polygon. parameters.x is 1 for a textured one.
+        let sampled = textureSample(icon_texture, icon_sampler, input.uv);
+        let coverage = clamp(input.local.x, 0.0, 1.0);
+        if coverage <= 0.0 {
+            discard;
+        }
+        let color = select(input.start_color, sampled * input.start_color, input.parameters.x > 0.5);
+        return vec4(color.rgb, color.a * coverage);
+    }
     if input.parameters.y > 5.5 {
         return card_shine(input);
     }

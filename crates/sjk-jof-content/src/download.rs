@@ -7,7 +7,7 @@
 //! one that fails its MD5) comes from the origin.
 
 use crate::manifest::{Asset, Manifest};
-use crate::source::Source;
+use crate::source::{Directory, Source, listed};
 use md5::{Digest, Md5};
 use std::fs::{File, OpenOptions};
 use std::io::{Read, Write};
@@ -45,6 +45,68 @@ pub fn agent(version: &str) -> ureq::Agent {
         .user_agent(format!("SJK/{version} (JoF content)"))
         .build()
         .into()
+}
+
+/// The largest answer of the hub's content sources.
+const DIRECTORY_LIMIT: u64 = 64 * 1024;
+
+/// The hosts to use: the hub's for the collection when it names them (the player's
+/// choice among them when it is still listed), else `fallback`. The hub's empty list
+/// means the collection is off; no hub and no fallback means there is nowhere to ask.
+pub fn sources(
+    agent: &ureq::Agent,
+    directory: Option<&Directory>,
+    fallback: &[Source],
+) -> Result<Vec<Source>, FetchError> {
+    let Some(directory) = directory else {
+        return Ok(fallback.to_vec());
+    };
+    let hub = directory.hub.trim().trim_end_matches('/');
+    let answer = if hub.is_empty() {
+        Err("no SJK hub is set (cl_hubUrl)".to_owned())
+    } else {
+        agent
+            .get(format!("{hub}/v1/content-sources"))
+            .config()
+            .timeout_global(Some(Duration::from_secs(15)))
+            .build()
+            .call()
+            .map_err(|error| error.to_string())
+            .and_then(|mut response| {
+                response
+                    .body_mut()
+                    .with_config()
+                    .limit(DIRECTORY_LIMIT)
+                    .read_to_vec()
+                    .map_err(|error| error.to_string())
+            })
+            .and_then(|bytes| {
+                listed(&bytes, directory.collection)
+                    .ok_or_else(|| "the SJK hub's list of hosts is unreadable".to_owned())
+            })
+    };
+    match answer {
+        Ok(listed) if listed.is_empty() => Err(FetchError::Failed(
+            "switched off by SJK for now; try again later".into(),
+        )),
+        Ok(listed) => {
+            let chosen: Vec<Source> = listed
+                .iter()
+                .filter(|source| {
+                    directory
+                        .only
+                        .as_deref()
+                        .is_none_or(|only| source.name == only)
+                })
+                .copied()
+                .collect();
+            Ok(if chosen.is_empty() { listed } else { chosen })
+        }
+        Err(_) if !fallback.is_empty() => Ok(fallback.to_vec()),
+        Err(error) => Err(FetchError::Failed(format!(
+            "cannot ask the SJK hub where it is: {error}"
+        ))),
+    }
 }
 
 /// The manifest from the first host that gives a readable one, and that host.
@@ -217,6 +279,55 @@ pub(crate) mod tests {
     use super::*;
     use std::io::BufRead;
     use std::net::TcpListener;
+
+    fn directory(hub: &str, collection: &'static str, only: Option<&str>) -> Directory {
+        Directory {
+            hub: hub.to_owned(),
+            collection,
+            only: only.map(str::to_owned),
+        }
+    }
+
+    const LISTED: &[u8] = br#"{"jof":[{"name":"mirror","manifest":"https://m.test/list","files":"https://m.test/files/"},{"name":"origin","manifest":"https://o.test/list","files":"https://o.test/files"}],"sith":[]}"#;
+
+    #[test]
+    fn the_hubs_hosts_come_first_and_the_players_choice_among_them() {
+        let agent = agent("test");
+        let (hub, server) = serve(LISTED, 2, false);
+        let all = sources(&agent, Some(&directory(&hub, "jof", None)), &[]).unwrap();
+        assert_eq!(
+            all.iter().map(|source| source.name).collect::<Vec<_>>(),
+            ["mirror", "origin"]
+        );
+        assert_eq!(all[0].files, "https://m.test/files");
+        let only = sources(&agent, Some(&directory(&hub, "jof", Some("origin"))), &[]).unwrap();
+        assert_eq!(only.len(), 1);
+        assert_eq!(only[0].manifest, "https://o.test/list");
+        server.join().unwrap();
+    }
+
+    #[test]
+    fn an_empty_list_switches_the_collection_off_even_with_a_fallback() {
+        let agent = agent("test");
+        let (hub, server) = serve(LISTED, 1, false);
+        let fallback = crate::source::SOURCES;
+        let error = sources(&agent, Some(&directory(&hub, "sith", None)), fallback).unwrap_err();
+        assert!(matches!(error, FetchError::Failed(reason) if reason.contains("switched off")));
+        server.join().unwrap();
+    }
+
+    #[test]
+    fn without_the_hub_the_fallback_is_used_and_without_one_it_says_so() {
+        let agent = agent("test");
+        let fallback = crate::source::SOURCES;
+        assert_eq!(
+            sources(&agent, Some(&directory("", "jof", None)), fallback).unwrap(),
+            fallback
+        );
+        let error = sources(&agent, Some(&directory("", "sith", None)), &[]).unwrap_err();
+        assert!(matches!(error, FetchError::Failed(reason) if reason.contains("cl_hubUrl")));
+        assert_eq!(sources(&agent, None, fallback).unwrap(), fallback);
+    }
 
     /// A one-file HTTP server on 127.0.0.1 for `requests` requests, answering
     /// `Range` with 206 when `ranges`; returns its address and the requests'

@@ -21,6 +21,8 @@ pub enum ChatDestination {
     Team,
     /// One currently connected player.
     Player(u16),
+    /// The server's admins: JA+'s and jaPRO's `amsay` (JoF EJK `Cmd_Amsay_f`).
+    Admin,
 }
 
 /// A roster observation, invalidated on a name change or observed slot reuse.
@@ -267,6 +269,7 @@ pub fn chat_command(destination: ChatDestination, text: &str) -> Option<String> 
         ChatDestination::Global => format!("say \"{payload}\""),
         ChatDestination::Team => format!("say_team \"{payload}\""),
         ChatDestination::Player(slot) => format!("tell {slot} \"{payload}\""),
+        ChatDestination::Admin => format!("amsay \"{payload}\""),
     })
 }
 

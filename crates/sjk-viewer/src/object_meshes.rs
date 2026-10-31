@@ -86,6 +86,10 @@ pub(super) fn load<'a>(
         model: crate::monitor::MODEL.to_owned(),
         variant: String::new(),
     });
+    appearances.insert(Appearance {
+        model: crate::banana::MODEL.to_owned(),
+        variant: String::new(),
+    });
     // The Profile screen's Holocrons tab: a model per tier and the locked look.
     appearances.extend(crate::holocrons::stage::models().map(|model| Appearance {
         model: model.to_owned(),

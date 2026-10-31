@@ -16,6 +16,13 @@ use std::cell::Cell;
 
 /// The surface `EV_BODYFADE` turns off (`G2SURFACEFLAG_OFF`).
 const MOUTH_SURFACE: &str = "head_eyes_mouth";
+/// Instance `view_flags` bit read by `stage_runtime.wgsl`: the stage's colour is meant for
+/// rd-vanilla's display-space `GL_DST_COLOR GL_ONE` (the scene times one plus the colour,
+/// on display values), so the program rewrites it for SJK's linear scene. The light side's
+/// glow, `gfx/misc/personalshield`, blends so in both its stages (retail `effects.shader`);
+/// blended in linear light it brightened the scene far less and only on the texture's
+/// brightest texels, a faint blue speckle (hub report #190).
+pub(crate) const DISPLAY_FILTER_ADD: u32 = 1 << 27;
 /// `CHAN_AUTO`.
 const CHAN_AUTO: sjk_audio::ChannelId = sjk_audio::ChannelId(0);
 
@@ -161,7 +168,7 @@ pub(crate) fn submit(
         Some(frame.materials.body_fade_dark)
     };
     if let Some(material) = glow_material {
-        let glow = if fade.burning {
+        let mut glow = if fade.burning {
             let mut burning = body;
             burning.view_flags |= crate::disintegration::RF_DISINTEGRATE2;
             burning.light_direction = body.position;
@@ -171,6 +178,9 @@ pub(crate) fn submit(
             let grey = f32::from(fade.glow) / 255.0;
             body.with_rgb_tint([grey; 4])
         };
+        if state.light_side {
+            glow.view_flags |= DISPLAY_FILTER_ADD;
+        }
         frame.push(entity_materials::OverrideInstance {
             mesh: mesh_ref,
             material: Some(material),
@@ -270,6 +280,12 @@ mod tests {
         let state = State::new(10_000, true);
         assert_eq!(state.threshold(12_000), 0.0);
         assert!((state.threshold(12_513 + 1_000) - 45.0).abs() < 1e-4);
+    }
+
+    #[test]
+    fn the_stage_program_reads_the_display_filter_bit() {
+        assert_eq!(super::DISPLAY_FILTER_ADD.trailing_zeros(), 27);
+        assert!(include_str!("stage_runtime.wgsl").contains("instance.view_flags & (1u << 27u)"));
     }
 
     #[test]

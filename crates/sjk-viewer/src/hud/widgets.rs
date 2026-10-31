@@ -23,6 +23,8 @@ pub(super) struct EmitContext<'a> {
     pub(super) crosshair_alpha: f32,
     pub(super) crosshair_teammate: bool,
     pub(super) lagometer: &'a sjk_client::LagometerSamples,
+    /// What `cg_lagometer` 2 and 3 add ([`super::lagometer`]).
+    pub(super) lagometer_readout: &'a super::lagometer::Readout,
 }
 
 pub(super) fn emit(
@@ -142,9 +144,22 @@ pub(super) fn emit(
         HudWidgetKind::Repeater if binding == Some("kill_feed") => {}
         HudWidgetKind::Repeater if binding == Some("lagometer") => {
             // Scaling changes presentation, not the number of retained samples shown.
-            let samples = rect.width.floor().clamp(1.0, 64.0) as usize;
+            let columns = rect.width.floor().clamp(1.0, 64.0) as usize;
             let rect = context.targeting.lagometer_rect(rect, context.viewport);
-            emit_lagometer(draw_list, theme, widget, rect, samples, context)
+            super::lagometer::emit(
+                draw_list,
+                rect,
+                &super::lagometer::Graph {
+                    samples: context.lagometer,
+                    readout: context.lagometer_readout,
+                    mode: context.targeting.lagometer_mode(),
+                    columns,
+                    // The numbers grow with the HUD, as its other text, and the graph.
+                    text_scale: context.dpi_scale * context.targeting.lagometer_scale(),
+                    screen: context.viewport,
+                },
+                &mut super::lagometer::panel(theme, widget),
+            )
         }
         // The team overlay ("team_rows") was removed (Sol's request, 13/10/2026): team
         // games show teammates by their logos and outlines instead. A repeater left in
@@ -200,65 +215,13 @@ fn emit_crosshair_name(
     });
 }
 
-fn emit_lagometer(
+pub(super) fn emit_panel(
     draw_list: &mut DrawList,
     theme: Theme,
     widget: &HudWidget,
     rect: Rect,
-    samples: usize,
-    context: &EmitContext<'_>,
+    radius: f32,
 ) {
-    emit_panel(
-        draw_list,
-        theme,
-        widget,
-        rect,
-        widget.style.radius.unwrap_or(theme.radii.sm),
-    );
-    let width = samples;
-    let bar_width = rect.width / width as f32;
-    let frame_range = rect.height / 3.0;
-    let middle = rect.y + frame_range;
-    let ping_range = rect.height / 2.0;
-    for offset in 0..width {
-        let x = rect.right() - (offset + 1) as f32 * bar_width;
-        let frame = context.lagometer.frame_newest(offset) as f32;
-        let height = (frame.abs() * frame_range / 300.0).min(frame_range);
-        if height > 0.0 {
-            let (y, color) = if frame > 0.0 {
-                (middle - height, Color::new(1.0, 0.82, 0.20, 0.9))
-            } else {
-                (middle, Color::new(0.25, 0.55, 1.0, 0.9))
-            };
-            let _ = draw_list.push(DrawCommand::SolidRect {
-                rect: Rect::new(x, y, bar_width, height),
-                color,
-            });
-        }
-        let sample = context.lagometer.snapshot_newest(offset);
-        let (height, color) = if sample.ping < 0 {
-            (ping_range, Color::new(1.0, 0.22, 0.18, 0.9))
-        } else {
-            let color = if sample.flags & 1 != 0 {
-                Color::new(1.0, 0.82, 0.20, 0.9)
-            } else {
-                Color::new(0.28, 0.95, 0.48, 0.9)
-            };
-            (
-                (sample.ping as f32 * ping_range / 900.0).min(ping_range),
-                color,
-            )
-        };
-        if height > 0.0 {
-            let _ = draw_list.push(DrawCommand::SolidRect {
-                rect: Rect::new(x, rect.bottom() - height, bar_width, height),
-                color,
-            });
-        }
-    }
-}
-
-fn emit_panel(draw_list: &mut DrawList, theme: Theme, widget: &HudWidget, rect: Rect, radius: f32) {
     let start = widget.style.background.unwrap_or(theme.surface);
     let _ = draw_list.push(match widget.style.background_end {
         Some(end) => DrawCommand::GradientRect {

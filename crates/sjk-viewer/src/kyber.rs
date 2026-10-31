@@ -191,7 +191,7 @@ pub(crate) fn pity_line(pity: Option<Pity>) -> String {
 
 /// The crystal each achievement brings, by its id: this client's copy of the hub's
 /// catalogue (`reward` there), a position in [`TIERS`].
-pub(crate) const REWARDS: [(&str, usize); 35] = [
+pub(crate) const REWARDS: [(&str, usize); 68] = [
     ("first_blood", 0),
     ("kills_100", 1),
     ("kills_1000", 3),
@@ -227,6 +227,39 @@ pub(crate) const REWARDS: [(&str, usize); 35] = [
     ("duel_partners_25", 1),
     ("saber_throw_far", 0),
     ("thermal_return", 1),
+    ("style_blue_50", 1),
+    ("style_yellow_50", 1),
+    ("style_red_50", 1),
+    ("style_dual_50", 1),
+    ("style_staff_50", 1),
+    ("monitor_payback", 0),
+    ("monitor_surge", 1),
+    ("box_minutes_30", 0),
+    ("box_minutes_60", 1),
+    ("box_ambush", 0),
+    ("box_spotted_10", 0),
+    ("order66_purge", 1),
+    ("order66_victims_25", 1),
+    ("hax_puppet", 0),
+    ("hax_double", 1),
+    ("hax_triple", 2),
+    ("hax_fall", 0),
+    ("hax_minutes_5", 0),
+    ("hax_minutes_15", 1),
+    ("hax_traps_5", 0),
+    ("drone_strike", 0),
+    ("drone_monitor", 0),
+    ("boombox_minutes_30", 0),
+    ("boombox_crowd", 1),
+    ("boombox_tough_crowd", 1),
+    ("monitor_victims_25", 1),
+    ("monitor_double", 0),
+    ("monitor_triple", 2),
+    ("monitor_far", 1),
+    ("box_hunt_mark", 0),
+    ("box_hunt_marks_10", 1),
+    ("box_hunt_survive", 0),
+    ("box_hunt_survive_5", 1),
 ];
 
 /// What the hub said each achievement brings, in [`crate::achievements::ALL`]'s order: 0
@@ -433,8 +466,8 @@ mod tests {
         );
     }
 
-    /// Every achievement brings a crystal, by the spec's tables (21/10 and 26/10/2026):
-    /// sixteen Uncommon, fourteen Rare, four Legendary, one Mythical. The hub's word
+    /// Every achievement brings a crystal, by the spec's tables (21/10, 26/10 and 29/10/2026):
+    /// seventeen Uncommon, twenty Rare, four Legendary, one Mythical. The hub's word
     /// replaces the copy.
     #[test]
     fn every_achievement_brings_its_crystal() {
@@ -450,7 +483,7 @@ mod tests {
             assert!(crate::achievements::find(id).is_some(), "{id}");
             per_tier[index] += 1;
         }
-        assert_eq!(per_tier, [16, 14, 4, 1]);
+        assert_eq!(per_tier, [30, 31, 6, 1]);
         assert_eq!(reward("kills_1000").map(|t| t.id), Some("kyber_mythical"));
         assert_eq!(reward("hours_100").map(|t| t.id), Some("kyber_legendary"));
         assert_eq!(reward("nope"), None);

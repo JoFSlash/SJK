@@ -658,7 +658,12 @@ impl GpuState {
         else {
             return;
         };
-        if Some(slot) == own || crate::player_mutes::is_muted(Some(&whisper.key_id), &shown) {
+        // Blocked here for the map or by staff (`muted_players.rs`) as well as muted on
+        // this PC: no console line, no taskbar flash and no sound, as for game chat.
+        if Some(slot) == own
+            || crate::player_mutes::is_muted(Some(&whisper.key_id), &shown)
+            || self.muted_players.contains(slot)
+        {
             return;
         }
         let server = session.server();

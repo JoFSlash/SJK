@@ -113,6 +113,9 @@ pub(crate) struct MenuStage {
 
 struct StageActor {
     model: String,
+    /// One of its shaders reads the entity colour, so the player's colour shows on it
+    /// (`player_menu/model_rgb.rs`).
+    tintable: bool,
     /// Which build this is ([`MenuStage::actor_builds`]).
     build: u64,
     /// Lit as a preview is ([`EntityLight::FALLBACK`], whatever the map), not by the map
@@ -171,6 +174,8 @@ impl GpuState {
             self.vfs.as_ref(),
             &self.shaders,
         );
+        // The News panel's pictures.
+        crate::news_images::service(&mut self.ui_shapes, &self.device, &self.queue);
         // Last frame's preview, if any, is what the profile can show now.
         let ready = self.menu_stage.preview_ready();
         if let Some(menu) = &mut self.client_menu {
@@ -436,6 +441,7 @@ impl GpuState {
             }
         }
         self.sync_stage_prop(now);
+        self.sync_stage_rgb();
         if let Some(request) = request {
             self.sync_stage_sabers(request);
         }
@@ -603,6 +609,9 @@ impl GpuState {
         let frame = animation_frame(&preview.sequence, 0.0);
         let mut flattened = FlattenedScene::default();
         let (actor_draws, vertex_ranges) = append_actor_mesh(&mut flattened, &preview, frame)?;
+        let tintable = flattened.materials.iter().any(|material| {
+            crate::player_menu::takes_entity_colour(&self.shaders, &material.shader)
+        });
         let materials = self.world_materials.compile_detached(
             &self.device,
             &self.queue,
@@ -663,13 +672,15 @@ impl GpuState {
             .create_buffer_init(&wgpu::util::BufferInitDescriptor {
                 label: Some("SJK player stage instance"),
                 contents: bytemuck::bytes_of(&instance),
-                usage: wgpu::BufferUsages::VERTEX,
+                // Written again when the Character page's colour changes (`sync_stage_rgb`).
+                usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
             });
         self.menu_stage.sabers_dirty = true;
         let pose = preview.animation.frame_matrices(frame).unwrap_or_default();
         self.menu_stage.actor_builds += 1;
         Ok(StageActor {
             model: model.to_owned(),
+            tintable,
             build: self.menu_stage.actor_builds,
             preview_lit,
             stance,
@@ -694,6 +705,37 @@ impl GpuState {
             upper: tracks::Track::new(sequence, started),
             from: None,
         })
+    }
+
+    /// The stage model wears the Character page's colour (`player_menu/model_rgb.rs`):
+    /// the player's `customRGBA`, which only the shader stages that read the entity
+    /// colour show, so only a model made for it (an RGB skin) changes.
+    fn sync_stage_rgb(&mut self) {
+        let Some(rgb) = self
+            .client_menu
+            .as_ref()
+            .map(crate::menu::ClientMenu::stage_rgb)
+        else {
+            return;
+        };
+        let Some(actor) = self.menu_stage.actor.as_mut() else {
+            return;
+        };
+        if let Some(menu) = self.client_menu.as_mut() {
+            menu.set_stage_tintable(&actor.model, actor.tintable);
+        }
+        let wanted = [rgb[0], rgb[1], rgb[2], 255].map(|channel| f32::from(channel) / 255.0);
+        if actor.instance.entity_color == wanted {
+            return;
+        }
+        actor.instance = actor
+            .instance
+            .with_entity_color([rgb[0], rgb[1], rgb[2], 255]);
+        self.queue.write_buffer(
+            &actor.instance_buffer,
+            0,
+            bytemuck::bytes_of(&actor.instance),
+        );
     }
 
     /// Where a preview actor stands without a stage, so the map lights it:

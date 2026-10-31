@@ -392,6 +392,11 @@ impl ClientMenu {
         &mut self.loading
     }
 
+    /// End a held Settings slider's peek ([`SettingsMenu::cancel_peek`]).
+    pub(crate) fn cancel_slider_peek(&mut self) {
+        self.settings.cancel_peek();
+    }
+
     /// Build the dark the backdrop's camera tour fades through between its
     /// shots and cuts through to a screen's shot, over the world `viewport`
     /// shows ([`Self::world_fade`]); false while the world is clear.
@@ -563,6 +568,16 @@ impl ClientMenu {
         Some((stage, self.player.stage_model()))
     }
 
+    /// The colour the stage model wears (`player_menu/model_rgb.rs`).
+    pub(crate) fn stage_rgb(&self) -> [u8; 3] {
+        self.player.stage_rgb()
+    }
+
+    /// Whether the stage's model `model` shows the player's colour.
+    pub(crate) fn set_stage_tintable(&mut self, model: &str, tintable: bool) {
+        self.player.set_stage_tintable(model, tintable);
+    }
+
     /// The model the classic profile's preview shows, with the stage it
     /// may stand on: only while the profile is on screen and its page shows
     /// one.
@@ -716,8 +731,8 @@ impl ClientMenu {
                 console.execute_console_line("assetbrowser", None);
                 MenuAction::None
             }
-            SettingsResult::OpenJofContent => {
-                console.execute_console_line("jof.downloads", None);
+            SettingsResult::OpenContent(command) => {
+                console.execute_console_line(command, None);
                 MenuAction::None
             }
             // First setup's "Import from another client" row: the Import page
@@ -1103,6 +1118,15 @@ impl ClientMenu {
         let PhysicalKey::Code(key) = event.physical_key else {
             return MenuAction::None;
         };
+        if matches!(self.state.phase(), ClientPhase::Browser)
+            && !field_open
+            && control
+            && key == KeyCode::KeyC
+            && !self.classic_info
+        {
+            self.copy_selected_server_address();
+            return MenuAction::None;
+        }
         match self.state.phase() {
             ClientPhase::MainMenu if self.menu_style == MenuStyle::Sjk => {
                 self.sjk_home_key(key, console)
@@ -1300,6 +1324,16 @@ impl ClientMenu {
         self.player.attach_catalogue(vfs);
     }
 
+    /// The game files mounted again (`fs_restart`): list the new ones from `vfs`.
+    pub(crate) fn refresh_catalogue(
+        &mut self,
+        vfs: std::sync::Arc<sjk_vfs::VirtualFileSystem>,
+        console: &ViewerConsole,
+    ) {
+        self.attach_catalogue(vfs);
+        self.player.prime(console);
+    }
+
     /// Leave or stay on the player screen after one of its events.
     pub(super) fn player_result(
         &mut self,
@@ -1372,6 +1406,13 @@ impl ClientMenu {
     /// Turn the player screen to page `index` (Character, Saber, Force).
     pub(crate) fn show_player_hub_page(&mut self, index: usize) {
         self.player.show_page(index);
+    }
+
+    /// The Profile screen's Character tab with its Name field open for typing.
+    pub(crate) fn edit_player_hub_name(&mut self) {
+        if self.player_hub_shown() {
+            self.player.open_name_field();
+        }
     }
 
     /// Whether a field of the Profile screen's player pages takes the keys, so Tab

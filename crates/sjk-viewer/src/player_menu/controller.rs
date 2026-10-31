@@ -390,6 +390,11 @@ impl PlayerMenu {
                         self.creator.show_chosen();
                     }
                     CharacterRow::Grid => self.grid_side(direction),
+                    CharacterRow::Red | CharacterRow::Green | CharacterRow::Blue => {
+                        if let Some(channel) = row.channel() {
+                            self.step_model_channel(channel, direction);
+                        }
+                    }
                 }
             }
             ProfilePage::Saber => {

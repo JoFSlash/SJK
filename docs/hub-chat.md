@@ -546,7 +546,8 @@ new GIPHY key allows 100 requests an hour, too few for every player to share.
   the 300 characters, the picker says so and nothing changes.
 - **Favourites**: the star in a tile's corner (shown on the tile under the pointer or
   the keyboard, gold on a favourite), or F on a tile, adds or removes it; the chosen
-  message has Add GIF to favourites (or Remove) under Mute when its line shows a GIF.
+  message has Add GIF to favourites (or Remove GIF favourite) under Mute when its line
+  shows a GIF, with Hide this GIF beside it ([Hidden GIFs](#hidden-gifs)).
   Kept in `gif-favourites.txt` beside `config.cfg`: one id a line, newest first, at
   most 500 (adding past that lets the oldest go), written through a temporary file at
   every change. Nothing is sent anywhere
@@ -588,6 +589,30 @@ new GIPHY key allows 100 requests an hour, too few for every player to share.
   says Enter pick, F favourite, PgUp/PgDn scroll, Esc close GIFs. The search field
   takes Ctrl+A (typing then replaces the words), Ctrl+V and a held Backspace as the
   message field does.
+
+## Hidden GIFs
+
+A player can hide a GIF they do not want to see (#ideas recap of 29/10/2026). The chosen
+message on the SJK chat page has **Hide this GIF** beside its favourites button, the two
+on one row as Staff's are (alone, as **Show this GIF again**, once hidden) for a message whose link is from a trusted source,
+while GIFs are on and its sender is not muted. A hidden GIF never shows
+(`chat_gifs::shows`): everywhere SJK chat shows GIFs (the SJK chat page, the menu docks,
+the chat feed, and the picker's Favourites, Search and Seen in chat) its line reads
+**GIF hidden** in place of the link (`link::HIDDEN_LABEL`), no picture is drawn, and it is
+never fetched for a line. Lines already worded follow at once
+(`chat_gifs::shown_revision`). Its favourites button is not offered while it is hidden.
+
+The picker's **Hidden** tab (between Seen in chat and Sources) lists the hidden GIFs,
+newest first, with their pictures (the one place they show, so a player can tell them
+apart; `chat_gifs::show_hidden_preview`): a click on a tile, or Enter on it, chooses it
+(a gold edge), and **Show this GIF again**, standing where Search's field does, shows
+that GIF again, the others staying hidden. Its tiles have no star. With none hidden it says
+how to hide one. `gif_unhideall` shows every hidden GIF again and says how many.
+
+The list is kept on this PC in `gif-hidden.txt` beside `config.cfg`, in the favourites'
+format (one id or approved-source link a line, newest first, at most 500, written
+through a temporary file at every change); nothing is sent anywhere
+([hidden.rs](../crates/sjk-viewer/src/chat_gifs/hidden.rs)).
 
 ## From a bind
 
@@ -705,7 +730,10 @@ request, 08/10/2026):
   starts with that client's icon instead, at the same size: the clients are the
   entries of [chat/client_icons.rs](../crates/sjk-viewer/src/chat/client_icons.rs)
   (`KNOWN`, each with why and its evidence; today JoF EternalJK, `client` `ejk`,
-  `ui_renderer::EJK_TEXTURE`, `assets/branding/jof-ejk-icon.png`, 21/10/2026).
+  `ui_renderer::EJK_TEXTURE`, `assets/branding/jof-ejk-icon.png`, 21/10/2026, and the
+  SJK Launcher's chat window, `client` `launcher`, `ui_renderer::LAUNCHER_TEXTURE`,
+  `assets/branding/sjk-launcher-icon.png`, 27/10/2026: the launcher signs with the
+  player's own `identity.key`, so its lines are the player's, marked with its icon).
   `cl_sjkChatClientIcons 0` (Settings, "Other clients' icons") gives every message
   SJK's emblem. The same icon marks that client's players on the scoreboard and the
   player card, once the client claims its slot (presence's `client`, 27/10/2026,
@@ -894,7 +922,13 @@ and plays changes. The code still says "mute" (`chat_mutes.rs`, `muted_players.r
   keys' line (six at most; a line says how many more `block` lists).
 - **What blocking does:** their SJK chat lines are hidden (the page shows "Blocked on this
   PC", the dock leaves them out, the game's feed hides them as ignored lines are) and so
-  are their game chat lines once they are matched to a slot. While they are on the
+  are their game chat lines once they are matched to a slot, in the chat box and in the
+  console, whose scrollback and alert words (`con_notifywords`) leave them out as the
+  chat box does (`ChatOverlay::sent_by_muted`, after bleck-bee's and Kushina's hub report
+  #191: the line was hidden in the chat box but showed in the console; the chat log
+  `cl_logchat` still keeps it), and the console's kill lines name them BLOCKED as the
+  kill feed does. Lines the server writes itself (a join, JA+'s "has defeated") come as
+  finished text and keep the name the server put in them. While they are on the
   server, their model is drawn as `kyle/default` (Kyle's red or blue skin when a team
   game colours the teams, so the teams still show), each saber they hold or throw as
   `single_1` in the default blue (`color1` 4), with no hat or cape; a body they leave
@@ -957,7 +991,7 @@ and plays changes. The code still says "mute" (`chat_mutes.rs`, `muted_players.r
 Since 26/10/2026 (Sol's request: "temporary, on the current map, synced between players
 ... only staff members can do the sync thing, everyone else it's personal"), a player can
 be blocked until the server's map changes, as the block above does it (Kyle, silent, no
-chat or emotes, named BLOCKED), with nothing written to `chat-mutes.txt`
+chat, encrypted whispers or emotes, named BLOCKED), with nothing written to `chat-mutes.txt`
 ([map_blocks.rs](../crates/sjk-viewer/src/map_blocks.rs)). It works for any player of
 the server, an SJK player or not.
 
@@ -1073,7 +1107,7 @@ the server, an SJK player or not.
   ([Emotes on stock models](rig-models.md#emotes-on-stock-models)); the `sound` plays
   on the player (`emotes::Cue`, channel 13,
   following another player, in both ears for the player's own, at `s_emoteVolume`
-  apart from `s_volume`)
+  apart from `s_volume`, live while it plays)
   and stops when the emote is cut short; the `torso` and `legs` animations are not
   played yet, and a received emote is written to the console (`* Sol: Wave`). Demos
   keep the emotes started on them.
@@ -1086,7 +1120,12 @@ the server, an SJK player or not.
   dance left running on purpose, whose music going quiet stopped it for everyone; since
   20/10/2026, hub report #107), unless they are away already. Going away, an emote the player plays goes quiet for everyone: the client
   posts `quiet` and each client stops its music (`ActiveEmotes::set_quiet`) while it
-  keeps time, so `loud`, posted on the way back, plays it again from where it would be.
+  keeps time, so `loud`, posted on the way back, plays it again from where it would be:
+  in a synced group, at the very sample the leader's music plays, or another
+  follower's when the leader is the one back or away too (`ActiveEmotes::in_step_with`;
+  since 29/10/2026, hub report #195: a leader back from alt-tab came in from the clock
+  alone, a few milliseconds off the followers, and the group sounded doubled until the
+  loop came round).
   Alt-tabbing out or minimising always does this to an emote playing, whatever
   `cg_awayAltTab` says (Sol's rule, 23/10/2026, `away_emote::alt_tab_quiets`): the
   setting only decides whether alt-tabbing with no emote playing starts the away emote
@@ -1097,14 +1136,18 @@ the server, an SJK player or not.
   hips, wait, surrender and Neo ones, which hold the player until they crouch), sent to
   the server; on the way back, while it still holds the player (`PM_FREEZE`), the
   commands crouch until it lets go, for a second at most (`away_emote::shape_command`;
-  sending it again does not end it); else the looping SJK emote of `cg_awayEmote` (Away emote, any
+  sending it again does not end it). Else (off a JA+ server, or on one with
+  `japlus.awayEmote none`) the looping SJK emote of `cg_awayEmote` (Away emote, any
   looping emote that is not `local`), posted with `quiet` so no client plays its
   music, and stopped (`stop`) on the way back unless it already ended. The hub takes
   one emote every 2 seconds from a key, so a post waits for its turn
   (`player_identity::emote_ready`); one still waiting when the player comes back was
   never seen, and neither it nor its undoing is sent. A hub from before 19/10/2026
   refuses `quiet` in a post: the emote goes again with its sound. The settings list
-  the installed emotes as they are when the page shows (`ValueKind::Live`).
+  the installed emotes as they are when the page shows (`ValueKind::Live`). A JA+ emote
+  that already holds the player when they go away (one they chose, `amsit5` or
+  `ammeditate`) is left alone: neither away emote goes over it and no crouch follows,
+  which got them up (hub report #196, `Away::turn`'s `held`).
 - The quick wheel's editor lists the installed emotes under Emotes. An emote's `icon`
   is decoded when the catalogue loads and put into the UI atlas's emote cells
   (`emote_icons.rs`, 128 of them): a wheel choice that runs `sjkemote <id>` wears it,
@@ -1167,6 +1210,12 @@ ahead) and 30 seconds or more after the last one it took on that server; the hub
 quota (one toy event a second, ten a minute per key) still applies. The client takes
 the hub's toy events once a frame and hands them to every toy (`identity_frame.rs`).
 
+The Monitor's Screen Saver (since 29/10/2026, no hub change,
+[client.md](client.md#monitor)) is told the same way: toy `monitor`, event
+`saver_<until>` (the game server time it ends, at most 31 seconds ahead of the reader's)
+when it rises, and `saver_off` if the player dies before, to the player whose monitor
+raised it (any other slot would do; the readers ignore the target).
+
 ## Toy relay
 
 The toy relay (since 21/10/2026, Sol-Vulpes/SJK-hub, `PROTOCOL.md`, "Toy relay")
@@ -1177,7 +1226,8 @@ cannot: the [Hax](client.md#hax)'s hacker steering the hacked player, the
 [Drone](client.md#drone)'s place, told to each in turn, the
 [Boombox](client.md#boombox)'s track, told to each player within reach, and the
 [Monitor](client.md#monitor)'s throws, told to every SJK player, the nearest first (its
-hits ride the Ragdoll's falls). Two threads of
+hits ride the Ragdoll's falls), and the [Banana peel](client.md#banana-peel)'s peels, told
+the same way, and their slips (since 29/10/2026). Two threads of
 the identity service of their own ([relay.rs](../crates/sjk-identity/src/relay.rs),
 `sjk-hub-relay-send` and `sjk-hub-relay-read`), each with its own HTTP client, read the
 hub and the game server as the feed does:
@@ -1375,7 +1425,7 @@ never in a game server's chat.
   sent to a game server.
 - "Read more": a click on the line in the dock or on the chat page (Up and Down on the
   page pass over it), or the console's `announcement [number]` (no number: the newest),
-  opens the announcement's card ([sjk-ui.md](sjk-ui.md#announcements-and-reward-rounds)).
+  opens the announcement on the News panel ([sjk-ui.md](sjk-ui.md#news-panel)).
   The command closes the console first; the card frees the cursor, in a match too
   (Sol's report, 25/10/2026: the console stayed under the card, and closing it closed
   the card too).
@@ -1402,13 +1452,32 @@ never in a game server's chat.
   the game's chat) and the windows offline: nothing is sent, nothing is written to
   `announcements_seen.txt`, a rehearsed Claim only closes the reward.
 
-**The creator** writes announcements in game: the `announce` window (Kind News or Release
-with its version, Title, Text; a live preview of the chat line; Ctrl+Enter or Send, then
-a confirmation) sends `POST /v1/creator/announce`, checked first with the hub's rules
-(`news::check`: a title of 1 to 80 characters on one line, a text of 1 to 2000 characters
-on at most 30 lines, the chat's alphabet without `^`, a release's version like
-`2026.1025.1`). Anyone else is told "Only SJK's creator can announce", and the hub refuses
+**The SJK team** writes announcements in game (the creator alone until 31/10/2026, then
+every staff member, Sol's decision): the `announce` window (Kind News or Release with its
+version, Title, Text; a live preview of the chat line; Ctrl+Enter or Send, then a
+confirmation) sends `POST /v1/staff/announce` (`POST /v1/creator/announce` on a hub from
+before), checked first with the hub's rules (`news::check`: a title of 1 to 80 characters
+on one line, a text of 1 to 2000 characters on at most 30 lines, the chat's alphabet
+without `^`, the backtick allowed for chips, well-formed markup, a release's version like
+`2026.1025.1`). Anyone else is told "Only the SJK team can announce", and the hub refuses
 them too.
+
+**News panel markup** (31/10/2026, [sjk-ui.md](sjk-ui.md#news-panel),
+[news_markup.rs](../crates/sjk-identity/src/news_markup.rs)): an announcement's text may
+hold links into the client's UI, `[Label](setting:<cvar>)` and `[Label](open:<page>)`,
+and lines `[[image:<id>]]` and `[[switch:<cvar>]]`. Only announcements are read this way,
+never chat messages, so only the SJK team makes links. The chat line shows a link's label
+and leaves pictures and switches out (`news_markup::plain`). In the `announce` window's
+Text: Ctrl+L makes the cvar just typed a link to its setting, named as Settings names it,
+or with none opens a picker of the places `ui_links.rs` knows; Ctrl+K makes the cvar just
+typed its switch, on a line of its own; Ctrl+I opens the system's file dialog (on a thread
+of its own) for a PNG or JPEG of at most 3 MB, uploads it (`PUT /v1/staff/news-image`,
+`Service::upload_news_image`, the outcome in `Snapshot::news_image`) and puts its line at
+the end. The hub re-encodes pictures (no metadata kept) at most 1600 x 900, names each by
+a hash of the file, and lists each announcement's pictures with their sizes (`images`);
+clients read them unsigned at `GET /v1/news-image/<id>` and keep them in `news/` beside
+the settings. On a hub before the panel the pictures and the staff route are missing:
+the announcement goes the creator's way and a picture upload fails with the hub's words.
 
 Checked (25/10/2026): unit tests for the wire types (the spec's examples), the rules,
 the request bodies, the feed's merging and its news, the posting of read announcements,

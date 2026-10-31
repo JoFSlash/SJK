@@ -37,7 +37,7 @@ fn fps_help_card() {
         shoot(&mut gpu, 4, "fps-help-offered");
         assert!(gpu.fps_card.is_open(), "the card shows");
 
-        // D ticks "Don't suggest this again"; the card stays.
+        // A click ticks "Don't suggest this again"; the card stays.
         gpu.fps_card_choice(Some(crate::fps_help::card::Choice::Tick));
         assert_eq!(
             gpu.console

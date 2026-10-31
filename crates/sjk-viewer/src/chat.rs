@@ -6,6 +6,7 @@ mod editing;
 mod editor;
 pub(crate) mod emoji;
 mod feed_gif;
+pub(crate) mod incoming_color;
 
 pub(crate) mod client_icons;
 mod interaction;
@@ -17,6 +18,7 @@ pub(crate) mod reply;
 pub(crate) mod server_copy;
 pub(crate) mod sjk;
 mod substitutions;
+pub(crate) mod tabs;
 pub(crate) mod text_sizes;
 
 mod view;
@@ -52,6 +54,8 @@ enum Channel {
     Whisper,
     /// The SJK chat, through the SJK hub (`chat/sjk.rs`).
     Sjk,
+    /// The server's admins, `amsay` (`chat/tabs.rs`): jaPRO's `<Admin>(name)` lines.
+    Admin,
 }
 
 struct ChatLine {
@@ -117,6 +121,10 @@ pub(crate) struct ChatOverlay {
     /// Text ids of this frame's centre-print rows, which retail drew with the
     /// medium font rather than the chat box's small one.
     center_text: (u32, u32),
+    /// Text ids of this frame's feed and composer, which `cg_chatBoxOutline` edges in a
+    /// dark outline ([`Self::palette_of`]); the centre prints and the sender card keep
+    /// their shadow.
+    chat_text: [(u32, u32); 2],
     combat: combat::Combat,
     input: Option<Editor>,
     modifiers: winit::keyboard::ModifiersState,
@@ -186,6 +194,13 @@ pub(crate) struct ChatOverlay {
     /// The channel (and whisper recipient) the composer last sent on, which the chat
     /// key opens on while `cg_chatRememberChannel` is on.
     last_channel: (Channel, Option<ChatTarget>),
+    /// The server being played takes `amsay` (`chat/tabs.rs`).
+    admin_server: bool,
+    /// Where the pointer last was over the chat, for hovers checked against this frame's
+    /// layout ([`card`]): the canvas's hovered widget is the one under the pointer when it
+    /// last moved, and a feed that changed under a still pointer (a tab chosen) would
+    /// otherwise hand that place to another widget.
+    pointer_at: Option<sjk_ui::Vec2>,
     /// The client slots (bits) whose player takes encrypted whispers now
     /// (`e2e_whispers.rs`): a whisper to them goes encrypted, which the composer says,
     /// and their card offers the safety code.
@@ -246,6 +261,7 @@ impl ChatOverlay {
             lines: VecDeque::with_capacity(HISTORY_LIMIT),
             center: None,
             center_text: (0, 0),
+            chat_text: [(0, 0); 2],
             combat: combat::Combat::default(),
             input: None,
             modifiers: winit::keyboard::ModifiersState::empty(),
@@ -285,6 +301,8 @@ impl ChatOverlay {
             own_slot: None,
             last_whisperer: None,
             last_channel: (Channel::Global, None),
+            admin_server: false,
+            pointer_at: None,
             encrypted_slots: 0,
             safety_request: None,
             reportable_slots: 0,
@@ -392,6 +410,25 @@ impl ChatOverlay {
                 .any(|name| chat_body(text, name).0.len() < text.len())
     }
 
+    /// Whether server chat `text` (from `sender`, when the server named one) comes from
+    /// a player blocked on this PC, decided as the chat box decides it: the console
+    /// leaves the line out too (hub report #191, 28/10/2026: a blocked player's name
+    /// and messages still showed there).
+    pub(crate) fn sent_by_muted(&self, text: &str, sender: Option<u16>) -> bool {
+        if self.muted_slots == 0 {
+            return false;
+        }
+        let display = chat_display_text(&chat_unescape(text));
+        match self
+            .roster
+            .target(sender)
+            .or_else(|| self.line_sender(&display))
+        {
+            Some(target) => self.slot_muted(target),
+            None => self.prefix_muted(&display),
+        }
+    }
+
     /// Chat lines each client slot has sent: a counter that only grows (and wraps).
     pub(crate) fn spoken(&self) -> &[u32; 32] {
         &self.spoken
@@ -487,6 +524,8 @@ impl ChatOverlay {
             sender: target,
             channel: if private {
                 Channel::Whisper
+            } else if tabs::is_admin_line(&display) {
+                Channel::Admin
             } else if kind == ServerEventKind::TeamChat {
                 Channel::Team
             } else {
@@ -681,10 +720,10 @@ impl ChatOverlay {
         }
     }
 
-    /// Lay out and append chat text: the chat box in the small game font and
-    /// centre prints in the medium one when `ui_gameFont` has them loaded
-    /// (`CG_ChatBox_DrawStrings` paints with `FONT_SMALL`, `CG_DrawCenterString`
-    /// with `FONT_MEDIUM`), otherwise in `font`.
+    /// Lay out and append chat text: the chat box in the small game font when
+    /// `ui_gameFont` has it loaded (`CG_ChatBox_DrawStrings` paints with
+    /// `FONT_SMALL`), centre prints in the headline font (where retail's
+    /// `CG_DrawCenterString` drew `FONT_MEDIUM`), otherwise in `font`.
     pub(crate) fn append(
         &mut self,
         draw_feed: bool,
@@ -701,20 +740,48 @@ impl ChatOverlay {
             viewport,
             ms,
         );
+        self.append_built(fonts, vertices, font, viewport);
+    }
+
+    /// Append the text [`Self::build`] laid out, each run in its font and palette.
+    fn append_built(
+        &self,
+        fonts: &mut GameFonts,
+        vertices: &mut Vec<TextVertex>,
+        font: &UiFont,
+        viewport: [f32; 2],
+    ) {
         let (start, end) = self.center_text;
+        let palette_of = self.palette_of();
         self.ui.append_text_routed(
             fonts,
             |id, _| {
                 Some(if (start..end).contains(&id.0) {
-                    RetailFont::Medium
+                    RetailFont::Headline
                 } else {
                     RetailFont::Small
                 })
             },
+            |id| palette_of(id.0),
             vertices,
             font,
             viewport,
         );
+    }
+
+    /// The palette each text run of this frame draws in, by its id: with
+    /// `cg_chatBoxOutline` on, the feed's and the composer's in a dark outline
+    /// ([`crate::text::CodePalette::DarkOutlined`]), the rest as the game draws it.
+    fn palette_of(&self) -> impl Fn(u32) -> crate::text::CodePalette + Copy + use<> {
+        let outline = self.options.outline;
+        let chat = self.chat_text;
+        move |id| {
+            if outline && chat.iter().any(|(start, end)| (*start..*end).contains(&id)) {
+                crate::text::CodePalette::DarkOutlined
+            } else {
+                crate::text::CodePalette::Game
+            }
+        }
     }
 }
 

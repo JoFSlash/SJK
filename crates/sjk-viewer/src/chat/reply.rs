@@ -87,9 +87,13 @@ impl ChatOverlay {
             return;
         }
         let recipient = recipient.filter(|target| self.roster.name(*target).is_some());
+        let offered = self.offers(channel);
         let input = self.input.as_mut().expect("opened composer");
         match channel {
             Channel::Whisper if recipient.is_none() => {}
+            // A channel since taken out of the row (`chat/tabs.rs`), or Admin away from a
+            // server that has it, opens on All.
+            Channel::Team | Channel::Sjk | Channel::Admin if !offered => {}
             channel => {
                 input.channel = channel;
                 input.recipient = recipient;

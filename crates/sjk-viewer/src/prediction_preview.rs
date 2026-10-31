@@ -59,7 +59,11 @@ pub(crate) fn tick(
         .local_prediction
         .committed_state()
         .map_or_else(|| snapshot.player.origin(), |state| state.origin);
-    gpu.ragdoll.shape_preview(&mut command, delta, origin);
+    // As the sent command: not while flying, or the preview walked the camera toward
+    // the ragdoll between commands and it snapped back (#232's review).
+    if !gpu.local_prediction.fake_noclip() {
+        gpu.ragdoll.shape_preview(&mut command, delta, origin);
+    }
     gpu.local_prediction
         .preview_command(command, &gpu.bsp, &mut gpu.trace_scratch);
     let presented_snapshot = session.snapshot_at_or_before(presentation_time);

@@ -2,12 +2,13 @@
 //! holocron (`docs/client.md`, Illuminate), the cardboard box (`docs/client.md`,
 //! Cardboard box), Order 66 (`docs/client.md`, Order 66), the Hax (`docs/client.md`,
 //! Hax), the Ragdoll (`docs/client.md`, Ragdoll), the Drone (`docs/client.md`, Drone),
-//! the Boombox (`docs/client.md`, Boombox), the Monitor (`docs/client.md`, Monitor) and
-//! Box hunt (`docs/client.md`, Box hunt), a row to each on the left (Sol's pick of
-//! 25/10/2026, the Collection revamp's canvas): its picture, its name and a line of what
-//! it does, the key bound to it and its own switch, which runs it in place
-//! (`toy_illuminate`, `toy_box`, `toy_order66`, `toy_hax`, `toy_ragdoll`, `toy_drone`,
-//! `toy_boombox`, `toy_monitor`, `toy_boxhunt`). The chosen one is described on a dark card beside the
+//! the Boombox (`docs/client.md`, Boombox), the Monitor (`docs/client.md`, Monitor), Box
+//! hunt (`docs/client.md`, Box hunt) and the Banana peel (`docs/client.md`, Banana peel),
+//! a row to each on the left (Sol's pick of 25/10/2026, the Collection revamp's canvas):
+//! its picture, its name and a line of what it does, the key bound to it and its own
+//! switch, which runs it in place (`toy_illuminate`, `toy_box`, `toy_order66`, `toy_hax`,
+//! `toy_ragdoll`, `toy_drone`, `toy_boombox`, `toy_monitor`, `toy_boxhunt`,
+//! `toy_banana`). The chosen one is described on a dark card beside the
 //! model, where its key is bound without the console (a click or K, then the key). The
 //! holocron floats lit by the model while it is chosen.
 
@@ -18,13 +19,15 @@ use crate::menu_widgets::TextFamily;
 use sjk_ui::{Color, DrawCommand, FontWeight, TextAlign, TextureId};
 
 /// The rows: their left edge and width, where the column heads and the first row stand,
-/// a row's height and the room between rows. Nine fit over the keys.
+/// a row's height and the room between rows, and its picture's side. Ten fit over the
+/// keys.
 const ROWS_X: f32 = LEFT_X - 12.0;
 const ROWS_WIDTH: f32 = 860.0;
 const HEADS_Y: f32 = 300.0;
 const ROWS_Y: f32 = 336.0;
-const ROW_HEIGHT: f32 = 68.0;
-const ROW_GAP: f32 = 4.0;
+const ROW_HEIGHT: f32 = 64.0;
+const ROW_GAP: f32 = 3.0;
+const ROW_ART: f32 = 54.0;
 /// A row's key column: its width, and the room the switch keeps at the row's right.
 const KEY_WIDTH: f32 = 150.0;
 const SWITCH_ROOM: f32 = 130.0;
@@ -39,11 +42,14 @@ const CARD_PAD: f32 = 26.0;
 /// size, a line of its other words this many.
 const ABOUT_CHARS: f32 = 46.0;
 const NOTE_CHARS: f32 = 52.0;
+/// The card's "See" row under its switch.
+const SIGHT_ROW: f32 = 48.0;
 
 /// Every command a toy is run by, in the order the page is told their keys
-/// ([`Inputs::toy_keys`]): each toy's switch, Order 66's order after its own, and the
-/// Monitor's throw (held, it charges) after its own.
-pub(crate) const COMMANDS: [&str; 11] = [
+/// ([`Inputs::toy_keys`]): each toy's switch, Order 66's order after its own, the
+/// Monitor's throw (held, it charges) after its own, and the Banana peel's drop after its
+/// own.
+pub(crate) const COMMANDS: [&str; 13] = [
     "toy_illuminate",
     "toy_box",
     "toy_order66",
@@ -55,6 +61,8 @@ pub(crate) const COMMANDS: [&str; 11] = [
     "toy_monitor",
     "+monitor_throw",
     "toy_boxhunt",
+    "toy_banana",
+    "banana_drop",
 ];
 
 /// One toy as the tab shows it.
@@ -74,6 +82,10 @@ struct Toy {
     commands: &'static [(&'static str, &'static str)],
     /// The switch's words.
     switch: &'static str,
+    /// The cvar of the card's second switch, which hides other players' toy on this PC,
+    /// and its words ([`crate::toy_sight`]); none for a toy that only acts on players
+    /// who have it on.
+    sight: Option<(&'static str, &'static str)>,
     token: u16,
 }
 
@@ -88,6 +100,7 @@ const TOYS: [Toy; TOY_COUNT] = [
         more: None,
         commands: &[("toy_illuminate", "Your key")],
         switch: "Holocron lit",
+        sight: Some((crate::toy_sight::ILLUMINATE, "See others' holocrons")),
         token: TOY_TOKEN,
     },
     Toy {
@@ -99,6 +112,7 @@ const TOYS: [Toy; TOY_COUNT] = [
         more: None,
         commands: &[("toy_box", "Your key")],
         switch: "In the box",
+        sight: Some((crate::toy_sight::CARDBOARD_BOX, "See others' boxes")),
         token: BOX_TOKEN,
     },
     Toy {
@@ -110,6 +124,7 @@ const TOYS: [Toy; TOY_COUNT] = [
         more: Some("Join with its switch or key; the order key executes it for everyone in it."),
         commands: &[("toy_order66", "Join key"), ("order66", "Order key")],
         switch: "In the order",
+        sight: None,
         token: ORDER_TOKEN,
     },
     Toy {
@@ -121,6 +136,7 @@ const TOYS: [Toy; TOY_COUNT] = [
         more: Some("With it on, hold Use on a player who has it on too."),
         commands: &[("toy_hax", "Your key")],
         switch: "Hacker",
+        sight: None,
         token: HAX_TOKEN,
     },
     Toy {
@@ -132,6 +148,7 @@ const TOYS: [Toy; TOY_COUNT] = [
         more: Some("Press its key again to get up."),
         commands: &[("toy_ragdoll", "Your key")],
         switch: "Limp",
+        sight: Some((crate::toy_sight::RAGDOLL, "See others fall limp")),
         token: RAGDOLL_TOKEN,
     },
     Toy {
@@ -143,6 +160,7 @@ const TOYS: [Toy; TOY_COUNT] = [
         more: Some("freecam and peek fly it, with the keys you have for them."),
         commands: &[("toy_drone", "Your key")],
         switch: "Peek me",
+        sight: Some((crate::toy_sight::DRONE, "See others' drones")),
         token: DRONE_TOKEN,
     },
     Toy {
@@ -154,6 +172,7 @@ const TOYS: [Toy; TOY_COUNT] = [
         more: Some("boombox in the console lists your tracks; boombox next skips one."),
         commands: &[("toy_boombox", "Your key")],
         switch: "Play",
+        sight: Some((crate::toy_sight::BOOMBOX, "See and hear others' boomboxes")),
         token: BOOMBOX_TOKEN,
     },
     Toy {
@@ -167,6 +186,7 @@ const TOYS: [Toy; TOY_COUNT] = [
         ),
         commands: &[("toy_monitor", "Your key"), ("+monitor_throw", "Throw key")],
         switch: "Hit me",
+        sight: Some((crate::monitor::SHOW_CVAR, "See monitors")),
         token: MONITOR_TOKEN,
     },
     Toy {
@@ -174,11 +194,29 @@ const TOYS: [Toy; TOY_COUNT] = [
         name: "Box hunt",
         tag: "Hunt the mark for a free mystery box roll.",
         title: "Box hunt",
-        what: "Every few minutes one player with Box hunt on becomes the mark. Kill the mark to win a free mystery box roll. Only players with it on see the mark or can be it.",
+        what: "Every 10 minutes one player with Box hunt on becomes the mark. Kill the mark to win a free mystery box roll. Only players with it on see the mark or can be it.",
         more: Some("Its switch is all there is: on, you hunt and may be the mark."),
         commands: &[("toy_boxhunt", "Your key")],
         switch: "Hunt",
+        sight: None,
         token: BOX_HUNT_TOKEN,
+    },
+    Toy {
+        icon: "banana",
+        name: "Banana peel",
+        tag: "Drop peels; players who walk onto them slip.",
+        title: "Banana peel",
+        what: "Drop a banana peel at your feet, or toss one ahead as you run. A player who has it on too and walks onto a peel slips and falls as a ragdoll, cartoon style; the peel is gone. With it off, you walk over peels.",
+        more: Some(
+            "Three peels down at a time, each for two minutes, none by a spawn point. Its switch lets you drop them and slip on them.",
+        ),
+        commands: &[
+            (crate::banana::COMMAND, "Your key"),
+            (crate::banana::DROP_COMMAND, "Drop key"),
+        ],
+        switch: "Slip on peels",
+        sight: Some((crate::banana::SHOW_CVAR, "See banana peels")),
+        token: BANANA_TOKEN,
     },
 ];
 
@@ -187,6 +225,20 @@ pub(super) fn command(toy: usize, slot: usize) -> Option<&'static str> {
     TOYS.get(toy)
         .and_then(|toy| toy.commands.get(slot))
         .map(|(command, _)| *command)
+}
+
+/// The cvar of toy `toy`'s "See" switch, if it has one.
+pub(super) fn sight_cvar(toy: usize) -> Option<&'static str> {
+    TOYS.get(toy)?.sight.map(|(cvar, _)| cvar)
+}
+
+/// The toys whose other players' are hidden, as bits in the tab's order: those whose
+/// "See" cvar `seen` says off.
+pub(crate) fn unseen(seen: impl Fn(&str) -> bool) -> u16 {
+    TOYS.iter()
+        .enumerate()
+        .filter(|(_, toy)| toy.sight.is_some_and(|(cvar, _)| !seen(cvar)))
+        .fold(0, |bits, (index, _)| bits | 1 << index)
 }
 
 /// The keys bound to `command`, as the page was told them; empty for none.
@@ -250,6 +302,7 @@ fn states(inputs: &Inputs<'_>) -> [bool; TOY_COUNT] {
         inputs.boombox,
         inputs.monitor,
         inputs.box_hunt,
+        inputs.banana,
     ]
 }
 
@@ -262,7 +315,7 @@ impl Panel {
             0 => "Switch them here or in a match; other SJK players on your server see what you turn on.".to_owned(),
             lit => format!("{lit} on now. Switch them here or in a match; other SJK players on your server see what you turn on."),
         };
-        self.lead(frame, "9 toys", &line);
+        self.lead(frame, "10 toys", &line);
         self.toy_heads(frame);
         let chosen = self.toy.min(TOY_COUNT - 1);
         for (index, toy) in TOYS.iter().enumerate() {
@@ -344,7 +397,7 @@ impl Panel {
                 color::alpha(color::HOLO, if hovered { 0.35 } else { 0.16 })
             },
         });
-        let art = 58.0;
+        let art = ROW_ART;
         let _ = self.ui.draw_list_mut().push(DrawCommand::TexturedQuad {
             rect: frame.rect(x + 14.0, y + (ROW_HEIGHT - art) * 0.5, art, art),
             texture: icon(toy.icon),
@@ -357,7 +410,7 @@ impl Panel {
             &mut self.ui,
             TextFamily::Display,
             format_args!("{}", toy.name),
-            frame.rect(words_x, y + 8.0, words_width, 30.0 * k),
+            frame.rect(words_x, y + 6.0, words_width, 30.0 * k),
             23.0 * s,
             if chosen {
                 color::GOLD_BRIGHT
@@ -371,7 +424,7 @@ impl Panel {
             &mut self.ui,
             TextFamily::Body,
             format_args!("{}", toy.tag),
-            frame.rect(words_x, y + 10.0 + 30.0 * k, words_width, 22.0 * k),
+            frame.rect(words_x, y + 8.0 + 30.0 * k, words_width, 22.0 * k),
             15.0 * s,
             color::MUTED,
             FontWeight::Regular,
@@ -441,6 +494,7 @@ impl Panel {
             + more as f32 * line(15.0)
             + 18.0
             + 48.0
+            + if toy.sight.is_some() { SIGHT_ROW } else { 0.0 }
             + CARD_PAD
     }
 
@@ -659,6 +713,26 @@ impl Panel {
             TOY_SWITCH_TOKEN,
             frame.rect(left - 4.0, middle - 19.0, right - left + 8.0, 38.0),
         );
+        // Other players' toy, seen or hidden on this PC.
+        if let Some((_, words)) = toy.sight {
+            let middle = middle + SIGHT_ROW;
+            let seen = inputs.toys_unseen & 1 << chosen == 0;
+            text(
+                &mut self.ui,
+                TextFamily::Display,
+                format_args!("{words}"),
+                frame.rect(x, middle - 13.0, width - 140.0, 26.0),
+                18.0 * s,
+                color::MUTED,
+                FontWeight::Semibold,
+                TextAlign::Start,
+            );
+            let left = kit::switch(&mut self.ui, frame, right, middle, seen, false);
+            self.ui.hit_region(
+                TOY_SIGHT_TOKEN,
+                frame.rect(left - 4.0, middle - 19.0, right - left + 8.0, 38.0),
+            );
+        }
     }
 }
 
@@ -733,7 +807,7 @@ mod tests {
                         }
                     }
                     let mut card = vec![TOY_SWITCH_TOKEN, BIND_TOKEN];
-                    if toy == 2 || toy == 7 {
+                    if toy == 2 || toy == 7 || toy == 9 {
                         card.push(BIND_SECOND_TOKEN);
                     }
                     for token in card {

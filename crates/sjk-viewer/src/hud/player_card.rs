@@ -69,19 +69,54 @@ const LOST_MS: i32 = 3_000;
 /// a swatch.
 const RETAIL_COLOURS: i32 = 6;
 
+/// The setting saying what opens the card ([`Opens`]).
+pub(crate) const CVAR: &str = "cg_playerCard";
+
+/// What opens the card, `cg_playerCard`: 0 nothing, 1 a steady look or `inspect` (the
+/// default, and what the old on/off setting's 1 was), 2 only `inspect` (Key only, Blep's
+/// idea, 29/10/2026: looking at a player never opens it).
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum Opens {
+    Off,
+    LookAndKey,
+    KeyOnly,
+}
+
+impl Opens {
+    /// The setting's value: 0 and below off, 1 (or unset) look and key, 2 and above key
+    /// only.
+    pub(crate) fn of(value: Option<i64>) -> Self {
+        match value {
+            Some(..=0) => Self::Off,
+            Some(2..) => Self::KeyOnly,
+            _ => Self::LookAndKey,
+        }
+    }
+
+    /// Looking at a player, steady, for `cg_playerCardDelay` shows their card.
+    pub(crate) fn by_look(self) -> bool {
+        self == Self::LookAndKey
+    }
+
+    /// `inspect` pins the card (and Escape unpins it).
+    pub(crate) fn by_key(self) -> bool {
+        self != Self::Off
+    }
+}
+
 /// Register the card's settings.
 pub(crate) fn register(cvars: &mut CvarRegistry) -> Result<(), sjk_shell::CvarError> {
     cvars.register(CvarDefinition::new(
-        "cg_playerCard",
-        true,
+        CVAR,
+        1_i64,
         CvarFlags::ARCHIVE,
-        "Show a card beside a player you look at without moving",
+        "Player card: 0 off, 1 when you look at a player without moving or press inspect, 2 only from the inspect key",
     ))?;
     cvars.register(CvarDefinition::new(
         "cg_playerCardDelay",
         1.5_f64,
         CvarFlags::ARCHIVE,
-        "Seconds you must look at a player, steady, before their card shows",
+        "Seconds you must look at a player, steady, before their card shows (cg_playerCard 1)",
     ))?;
     cvars.register(CvarDefinition::new(
         "cg_playerCardOutline",
@@ -826,7 +861,8 @@ pub(crate) struct Input<'a> {
 
 /// The card's state: settings, dwell, fade and the draw list.
 pub(crate) struct State {
-    enabled: bool,
+    /// `cg_playerCard`: what opens the card.
+    opens: Opens,
     outline: bool,
     delay_ms: i32,
     dwell: Dwell,
@@ -850,7 +886,7 @@ pub(crate) struct State {
 impl Default for State {
     fn default() -> Self {
         Self {
-            enabled: true,
+            opens: Opens::LookAndKey,
             outline: true,
             delay_ms: 1_500,
             dwell: Dwell::default(),
@@ -871,9 +907,7 @@ impl Default for State {
 impl State {
     /// Sample the settings once a frame, outside text emission.
     pub(crate) fn sample(&mut self, console: Option<&crate::console::ViewerConsole>) {
-        self.enabled = console
-            .and_then(|c| c.bool_cvar("cg_playercard"))
-            .unwrap_or(true);
+        self.opens = Opens::of(console.and_then(|c| c.integer_cvar(CVAR)));
         self.outline = console
             .and_then(|c| c.bool_cvar("cg_playercardoutline"))
             .unwrap_or(true);
@@ -884,7 +918,7 @@ impl State {
     /// Escape: unpin a pinned card, as `inspect` would. False when no card is pinned
     /// (or it is hidden with `cg_playerCard` off), so Escape opens the game menu instead.
     pub(crate) fn cancel(&mut self) -> bool {
-        self.enabled && self.pin.cancel()
+        self.opens.by_key() && self.pin.cancel()
     }
 
     /// `inspect`: pin the card to the player under the crosshair, or unpin it.
@@ -976,22 +1010,7 @@ impl State {
         if self.suppressed.is_some() && self.suppressed != aimed {
             self.suppressed = None;
         }
-        let seen = if self.enabled && !input.hidden && self.suppressed.is_none() {
-            aimed
-        } else {
-            None
-        };
-        self.dwell.observe(seen, forward, now);
-        let pinned = step.target.filter(|_| self.enabled);
-        let want = if input.hidden {
-            None
-        } else if pinned.is_some() {
-            pinned.filter(|_| !self.sight.hidden())
-        } else if self.enabled {
-            self.dwell.ready(now, self.delay_ms)
-        } else {
-            None
-        };
+        let (pinned, want) = self.choose(aimed, step.target, input.hidden, forward, now);
         let elapsed = (now - self.last_frame).clamp(0, 100) as f32;
         self.last_frame = now;
         match want {
@@ -1048,6 +1067,33 @@ impl State {
             seconds: now as f32 / 1_000.0,
         };
         self.emit(hips, side, input.camera.viewport, pinned.is_some(), look);
+    }
+
+    /// Who is pinned and whose card shows this frame, from the player aimed at in sight
+    /// (`aimed`), the pin's player (`pin`) and whether a menu or the like hides the card
+    /// (`hidden`), as `cg_playerCard` lets them open it: a steady look only with 1 (Key
+    /// only, 2, leaves the look out), the pin with 1 and 2.
+    fn choose(
+        &mut self,
+        aimed: Option<u16>,
+        pin: Option<u16>,
+        hidden: bool,
+        forward: Vec3,
+        now: i32,
+    ) -> (Option<u16>, Option<u16>) {
+        let look = self.opens.by_look() && !hidden && self.suppressed.is_none();
+        self.dwell.observe(aimed.filter(|_| look), forward, now);
+        let pinned = pin.filter(|_| self.opens.by_key());
+        let want = if hidden {
+            None
+        } else if pinned.is_some() {
+            pinned.filter(|_| !self.sight.hidden())
+        } else if self.opens.by_look() {
+            self.dwell.ready(now, self.delay_ms)
+        } else {
+            None
+        };
+        (pinned, want)
     }
 
     fn key_of(client: u16, input: &Input<'_>) -> (u16, u64, u64, u64) {
@@ -2200,7 +2246,7 @@ mod tests {
         assert_eq!(card.texts[T_STAFF], "SJK TEAM");
         assert_eq!(card.texts[T_HOLOCRON], "Legendary Holocron");
         // Out of the obtainable ones: they do not hold the retired Surveyor.
-        assert_eq!(card.texts[T_ACHIEVEMENTS], "Achievements  4 / 34");
+        assert_eq!(card.texts[T_ACHIEVEMENTS], "Achievements  4 / 67");
         assert_eq!(card.texts[T_BIO], "Fox of the JoF, maker of SJK.");
         assert!(card.texts[T_SINCE].starts_with("In SJK since "));
         assert_eq!(card.texts[T_GOAL], "1K");
@@ -2384,6 +2430,109 @@ mod tests {
         assert!(corner.card.y >= 0.0 && corner.card.x >= 0.0);
         let low = place([900.0, 1_075.0], size, 34.0, viewport);
         assert!(low.card.y + low.card.height <= viewport[1]);
+    }
+
+    /// `cg_playerCard` is three-way (Blep's idea, 29/10/2026): 0 off, 1 a steady look or
+    /// `inspect` (the default), 2 `inspect` only. The old on/off setting saved 0 and 1,
+    /// which read as before.
+    #[test]
+    fn the_setting_reads_three_ways_and_old_configs_keep_their_meaning() {
+        let directory = tempfile::tempdir().unwrap();
+        let mut console =
+            crate::console::ViewerConsole::new(directory.path().join("config.cfg")).unwrap();
+        let mut state = State::default();
+        state.sample(Some(&console));
+        assert_eq!(state.opens, Opens::LookAndKey, "on by default, as before");
+        for (value, opens) in [
+            // `seta cg_playerCard "0"` and `"1"`, as the old on/off setting saved them.
+            ("0", Opens::Off),
+            ("1", Opens::LookAndKey),
+            ("2", Opens::KeyOnly),
+            ("5", Opens::KeyOnly),
+            ("-1", Opens::Off),
+        ] {
+            assert!(console.set_cvar(CVAR, value), "{value}");
+            state.sample(Some(&console));
+            assert_eq!(state.opens, opens, "{value}");
+        }
+        assert_eq!(Opens::of(None), Opens::LookAndKey);
+        assert!(Opens::LookAndKey.by_look() && Opens::LookAndKey.by_key());
+        assert!(!Opens::KeyOnly.by_look() && Opens::KeyOnly.by_key());
+        assert!(!Opens::Off.by_look() && !Opens::Off.by_key());
+    }
+
+    /// Frames 50 ms apart from `start` to `end` with `aimed` under the crosshair and `pin`
+    /// pinned: whose card the last one wants.
+    fn looking(
+        state: &mut State,
+        aimed: Option<u16>,
+        pin: Option<u16>,
+        start: i32,
+        end: i32,
+    ) -> (Option<u16>, Option<u16>) {
+        let mut chosen = (None, None);
+        for now in (start..=end).step_by(50) {
+            chosen = state.choose(aimed, pin, false, Vec3::X, now);
+        }
+        chosen
+    }
+
+    /// 1 (and the default) shows a card after a steady look and on `inspect`; Key only (2)
+    /// shows it on `inspect` alone, however long the look; 0 shows none, pinned or not.
+    #[test]
+    fn each_mode_opens_the_card_its_own_way() {
+        let delay = State::default().delay_ms;
+        let mut look = State::default();
+        assert_eq!(
+            looking(&mut look, Some(4), None, 0, delay - 100),
+            (None, None)
+        );
+        assert_eq!(
+            looking(&mut look, Some(4), None, delay, delay + 100).1,
+            Some(4)
+        );
+        assert_eq!(
+            looking(&mut look, None, Some(7), 5_000, 5_000),
+            (Some(7), Some(7)),
+            "pinned"
+        );
+        let mut key = State {
+            opens: Opens::KeyOnly,
+            ..State::default()
+        };
+        assert_eq!(
+            looking(&mut key, Some(4), None, 0, 10 * delay),
+            (None, None),
+            "a long steady look opens nothing"
+        );
+        assert_eq!(
+            looking(&mut key, Some(4), Some(4), 10 * delay, 10 * delay),
+            (Some(4), Some(4)),
+            "inspect does"
+        );
+        // Escape unpins it in Key only too, and goes to the menu once nothing is pinned.
+        key.pin.request();
+        key.pin.resolve(Some(4), true, false);
+        assert!(key.cancel());
+        let mut off = State {
+            opens: Opens::Off,
+            ..State::default()
+        };
+        assert_eq!(
+            looking(&mut off, Some(4), Some(4), 0, 10 * delay),
+            (None, None)
+        );
+        off.pin.request();
+        off.pin.resolve(Some(4), true, false);
+        assert!(!off.cancel(), "off: Escape opens the game menu");
+        // A hidden card (a menu, the scoreboard) shows in no mode.
+        for opens in [Opens::LookAndKey, Opens::KeyOnly] {
+            let mut state = State {
+                opens,
+                ..State::default()
+            };
+            assert_eq!(state.choose(Some(4), Some(4), true, Vec3::X, 0).1, None);
+        }
     }
 
     #[test]

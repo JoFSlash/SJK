@@ -27,7 +27,7 @@ const EF_NODRAW: u32 = 1 << 8;
 /// `WP_MELEE`, `WP_SABER`, `WP_BLASTER`.
 const WP_MELEE: u8 = 2;
 const WP_SABER: u8 = 3;
-const WP_BLASTER: u8 = 4;
+const WP_BLASTER: u8 = 5;
 /// `BUTTON_ATTACK`, `BUTTON_ALT_ATTACK`.
 const BUTTON_ATTACK: u16 = 1;
 const BUTTON_ALT_ATTACK: u16 = 128;
@@ -139,9 +139,127 @@ impl Riding {
     }
 }
 
+#[cfg(test)]
+mod prediction_tests {
+    use super::*;
+    struct Void;
+    impl MovementCollision for Void {
+        fn trace(
+            &self,
+            _: [f32; 3],
+            _: [f32; 3],
+            _: [f32; 3],
+            end: [f32; 3],
+            _: u32,
+        ) -> MovementTrace {
+            MovementTrace::miss(end)
+        }
+    }
+    #[test]
+    fn external_rider_weapons_advance_on_the_client() {
+        for step in [8, 7, 4, 3] {
+            for hidden in [false, true] {
+                let mut predictor = Predictor::from_state(
+                    MovementState {
+                        health: 100,
+                        client_num: 0,
+                        vehicle_entity_num: 42,
+                        weapon: WP_MELEE,
+                        weapons: 1 << WP_MELEE,
+                        weapon_time: 100,
+                        entity_flags: if hidden { EF_NODRAW } else { 0 },
+                        standing_height: 40.0,
+                        ..MovementState::default()
+                    },
+                    MovementConfig::default(),
+                );
+                predictor.set_riding(Some(Riding {
+                    vehicle: 42,
+                    kind: kind::SPEEDER,
+                    pilot: false,
+                    speed: 0.0,
+                    speed_max: 100.0,
+                    orientation: [0.0; 3],
+                    hyperspace_time: 0,
+                    hyperspace_angles: [0.0; 3],
+                    command_moves: None,
+                    ready_for_hyperspace: false,
+                    solid_hack: false,
+                    turnaround: None,
+                }));
+                predictor.predict_command(
+                    UserCommand {
+                        server_time: step,
+                        weapon: WP_MELEE,
+                        ..UserCommand::default()
+                    },
+                    &Void,
+                );
+                assert_eq!(
+                    predictor.state().weapon_time,
+                    if hidden { 100 } else { 100 - step }
+                );
+                assert_eq!(predictor.state().origin, [0.0; 3]);
+            }
+        }
+    }
+}
+
 /// `PM_WeaponOkOnVehicle` (`bg_pmove.c:9713-9727`).
 pub fn weapon_ok_on_vehicle(weapon: u8) -> bool {
     matches!(weapon, WP_MELEE | WP_SABER | WP_BLASTER)
+}
+
+#[cfg(test)]
+mod whitelist_tests {
+    use super::*;
+
+    #[test]
+    fn rider_weapon_ids_match_codemp() {
+        for weapon in 0..crate::LEGACY_WEAPON_COUNT as u8 {
+            assert_eq!(
+                weapon_ok_on_vehicle(weapon),
+                matches!(weapon, 2 | 3 | 5),
+                "weapon {weapon}"
+            );
+        }
+        for step in [8, 7, 4, 3] {
+            let mut predictor = Predictor::from_state(
+                MovementState {
+                    client_num: 0,
+                    vehicle_entity_num: 42,
+                    weapon: 4,
+                    weapons: (1 << 4) | (1 << 5),
+                    ..MovementState::default()
+                },
+                MovementConfig::default(),
+            );
+            let mut command = UserCommand {
+                server_time: step,
+                weapon: 4,
+                ..UserCommand::default()
+            };
+            predictor.set_riding(Some(Riding {
+                vehicle: 42,
+                kind: kind::SPEEDER,
+                pilot: false,
+                speed: 0.0,
+                speed_max: 100.0,
+                orientation: [0.0; 3],
+                hyperspace_time: 0,
+                hyperspace_angles: [0.0; 3],
+                command_moves: None,
+                ready_for_hyperspace: false,
+                solid_hack: false,
+                turnaround: None,
+            }));
+            assert!(predictor.rider_weapon(&mut command));
+            assert_eq!(command.weapon, 5);
+            assert_eq!(predictor.state().weapon, 5);
+            predictor.state_mut().entity_flags |= EF_NODRAW;
+            assert!(!predictor.rider_weapon(&mut command));
+        }
+    }
 }
 
 impl Predictor {
@@ -155,11 +273,10 @@ impl Predictor {
         self.riding
     }
 
-    /// Whether this is a rider's move (`m_iVehicleNum` of a client, with its vehicle).
+    /// Whether this is a rider's move (`m_iVehicleNum` of a client). A passenger
+    /// need not have the optional vehicle context used for piloting prediction.
     pub(super) fn riding_move(&self) -> bool {
-        self.riding.is_some()
-            && self.state.vehicle_entity_num != 0
-            && self.state.client_num < MAX_CLIENTS
+        self.state.vehicle_entity_num != 0 && self.state.client_num < MAX_CLIENTS
     }
 
     /// An NPC that is no vehicle (`CLASS_VEHICLE`, 53) with an `m_iVehicleNum` (`bg_pmove.c:11027-11030`): a
@@ -448,5 +565,79 @@ fn forced_turning(
     for axis in 0..3 {
         let short = crate::npc_think::angle_to_short(state.view_angles[axis]);
         state.delta_angles[axis] = short.wrapping_sub(command.angles[axis]);
+    }
+}
+
+#[cfg(test)]
+mod passenger_tests {
+    use super::*;
+
+    struct Clear;
+    impl MovementCollision for Clear {
+        fn trace(
+            &self,
+            _: [f32; 3],
+            _: [f32; 3],
+            _: [f32; 3],
+            end: [f32; 3],
+            _: u32,
+        ) -> MovementTrace {
+            MovementTrace::miss(end)
+        }
+    }
+
+    #[test]
+    fn passenger_without_chassis_context_does_not_run_physics() {
+        // OpenJK 4d0dfaf1 bg_pmove.c:11027-11031 dispatches from m_iVehicleNum,
+        // not CG_Piloting or the availability of predictedVehicleState.
+        for millis in [8, 7, 4, 3] {
+            for velocity in [[0.0; 3], [80.0, -40.0, 120.0]] {
+                let mut player = sjk_protocol::PlayerState::default();
+                player.stats[0] = 100;
+                let mut predictor =
+                    Predictor::from_player_state(&player, MovementConfig::default());
+                let origin = [20.0, 30.0, 200.0];
+                let state = predictor.state_mut();
+                state.origin = origin;
+                state.velocity = velocity;
+                state.gravity = 800.0;
+                state.speed = 250.0;
+                state.vehicle_entity_num = 100;
+                state.ground_entity_number = ENTITY_NUMBER_NONE;
+                assert!(predictor.riding().is_none());
+                assert!(predictor.riding_move());
+                predictor.predict_command(
+                    UserCommand {
+                        server_time: millis,
+                        forward_move: 127,
+                        right_move: 127,
+                        up_move: 127,
+                        ..Default::default()
+                    },
+                    &Clear,
+                );
+                assert_eq!(
+                    predictor.state().origin,
+                    origin,
+                    "{millis} ms, {velocity:?}"
+                );
+                assert_eq!(predictor.state().velocity, velocity);
+                assert_eq!(predictor.state().command_time, millis);
+
+                // Dismounting restores movement on the next command without any
+                // optional Riding context needing to be installed or removed.
+                predictor.state_mut().vehicle_entity_num = 0;
+                assert!(!predictor.riding_move());
+                predictor.predict_command(
+                    UserCommand {
+                        server_time: millis * 2,
+                        forward_move: 127,
+                        ..Default::default()
+                    },
+                    &Clear,
+                );
+                assert_ne!(predictor.state().origin, origin);
+            }
+        }
     }
 }

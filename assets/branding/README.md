@@ -17,6 +17,7 @@ them is edited by hand.
 | `jawa-emblem.png` | 128, full colour | The JAWA clan's emblem beside JAWA-tagged names ([jof_tag.rs](../../crates/sjk-viewer/src/jof_tag.rs)); the clan's forum icon, a Jawa's hood (60x60, supplied by Sol, not kept here), enlarged by `python scripts/clan_emblem.py <icon.png> <out.png>` (not SJK's emblem) |
 | `s-emblem.png` | 128, full colour | The {{S}} clan's emblem beside `{{S}}`-tagged names ([jof_tag.rs](../../crates/sjk-viewer/src/jof_tag.rs)); the clan's red Sith emblem (178x93 with margins, supplied by Sol, not kept here) by `python scripts/clan_emblem.py <logo.png> <out.png>` (not SJK's emblem) |
 | `jof-ejk-icon.png` | 64, full colour | JoF EternalJK's icon, which an SJK chat message sent from that client starts with in place of SJK's emblem ([sjk_line.rs](../../crates/sjk-viewer/src/chat/view/sjk_line.rs)); supplied by JoF as is (not SJK's emblem) |
+| `sjk-launcher-icon.png` | 64, full colour | The SJK Launcher's icon, which an SJK chat message sent from the launcher's chat window starts with in place of SJK's emblem ([client_icons.rs](../../crates/sjk-viewer/src/chat/client_icons.rs)); made by `python scripts/launcher_icon.py <out.png> 64` in Sol-Vulpes/sjk-launcher (not SJK's emblem) |
 | `sjk.ico` | 16 to 256 | Windows icon of `sjk.exe` and `sjk-server.exe` (the crates' `build.rs`) |
 | `site/assets/sjk-logo-512.png` | 512 | The site's hero |
 | `site/assets/favicon.ico`, `favicon-32.png` | 16 to 48 | The site's favicon and navigation mark |

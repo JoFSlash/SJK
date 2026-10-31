@@ -1979,6 +1979,7 @@ fn skin_glow_at(input: VertexOutput, pixel: f32, x: f32) -> vec3<f32> {
             return sig_coloured(input, glow * sig_edge(input)) * persona_fade(input);
         }
         let ray = sig_ray(input);
+        labRayPrepare(ray.o, ray.d);
         let shown = sig_full(input);
         glow += (max(sig_vol(ray.o, ray.d, pixel), vec3(0.0))
             + max(sig_orbit(ray.o, ray.d, pixel), vec3(0.0))) * shown;
@@ -2255,6 +2256,11 @@ fn fragment_main(input: VertexOutput) -> @location(0) vec4<f32> {
 }
 
 // JA+ black blades use alpha blending, not the additive retail/RGB pass.
+// How many of stock's glow sprites cover a point of a blade (`fragment_black`).
+// A little under stock's 2 / 0.65 (Dave's test, 28/10/2026: the full overlap read as
+// too much black glow in game).
+const BLACK_GLOW_OVERLAP: f32 = 2.2;
+
 @fragment
 fn fragment_black(input: VertexOutput) -> @location(0) vec4<f32> {
     let uv = core_coordinates(input);
@@ -2269,7 +2275,12 @@ fn fragment_black(input: VertexOutput) -> @location(0) vec4<f32> {
     let radius = chain_radius(input.radius, input.length, clamp(along / max(input.length, 0.0001), 0.0, 1.0));
     let glow_uv = vec2(0.5 + input.blade.x / (2.0 * radius), 0.5 + beyond / (2.0 * radius));
     if any(glow_uv < vec2(0.0)) || any(glow_uv > vec2(1.0)) { return vec4(0.0); }
-    return textureSampleLevel(glow_texture, saber_sampler, glow_uv, 0.0);
+    let glow = textureSampleLevel(glow_texture, saber_sampler, glow_uv, 0.0);
+    // Stock's sprite chain (`RB_SurfaceSaberGlow`, rd-vanilla `tr_surface.cpp`) lays a
+    // sprite of the blade's radius every 0.65 radii, so every point of the blade is under
+    // about 2 / 0.65 of them, each blending its alpha over the last: the black blade's
+    // halo is that much darker (thicker) than one sprite (Dave's test, 27/10/2026).
+    return vec4(glow.rgb, 1.0 - pow(1.0 - glow.a, BLACK_GLOW_OVERLAP));
 }
 
 // --- Heat haze: drawn first into the effect layer, replacing its pixels ---------------------
@@ -2481,6 +2492,7 @@ fn fragment_solid(input: VertexOutput) -> @location(0) vec4<f32> {
             return vec4(sig_coloured(input, out.rgb), out.a * sig_edge(input) * persona_fade(input));
         }
         let ray = sig_ray(input);
+        labRayPrepare(ray.o, ray.d);
         let shown = sig_full(input);
         let near = clamp(sig_vol_solid(ray.o, ray.d, pixel), vec4(0.0), vec4(1.0));
         let round = clamp(sig_orbit_solid(ray.o, ray.d, pixel), vec4(0.0), vec4(1.0));
@@ -4321,6 +4333,11 @@ fn sig_edge(input: VertexOutput) -> f32 {
 }
 
 // @signature begin
+fn labRayPrepare(ro: vec3<f32>, rd: vec3<f32>) {
+    // The lab keeps what of its blade hiding depends on the view ray alone (`lab.glsl`,
+    // behindBlade); a module with no signature has nothing to keep.
+}
+
 fn sig_glow(g: vec3<f32>, b: vec2<f32>, r: f32, px: f32) -> vec3<f32> {
     return g;
 }

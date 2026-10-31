@@ -170,6 +170,16 @@ use winit::event::{ElementState, KeyEvent};
 use winit::keyboard::{KeyCode, PhysicalKey};
 
 const INPUT_LIMIT: usize = 512;
+/// The list `sjkemote`'s first argument completes from on Tab
+/// ([`crate::emotes::argument_words`]).
+const EMOTE_ARGUMENTS: &str = "emote";
+/// The client's commands whose first argument Tab completes, beside the shell's
+/// own (`exec`, `devmap`...), one entry per command.
+const ARGUMENT_SOURCES: &[sjk_shell::ArgumentSource] = &[sjk_shell::ArgumentSource {
+    command: crate::emotes::COMMAND,
+    list: EMOTE_ARGUMENTS,
+    label: "Emote",
+}];
 
 /// Toggleable console state owned by the viewer frontend.
 pub(crate) struct ViewerConsole {
@@ -185,6 +195,8 @@ pub(crate) struct ViewerConsole {
     bind_state: sjk_shell::BindState,
     /// Held keys whose bind repeats push or pull (`cl_forceRepeat`).
     force_repeat: crate::input::force_repeat::ForceRepeat,
+    /// Held mouse 4 and 5, pressed again while `in_mouseRepeat` is on.
+    mouse_repeat: crate::input::mouse_repeat::MouseRepeat,
     input: String,
     history: Vec<String>,
     history_index: Option<usize>,
@@ -199,6 +211,9 @@ pub(crate) struct ViewerConsole {
     /// The JoF content card (`jof.downloads`), drawn in place of the console while open.
     #[cfg(feature = "mod-jof")]
     pub(crate) jof_content: crate::jof_content::card::Card,
+    /// The Sith cloud card (`sith.downloads`), the same card with its own words.
+    #[cfg(feature = "mod-jof")]
+    pub(crate) sith_cloud: crate::jof_content::card::Card,
     /// Personal test list of Sol's build, drawn in place of the console while open.
     debug_panel: debug_panel::Panel,
     /// The `modelviewer` page, drawn in place of the console while open.
@@ -261,6 +276,10 @@ pub(crate) struct ViewerConsole {
     box_hunt_on: bool,
     /// The Toys tab asked to turn Box hunt on (`true`) or off, not yet taken.
     pending_box_hunt: Option<bool>,
+    /// The Banana peel toy is on, mirrored as [`Self::order66_on`] is.
+    banana_on: bool,
+    /// The Toys tab asked to turn the Banana peel on (`true`) or off, not yet taken.
+    pending_banana: Option<bool>,
     /// A chip naming a setting was clicked (`console_changelog.rs`): the cvar to search
     /// Settings for, not yet taken.
     pending_settings_search: Option<String>,
@@ -336,6 +355,9 @@ pub(crate) struct ViewerConsole {
     /// The last line `viewpos` or `mark` answered, for Ctrl+C on an empty prompt.
     copied: String,
     pending_quit: bool,
+    /// The Profile page's Change name was pressed: the Profile screen shows its
+    /// Character tab with the Name field open ([`Self::take_name_edit`]).
+    pending_name_edit: bool,
     pending_input: Vec<String>,
     pending_chat: std::collections::VecDeque<(String, u16, u32)>,
     /// Sent whisper recipients paired with their eventual console echo.
@@ -398,6 +420,11 @@ impl ViewerConsole {
             plugin_disable: u32::try_from(self.plugin_disable.value())
                 .unwrap_or(sjk_client::PLUGIN_DISABLE_DEFAULT),
         }
+    }
+
+    /// The existing USERINFO plugin mask, cached for movement/presentation policy.
+    pub(crate) fn plugin_disable_bits(&self) -> u32 {
+        u32::try_from(self.plugin_disable.value()).unwrap_or(sjk_client::PLUGIN_DISABLE_DEFAULT)
     }
 
     /// Cached `cl_showtimedelta` state for the allocation-free runtime read.
@@ -534,11 +561,12 @@ impl ViewerConsole {
         self.open
     }
 
-    /// The JoF content card is open (never in a build without JoF tools).
+    /// A content card (JoF content or the Sith cloud) is open (never in a build
+    /// without JoF tools).
     pub(crate) fn jof_content_open(&self) -> bool {
         #[cfg(feature = "mod-jof")]
         {
-            self.jof_content.open
+            self.jof_content.open || self.sith_cloud.open
         }
         #[cfg(not(feature = "mod-jof"))]
         {
@@ -599,15 +627,30 @@ impl ViewerConsole {
         }
     }
 
-    /// A mouse button bound under `key` went up, wherever the release was routed.
+    /// A mouse button bound under `key` went up, wherever the release was routed: it
+    /// stops repeating push or pull, and its own presses (`in_mouseRepeat`).
     pub(crate) fn force_repeat_button_up(&mut self, key: &str) {
         self.force_repeat.release(key);
+        self.mouse_repeat.release(key);
     }
 
     /// Every key was let go of: the window lost the keyboard.
     pub(crate) fn clear_force_repeat(&mut self) {
         self.force_repeat.clear();
+        self.mouse_repeat.clear();
         self.bind_state.clear();
+    }
+
+    /// Press the held mouse 4 and 5 again when their repeat is due (`in_mouseRepeat`,
+    /// [`crate::input::mouse_repeat`]); called once a frame while the keys are the game's.
+    pub(crate) fn repeat_held_mouse_buttons(&mut self) {
+        let mode = self
+            .integer_cvar(crate::input::mouse_repeat::CVAR)
+            .unwrap_or(0);
+        let now = self.input_millis();
+        for key in self.mouse_repeat.due(mode, now).into_iter().flatten() {
+            self.queue_bound_script(key, true);
+        }
     }
 
     /// The `generic_cmd` a held push or pull key repeats in the next user command.
@@ -618,6 +661,14 @@ impl ViewerConsole {
     /// Add text to the scrollback without showing it among the notify lines.
     pub(crate) fn push_log_quiet(&mut self, text: impl Into<String>) {
         self.shell.push_log_quiet(text);
+    }
+
+    /// Whether `cmdlist` lists command `name` (any case).
+    #[cfg(test)]
+    pub(crate) fn has_command(&self, name: &str) -> bool {
+        self.shell
+            .command_help()
+            .any(|(known, _, _)| known.eq_ignore_ascii_case(name))
     }
 
     /// Queue `text` to run as if typed, on the next command frame.
@@ -633,8 +684,11 @@ impl ViewerConsole {
         let id = key
             .bytes()
             .fold(0_u64, |hash, byte| hash.wrapping_mul(31) + u64::from(byte));
-        if !pressed {
+        if pressed {
+            self.mouse_repeat.press(key, time);
+        } else {
             self.force_repeat.release(key);
+            self.mouse_repeat.release(key);
         }
         let repeat = pressed && self.bool_cvar(crate::input::force_repeat::CVAR) != Some(false);
         match self
@@ -1005,8 +1059,10 @@ impl ViewerConsole {
             return self.asset_browser.draw_list();
         }
         #[cfg(feature = "mod-jof")]
-        if self.open && self.jof_content.open {
-            return self.jof_content.draw_list();
+        if self.open
+            && let Some(draw_list) = self.content_draw_list()
+        {
+            return draw_list;
         }
         if let Some(draw_list) = self.model_viewer_draw_list() {
             return draw_list;
@@ -1098,9 +1154,7 @@ impl ViewerConsole {
             self.dialogue_closed();
             self.asset_browser.open = false;
             #[cfg(feature = "mod-jof")]
-            {
-                self.jof_content.open = false;
-            }
+            self.close_content();
             self.browser.close();
             self.debug_panel.close();
             self.model_viewer.close();
@@ -1138,14 +1192,15 @@ impl ViewerConsole {
     fn complete_command(&mut self, key: CompletionKey) {
         let resolver =
             console_scripting::Resolver::new(&self.config_directory, self.script_vfs.as_deref());
-        let files = |extension: &str| {
-            if extension == sjk_shell::MAP_EXTENSION {
-                resolver.map_names()
-            } else {
-                resolver.root_files(extension)
-            }
+        let lists = |list: &str| match list {
+            sjk_shell::MAP_EXTENSION => resolver.map_names(),
+            EMOTE_ARGUMENTS => crate::emotes::argument_words(self.script_vfs.as_deref()),
+            extension => resolver.root_files(extension),
         };
-        if let Some(line) = self.shell.complete_line_with_files(&self.input, key, files) {
+        let completed =
+            self.shell
+                .complete_line_with_arguments(&self.input, key, ARGUMENT_SOURCES, lists);
+        if let Some(line) = completed {
             self.input = line;
             self.rebuild_prompt();
         }

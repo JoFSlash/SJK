@@ -26,6 +26,9 @@ pub(crate) struct Context {
     /// render scale below; `frame_target::scale::requested`), retained across console-free
     /// map installs.
     pub(crate) render_scale: u32,
+    /// Startup `r_highDpi`: whether [`Self::render_scale`] counts the window's pixels or
+    /// its points (`frame_target::scale::in_points`).
+    pub(crate) high_dpi: bool,
     /// Startup FXAA policy, preserved through background map installation.
     pub(crate) fxaa: bool,
 
@@ -90,80 +93,10 @@ impl Context {
             .as_ref()
             .map(|window| instance.create_surface(window.clone()).map(Arc::new))
             .transpose()?;
-        let adapter = instance
-            .request_adapter(&wgpu::RequestAdapterOptions {
-                power_preference: wgpu::PowerPreference::HighPerformance,
-                compatible_surface: surface.as_deref(),
-                force_fallback_adapter: false,
-                apply_limit_buckets: false,
-            })
-            .await?;
+        let (adapter, device, queue) = open_device(&instance, surface.as_deref()).await?;
         let adapter_info = adapter.get_info();
         crate::crash_report::set_gpu(&adapter_info);
         let hdr = crate::frame_target::aa::hdr::Settings::sample(console);
-        let stage_table = adapter
-            .features()
-            .contains(crate::world_materials::stage_table::FEATURES);
-        let (device, queue) = adapter
-            .request_device(&wgpu::DeviceDescriptor {
-                label: Some("SJK device"),
-                // The stage table binds every world texture in one group, where offered.
-                required_features: (adapter.features() & wgpu::Features::TEXTURE_COMPRESSION_BC)
-                    | crate::gpu_phases::features(&adapter)
-                    | if stage_table {
-                        crate::world_materials::stage_table::FEATURES
-                    } else {
-                        wgpu::Features::empty()
-                    },
-                // The lamp light cache attaches a third RGBA32F receiver target.
-                required_limits: wgpu::Limits {
-                    max_texture_array_layers: adapter.limits().max_texture_array_layers.min(1536),
-                    max_color_attachment_bytes_per_sample: adapter
-                        .limits()
-                        .max_color_attachment_bytes_per_sample
-                        .min(crate::world_materials::lamp_cache::ATTACHMENT_BYTES)
-                        .max(wgpu::Limits::default().max_color_attachment_bytes_per_sample),
-                    max_binding_array_elements_per_shader_stage: if stage_table {
-                        adapter
-                            .limits()
-                            .max_binding_array_elements_per_shader_stage
-                            .min(1 << 16)
-                    } else {
-                        0
-                    },
-                    // Large community maps: the shared vertex buffer of `amjh3te` is 183 MiB,
-                    // above WebGPU's default 128 MiB storage binding (its world install
-                    // failed validation) and close to the default 256 MiB buffer size.
-                    max_storage_buffer_binding_size: adapter
-                        .limits()
-                        .max_storage_buffer_binding_size
-                        .max(wgpu::Limits::default().max_storage_buffer_binding_size),
-                    max_buffer_size: adapter
-                        .limits()
-                        .max_buffer_size
-                        .max(wgpu::Limits::default().max_buffer_size),
-                    max_immediate_size: if stage_table { 16 } else { 0 },
-                    max_binding_array_sampler_elements_per_shader_stage: if stage_table {
-                        adapter
-                            .limits()
-                            .max_binding_array_sampler_elements_per_shader_stage
-                            .min(16)
-                    } else {
-                        0
-                    },
-                    ..wgpu::Limits::default()
-                },
-                experimental_features: wgpu::ExperimentalFeatures::disabled(),
-                // Small blocks: a map change builds the next world while the last one
-                // still lives, and once it goes the 128-256 MiB blocks of `Performance`
-                // stayed partly used, holding about 3 GB of the process at 4K after a few
-                // map changes (`docs/rendering.md`, "GPU memory").
-                memory_hints: wgpu::MemoryHints::Manual {
-                    suballocated_device_memory_block_size: (4 << 20)..(16 << 20),
-                },
-                trace: wgpu::Trace::Off,
-            })
-            .await?;
         crate::gpu_guard::name_uncaptured(&device);
         crate::world_materials::filtering::mips::compress::set_device(device.features());
         let capabilities = surface
@@ -194,6 +127,7 @@ impl Context {
             hdr,
             sun_shadows: crate::world_materials::shadows::settings::Settings::sample(console),
             render_scale: crate::frame_target::scale::requested(console),
+            high_dpi: console.map_or(crate::settings::HIGH_DPI_DEFAULT, crate::settings::high_dpi),
             fxaa: crate::frame_target::aa::enabled(console),
 
             post_color: console.map(|c| c.post_color.clone()).unwrap_or_default(),
@@ -246,6 +180,7 @@ impl Context {
             hdr: crate::frame_target::aa::hdr::Settings::sample(console),
             sun_shadows: crate::world_materials::shadows::settings::Settings::sample(console),
             render_scale: crate::frame_target::scale::requested(console),
+            high_dpi: console.map_or(crate::settings::HIGH_DPI_DEFAULT, crate::settings::high_dpi),
             fxaa: crate::frame_target::aa::enabled(console),
             post_color: self.post_color.clone(),
             dynamic_light_settings: self.dynamic_light_settings.clone(),
@@ -290,4 +225,147 @@ impl Context {
             runtime_settings::preferred_present_mode(&self.present_modes, vsync)
         }
     }
+}
+
+/// The device SJK asks of `adapter`: the features and limits it uses where offered.
+fn device_descriptor(adapter: &wgpu::Adapter) -> wgpu::DeviceDescriptor<'static> {
+    let stage_table = adapter
+        .features()
+        .contains(crate::world_materials::stage_table::FEATURES);
+    wgpu::DeviceDescriptor {
+        label: Some("SJK device"),
+        // The stage table binds every world texture in one group, where offered.
+        required_features: (adapter.features() & wgpu::Features::TEXTURE_COMPRESSION_BC)
+            | crate::gpu_phases::features(adapter)
+            | if stage_table {
+                crate::world_materials::stage_table::FEATURES
+            } else {
+                wgpu::Features::empty()
+            },
+        // The lamp light cache attaches a third RGBA32F receiver target.
+        required_limits: wgpu::Limits {
+            max_texture_array_layers: adapter.limits().max_texture_array_layers.min(1536),
+            max_color_attachment_bytes_per_sample: adapter
+                .limits()
+                .max_color_attachment_bytes_per_sample
+                .min(crate::world_materials::lamp_cache::ATTACHMENT_BYTES)
+                .max(wgpu::Limits::default().max_color_attachment_bytes_per_sample),
+            max_binding_array_elements_per_shader_stage: if stage_table {
+                adapter
+                    .limits()
+                    .max_binding_array_elements_per_shader_stage
+                    .min(1 << 16)
+            } else {
+                0
+            },
+            // Large community maps: the shared vertex buffer of `amjh3te` is 183 MiB,
+            // above WebGPU's default 128 MiB storage binding (its world install
+            // failed validation) and close to the default 256 MiB buffer size.
+            max_storage_buffer_binding_size: adapter
+                .limits()
+                .max_storage_buffer_binding_size
+                .max(wgpu::Limits::default().max_storage_buffer_binding_size),
+            max_buffer_size: adapter
+                .limits()
+                .max_buffer_size
+                .max(wgpu::Limits::default().max_buffer_size),
+            max_immediate_size: if stage_table { 16 } else { 0 },
+            max_binding_array_sampler_elements_per_shader_stage: if stage_table {
+                adapter
+                    .limits()
+                    .max_binding_array_sampler_elements_per_shader_stage
+                    .min(16)
+            } else {
+                0
+            },
+            ..wgpu::Limits::default()
+        },
+        experimental_features: wgpu::ExperimentalFeatures::disabled(),
+        // Small blocks: a map change builds the next world while the last one
+        // still lives, and once it goes the 128-256 MiB blocks of `Performance`
+        // stayed partly used, holding about 3 GB of the process at 4K after a few
+        // map changes (`docs/rendering.md`, "GPU memory").
+        memory_hints: wgpu::MemoryHints::Manual {
+            suballocated_device_memory_block_size: (4 << 20)..(16 << 20),
+        },
+        trace: wgpu::Trace::Off,
+    }
+}
+
+/// Where a graphics card of `kind` comes in the order SJK tries them: the fast card
+/// first (a discrete one, then an integrated one), the software ones last.
+fn adapter_rank(kind: wgpu::DeviceType) -> u8 {
+    match kind {
+        wgpu::DeviceType::DiscreteGpu => 0,
+        wgpu::DeviceType::IntegratedGpu => 1,
+        wgpu::DeviceType::VirtualGpu => 2,
+        wgpu::DeviceType::Other => 3,
+        wgpu::DeviceType::Cpu => 4,
+    }
+}
+
+/// Open the device: on the adapter wgpu picks for high performance first, then, if
+/// that fails, on every other adapter that can draw to `surface`, the fast cards and
+/// Vulkan before DX12 (a laptop with two graphics cards closed at once when the one it
+/// was started on could not open the device, #sjk player chat 28-29/10/2026). Each
+/// failure goes to the log; the last one is returned when none opens.
+async fn open_device(
+    instance: &wgpu::Instance,
+    surface: Option<&wgpu::Surface<'static>>,
+) -> Result<(wgpu::Adapter, wgpu::Device, wgpu::Queue), Box<dyn Error>> {
+    let preferred = instance
+        .request_adapter(&wgpu::RequestAdapterOptions {
+            power_preference: wgpu::PowerPreference::HighPerformance,
+            compatible_surface: surface,
+            force_fallback_adapter: false,
+            apply_limit_buckets: false,
+        })
+        .await;
+    let same = |a: &wgpu::AdapterInfo, b: &wgpu::AdapterInfo| {
+        a.name == b.name && a.backend == b.backend && a.device == b.device
+    };
+    let mut others: Vec<wgpu::Adapter> = instance
+        .enumerate_adapters(wgpu::Backends::all())
+        .await
+        .into_iter()
+        .filter(|adapter| surface.is_none_or(|surface| adapter.is_surface_supported(surface)))
+        .filter(|adapter| {
+            !preferred
+                .as_ref()
+                .is_ok_and(|preferred| same(&preferred.get_info(), &adapter.get_info()))
+        })
+        .collect();
+    others.sort_by_key(|adapter| {
+        let info = adapter.get_info();
+        (
+            adapter_rank(info.device_type),
+            u8::from(info.backend != wgpu::Backend::Vulkan),
+        )
+    });
+    let mut last: Option<Box<dyn Error>> = None;
+    if let Err(error) = &preferred {
+        crate::log::progress(format_args!("gpu: no high-performance adapter: {error}"));
+    }
+    for adapter in preferred.ok().into_iter().chain(others) {
+        let info = adapter.get_info();
+        match adapter.request_device(&device_descriptor(&adapter)).await {
+            Ok((device, queue)) => {
+                if last.is_some() {
+                    crate::log::progress(format_args!(
+                        "gpu: opened {} ({:?}) after the adapters above failed",
+                        info.name, info.backend
+                    ));
+                }
+                return Ok((adapter, device, queue));
+            }
+            Err(error) => {
+                crate::log::progress(format_args!(
+                    "gpu: {} ({:?}, {:?}) could not open the device: {error}",
+                    info.name, info.backend, info.device_type
+                ));
+                last = Some(Box::new(error));
+            }
+        }
+    }
+    Err(last.unwrap_or_else(|| "no graphics adapter can draw to the window".into()))
 }

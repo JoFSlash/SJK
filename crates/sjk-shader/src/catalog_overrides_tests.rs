@@ -115,3 +115,39 @@ fn malformed_override_does_not_discard_valid_normal_definitions() {
     assert_eq!(image(&catalog), "normal");
     assert!(ShaderCatalog::load(&vfs).is_err());
 }
+
+#[test]
+fn a_normal_script_naming_a_shader_twice_keeps_the_first() {
+    // `shaders/oot.shader` (maps/oot.bsp) names textures/oot/wtr_0_yuka_02_4 twice.
+    let mut twice = script("first");
+    twice.extend(script("second"));
+    let mut vfs = VirtualFileSystem::new();
+    let mount = vfs
+        .mount_memory("synthetic", [("shaders/a.shader", twice)])
+        .unwrap();
+    assert_eq!(image(&ShaderCatalog::load(&vfs).unwrap()), "first");
+    assert_eq!(
+        image(&ShaderCatalog::load_with_warnings(&vfs, |_, error| panic!(
+            "{error}"
+        ))),
+        "first"
+    );
+    for trusted in [true, false] {
+        let catalog = ShaderCatalog::load_with_authority(
+            &vfs,
+            |source| trusted && source.mount_id == mount,
+            |_, error| panic!("{error}"),
+            |_, _, _| {},
+        );
+        assert_eq!(image(&catalog), "first", "authoritative {trusted}");
+    }
+    let mut added = ShaderCatalog::default();
+    added.add_unclaimed(
+        &vfs,
+        |source| source.mount_id == mount,
+        |_| false,
+        |_, error| panic!("{error}"),
+        |_, _| {},
+    );
+    assert_eq!(image(&added), "first");
+}

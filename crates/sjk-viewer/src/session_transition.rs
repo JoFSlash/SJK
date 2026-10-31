@@ -253,7 +253,7 @@ fn panic_message(payload: &(dyn std::any::Any + Send)) -> String {
 impl Drop for WorldInstallTask {
     fn drop(&mut self) {
         self.cancelled
-            .store(true, std::sync::atomic::Ordering::Relaxed);
+            .store(true, std::sync::atomic::Ordering::Release);
     }
 }
 
@@ -515,6 +515,7 @@ impl GpuState {
         to.display_suspended = self.display_suspended;
         to.display_changed_at = self.display_changed_at;
         to.applied_resolution = self.applied_resolution;
+        to.applied_high_dpi = self.applied_high_dpi;
         // Preserve a remote connection's command floor across world installs.
         // A local authority has an independent timeline that must never stamp
         // the destination server's commands.
@@ -531,9 +532,14 @@ impl GpuState {
         to.log_request_card = std::mem::take(&mut self.log_request_card);
         to.e2e_whispers = std::mem::take(&mut self.e2e_whispers);
         to.mod_notice = std::mem::take(&mut self.mod_notice);
-        to.whats_new_card = std::mem::take(&mut self.whats_new_card);
+        to.news = std::mem::take(&mut self.news);
         to.load_event_gap = self.load_event_gap.clone();
         to.hitches = std::mem::take(&mut self.hitches);
+        // The trades go on across the map (the toast and what it already said): a world
+        // that started without them took the last refusal the hub gave for a new one and
+        // showed it again at every map change. The game menu does not go on, so neither
+        // does the window's claim to have opened it.
+        to.trades = std::mem::take(&mut self.trades).handed_over();
         to.hitches.settle(now);
         to.completed_map_changes = self.completed_map_changes;
         to.gameplay_input.clear();
@@ -595,6 +601,7 @@ impl GpuState {
             // The map transition is reported when the next map is in, not now.
             loaded.transition_report_pending = false;
         }
+        crate::vfs_lifetime::log("world attach", loaded.vfs.as_ref());
         loaded
     }
 
@@ -642,6 +649,35 @@ impl GpuState {
 #[cfg(test)]
 mod install_tests {
     use super::*;
+
+    #[test]
+    fn a_cancelled_install_worker_releases_its_vfs() {
+        let vfs = Arc::new(sjk_vfs::VirtualFileSystem::new());
+        let weak = Arc::downgrade(&vfs);
+        let cancelled = Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let worker_cancelled = Arc::clone(&cancelled);
+        let (sender, receiver) = mpsc::channel();
+        let worker = std::thread::spawn(move || {
+            while !worker_cancelled.load(std::sync::atomic::Ordering::Acquire) {
+                std::thread::yield_now();
+            }
+            drop(vfs);
+        });
+        let task = WorldInstallTask {
+            receiver,
+            cancelled,
+            result: None,
+            map_path: String::new(),
+            started: Instant::now(),
+            unload: false,
+        };
+
+        drop(task);
+        drop(sender);
+        worker.join().unwrap();
+
+        assert!(weak.upgrade().is_none());
+    }
 
     #[test]
     fn a_panicking_install_reports_what_it_said() {

@@ -17,6 +17,8 @@ mod force_templates;
 mod grid;
 pub(crate) mod icons;
 mod model_icons;
+mod model_rgb;
+pub(crate) use model_rgb::takes_entity_colour;
 mod numeric;
 mod part_icons;
 mod pointer;
@@ -192,6 +194,8 @@ pub(crate) struct PlayerMenu {
     /// the draft's model but wears this one until Apply ([`Self::apply_look`]).
     applied_model: String,
     applied_rgb: [u8; 3],
+    /// The stage's model and whether the player's colour shows on it (`model_rgb.rs`).
+    stage_tintable: Option<(String, bool)>,
     choice: Option<Choice>,
     /// Selected head, torso, legs and skin colour of the current species.
     variants: [usize; 4],
@@ -267,6 +271,7 @@ impl PlayerMenu {
             draft: Draft::default(),
             applied_model: "kyle/default".to_owned(),
             applied_rgb: [255; 3],
+            stage_tintable: None,
             choice: None,
             variants: [0; 4],
             selected: 0,
@@ -318,6 +323,15 @@ impl PlayerMenu {
     /// Show page `index` (Character, Saber, Force), its first row chosen.
     pub(crate) fn show_page(&mut self, index: usize) {
         self.set_page(ProfilePage::ALL[index.min(2)]);
+    }
+
+    /// Show the Character page with its Name field open for typing (the SJK Profile
+    /// tab's Change name), as Enter on the Name row opens it.
+    pub(crate) fn open_name_field(&mut self) {
+        self.set_page(ProfilePage::Character);
+        self.name_before_edit.clone_from(&self.draft.name);
+        self.search_editing = false;
+        self.name_editing = true;
     }
 
     /// Whether the page on show is the Force page, the classic one or the

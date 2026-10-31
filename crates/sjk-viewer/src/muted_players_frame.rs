@@ -83,6 +83,26 @@ impl GpuState {
         self.chat.set_muted_slots(muted);
         // Their look too: the stock blade and its sounds, no holocron (`looks.rs`).
         self.looks.set_muted(muted);
+        // The toys hidden on other players here (Collection > Toys).
+        let console = self.console.as_ref();
+        let seen = |cvar| crate::toy_sight::seen(console, cvar);
+        let mut unseen = 0;
+        for (cvar, bit) in [
+            (
+                crate::toy_sight::ILLUMINATE,
+                crate::looks::Unseen::ILLUMINATE,
+            ),
+            (
+                crate::toy_sight::CARDBOARD_BOX,
+                crate::looks::Unseen::CARDBOARD_BOX,
+            ),
+            (crate::toy_sight::BOOMBOX, crate::looks::Unseen::BOOMBOX),
+        ] {
+            if !seen(cvar) {
+                unseen |= bit;
+            }
+        }
+        self.looks.set_unseen(unseen);
     }
 
     /// Draw the muted players as the stand-in, or as themselves again, when the muted

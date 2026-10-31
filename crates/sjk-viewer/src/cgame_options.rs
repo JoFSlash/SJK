@@ -8,6 +8,7 @@ pub(crate) fn register(cvars: &mut CvarRegistry) -> Result<(), sjk_shell::CvarEr
     crate::hud::family::register(cvars)?;
     crate::hud::kill_feed::register(cvars)?;
     crate::hud::movement::register(cvars)?;
+    crate::hud::movement_keys::register(cvars)?;
     cvars.register(CvarDefinition::new(
         crate::actor_world_submission::force_powers::victim::CVAR,
         true,
@@ -37,6 +38,11 @@ pub(crate) fn register(cvars: &mut CvarRegistry) -> Result<(), sjk_shell::CvarEr
             "Show expired chat while the console is open",
         ),
         (
+            crate::chat::incoming_color::CVAR,
+            0,
+            "Incoming message colour: 0 original, 1-9 chat codes, 10 black; names and outgoing text unchanged",
+        ),
+        (
             "cg_cleanChatbox",
             0,
             "Clean body colours and suppress repeated messages",
@@ -52,9 +58,44 @@ pub(crate) fn register(cvars: &mut CvarRegistry) -> Result<(), sjk_shell::CvarEr
             "The chat key opens on the channel of the last message sent (All, Team, SJK or a whisper); 0 always opens All",
         ),
         (
+            crate::chat::tabs::TEAM_CVAR,
+            1,
+            "Team chat in the chat composer's row of channels; the team chat key still opens it",
+        ),
+        (
+            crate::chat::tabs::SJK_CVAR,
+            1,
+            "SJK chat in the chat composer's row of channels",
+        ),
+        (
+            crate::chat::tabs::ADMIN_CVAR,
+            1,
+            "Admin chat (amsay, read by the server's admins) in the chat composer's row, on JA+ and jaPRO servers",
+        ),
+        (
+            crate::chat::tabs::FILTER_CVAR,
+            1,
+            "While typing, a chat button (Team, SJK, Admin or PM) shows only its own messages; 0 keeps every message and the button only picks where you talk",
+        ),
+        (
+            crate::chat::tabs::PM_CVAR,
+            0,
+            "A PM button in the chat composer's row: replies to players who whispered you, left click next, right click back",
+        ),
+        (
             crate::chat::emoji::CVAR,
             0,
             "Show emoji pictures (gfx/emoji) in place of their names in chat; listEmojis lists them",
+        ),
+        (
+            crate::chat::options::BACKDROP_CVAR,
+            0,
+            "Dark band behind each chat row, its opacity in per cent (0 off to 100)",
+        ),
+        (
+            crate::chat::options::OUTLINE_CVAR,
+            0,
+            "Dark outline round each letter of the chat and the chat field instead of its drop shadow",
         ),
         (
             "cg_fovViewmodelAdjust",
@@ -236,6 +277,12 @@ impl crate::GpuState {
         scoreboard: bool,
     ) {
         self.chat.configure(self.console.as_ref());
+        let admin = self.live_session.as_ref().is_some_and(|session| {
+            crate::chat::tabs::server_has_admin_chat(crate::mods::server_kind(
+                session.compat_profile(),
+            ))
+        });
+        self.chat.set_admin_server(admin);
         self.chat
             .set_scoreboard_layout(crate::scoreboard::behavior::chat_layout(self, scoreboard));
         let visible = self

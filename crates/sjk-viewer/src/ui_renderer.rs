@@ -22,8 +22,9 @@ use icons::IconAtlas;
 pub(crate) use icons::{
     ATLAS_CELLS, BIND_ICON_CELLS, BIND_ICON_FIRST, CROSSHAIR_ICON_CELLS, CROSSHAIR_ICON_FIRST,
     EMOJI_ICON_CELLS, EMOJI_ICON_FIRST, FORCE_ICON_CELLS, FORCE_ICON_FIRST, FORCE_WHEEL_ICON_CELLS,
-    FORCE_WHEEL_ICON_FIRST, HOLOCRON_ICON_FIRST, ICON_CELLS, ICON_SIZE, LOGO_ICON, PART_ICON_CELLS,
-    PART_ICON_FIRST, ROCKET_LOCK_ICON_FIRST, SCOREBOARD_ICON_CELLS, VEHICLE_CROSSHAIR_ICON,
+    FORCE_WHEEL_ICON_FIRST, HOLOCRON_ICON_FIRST, ICON_CELLS, ICON_SIZE, LOGO_ICON,
+    MOVEMENT_KEY_ICON_CELLS, MOVEMENT_KEY_ICON_FIRST, PART_ICON_CELLS, PART_ICON_FIRST,
+    ROCKET_LOCK_ICON_FIRST, SCOREBOARD_ICON_CELLS, VEHICLE_CROSSHAIR_ICON,
 };
 pub(crate) use levelshot::LEVELSHOT_TEXTURE;
 use medal_art::MedalTextures;
@@ -38,11 +39,31 @@ pub(crate) const HUD_PREVIEW_TEXTURE: sjk_ui::TextureId = sjk_ui::TextureId(u32:
 /// ([`crate::blade_pictures`]), bound by [`ShapeRenderer::set_blade_pictures`] and added
 /// over what is below (the blades' light, in display values).
 pub(crate) const BLADE_PICTURES_TEXTURE: sjk_ui::TextureId = sjk_ui::TextureId(u32::MAX - 4);
+/// Pictures the News panel shows at once, each its own texture ([`news_image_texture`]).
+pub(crate) const NEWS_IMAGE_SLOTS: usize = 3;
+/// The first News picture's texture id; the others follow it.
+const NEWS_IMAGE_FIRST: u32 = u32::MAX - 4 - NEWS_IMAGE_SLOTS as u32;
+
+/// `TexturedQuad` texture naming News picture slot `slot` ([`crate::news_images`]),
+/// uploaded by [`ShapeRenderer::upload_news_image`].
+pub(crate) fn news_image_texture(slot: usize) -> sjk_ui::TextureId {
+    sjk_ui::TextureId(NEWS_IMAGE_FIRST + slot.min(NEWS_IMAGE_SLOTS - 1) as u32)
+}
+
+/// The News picture slot `texture` names.
+fn news_slot_of(texture: sjk_ui::TextureId) -> Option<u8> {
+    (NEWS_IMAGE_FIRST..NEWS_IMAGE_FIRST + NEWS_IMAGE_SLOTS as u32)
+        .contains(&texture.0)
+        .then(|| (texture.0 - NEWS_IMAGE_FIRST) as u8)
+}
 /// `TexturedQuad` texture naming SJK's emblem, uploaded once at start.
 pub(crate) const LOGO_TEXTURE: sjk_ui::TextureId = sjk_ui::TextureId(LOGO_ICON);
 /// `TexturedQuad` texture naming JoF EternalJK's icon, which SJK chat messages sent from
 /// it start with in place of SJK's emblem, uploaded once at start.
 pub(crate) const EJK_TEXTURE: sjk_ui::TextureId = sjk_ui::TextureId(icons::EJK_ICON);
+/// `TexturedQuad` texture naming the SJK Launcher's icon, which SJK chat messages sent from
+/// its chat window start with in place of SJK's emblem, uploaded once at start.
+pub(crate) const LAUNCHER_TEXTURE: sjk_ui::TextureId = sjk_ui::TextureId(icons::LAUNCHER_ICON);
 /// `TexturedQuad` texture naming the gold verified badge, drawn once at start.
 pub(crate) const VERIFIED_TEXTURE: sjk_ui::TextureId = sjk_ui::TextureId(icons::VERIFIED_ICON);
 /// `TexturedQuad` texture naming the trust mark for `trust` (`trust_badge`), drawn once
@@ -183,6 +204,8 @@ use levelshot::LevelshotTexture;
 const SJK_EMBLEM: &[u8] = include_bytes!("../../../assets/branding/sjk-logo-512.png");
 /// JoF EternalJK's icon, scaled into one icon cell at start.
 const EJK_ICON: &[u8] = include_bytes!("../../../assets/branding/jof-ejk-icon.png");
+/// The SJK Launcher's icon, scaled into one icon cell at start.
+const LAUNCHER_ICON: &[u8] = include_bytes!("../../../assets/branding/sjk-launcher-icon.png");
 
 /// Shape vertices one frame may draw (six per quad), across every layer: the Collection alone
 /// may fill its [`crate::console::collection_panel::DRAW_COMMANDS`] (#117: its Forge reached
@@ -200,6 +223,9 @@ const AURA_MODE: f32 = 5.0;
 
 /// `parameters.y` value that selects the card finish shader path (`ui_shapes.wgsl`).
 const SHINE_MODE: f32 = 6.0;
+
+/// `parameters.y` value that selects the convex polygon shader path (`ui_shapes.wgsl`).
+const POLYGON_MODE: f32 = 7.0;
 
 #[repr(C)]
 #[derive(Clone, Copy, Pod, Zeroable)]
@@ -281,6 +307,9 @@ pub(crate) fn texture_switches(lists: &[&DrawList]) -> usize {
             Some(piece) => Source::Art(piece),
             None if texture == LEVELSHOT_TEXTURE => Source::Levelshot,
             None if texture == HUD_PREVIEW_TEXTURE => Source::HudPreview,
+            None if news_slot_of(texture).is_some() => {
+                Source::News(news_slot_of(texture).unwrap_or_default())
+            }
             None if texture == PREVIEW_TEXTURE => Source::Preview,
             None if texture == BLADE_PICTURES_TEXTURE => Source::BladePictures,
             None if crate::chat_gifs::slot_of(texture).is_some() => {
@@ -335,6 +364,8 @@ pub(crate) struct ShapeRenderer {
     levelshot: LevelshotTexture,
     /// The HUD picker's preview of the highlighted HUD.
     hud_preview: LevelshotTexture,
+    /// The News panel's pictures on show.
+    news: Vec<LevelshotTexture>,
     /// The model preview's display texture, once one exists.
     preview: Option<wgpu::BindGroup>,
     blade_pictures: Option<wgpu::BindGroup>,
@@ -426,9 +457,13 @@ impl ShapeRenderer {
         let icons = IconAtlas::new(device, &texture_layout);
         let levelshot = LevelshotTexture::new(device, &texture_layout);
         let hud_preview = LevelshotTexture::new(device, &texture_layout);
+        let news = (0..NEWS_IMAGE_SLOTS)
+            .map(|_| LevelshotTexture::new(device, &texture_layout))
+            .collect();
         for (name, bytes, texture) in [
             ("SJK emblem", SJK_EMBLEM, LOGO_TEXTURE),
             ("JoF EternalJK icon", EJK_ICON, EJK_TEXTURE),
+            ("SJK Launcher icon", LAUNCHER_ICON, LAUNCHER_TEXTURE),
         ] {
             match image::load_from_memory(bytes) {
                 Ok(emblem) => {
@@ -540,6 +575,7 @@ impl ShapeRenderer {
             gifs: GifTextures::new(),
             levelshot,
             hud_preview,
+            news,
             preview: None,
             blade_pictures: None,
             preview_sampler: device.create_sampler(&wgpu::SamplerDescriptor {
@@ -797,6 +833,7 @@ impl ShapeRenderer {
                         | Source::Gif(_)
                         | Source::Levelshot
                         | Source::HudPreview
+                        | Source::News(_)
                         | Source::BladePictures
                         | Source::Preview => ([0.0, 0.0], [1.0, 1.0]),
                         Source::Atlas => icons::uv_range(animated(texture, now)),
@@ -856,6 +893,7 @@ impl ShapeRenderer {
                         | Source::Gif(_)
                         | Source::Levelshot
                         | Source::HudPreview
+                        | Source::News(_)
                         | Source::Preview => uv,
                         // A blade picture is clipped as other shapes are (it scrolls in
                         // the Collection's list): its coordinates are an upright
@@ -957,6 +995,45 @@ impl ShapeRenderer {
                     (clips[clip_depth], rounds[clip_depth]),
                     viewport,
                 ),
+                DrawCommand::Polygon {
+                    points,
+                    count,
+                    color,
+                    texture,
+                } => {
+                    let uv = match texture {
+                        None => {
+                            art::untextured(&mut self.runs, self.vertices.len());
+                            None
+                        }
+                        Some((texture, [low, high])) => {
+                            let Some(source) = self.texture_source(queue, texture, now) else {
+                                continue;
+                            };
+                            Some(match source {
+                                Source::Atlas => {
+                                    let (cell_low, cell_high) =
+                                        icons::uv_range(animated(texture, now));
+                                    let at = |[s, t]: [f32; 2]| {
+                                        [
+                                            cell_low[0] + s * (cell_high[0] - cell_low[0]),
+                                            cell_low[1] + t * (cell_high[1] - cell_low[1]),
+                                        ]
+                                    };
+                                    (at(low), at(high))
+                                }
+                                _ => (low, high),
+                            })
+                        }
+                    };
+                    self.push_polygon(
+                        &points[..usize::from(count).min(points.len())],
+                        color,
+                        uv,
+                        opacity[opacity_depth],
+                        viewport,
+                    );
+                }
                 DrawCommand::Text { .. }
                 | DrawCommand::PushClip(_)
                 | DrawCommand::PushRoundedClip { .. }
@@ -1007,6 +1084,9 @@ impl ShapeRenderer {
             Some(_) => return None,
             None if texture == LEVELSHOT_TEXTURE => Source::Levelshot,
             None if texture == HUD_PREVIEW_TEXTURE => Source::HudPreview,
+            None if news_slot_of(texture).is_some() => {
+                Source::News(news_slot_of(texture).unwrap_or_default())
+            }
             None if texture == PREVIEW_TEXTURE => match self.preview {
                 Some(_) => Source::Preview,
                 None => return None,
@@ -1080,6 +1160,10 @@ impl ShapeRenderer {
                 Source::Gif(slot) => self.gifs.group(usize::from(slot)),
                 Source::Levelshot => Some(self.levelshot.bind_group()),
                 Source::HudPreview => Some(self.hud_preview.bind_group()),
+                Source::News(slot) => self
+                    .news
+                    .get(usize::from(slot))
+                    .map(LevelshotTexture::bind_group),
                 Source::Preview => self.preview.as_ref(),
                 Source::BladePictures => self.blade_pictures.as_ref(),
                 Source::Atlas => None,
@@ -1248,6 +1332,70 @@ impl ShapeRenderer {
             self.vertices.push(vertex(points[0]));
             self.vertices.push(vertex(points[index]));
             self.vertices.push(vertex(points[index + 1]));
+        }
+    }
+
+    /// A convex polygon as a fan of triangles from its middle, each carrying its
+    /// distance to its outer edge for the shader to fade the last pixel (mode 7);
+    /// textured when `uv` gives the texture coordinates of its bounding box's top-left
+    /// and bottom-right corners.
+    fn push_polygon(
+        &mut self,
+        points: &[[f32; 2]],
+        color: Color,
+        uv: Option<([f32; 2], [f32; 2])>,
+        opacity: f32,
+        viewport: [f32; 2],
+    ) {
+        let count = points.len();
+        if count < 3
+            || self.vertices.len() + 3 * count > MAX_SHAPE_VERTICES
+            || points.iter().flatten().any(|value| !value.is_finite())
+        {
+            return;
+        }
+        let middle = points
+            .iter()
+            .fold([0.0, 0.0], |sum, [x, y]| [sum[0] + x, sum[1] + y])
+            .map(|sum| sum / count as f32);
+        let (mut low, mut high) = ([f32::MAX; 2], [f32::MIN; 2]);
+        for [x, y] in points {
+            low = [low[0].min(*x), low[1].min(*y)];
+            high = [high[0].max(*x), high[1].max(*y)];
+        }
+        let size = [(high[0] - low[0]).max(1e-6), (high[1] - low[1]).max(1e-6)];
+        let position =
+            |[x, y]: [f32; 2]| [x / viewport[0] * 2.0 - 1.0, 1.0 - y / viewport[1] * 2.0];
+        let tint = [color.r, color.g, color.b, color.a * opacity];
+        let (textured, (uv_low, uv_high)) = match uv {
+            Some(uv) => (1.0, uv),
+            None => (0.0, ([0.0; 2], [0.0; 2])),
+        };
+        let vertex = |point: [f32; 2], edge: f32| ShapeVertex {
+            position: position(point),
+            local: [edge, 0.0],
+            size,
+            start_color: tint,
+            end_color: tint,
+            parameters: [textured, POLYGON_MODE],
+            uv: [
+                uv_low[0] + (uv_high[0] - uv_low[0]) * (point[0] - low[0]) / size[0],
+                uv_low[1] + (uv_high[1] - uv_low[1]) * (point[1] - low[1]) / size[1],
+            ],
+        };
+        for index in 0..count {
+            let (from, to) = (points[index], points[(index + 1) % count]);
+            let along = [to[0] - from[0], to[1] - from[1]];
+            let length = along[0].hypot(along[1]);
+            if length < 1e-4 {
+                continue;
+            }
+            // The middle's distance from this edge: the fan is wound either way.
+            let reach = ((middle[0] - from[0]) * along[1] - (middle[1] - from[1]) * along[0]).abs()
+                / length;
+            self.vertices.push(vertex(middle, reach));
+            self.vertices.push(vertex(from, 0.0));
+            self.vertices.push(vertex(to, 0.0));
         }
     }
 
@@ -1479,6 +1627,19 @@ impl ShapeRenderer {
             .upload(device, queue, &self.texture_layout, image);
     }
 
+    /// Replace News picture slot `slot` ([`news_image_texture`]) with `image`.
+    pub(crate) fn upload_news_image(
+        &mut self,
+        device: &wgpu::Device,
+        queue: &crate::frame_queue::FrameQueue,
+        slot: usize,
+        image: &crate::menu::levelshot::LevelshotImage,
+    ) {
+        if let Some(texture) = self.news.get_mut(slot) {
+            texture.upload(device, queue, &self.texture_layout, image);
+        }
+    }
+
     /// Replace the HUD picker's preview sampled by `TexturedQuad` commands
     /// naming [`HUD_PREVIEW_TEXTURE`] with `image`.
     pub(crate) fn upload_hud_preview(
@@ -1700,6 +1861,31 @@ pub(crate) fn append_text_commands_where<'a>(
     style: text::TextStyle,
     palette: text::CodePalette,
 ) {
+    append_text_commands_paletted(
+        draw_list,
+        resolve,
+        keep,
+        vertices,
+        font,
+        viewport,
+        style,
+        |_| palette,
+    );
+}
+
+/// [`append_text_commands_where`], each command's colour codes and edge drawn in the
+/// palette `palette_of` gives for its id (the chat's outline, `cg_chatBoxOutline`).
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn append_text_commands_paletted<'a>(
+    draw_list: &DrawList,
+    resolve: impl Fn(TextId) -> &'a str,
+    keep: impl Fn(TextId, &str) -> bool,
+    vertices: &mut Vec<TextVertex>,
+    font: &UiFont,
+    viewport: [f32; 2],
+    style: text::TextStyle,
+    palette_of: impl Fn(TextId) -> text::CodePalette,
+) {
     let mut opacity = [1.0_f32; 8];
     let mut opacity_depth = 0_usize;
     let mut clips = [Rect::new(0.0, 0.0, viewport[0], viewport[1]); 8];
@@ -1778,7 +1964,7 @@ pub(crate) fn append_text_commands_where<'a>(
             [color.r, color.g, color.b, color.a * opacity[opacity_depth]],
             placement.letter_spacing,
             *overflow,
-            palette,
+            palette_of(*id),
         );
         if let Some(transform) = transforms[transform_depth] {
             text::map_vertices(&mut vertices[start..], |point| {

@@ -624,6 +624,8 @@ impl ClientMenu {
     /// or resolution list's card over either.
     pub(crate) fn append_sjk_settings(&mut self, target: TextTarget<'_>, viewport: [f32; 2]) {
         let reveal = self.screen_reveal();
+        // A held slider may peek at a match behind, never at the menu's map.
+        self.settings.set_world_behind(self.opened_from_game());
         if self.settings.hud_picker_open() {
             self.settings
                 .append_hud_picker_sjk(target, viewport, reveal);
@@ -672,6 +674,24 @@ fn category_of_tab(caption: &str) -> usize {
 
 #[cfg(test)]
 impl ClientMenu {
+    /// Settings > Graphics over a match with `cvar`'s row focused, its slider
+    /// held long enough to peek when `held` (world shots).
+    pub(crate) fn sjk_slider_peek_for_shot(
+        &mut self,
+        console: &ViewerConsole,
+        cvar: &str,
+        held: bool,
+    ) {
+        if !self.sjk_settings_on_show() {
+            self.open_sjk_renderer(console, ReturnTarget::InGame);
+        }
+        if held {
+            self.settings.peek_for_shot(cvar);
+        } else {
+            self.settings.select_cvar(cvar);
+        }
+    }
+
     /// The SJK UI's Key bindings, the action of `command` focused and awaiting
     /// its second key when `capture` (world shots).
     pub(crate) fn sjk_keys_for_shot(

@@ -69,9 +69,10 @@ pub(super) enum ValueKind {
     /// A chat kind's preview (not a cvar; its name is the console command that plays
     /// the same, `chat_sounds.rs`): Enter or a click plays the kind's chosen sound.
     SoundPreview,
-    /// Open the JoF content card (`jof.downloads`, `crate::jof_content`).
+    /// Open a content card: JoF content (`jof.downloads`, `crate::jof_content`) or the
+    /// Sith cloud (`sith.downloads`, `crate::sith_cloud`); the row's cvar is the command.
     #[cfg_attr(not(feature = "mod-jof"), allow(dead_code))]
-    JofContent,
+    ContentCard,
     /// `cl_gameplayFps`: Left/Right step through the presets (125, 142, 250,
     /// 333); Enter opens the card that explains it and takes any value
     /// ([`crate::gameplay_fps`]).
@@ -128,6 +129,11 @@ pub(super) const VIDEO: &[Setting] = &[
         label: "Resolution",
         cvar: "r_resolution",
         kind: ValueKind::Resolution,
+    },
+    Setting {
+        label: "High DPI (reload)",
+        cvar: super::display::HIGH_DPI_CVAR,
+        kind: ValueKind::Bool,
     },
     Setting {
         label: "Display mode",
@@ -375,6 +381,11 @@ pub(super) const AUDIO: &[Setting] = &[
         kind: ValueKind::Bool,
     },
     Setting {
+        label: "Banana peel sounds",
+        cvar: crate::toy_sounds::Toy::Banana.cvar(),
+        kind: ValueKind::Bool,
+    },
+    Setting {
         label: "Unlock sound",
         cvar: crate::unlock_toast::SOUND_CVAR,
         kind: ValueKind::Bool,
@@ -466,6 +477,11 @@ pub(super) const HUD_OPTIONS: &[Setting] = &[
         kind: ValueKind::Bool,
     },
     Setting {
+        label: "Movement keys",
+        cvar: crate::hud::movement_keys::CVAR,
+        kind: ValueKind::Bool,
+    },
+    Setting {
         label: "Strafe lines",
         cvar: crate::hud::movement::LINES_ROW,
         kind: ValueKind::Bool,
@@ -538,6 +554,24 @@ pub(super) const HUD: &[Setting] = &[
         },
     },
     Setting {
+        label: "Radial HUD spacing",
+        cvar: crate::hud::RadialPlacement::SPREAD_CVAR,
+        kind: ValueKind::Float {
+            min: 0.0,
+            max: 250.0,
+            step: 10.0,
+        },
+    },
+    Setting {
+        label: "Radial HUD height",
+        cvar: crate::hud::RadialPlacement::HEIGHT_CVAR,
+        kind: ValueKind::Float {
+            min: -20.0,
+            max: 40.0,
+            step: 1.0,
+        },
+    },
+    Setting {
         label: "Status (health / armour / force)",
         cvar: "cg_drawStatus",
         kind: ValueKind::Bool,
@@ -596,8 +630,8 @@ pub(super) const HUD: &[Setting] = &[
     },
     Setting {
         label: "Player card",
-        cvar: "cg_playerCard",
-        kind: ValueKind::Bool,
+        cvar: crate::hud::player_card::CVAR,
+        kind: ValueKind::Choice(&["0", "1", "2"]),
     },
     Setting {
         label: "Card delay (s)",
@@ -622,6 +656,11 @@ pub(super) const HUD: &[Setting] = &[
         label: "See & share nameplates",
         cvar: "cg_nameplate",
         kind: ValueKind::Bool,
+    },
+    Setting {
+        label: "Nameplate style",
+        cvar: crate::hud::nameplate::STYLE_CVAR,
+        kind: ValueKind::Choice(&["0", "1", "2"]),
     },
     Setting {
         label: "Nameplate range",
@@ -670,9 +709,9 @@ pub(super) const HUD: &[Setting] = &[
         kind: ValueKind::Bool,
     },
     Setting {
-        label: "Weapon icon",
-        cvar: "cg_nameplateWeapon",
-        kind: ValueKind::Bool,
+        label: "Name outline",
+        cvar: "cg_nameplateOutline",
+        kind: ValueKind::Choice(&["0", "1", "2"]),
     },
     Setting {
         label: "My own nameplate",
@@ -750,8 +789,8 @@ pub(super) const HUD: &[Setting] = &[
     },
     Setting {
         label: "Lagometer",
-        cvar: "cg_lagometer",
-        kind: ValueKind::Bool,
+        cvar: crate::hud::lagometer::CVAR,
+        kind: ValueKind::Choice(&["0", "1", "2", "3"]),
     },
     Setting {
         label: "Lagometer scale",
@@ -797,6 +836,31 @@ pub(super) const HUD: &[Setting] = &[
         kind: ValueKind::Bool,
     },
     Setting {
+        label: "Tabs hide other chat",
+        cvar: crate::chat::tabs::FILTER_CVAR,
+        kind: ValueKind::Bool,
+    },
+    Setting {
+        label: "Team chat button",
+        cvar: crate::chat::tabs::TEAM_CVAR,
+        kind: ValueKind::Bool,
+    },
+    Setting {
+        label: "SJK chat button",
+        cvar: crate::chat::tabs::SJK_CVAR,
+        kind: ValueKind::Bool,
+    },
+    Setting {
+        label: "Admin chat button",
+        cvar: crate::chat::tabs::ADMIN_CVAR,
+        kind: ValueKind::Bool,
+    },
+    Setting {
+        label: "PM chat button",
+        cvar: crate::chat::tabs::PM_CVAR,
+        kind: ValueKind::Bool,
+    },
+    Setting {
         label: "Chat line spacing",
         cvar: crate::chat::options::LINE_SPACING_CVAR,
         kind: ValueKind::Float {
@@ -813,6 +877,25 @@ pub(super) const HUD: &[Setting] = &[
             max: 8.0,
             step: 0.5,
         },
+    },
+    Setting {
+        label: "Chat backdrop (%)",
+        cvar: crate::chat::options::BACKDROP_CVAR,
+        kind: ValueKind::Integer {
+            min: 0,
+            max: 100,
+            step: 10,
+        },
+    },
+    Setting {
+        label: "Incoming chat colour",
+        cvar: crate::chat::incoming_color::CVAR,
+        kind: ValueKind::Choice(crate::chat::incoming_color::CHOICES),
+    },
+    Setting {
+        label: "Chat text outline",
+        cvar: crate::chat::options::OUTLINE_CVAR,
+        kind: ValueKind::Bool,
     },
     Setting {
         label: "Chat card size",
@@ -888,6 +971,11 @@ pub(super) const CONTROLS: &[Setting] = &[
         cvar: crate::input::force_repeat::CVAR,
         kind: ValueKind::Bool,
     },
+    Setting {
+        label: "Hold mouse 4/5 repeats",
+        cvar: crate::input::mouse_repeat::CVAR,
+        kind: ValueKind::Choice(&["0", "1", "2"]),
+    },
 ];
 pub(super) const GAME: &[Setting] = &[
     Setting {
@@ -940,6 +1028,24 @@ pub(super) const GAME: &[Setting] = &[
         },
     },
     Setting {
+        label: "Blade core thickness",
+        cvar: crate::saber_core::CVAR,
+        kind: ValueKind::Float {
+            min: crate::saber_core::MIN as f64,
+            max: crate::saber_core::MAX as f64,
+            step: 0.1,
+        },
+    },
+    Setting {
+        label: "Saber hit sparks",
+        cvar: crate::impacts::FLESH_SPARKS_CVAR,
+        kind: ValueKind::Integer {
+            min: 0,
+            max: crate::impacts::FLESH_SPARKS_ALL as i64,
+            step: 1,
+        },
+    },
+    Setting {
         label: "Team saber colours",
         cvar: crate::team_sabers::TEAM_COLORS_CVAR,
         kind: ValueKind::Bool,
@@ -972,6 +1078,36 @@ pub(super) const GAME: &[Setting] = &[
     Setting {
         label: "Show monitors",
         cvar: crate::monitor::SHOW_CVAR,
+        kind: ValueKind::Bool,
+    },
+    Setting {
+        label: "Show banana peels",
+        cvar: crate::banana::SHOW_CVAR,
+        kind: ValueKind::Bool,
+    },
+    Setting {
+        label: "Show others' holocrons",
+        cvar: crate::toy_sight::ILLUMINATE,
+        kind: ValueKind::Bool,
+    },
+    Setting {
+        label: "Show others' boxes",
+        cvar: crate::toy_sight::CARDBOARD_BOX,
+        kind: ValueKind::Bool,
+    },
+    Setting {
+        label: "Show others' ragdolls",
+        cvar: crate::toy_sight::RAGDOLL,
+        kind: ValueKind::Bool,
+    },
+    Setting {
+        label: "Show others' drones",
+        cvar: crate::toy_sight::DRONE,
+        kind: ValueKind::Bool,
+    },
+    Setting {
+        label: "Show others' boomboxes",
+        cvar: crate::toy_sight::BOOMBOX,
         kind: ValueKind::Bool,
     },
     Setting {
@@ -1247,6 +1383,11 @@ pub(super) const GAME: &[Setting] = &[
         kind: ValueKind::Bool,
     },
     Setting {
+        label: "Prediction",
+        cvar: "cg_predictLegacy",
+        kind: ValueKind::Choice(&["0", "255"]),
+    },
+    Setting {
         label: "Prediction error smoothing (ms)",
         cvar: "cg_errorDecay",
         kind: ValueKind::Float {
@@ -1268,6 +1409,11 @@ pub(super) const GAME: &[Setting] = &[
     Setting {
         label: "Support SJK",
         cvar: crate::support_links::CVAR,
+        kind: ValueKind::Bool,
+    },
+    Setting {
+        label: "Slider peek",
+        cvar: super::slider_peek::CVAR,
         kind: ValueKind::Bool,
     },
     Setting {
@@ -1312,18 +1458,117 @@ pub(super) const GAME: &[Setting] = &[
         cvar: "mod_jof",
         kind: ValueKind::Bool,
     },
+    // JA+ and jaPRO plugin options (`docs/mods.md`): each a bit of `cp_pluginDisable`,
+    // named after the feature (`settings/plugin_rows.rs`, the mods' tables).
+    #[cfg(feature = "mod-japlus")]
+    Setting {
+        label: "See others in duels (JA+)",
+        cvar: "japlus.plugin 1",
+        kind: ValueKind::Bool,
+    },
+    #[cfg(feature = "mod-japlus")]
+    Setting {
+        label: "Black sabers (JA+)",
+        cvar: "japlus.plugin 3",
+        kind: ValueKind::Bool,
+    },
+    #[cfg(feature = "mod-japlus")]
+    Setting {
+        label: "New Force effects (JA+)",
+        cvar: "japlus.plugin 5",
+        kind: ValueKind::Bool,
+    },
+    #[cfg(feature = "mod-japlus")]
+    Setting {
+        label: "Staff on the back (JA+)",
+        cvar: "japlus.plugin 9",
+        kind: ValueKind::Bool,
+    },
+    #[cfg(feature = "mod-japlus")]
+    Setting {
+        label: "Holstered sabers (JA+)",
+        cvar: "japlus.plugin 15",
+        kind: ValueKind::Bool,
+    },
+    #[cfg(feature = "mod-japro")]
+    Setting {
+        label: "Black sabers (jaPRO)",
+        cvar: "japro.plugin 0",
+        kind: ValueKind::Bool,
+    },
+    #[cfg(feature = "mod-japro")]
+    Setting {
+        label: "Force jumps (jaPRO)",
+        cvar: "japro.plugin 1",
+        kind: ValueKind::Bool,
+    },
+    #[cfg(feature = "mod-japro")]
+    Setting {
+        label: "Respawn where you fell (jaPRO)",
+        cvar: "japro.plugin 5",
+        kind: ValueKind::Bool,
+    },
+    #[cfg(feature = "mod-japro")]
+    Setting {
+        label: "Checkpoints on screen (jaPRO)",
+        cvar: "japro.plugin 6",
+        kind: ValueKind::Bool,
+    },
+    #[cfg(feature = "mod-japro")]
+    Setting {
+        label: "Checkpoints in chat (jaPRO)",
+        cvar: "japro.plugin 7",
+        kind: ValueKind::Bool,
+    },
+    #[cfg(feature = "mod-japro")]
+    Setting {
+        label: "Damage numbers (jaPRO)",
+        cvar: "japro.plugin 8",
+        kind: ValueKind::Bool,
+    },
+    #[cfg(feature = "mod-japro")]
+    Setting {
+        label: "Shots from the centre (jaPRO)",
+        cvar: "japro.plugin 9",
+        kind: ValueKind::Bool,
+    },
+    #[cfg(feature = "mod-japro")]
+    Setting {
+        label: "Checkpoints in console (jaPRO)",
+        cvar: "japro.plugin 10",
+        kind: ValueKind::Bool,
+    },
     // JoF content (`docs/jof-content.md`): its card, and where it downloads from.
     #[cfg(feature = "mod-jof")]
     Setting {
         label: "JoF content",
         cvar: crate::jof_content::COMMAND,
-        kind: ValueKind::JofContent,
+        kind: ValueKind::ContentCard,
+    },
+    #[cfg(feature = "mod-jof")]
+    Setting {
+        label: "JoF content auto-update",
+        cvar: crate::jof_content::AUTO,
+        kind: ValueKind::Bool,
     },
     #[cfg(feature = "mod-jof")]
     Setting {
         label: "JoF content host",
         cvar: crate::jof_content::SOURCE,
         kind: ValueKind::Choice(&crate::jof_content::SOURCES),
+    },
+    // The Sith cloud (`docs/sith-cloud.md`): the S community's server, on the same card.
+    #[cfg(feature = "mod-jof")]
+    Setting {
+        label: "Sith cloud",
+        cvar: crate::sith_cloud::COMMAND,
+        kind: ValueKind::ContentCard,
+    },
+    #[cfg(feature = "mod-jof")]
+    Setting {
+        label: "Sith cloud auto-update",
+        cvar: crate::sith_cloud::AUTO,
+        kind: ValueKind::Bool,
     },
     Setting {
         label: "Invisible brushes",
@@ -1512,6 +1757,11 @@ pub(super) const TEXT: &[Setting] = &[
         kind: ValueKind::Bool,
     },
     Setting {
+        label: "Console over chat",
+        cvar: crate::console::console_options::OVER_CHAT_CVAR,
+        kind: ValueKind::Bool,
+    },
+    Setting {
         label: "Other clients' text",
         cvar: crate::text::charset::CVAR,
         kind: ValueKind::Choice(&crate::text::charset::NAMES),
@@ -1575,6 +1825,11 @@ pub(super) const RENDER_IMAGE: &[Setting] = &[
         label: "Dynamic glow",
         cvar: "r_DynamicGlow",
         kind: ValueKind::Choice(&["0", "1", "2"]),
+    },
+    Setting {
+        label: "No glow on sabers",
+        cvar: crate::frame_target::aa::glow::NO_SABERS_CVAR,
+        kind: ValueKind::Bool,
     },
     Setting {
         label: "Glow style",
@@ -1725,6 +1980,11 @@ pub(super) const RENDER_LIGHTING: &[Setting] = &[
             max: 24.0,
             step: 0.5,
         },
+    },
+    Setting {
+        label: "Sun follows PC clock",
+        cvar: "r_dayClock",
+        kind: ValueKind::Bool,
     },
     Setting {
         label: "Day length, min (0 holds)",

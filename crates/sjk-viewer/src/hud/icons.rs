@@ -61,6 +61,10 @@ pub(crate) fn install(
         .set_pictures(super::rocket_lock::load(vfs, shaders, |id, rgba| {
             renderer.upload_icon(queue, id, rgba)
         }));
+    hud.movement_keys
+        .set_pictures(super::movement_keys::load(vfs, shaders, |id, rgba| {
+            renderer.upload_icon(queue, id, rgba)
+        }));
     (renderer, hud)
 }
 
@@ -127,19 +131,6 @@ impl Icons {
         (means < assets::MEANS_COUNT)
             .then(|| self.handles[assets::MEANS_FIRST + means])
             .flatten()
-    }
-
-    /// Icons with only `weapons`' own pictures, as `(weapon, texture)`, for the
-    /// off-screen snapshots.
-    #[cfg(test)]
-    pub(crate) fn with_weapons(weapons: &[(u8, TextureId)]) -> Self {
-        let mut icons = Self::default();
-        for (weapon, texture) in weapons {
-            if let Some(slot) = assets::WEAPONS.get(usize::from(*weapon)) {
-                icons.handles[*slot] = Some(*texture);
-            }
-        }
-        icons
     }
 
     /// Icons with only `means`' cause-of-death pictures, as `(MOD_*, texture)`.

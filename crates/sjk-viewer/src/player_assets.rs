@@ -135,6 +135,39 @@ pub(super) fn load_player_appearance_with(
     camera_yaw: f32,
     cache: &mut GlaCache,
 ) -> Result<PlayerPreview, Box<dyn Error>> {
+    load_appearance(
+        vfs,
+        directory,
+        variant,
+        camera_origin,
+        camera_yaw,
+        cache,
+        true,
+    )
+}
+
+/// The game's own model in `directory`, whatever rig model a pack lays over it
+/// (`crate::rig_model`) and without the emote clips: a card's picture of a character
+/// shows the character (`crate::card_scenes`), not what one player's packs dress it as.
+pub(super) fn load_stock_player_appearance(
+    vfs: &VirtualFileSystem,
+    directory: &str,
+    variant: &str,
+    cache: &mut GlaCache,
+) -> Result<PlayerPreview, Box<dyn Error>> {
+    load_appearance(vfs, directory, variant, [0.0; 3], 0.0, cache, false)
+}
+
+/// [`load_player_appearance_with`], with rig models and their emotes when `rigs`.
+fn load_appearance(
+    vfs: &VirtualFileSystem,
+    directory: &str,
+    variant: &str,
+    camera_origin: [f32; 3],
+    camera_yaw: f32,
+    cache: &mut GlaCache,
+    rigs: bool,
+) -> Result<PlayerPreview, Box<dyn Error>> {
     // A vehicle names itself, not a model (`$<vehicle>`): the vehicle table knows what it wears.
     let vehicle = match sjk_client::legacy_vehicle_name(directory) {
         Some(name) => Some(
@@ -155,7 +188,7 @@ pub(super) fn load_player_appearance_with(
             .bytes)
     };
     // A rig model is driven by a stock model's mesh and skeleton, drawn as its glTF.
-    let rig_manifest = if vehicle.is_none() {
+    let rig_manifest = if vehicle.is_none() && rigs {
         crate::rig_model::manifest(vfs, directory)?
     } else {
         None
@@ -179,7 +212,7 @@ pub(super) fn load_player_appearance_with(
         .transpose()?
         .map(Arc::new);
     // A stock humanoid plays the rig models' emote clips on its own bones.
-    let stock_emotes = if rig.is_none() && vehicle.is_none() {
+    let stock_emotes = if rig.is_none() && vehicle.is_none() && rigs {
         crate::rig_model::StockEmotes::load(vfs, &animation, &mesh).map(Arc::new)
     } else {
         None

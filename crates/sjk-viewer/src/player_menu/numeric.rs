@@ -1,10 +1,21 @@
-//! Direct entry for either saber's RGB sliders.
+//! Direct entry for either saber's RGB sliders, and the model's (`model_rgb.rs`).
 use super::*;
 use crate::menu_widgets::numeric::{EditResult, NumericEdit};
 use winit::keyboard::KeyCode;
 
 impl PlayerMenu {
     pub(super) fn begin_numeric(&mut self, index: usize) -> bool {
+        if let Some(channel) = self.model_channel(index) {
+            self.selected = index;
+            self.numeric = Some(NumericEdit::new(
+                index,
+                self.model_channel_value(channel).to_string(),
+                0.0,
+                255.0,
+                true,
+            ));
+            return true;
+        }
         if self.page != ProfilePage::Saber {
             return false;
         }
@@ -28,6 +39,14 @@ impl PlayerMenu {
     /// SJK: typing a number on a selected RGB row opens entry with what was
     /// typed. False when the row has no channel or `typed` cannot start a number.
     pub(super) fn begin_typed(&mut self, index: usize, typed: &str) -> bool {
+        if self.model_channel(index).is_some() {
+            let Some(edit) = NumericEdit::typed(index, typed, 0.0, 255.0, true) else {
+                return false;
+            };
+            self.selected = index;
+            self.numeric = Some(edit);
+            return true;
+        }
         if self.page != ProfilePage::Saber {
             return false;
         }
@@ -47,11 +66,12 @@ impl PlayerMenu {
 
     /// Whether `index` is an RGB row, which Space steps instead of opening.
     pub(super) fn is_channel_row(&self, index: usize) -> bool {
-        self.page == ProfilePage::Saber
-            && self
-                .saber_rows()
-                .get(index)
-                .is_some_and(|row| row.channel().is_some())
+        self.model_channel(index).is_some()
+            || self.page == ProfilePage::Saber
+                && self
+                    .saber_rows()
+                    .get(index)
+                    .is_some_and(|row| row.channel().is_some())
     }
 
     pub(super) fn edit_numeric(
@@ -85,7 +105,9 @@ impl PlayerMenu {
     }
 
     fn commit_numeric(&mut self, index: usize, value: f64, console: &mut ViewerConsole) {
-        if let Some(row) = self.saber_rows().get(index).copied()
+        if let Some(channel) = self.model_channel(index) {
+            self.set_model_channel(channel, value as u8);
+        } else if let Some(row) = self.saber_rows().get(index).copied()
             && let Some(channel) = row.channel()
         {
             self.saber.set_channel(row.second(), channel, value as u8);

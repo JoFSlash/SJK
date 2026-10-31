@@ -25,13 +25,24 @@ pub(crate) struct ClientIcon {
     pub(crate) why: &'static str,
 }
 
-pub(crate) const KNOWN: &[ClientIcon] = &[ClientIcon {
-    client: "ejk",
-    name: "JoF EternalJK",
-    texture: crate::ui_renderer::EJK_TEXTURE,
-    why: "Takes part in SJK chat with the same keys and identity files \
-          (JediofFreedom/JoF_EJK#398, SJK #194); the hub marks its messages \"ejk\"",
-}];
+pub(crate) const KNOWN: &[ClientIcon] = &[
+    ClientIcon {
+        client: "ejk",
+        name: "JoF EternalJK",
+        texture: crate::ui_renderer::EJK_TEXTURE,
+        why: "Takes part in SJK chat with the same keys and identity files \
+              (JediofFreedom/JoF_EJK#398, SJK #194); the hub marks its messages \"ejk\"",
+    },
+    ClientIcon {
+        client: "launcher",
+        name: "SJK Launcher",
+        texture: crate::ui_renderer::LAUNCHER_TEXTURE,
+        why: "Its chat window signs with the player's own identity.key from SJK's settings \
+              folder (Sol-Vulpes/sjk-launcher, src/chat.rs); the hub marks its messages \
+              \"launcher\" from the User-Agent SJKLauncher/<version> (SJK-hub clients.rs, \
+              27/10/2026)",
+    },
+];
 
 /// The icon for messages from `client`, `None` for SJK's emblem.
 pub(crate) fn find(client: &str) -> Option<&'static ClientIcon> {
@@ -69,7 +80,7 @@ mod tests {
                 icon.client
             );
         }
-        assert!(find("ejk").is_some());
+        assert!(find("ejk").is_some() && find("launcher").is_some());
         assert!(find("").is_none() && find("sjk").is_none());
     }
 }

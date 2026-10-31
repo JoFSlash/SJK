@@ -618,6 +618,11 @@ fn find_message(find: FindEvent, own: &str) -> ChatMessage {
                 name: find.item_name,
                 rarity: find.rarity,
                 finish: find.finish,
+                card: if find.prize == "card" {
+                    find.item
+                } else {
+                    String::new()
+                },
             }),
         }),
         official: None,
@@ -970,6 +975,7 @@ mod tests {
             title: title.to_owned(),
             text: "Hello all".to_owned(),
             version: String::new(),
+            images: std::collections::BTreeMap::new(),
         }
     }
 

@@ -72,6 +72,10 @@ pub(super) const COMMANDS: &[(&str, &str)] = &[
         "messagemode5",
         "Compose SJK chat, which every SJK player shares through the SJK hub",
     ),
+    (
+        crate::chat::tabs::ADMIN_COMMAND,
+        "Compose admin chat (amsay): read only by the server's admins, on JA+ and jaPRO servers",
+    ),
     (crate::am_color::COMMAND, crate::am_color::HELP),
     (
         crate::chat_sounds::PREVIEW_COMMAND,
@@ -196,6 +200,10 @@ pub(super) const COMMANDS: &[(&str, &str)] = &[
     ),
     (crate::emotes::COMMAND, crate::emotes::HELP),
     (crate::boombox::TRACK_COMMAND, crate::boombox::HELP),
+    (
+        crate::toy_switch_words::COMMAND,
+        crate::toy_switch_words::HELP,
+    ),
     (crate::block_command::COMMAND, crate::block_command::HELP),
     (
         crate::block_command::UNBLOCK_COMMAND,
@@ -226,6 +234,10 @@ pub(super) const COMMANDS: &[(&str, &str)] = &[
         crate::graphics_quality::RENDERER_HELP,
     ),
     ("cmd", "Forward arguments as a reliable server command"),
+    (
+        "copyServerIP",
+        "Copy the connected server IP and port to the clipboard",
+    ),
     ("clientinfo", "Print client state and userinfo"),
     ("userinfo", "Print userinfo"),
     ("model", "Set player model and optional skin"),
@@ -262,13 +274,22 @@ pub(super) const COMMANDS: &[(&str, &str)] = &[
     (crate::fps_help::COMMAND, crate::fps_help::HELP),
     (crate::emote_help::COMMAND, crate::emote_help::HELP),
     (crate::emote_picker::COMMAND, crate::emote_picker::HELP),
-    (crate::whats_new_card::COMMAND, crate::whats_new_card::HELP),
+    (crate::news_panel::COMMAND, crate::news_panel::HELP),
+    (
+        crate::news_panel::NEWS_COMMAND,
+        crate::news_panel::NEWS_HELP,
+    ),
     (crate::gameplay_fps::COMMAND, crate::gameplay_fps::HELP),
     (
         "snd_restart",
         "Recreate audio output and reload sound assets",
     ),
     ("in_restart", "Reset held input and pointer capture"),
+    (crate::fs_restart::COMMAND, crate::fs_restart::HELP),
+    (
+        crate::chat_gifs::hidden::UNHIDE_ALL,
+        crate::chat_gifs::hidden::UNHIDE_ALL_HELP,
+    ),
 ];
 
 /// Queue and worker replies exist only for explicitly requested commands.
@@ -285,17 +306,22 @@ pub(super) struct Commands {
     pub timeout_frames: u8,
     /// Name-edit cooldown shared with the userinfo callback.
     pub name_clock: identity::NameClock,
+    /// `fs_restart`'s mount in flight.
+    pub fs_restart: crate::fs_restart::Task,
 }
 
-/// JoF content's command (`jof.downloads`), in a build with JoF tools.
-fn jof_commands() -> &'static [(&'static str, &'static str)] {
+/// JoF content's and the Sith cloud's commands (`jof.downloads`, `sith.downloads`),
+/// in a build with JoF tools.
+fn jof_commands() -> impl Iterator<Item = &'static (&'static str, &'static str)> {
     #[cfg(feature = "mod-jof")]
     {
         crate::jof_content::COMMANDS
+            .iter()
+            .chain(crate::sith_cloud::COMMANDS)
     }
     #[cfg(not(feature = "mod-jof"))]
     {
-        &[]
+        [].iter()
     }
 }
 
@@ -925,6 +951,7 @@ impl crate::GpuState {
                 }
             }
         }
+        self.poll_fs_restart();
     }
 
     fn client_command(
@@ -979,6 +1006,9 @@ impl crate::GpuState {
             "messagemode5" => {
                 self.apply_input_action(Some(crate::input::InputAction::SjkMessageMode));
             }
+            crate::chat::tabs::ADMIN_COMMAND => {
+                self.apply_input_action(Some(crate::input::InputAction::AdminMessageMode));
+            }
             crate::am_color::COMMAND => {
                 let console = self.console.as_mut().ok_or("Console unavailable")?;
                 return crate::am_color::run(console, args);
@@ -1030,6 +1060,13 @@ impl crate::GpuState {
             crate::jof_content::COMMAND => {
                 if let Some(console) = &mut self.console {
                     console.open_jof_content(&self.game_data);
+                }
+                self.sync_cursor_policy();
+            }
+            #[cfg(feature = "mod-jof")]
+            crate::sith_cloud::COMMAND => {
+                if let Some(console) = &mut self.console {
+                    console.open_sith_cloud(&self.game_data);
                 }
                 self.sync_cursor_policy();
             }
@@ -1098,6 +1135,7 @@ impl crate::GpuState {
             }
             crate::emotes::COMMAND => return self.emote_command(args),
             crate::boombox::TRACK_COMMAND => return self.boombox_command(args),
+            crate::toy_switch_words::COMMAND => return Ok(crate::toy_switch_words::help_lines()),
             crate::block_command::COMMAND => return self.block_command(args),
             crate::block_command::UNBLOCK_COMMAND => return self.unblock_command(args),
             crate::medal_popup::rehearsal::COMMAND => return self.debug_medal_command(args),
@@ -1238,11 +1276,17 @@ impl crate::GpuState {
             crate::fps_help::COMMAND => return self.fps_help_command(),
             crate::emote_help::COMMAND => return self.emote_help_command(),
             crate::emote_picker::COMMAND => return self.emote_picker_command(),
-            crate::whats_new_card::COMMAND => {
+            crate::news_panel::COMMAND => {
                 self.preview_whats_new();
                 return Ok(Vec::new());
             }
+            crate::news_panel::NEWS_COMMAND => return self.news_command(),
             crate::gameplay_fps::COMMAND => return self.gameplay_fps_command(args),
+            crate::fs_restart::COMMAND => return self.fs_restart_command(),
+            crate::chat_gifs::hidden::UNHIDE_ALL => {
+                let count = crate::chat_gifs::hidden::clear();
+                return Ok(vec![crate::chat_gifs::hidden::unhide_all_reply(count)]);
+            }
             "freecam" => return self.free_camera_command(args),
             "peek" => return self.peek_command(args),
             "cosmetics" => return self.cosmetics_command(args),

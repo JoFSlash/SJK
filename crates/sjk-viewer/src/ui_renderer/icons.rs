@@ -30,8 +30,9 @@ pub(crate) const PART_ICON_CELLS: u32 = 4 * COLUMNS;
 /// First of the key-binding panel's cells (weapon, item and Force icons),
 /// after character creation's.
 pub(crate) const BIND_ICON_FIRST: u32 = PART_ICON_FIRST + PART_ICON_CELLS;
-/// Key-binding panel cells: three atlas rows.
-pub(crate) const BIND_ICON_CELLS: u32 = 3 * COLUMNS;
+/// Key-binding panel cells: three atlas rows and four cells (the toys' pictures filled
+/// the three rows; the four fit in the atlas's last row, so it keeps its height).
+pub(crate) const BIND_ICON_CELLS: u32 = 3 * COLUMNS + 4;
 /// First of the HUD Force wheel's cells (the selection bar's power icons and
 /// JoF's), after the key-binding panel's.
 pub(crate) const FORCE_WHEEL_ICON_FIRST: u32 = BIND_ICON_FIRST + BIND_ICON_CELLS;
@@ -71,8 +72,10 @@ pub(crate) const EMOJI_ICON_FIRST: u32 = MEDAL_ICON_FIRST + MEDAL_ICON_CELLS;
 pub(crate) const EMOJI_ICON_CELLS: u32 = 4 * COLUMNS;
 /// First of the players' pictures' cells (`avatars`), after the emojis'.
 pub(crate) const AVATAR_ICON_FIRST: u32 = EMOJI_ICON_FIRST + EMOJI_ICON_CELLS;
-/// Picture cells: two rows, the cache's pictures and the upload's preview.
-pub(crate) const AVATAR_ICON_CELLS: u32 = 2 * COLUMNS;
+/// Picture cells: three rows, the cache's pictures and the upload's preview. Three
+/// since the nameplates show pictures (28/10/2026): a full server's 31 other players
+/// and the player's own plate, with room left for the chat, the cards and the boards.
+pub(crate) const AVATAR_ICON_CELLS: u32 = 3 * COLUMNS;
 /// The cell holding the riding vehicle's crosshair picture (`crosshairShader` of its
 /// `.veh`), after the pictures'. One cell: it is replaced when the pilot changes vehicle.
 pub(crate) const VEHICLE_CROSSHAIR_ICON: u32 = AVATAR_ICON_FIRST + AVATAR_ICON_CELLS;
@@ -119,8 +122,16 @@ pub(crate) const TICK_ICON_CELLS: u32 = 5 + super::tick_badge::CREATOR_FRAMES;
 pub(crate) const TAG_ICON_FIRST: u32 = TICK_ICON_FIRST + TICK_ICON_CELLS;
 /// Tag cells: two rows, room for twice the first tags.
 pub(crate) const TAG_ICON_CELLS: u32 = 2 * COLUMNS;
+/// The cell holding the SJK Launcher's icon (`ui_renderer::LAUNCHER_TEXTURE`), after the
+/// tags'.
+pub(crate) const LAUNCHER_ICON: u32 = TAG_ICON_FIRST + TAG_ICON_CELLS;
+/// First of the movement keys' picture cells (`gfx/hud/keys`, `hud::movement_keys`),
+/// after the SJK Launcher's icon.
+pub(crate) const MOVEMENT_KEY_ICON_FIRST: u32 = LAUNCHER_ICON + 1;
+/// Movement key cells: six keys, each released and pressed.
+pub(crate) const MOVEMENT_KEY_ICON_CELLS: u32 = 12;
 /// Every icon cell.
-pub(crate) const ATLAS_CELLS: u32 = TAG_ICON_FIRST + TAG_ICON_CELLS;
+pub(crate) const ATLAS_CELLS: u32 = MOVEMENT_KEY_ICON_FIRST + MOVEMENT_KEY_ICON_CELLS;
 const TOTAL_CELLS: u32 = ATLAS_CELLS;
 const ATLAS_HEIGHT: u32 = TOTAL_CELLS.div_ceil(COLUMNS) * ICON_SIZE;
 

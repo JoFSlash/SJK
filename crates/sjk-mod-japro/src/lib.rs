@@ -5,12 +5,14 @@
 //! It owns jaPRO's movement styles ([`movement_styles`]): which styles the client's
 //! prediction models, and later the ports of the others (CPM, QW...). The viewer asks
 //! it through a small bridge while the mod is loaded; with the mod off or another
-//! server, nothing of it applies.
+//! server, nothing of it applies. It also lists jaPRO's plugin options
+//! (`cp_pluginDisable`, [`plugin`]), which Settings switches.
 
 use sjk_mod::{ClientMod, Command, Host, Server, ServerKind, Setting, command};
 
 /// jaPRO's movement styles and which this client predicts.
 pub mod movement_styles;
+pub mod plugin;
 
 /// The mod's id and prefix.
 pub const ID: &str = "japro";
@@ -21,10 +23,16 @@ const SETTINGS: &[Setting] = &[Setting {
     help: "Predict jaPRO movement styles SJK does not model yet (CPM, QW...) as JKA; off shows them as the server has them",
 }];
 
-const COMMANDS: &[Command] = &[command(
-    "japro.styles",
-    "List jaPRO's movement styles and which ones SJK predicts",
-)];
+const COMMANDS: &[Command] = &[
+    command(
+        "japro.styles",
+        "List jaPRO's movement styles and which ones SJK predicts",
+    ),
+    command(
+        "japro.plugin",
+        "List the jaPRO plugin options (cp_pluginDisable) or switch one: japro.plugin [number]",
+    ),
+];
 
 /// Whether `server` runs jaPRO or its TaystJK lineage.
 pub fn is_japro(server: &Server) -> bool {
@@ -67,7 +75,7 @@ impl ClientMod for JaPro {
     }
 
     fn about(&self) -> &'static str {
-        "jaPRO movement styles: what SJK predicts and what it shows from the server"
+        "jaPRO movement styles (what SJK predicts, what it shows from the server) and plugin options"
     }
 
     fn servers(&self) -> &'static str {
@@ -89,11 +97,12 @@ impl ClientMod for JaPro {
     fn run(
         &mut self,
         name: &str,
-        _args: &[String],
-        _host: &mut dyn Host,
+        args: &[String],
+        host: &mut dyn Host,
     ) -> Result<Vec<String>, String> {
         match name {
             "japro.styles" => Ok(listing()),
+            "japro.plugin" => plugin::OPTIONS.run(args, host),
             _ => Err(format!("Unknown jaPRO tools command {name}")),
         }
     }

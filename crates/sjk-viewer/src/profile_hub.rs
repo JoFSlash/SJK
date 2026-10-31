@@ -80,10 +80,12 @@ pub(crate) enum Tab {
     Forge,
     /// The cards opening holocrons brought, and the credits.
     Cards,
+    /// What came, was opened, spent and traded, newest first (31/10/2026).
+    History,
 }
 
 const PROFILE_TABS: [Tab; 4] = [Tab::Character, Tab::Saber, Tab::Force, Tab::Profile];
-const COLLECTION_TABS: [Tab; 9] = [
+const COLLECTION_TABS: [Tab; 10] = [
     Tab::Medals,
     Tab::Achievements,
     Tab::Shaders,
@@ -93,9 +95,10 @@ const COLLECTION_TABS: [Tab; 9] = [
     Tab::Holocrons,
     Tab::Forge,
     Tab::Cards,
+    Tab::History,
 ];
 const PROFILE_LABELS: [&str; 4] = ["Character", "Saber", "Force", "SJK Profile"];
-const COLLECTION_LABELS: [&str; 9] = [
+const COLLECTION_LABELS: [&str; 10] = [
     "Medals",
     "Achievements",
     "Shaders",
@@ -105,6 +108,7 @@ const COLLECTION_LABELS: [&str; 9] = [
     HOLOCRONS,
     FORGE,
     "Cards",
+    "History",
 ];
 
 /// The Collection screen's title: one place to rename it.
@@ -118,7 +122,7 @@ pub(crate) const FORGE: &str = "Forge";
 
 impl Tab {
     #[cfg(test)]
-    pub(crate) const ALL: [Self; 13] = [
+    pub(crate) const ALL: [Self; 14] = [
         Self::Character,
         Self::Saber,
         Self::Force,
@@ -132,6 +136,7 @@ impl Tab {
         Self::Holocrons,
         Self::Forge,
         Self::Cards,
+        Self::History,
     ];
 
     /// The screen the tab is on.
@@ -154,6 +159,7 @@ impl Tab {
             Self::Holocrons => 6,
             Self::Forge => 7,
             Self::Cards => 8,
+            Self::History => 9,
         }
     }
 
@@ -658,6 +664,20 @@ impl GpuState {
         self.sync_cursor_policy();
     }
 
+    /// The SJK Profile tab's Change name: the Character tab shows with its Name field
+    /// open, the screen still returning where it did. The hub's name is the one worn in
+    /// game (`name`), so this is where it changes.
+    pub(crate) fn edit_name_on_profile_hub(&mut self) {
+        if self.profile_hub_tab() != Some(Tab::Profile) {
+            return;
+        }
+        self.switch_profile_hub(Tab::Character);
+        if let Some(menu) = &mut self.client_menu {
+            menu.edit_player_hub_name();
+        }
+        self.sync_cursor_policy();
+    }
+
     /// Switch the screen on show to its tab `tab`, keeping where it returns.
     fn switch_profile_hub(&mut self, tab: Tab) {
         let Some(current) = self.profile_hub_tab() else {
@@ -782,11 +802,12 @@ mod tests {
         assert_eq!(Tab::Force.next(true), Tab::Profile);
         assert_eq!(Tab::Profile.next(true), Tab::Character);
         assert_eq!(Tab::Character.next(false), Tab::Profile);
-        assert_eq!(Tab::Medals.next(false), Tab::Cards);
+        assert_eq!(Tab::Medals.next(false), Tab::History);
         assert_eq!(Tab::Nameplates.next(true), Tab::Holocrons);
         assert_eq!(Tab::Holocrons.next(true), Tab::Forge);
         assert_eq!(Tab::Forge.next(true), Tab::Cards);
-        assert_eq!(Tab::Cards.next(true), Tab::Medals);
+        assert_eq!(Tab::Cards.next(true), Tab::History);
+        assert_eq!(Tab::History.next(true), Tab::Medals);
         assert_eq!(Tab::Achievements.next(true), Tab::Shaders);
         for screen in [Screen::Profile, Screen::Collection] {
             for (index, tab) in screen.tabs().iter().enumerate() {
@@ -807,7 +828,8 @@ mod tests {
         assert_eq!(collection_tab_of(TOKEN + 6), Some(Tab::Holocrons));
         assert_eq!(collection_tab_of(TOKEN + 7), Some(Tab::Forge));
         assert_eq!(collection_tab_of(TOKEN + 8), Some(Tab::Cards));
-        assert_eq!(collection_tab_of(TOKEN + 9), None);
+        assert_eq!(collection_tab_of(TOKEN + 9), Some(Tab::History));
+        assert_eq!(collection_tab_of(TOKEN + 10), None);
         assert_eq!(collection_tab_of(TOKEN - 1), None);
     }
 

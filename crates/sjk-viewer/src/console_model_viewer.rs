@@ -33,9 +33,7 @@ impl ViewerConsole {
         self.sjk_chat_panel.close();
         self.asset_browser.open = false;
         #[cfg(feature = "mod-jof")]
-        {
-            self.jof_content.open = false;
-        }
+        self.close_content();
         self.dead_key.settle();
         self.model_viewer.open(owns_console);
     }

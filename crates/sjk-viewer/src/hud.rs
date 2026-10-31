@@ -13,6 +13,8 @@ pub(crate) use follow::shown as follow_shown;
 mod force_streams;
 pub(crate) mod force_wheel;
 mod hack_bar;
+mod jetpack_fuel;
+pub(crate) mod lagometer;
 mod monitor_marks;
 pub(crate) use monitor_marks::MonitorMarks;
 pub(crate) mod icons;
@@ -20,8 +22,9 @@ pub(crate) mod identification;
 mod info;
 pub(crate) mod kill_feed;
 pub(crate) mod movement;
+pub(crate) mod movement_keys;
 pub(crate) mod nameplate;
-mod nameplate_math;
+pub(crate) mod nameplate_math;
 mod npc_class;
 pub(crate) mod options;
 pub(crate) mod player_card;
@@ -57,9 +60,11 @@ use std::path::Path;
 
 const WIDGET_LIMIT: usize = 64;
 /// The HUD's draw commands: the 384 its other widgets had, and room for a full
-/// kill feed (55).
-const DRAW_LIMIT: usize =
-    384 + kill_feed::CAPACITY * kill_feed::ENTRY_COMMANDS + movement::AURA_COMMANDS;
+/// kill feed (55), the strafe aura and the movement keys.
+const DRAW_LIMIT: usize = 384
+    + kill_feed::CAPACITY * kill_feed::ENTRY_COMMANDS
+    + movement::AURA_COMMANDS
+    + movement_keys::COMMANDS;
 const DEFAULT_LAYOUT: &str = include_str!("../assets/hud/default.json");
 /// The weapon name fades over this long at the end of its life.
 const WEAPON_FADE_MS: u64 = 600;
@@ -122,7 +127,7 @@ impl HudVisibility {
                     != 0,
             crosshair_names: hud && enabled("cg_drawCrosshairNames", true),
             timer: hud && enabled("cg_drawTimer", true),
-            lagometer: hud && enabled("cg_lagometer", false),
+            lagometer: hud && lagometer::mode(console) != 0,
             ground_hud: false,
             menu_hud: false,
         }
@@ -162,6 +167,8 @@ pub(crate) struct HudOverlay {
     /// Who the team outlines ring this frame.
     pub(crate) team_outline: team_outline::State,
     guides: movement::Guides,
+    /// JoF EJK's movement keys (`cg_movementKeys`).
+    pub(crate) movement_keys: movement_keys::State,
     family: family::Policy,
     pub(crate) targeting: targeting::State,
     pub(crate) enemy_info: enemy_info::State,
@@ -238,11 +245,16 @@ pub(crate) struct HudOverlay {
     /// The share of the player's hack still to go (`hack_bar`), `None` while it hacks
     /// nothing.
     hack_left: Option<f32>,
+    /// The jetpack fuel the bar at the right edge shows (`jetpack_fuel`), `None` while
+    /// it is hidden.
+    jetpack_fuel: Option<i32>,
     /// The Hax toy's hack still to go (`hax.rs`), drawn as a siege hack is.
     toy_hack_left: Option<f32>,
     /// The Monitor toy's charge ring and hit marker (`monitor.rs`).
     monitor_marks: MonitorMarks,
     lagometer: sjk_client::LagometerSamples,
+    /// `cg_lagometer` 2 and 3's numbers and speed history ([`lagometer`]).
+    lagometer_readout: lagometer::Readout,
     default_document: HudLayoutDocument,
     classic_document: HudLayoutDocument,
     override_document: Option<HudLayoutDocument>,
@@ -254,7 +266,85 @@ pub(crate) struct HudOverlay {
     displayed_ratios: [f32; 3],
     ammo_ratio: Tween,
     displayed_ammo: f32,
+    /// The radial look as bundled, and as drawn: placed by the player's spacing and
+    /// height ([`Self::set_radial_placement`]).
+    radial_base: HudLayoutDocument,
     radial_document: HudLayoutDocument,
+    radial_placement: RadialPlacement,
+}
+
+/// Where the player wants the radial look's status meters (Lex's idea, 29/10/2026: too
+/// close to the character): `spread` logical pixels farther out on each side
+/// (`cg_hudRadialSpread`), `height` per cent of the screen higher (`cg_hudRadialHeight`;
+/// negative is lower).
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub(crate) struct RadialPlacement {
+    pub(crate) spread: f32,
+    pub(crate) height: f32,
+}
+
+impl RadialPlacement {
+    pub(crate) const SPREAD_CVAR: &'static str = "cg_hudRadialSpread";
+    pub(crate) const HEIGHT_CVAR: &'static str = "cg_hudRadialHeight";
+    pub(crate) const SPREAD_MAX: f32 = 250.0;
+    pub(crate) const HEIGHT_RANGE: (f32, f32) = (-20.0, 40.0);
+
+    /// The placement the console's cvars ask for, within its limits.
+    pub(crate) fn read(console: Option<&crate::console::ViewerConsole>) -> Self {
+        let number = |name: &str| {
+            console
+                .and_then(|console| console.float_cvar(name))
+                .unwrap_or(0.0) as f32
+        };
+        let (low, high) = Self::HEIGHT_RANGE;
+        Self {
+            spread: number(Self::SPREAD_CVAR).clamp(0.0, Self::SPREAD_MAX),
+            height: number(Self::HEIGHT_CVAR).clamp(low, high),
+        }
+    }
+}
+
+/// The radial look's status meters, the pills, arcs and numbers round the crosshair:
+/// what [`RadialPlacement`] moves. The crosshair, its name, the timer and the rest stay.
+const RADIAL_STATUS: [&str; 13] = [
+    "left_pill",
+    "right_pill",
+    "health_arc",
+    "armor_arc",
+    "force_arc",
+    "ammo_arc",
+    "style_arc",
+    "health_value",
+    "armor_value",
+    "ammo_value",
+    "force_value",
+    "style_value",
+    "weapon_value",
+];
+
+/// Which side of the crosshair a status widget is on: -1 left, 1 right, 0 under it. An
+/// arc is centred on the crosshair, so its side is its sweep's; anything else, its
+/// offset's.
+fn radial_side(widget: &sjk_ui::HudWidget) -> f32 {
+    let x = match widget.style.arc {
+        Some(arc) => (arc.start_degrees + arc.sweep_degrees * 0.5)
+            .to_radians()
+            .cos(),
+        None => widget.offset.x,
+    };
+    if x.abs() < 1e-3 { 0.0 } else { x.signum() }
+}
+
+/// `base` with its status meters placed as `placement` says.
+fn place_radial(base: &HudLayoutDocument, placement: RadialPlacement) -> HudLayoutDocument {
+    let mut document = base.clone();
+    for widget in &mut document.widgets {
+        if RADIAL_STATUS.contains(&widget.id.as_str()) {
+            widget.offset.x += radial_side(widget) * placement.spread;
+            widget.offset_fraction.y -= placement.height / 100.0;
+        }
+    }
+    document
 }
 
 /// Which bundled layout document the status HUD is drawn from.
@@ -305,6 +395,7 @@ impl HudOverlay {
             weapon_select: crate::weapon_select::State::new(),
             tints: tints::State::default(),
             guides: movement::Guides::default(),
+            movement_keys: movement_keys::State::default(),
             family: family::Policy::default(),
             targeting: targeting::State::default(),
             enemy_info: enemy_info::State::default(),
@@ -366,9 +457,11 @@ impl HudOverlay {
             followed_name: String::with_capacity(64),
             interrupted: false,
             hack_left: None,
+            jetpack_fuel: None,
             toy_hack_left: None,
             monitor_marks: MonitorMarks::default(),
             lagometer: sjk_client::LagometerSamples::new(),
+            lagometer_readout: lagometer::Readout::default(),
             default_document: HudLayoutDocument::from_json(DEFAULT_LAYOUT)
                 .expect("bundled default HUD document is valid"),
             classic_document: HudLayoutDocument::from_json(CLASSIC_LAYOUT)
@@ -386,8 +479,20 @@ impl HudOverlay {
             displayed_ratios: [1.0, 0.0, 1.0],
             ammo_ratio: Tween::settled(0.0),
             displayed_ammo: 0.0,
+            radial_base: HudLayoutDocument::from_json(RADIAL_LAYOUT)
+                .expect("bundled radial HUD document is valid"),
             radial_document: HudLayoutDocument::from_json(RADIAL_LAYOUT)
                 .expect("bundled radial HUD document is valid"),
+            radial_placement: RadialPlacement::default(),
+        }
+    }
+
+    /// Place the radial look's status meters as the player asks (laid out again only
+    /// when it changes).
+    pub(crate) fn set_radial_placement(&mut self, placement: RadialPlacement) {
+        if placement != self.radial_placement {
+            self.radial_placement = placement;
+            self.radial_document = place_radial(&self.radial_base, placement);
         }
     }
 
@@ -592,16 +697,19 @@ impl HudOverlay {
                     crosshair_alpha: self.crosshair_alpha,
                     crosshair_teammate: self.crosshair_teammate,
                     lagometer: &self.lagometer,
+                    lagometer_readout: &self.lagometer_readout,
                 },
                 &mut output,
             );
         }
         if visibility.hud {
+            jetpack_fuel::emit(&mut self.draw_list, viewport, user_scale, self.jetpack_fuel);
             if visibility.vehicle {
                 self.vehicle
                     .emit(&mut self.draw_list, self.theme, viewport, user_scale);
             }
             self.speed.emit(&mut self.draw_list, self.theme, viewport);
+            self.movement_keys.emit(&mut self.draw_list, viewport);
             follow::emit(
                 &mut self.draw_list,
                 &self.followed_name,
@@ -695,6 +803,7 @@ impl HudOverlay {
             &self.draw_list,
             |id| self.resolve_text(id),
             |id, _| text_values::retail_font(id),
+            |_| crate::text::CodePalette::Game,
             (vertices, font),
             viewport,
             crate::text::TextStyle::NEUTRAL,
@@ -730,6 +839,50 @@ mod tests {
             };
             let top = 540.0 - height * 0.5 + widget.offset.y;
             assert!((top - 170.0 * 1_080.0 / 480.0).abs() < 1e-3, "{top}");
+        }
+    }
+
+    /// The radial look's spacing moves the left meters left and the right ones right,
+    /// its height moves all of them, and the rest of the HUD stays where it was.
+    #[test]
+    fn radial_placement_moves_only_the_status_meters() {
+        let base = HudLayoutDocument::from_json(super::RADIAL_LAYOUT).unwrap();
+        let placed = super::place_radial(
+            &base,
+            super::RadialPlacement {
+                spread: 100.0,
+                height: 10.0,
+            },
+        );
+        let find = |document: &HudLayoutDocument, id: &str| {
+            document
+                .widgets
+                .iter()
+                .find(|widget| widget.id == id)
+                .unwrap()
+                .clone()
+        };
+        for (id, side) in [
+            ("health_arc", -1.0),
+            ("left_pill", -1.0),
+            ("health_value", -1.0),
+            ("force_arc", 1.0),
+            ("ammo_value", 1.0),
+            ("weapon_value", 0.0),
+        ] {
+            let (before, after) = (find(&base, id), find(&placed, id));
+            assert_eq!(after.offset.x - before.offset.x, side * 100.0, "{id}");
+            assert!((before.offset_fraction.y - after.offset_fraction.y - 0.1).abs() < 1e-6);
+        }
+        for id in ["crosshair", "match_timer", "lagometer"] {
+            assert_eq!(find(&base, id), find(&placed, id), "{id}");
+        }
+        assert_eq!(
+            super::place_radial(&base, super::RadialPlacement::default()),
+            base
+        );
+        for id in super::RADIAL_STATUS {
+            assert!(base.widgets.iter().any(|widget| widget.id == id), "{id}");
         }
     }
 }

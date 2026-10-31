@@ -1,7 +1,7 @@
-//! Nameplate maths: how large, how opaque and where a plate sits, and the
-//! colours and rectangles of its bars. Pure functions, so the layout is
-//! testable without a window; [`super::nameplate`] collects the players and
-//! draws with these.
+//! Nameplate maths: how large, how opaque and where a plate sits, the holo frame it is
+//! drawn as ([`Holo`]), and the colours and rectangles of its bars. Pure functions,
+//! so the layout is testable without a window; [`super::nameplate`] collects the
+//! players and draws with these.
 use sjk_ui::{Color, Rect};
 
 /// Distance, in world units, out to which a plate keeps its full size.
@@ -9,17 +9,17 @@ const FULL_SIZE_DISTANCE: f32 = 300.0;
 /// Share of the range, from the camera, over which a plate is fully opaque.
 const OPAQUE_SHARE: f32 = 0.75;
 /// Units above the top of the player's box at which the plate is anchored.
-pub(super) const HEAD_CLEARANCE: f32 = 8.0;
+pub(crate) const HEAD_CLEARANCE: f32 = 8.0;
 /// Standing box top above the origin, used when the entity sends none.
 const STANDING_TOP: f32 = 40.0;
 /// Milliseconds a plate takes to fade between hidden and shown.
-pub(super) const FADE_MILLIS: f32 = 120.0;
+pub(crate) const FADE_MILLIS: f32 = 120.0;
 /// Share of the detail distance over which the bars fade in on approach.
 const DETAIL_BLEND: f32 = 0.25;
 
 /// Size multiplier for a plate `distance` away: full size up close, shrinking
 /// linearly to `minimum` at `range`.
-pub(super) fn distance_scale(distance: f32, range: f32, minimum: f32) -> f32 {
+pub(crate) fn distance_scale(distance: f32, range: f32, minimum: f32) -> f32 {
     if range <= FULL_SIZE_DISTANCE {
         return 1.0;
     }
@@ -29,7 +29,7 @@ pub(super) fn distance_scale(distance: f32, range: f32, minimum: f32) -> f32 {
 
 /// Opacity for a plate `distance` away: opaque for the first part of the range,
 /// then fading to nothing at `range`.
-pub(super) fn distance_fade(distance: f32, range: f32) -> f32 {
+pub(crate) fn distance_fade(distance: f32, range: f32) -> f32 {
     let start = range * OPAQUE_SHARE;
     if distance <= start || range <= start {
         return 1.0;
@@ -39,7 +39,7 @@ pub(super) fn distance_fade(distance: f32, range: f32) -> f32 {
 
 /// How much of the plate (the bars) shows at `distance`: none beyond `near`,
 /// all of it within the inner part of `near`, blending between.
-pub(super) fn detail(distance: f32, near: f32) -> f32 {
+pub(crate) fn detail(distance: f32, near: f32) -> f32 {
     if near <= 0.0 {
         return 0.0;
     }
@@ -49,7 +49,7 @@ pub(super) fn detail(distance: f32, near: f32) -> f32 {
 /// Height of the top of an entity's box above its origin, from the packed
 /// `entityState_t::solid` (`SV_LinkEntity`: bits 16-23 hold top + 32). A
 /// player who sends no box is taken as standing.
-pub(super) fn head_height(solid: u32) -> f32 {
+pub(crate) fn head_height(solid: u32) -> f32 {
     let packed = (solid >> 16) & 255;
     if solid == 0 || packed == 0 {
         STANDING_TOP
@@ -61,13 +61,13 @@ pub(super) fn head_height(solid: u32) -> f32 {
 /// Where a player's plate hangs: the world point it is traced from and the
 /// height of the box top above it.
 #[derive(Clone, Copy, Debug, PartialEq)]
-pub(super) struct Anchor {
-    pub(super) origin: [f32; 3],
-    pub(super) head: f32,
+pub(crate) struct Anchor {
+    pub(crate) origin: [f32; 3],
+    pub(crate) head: f32,
 }
 
 /// A presented body: its interpolated origin and packed `entityState_t::solid`.
-pub(super) type Body = ([f32; 3], u32);
+pub(crate) type Body = ([f32; 3], u32);
 
 /// The anchor of a player whose own body is `own` and whose vehicle's body is
 /// `vehicle`, each `None` when the world does not present it.
@@ -75,7 +75,7 @@ pub(super) type Body = ([f32; 3], u32);
 /// A pilot inside a `hideRider` vehicle carries `EF_NODRAW`, so the client never
 /// presents his body (`CG_AddCEntity` skips it); his plate hangs over the
 /// vehicle he sits in instead. A rider whose body is presented keeps his own.
-pub(super) fn anchor(own: Option<Body>, vehicle: Option<Body>) -> Option<Anchor> {
+pub(crate) fn anchor(own: Option<Body>, vehicle: Option<Body>) -> Option<Anchor> {
     let (origin, solid) = own.or(vehicle)?;
     Some(Anchor {
         origin,
@@ -95,7 +95,7 @@ const MAX_CLIENTS: u16 = 32;
 /// `CLASS_VEHICLE` entity from its `owner` while that is below `MAX_CLIENTS`
 /// (`CG_DrawCrosshair`). The viewer is not named to himself, and a pilot whose
 /// entity is sent (`present`) keeps the ordinary plate.
-pub(super) fn hidden_pilot(
+pub(crate) fn hidden_pilot(
     entity_type: u8,
     npc_class: u8,
     owner: u16,
@@ -112,19 +112,19 @@ pub(super) fn hidden_pilot(
 
 /// Bar fills until the HUD in use names its own: the retail HUD's red health,
 /// green shield (armour) and light blue Force.
-pub(super) const HEALTH_COLOR: Color = Color::new(1.0, 0.25, 0.2, 1.0);
-pub(super) const SHIELD_COLOR: Color = Color::new(0.3, 0.9, 0.35, 1.0);
-pub(super) const FORCE_COLOR: Color = Color::new(0.36, 0.7, 1.0, 1.0);
+pub(crate) const HEALTH_COLOR: Color = Color::new(1.0, 0.25, 0.2, 1.0);
+pub(crate) const SHIELD_COLOR: Color = Color::new(0.3, 0.9, 0.35, 1.0);
+pub(crate) const FORCE_COLOR: Color = Color::new(0.36, 0.7, 1.0, 1.0);
 /// The grey of an empty shield's broken bar.
-pub(super) const EMPTY_SHIELD: Color = Color::new(0.55, 0.57, 0.6, 0.7);
+pub(crate) const EMPTY_SHIELD: Color = Color::new(0.55, 0.57, 0.6, 0.7);
 /// The "?" over a bar the estimate cannot fill.
-pub(super) const UNKNOWN_MARK: Color = Color::new(1.0, 0.85, 0.15, 1.0);
+pub(crate) const UNKNOWN_MARK: Color = Color::new(1.0, 0.85, 0.15, 1.0);
 
 /// A deeper, more saturated `color`: the second layer of a bar over its maximum
 /// (overheal, overshield). Each channel moves away from the mean and the whole
 /// darkens, so it reads as the same colour, deeper, even for a green that is
 /// already near full.
-pub(super) fn saturated(color: Color) -> Color {
+pub(crate) fn saturated(color: Color) -> Color {
     let mean = (color.r + color.g + color.b) / 3.0;
     let push = |channel: f32| ((mean + (channel - mean) * 1.8) * 0.72).clamp(0.0, 1.0);
     Color::new(push(color.r), push(color.g), push(color.b), color.a)
@@ -132,110 +132,447 @@ pub(super) fn saturated(color: Color) -> Color {
 
 /// Where a bar's second layer (over the maximum) is drawn in `bar`: an inner band,
 /// so the full bar shows round it. The nameplates and the HUD's meters share it.
-pub(super) fn overflow_band(bar: Rect) -> Rect {
+pub(crate) fn overflow_band(bar: Rect) -> Rect {
     let inset = bar.height * 0.22;
     Rect::new(bar.x, bar.y + inset, bar.width, bar.height - inset * 2.0)
 }
 
-/// The pieces of an empty shield's broken bar, as `(start, end)` shares of its
-/// width: dashes with gaps between, a crack's look.
-pub(super) fn broken_dashes() -> impl Iterator<Item = (f32, f32)> {
-    const DASHES: usize = 7;
-    const SOLID: f32 = 0.7;
-    (0..DASHES).map(|index| {
-        let start = index as f32 / DASHES as f32;
-        (start, start + SOLID / DASHES as f32)
+/// The pieces of a dashed run `width` pixels long from `x`: `on` pixels drawn, `off`
+/// left out, as `(start, end)` pixels, the last piece cut to the run. The bars'
+/// segments, an empty shield's broken bar and the dotted line of a plate without bars.
+pub(crate) fn dashes(x: f32, width: f32, on: f32, off: f32) -> impl Iterator<Item = (f32, f32)> {
+    let step = (on + off).max(0.5);
+    let count = if width > 0.0 && on > 0.0 {
+        (width / step).ceil() as usize
+    } else {
+        0
+    };
+    (0..count).filter_map(move |index| {
+        let start = x + index as f32 * step;
+        let end = (start + on).min(x + width);
+        (end > start).then_some((start, end))
     })
 }
 
-/// `color` mixed `share` of the way to white, at opacity `alpha`: a bar's outline.
-pub(super) fn lighter(color: Color, share: f32, alpha: f32) -> Color {
-    let mix = |channel: f32| channel + (1.0 - channel) * share.clamp(0.0, 1.0);
-    Color::new(mix(color.r), mix(color.g), mix(color.b), alpha)
+/// A bar `width` pixels long from `x` cut into whole segments about `on` pixels long
+/// with `off` between them, stretched to fill it, as `(start, end)` pixels.
+pub(crate) fn segments(x: f32, width: f32, on: f32, off: f32) -> impl Iterator<Item = (f32, f32)> {
+    let count = ((width + off) / (on + off).max(0.5)).round().max(1.0);
+    let on = ((width - off * (count - 1.0)) / count).max(0.0);
+    dashes(x, width, on, off)
 }
 
 /// Which bars a plate holds.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub(super) struct Rows {
-    pub(super) health: bool,
-    pub(super) shield: bool,
-    pub(super) force: bool,
+pub(crate) struct Rows {
+    pub(crate) health: bool,
+    pub(crate) shield: bool,
+    pub(crate) force: bool,
 }
 
 impl Rows {
-    pub(super) fn any(self) -> bool {
+    pub(crate) fn any(self) -> bool {
         self.health || self.shield || self.force
     }
 }
 
-/// The plate under a name: its frame and the bars inside (shield on top, then
-/// health, then Force), in physical pixels.
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub(super) struct Stack {
-    pub(super) frame: Rect,
-    pub(super) health: Option<Rect>,
-    pub(super) shield: Option<Rect>,
-    pub(super) force: Option<Rect>,
+/// The holo frame's measures are its design's (28/10/2026, design C), in that design's
+/// pixels, whose name is this tall: a plate scales them by its name's size over it.
+const DESIGN_NAME: f32 = 15.0;
+/// The plate's least width, its cut top-right corner and its edge's width.
+const PLATE_WIDTH: f32 = 150.0;
+const CUT: f32 = 8.0;
+pub(crate) const EDGE: f32 = 1.0;
+/// The room after the name, and before it on a plate without a picture (an NPC's).
+const PAD_RIGHT: f32 = 9.0;
+const BARE_LEFT: f32 = 9.0;
+/// The name's row.
+const NAME_ROW: f32 = 15.0;
+/// The verified seal's side, and the gap before it.
+const MARK: f32 = 11.0;
+const MARK_GAP: f32 = 4.0;
+/// The widest the name runs before its ellipsis.
+const NAME_MAX: f32 = 160.0;
+/// The bars, top to bottom (shield, health, Force), the gap over each and the room
+/// between the name and the first.
+const BAR_SHIELD: f32 = 3.0;
+const BAR_HEALTH: f32 = 5.0;
+const BAR_FORCE: f32 = 2.0;
+const BAR_GAP: f32 = 2.0;
+const NAME_GAP: f32 = 1.0;
+/// The shield's and health's segments, and the gaps between them.
+pub(crate) const SEGMENT: f32 = 9.0;
+pub(crate) const SEGMENT_GAP: f32 = 2.0;
+/// The dotted line under the name of a plate without bars: its dots, the gaps
+/// between them, its thickness and the room over it.
+pub(crate) const DOT: f32 = 3.0;
+pub(crate) const DOT_GAP: f32 = 4.0;
+const DOTTED: f32 = 2.0;
+const DOTTED_GAP: f32 = 3.0;
+/// An empty shield's dashes and the gaps between them.
+pub(crate) const EMPTY_DASH: f32 = 4.0;
+pub(crate) const EMPTY_GAP: f32 = 3.0;
+/// The gold corner of a player who shares: how far along the top it starts from the
+/// right end, and how far down the right side it runs; its width.
+const GOLD_ALONG: f32 = 34.0;
+const GOLD_DOWN: f32 = 22.0;
+pub(crate) const GOLD_WIDTH: f32 = 2.0;
+/// The scan lines' spacing over the plate.
+pub(crate) const SCAN: f32 = 3.0;
+/// Far away: the hex beside the name, the gap between them, and the hairline under
+/// them (its width and the room over it).
+const FAR_HEX: [f32; 2] = [17.0, 15.0];
+const FAR_GAP: f32 = 4.0;
+const HAIRLINE: f32 = 46.0;
+const HAIRLINE_GAP: f32 = 2.0;
+/// The duel badge on the hex's bottom-right corner, near and far, and how far out it
+/// stands.
+const BADGE: f32 = 17.0;
+const FAR_BADGE: f32 = 11.0;
+const BADGE_OUT: f32 = 5.0;
+/// The power icons over the plate's right end: their square cells' side (1.5 times the
+/// design's 15, Sol, 28/10/2026), the gap between them, the room from the plate's right
+/// end and under the row.
+const CHIP: f32 = 22.5;
+const CHIP_GAP: f32 = 2.0;
+const CHIP_RIGHT: f32 = 2.0;
+const CHIP_LIFT: f32 = 4.0;
+
+/// A plate's measures with no bars (names only, a player who does not share, a duel)
+/// and with them: the hex's size, how far it overlaps the plate, and the plate's room
+/// over the name, before it and under the last row.
+#[derive(Clone, Copy)]
+struct Measures {
+    hex: [f32; 2],
+    overlap: f32,
+    top: f32,
+    left: f32,
+    bottom: f32,
 }
 
-impl Stack {
-    /// Bar heights and spacing in units of `u` pixels (the scaled pixel unit).
-    const HEALTH: f32 = 7.0;
-    const SHIELD: f32 = 5.0;
-    const FORCE: f32 = 4.0;
-    const GAP: f32 = 2.5;
-    const PAD: f32 = 4.0;
-    /// Plate width in units of `u`.
-    pub(super) const WIDTH: f32 = 112.0;
+const SHORT: Measures = Measures {
+    hex: [38.0, 34.0],
+    overlap: 10.0,
+    top: 5.0,
+    left: 16.0,
+    bottom: 5.0,
+};
+const TALL: Measures = Measures {
+    hex: [44.0, 40.0],
+    overlap: 12.0,
+    top: 4.0,
+    left: 18.0,
+    bottom: 4.0,
+};
 
-    /// Total height of a stack holding `rows`, in pixels.
-    pub(super) fn height(rows: Rows, u: f32) -> f32 {
-        let bars = [
-            (rows.shield, Self::SHIELD),
-            (rows.health, Self::HEALTH),
-            (rows.force, Self::FORCE),
-        ];
-        let heights: f32 = bars.iter().filter(|b| b.0).map(|b| b.1).sum();
-        let count = bars.iter().filter(|b| b.0).count();
-        if count == 0 {
-            return 0.0;
-        }
-        (Self::PAD * 2.0 + heights + Self::GAP * (count - 1) as f32) * u
-    }
+/// The points of a hexagon pointed left and right in `rect`, its top and bottom edges
+/// running over the middle half, clockwise from the left point.
+pub(crate) fn hexagon(rect: Rect) -> [[f32; 2]; 6] {
+    let middle = rect.y + rect.height * 0.5;
+    let quarter = rect.width * 0.25;
+    [
+        [rect.x, middle],
+        [rect.x + quarter, rect.y],
+        [rect.right() - quarter, rect.y],
+        [rect.right(), middle],
+        [rect.right() - quarter, rect.bottom()],
+        [rect.x + quarter, rect.bottom()],
+    ]
+}
 
-    /// Lay a stack out centred on `centre_x` with its bottom edge on
-    /// `bottom_y`, kept on screen.
-    pub(super) fn new(
-        centre_x: f32,
-        bottom_y: f32,
-        rows: Rows,
-        u: f32,
-        viewport: [f32; 2],
-    ) -> Self {
-        let width = Self::WIDTH * u;
-        let height = Self::height(rows, u);
-        let x = (centre_x - width * 0.5).clamp(0.0, (viewport[0] - width).max(0.0));
-        let y = bottom_y - height;
-        let inner_x = x + Self::PAD * u;
-        let inner_width = width - Self::PAD * 2.0 * u;
-        let mut cursor = y + Self::PAD * u;
-        let mut bar = |wanted: bool, h: f32| {
-            wanted.then(|| {
-                let rect = Rect::new(inner_x, cursor, inner_width, h * u);
-                cursor += (h + Self::GAP) * u;
-                rect
-            })
+/// `rect` shrunk by `inset` on every side.
+pub(crate) fn inset(rect: Rect, inset: f32) -> Rect {
+    Rect::new(
+        rect.x + inset,
+        rect.y + inset,
+        (rect.width - inset * 2.0).max(0.0),
+        (rect.height - inset * 2.0).max(0.0),
+    )
+}
+
+/// The texture coordinates (top-left, bottom-right) a round-cut picture is spread over
+/// a [`hexagon`] with: the hexagon's corners land just inside the picture's disc, so
+/// none of the clear outside shows.
+pub(crate) const HEX_UV: [[f32; 2]; 2] = {
+    const REACH: f32 = 0.49;
+    // A regular hexagon's corners: half its width across, sin 60° of it up and down.
+    const RISE: f32 = REACH * 0.866;
+    [[0.5 - REACH, 0.5 - RISE], [0.5 + REACH, 0.5 + RISE]]
+};
+
+/// What [`Holo::new`] lays out.
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct HoloSpec {
+    /// The point the plate is centred on, and its bottom.
+    pub(crate) centre_x: f32,
+    pub(crate) bottom: f32,
+    /// The name's text size and drawn width, in pixels.
+    pub(crate) size: f32,
+    pub(crate) name_width: f32,
+    pub(crate) picture: bool,
+    /// The mark after the name (the verified seal or a trust mark).
+    pub(crate) mark: bool,
+    /// The duel badge on the picture.
+    pub(crate) duel: bool,
+    /// The bars; none, a dotted line under the name instead.
+    pub(crate) rows: Rows,
+    /// How much of the bars shows, 0 to 1 ([`detail`]): the plate grows to hold them
+    /// as they fade in.
+    pub(crate) detail: f32,
+    /// How close the player is, 0 (far) to 1 ([`detail`]'s ramp, bars or not): far away
+    /// the plate fades and a small hex and the name stay, over a hairline.
+    pub(crate) proximity: f32,
+    /// The thinnest a bar or line may be, in pixels.
+    pub(crate) least_bar: f32,
+    pub(crate) viewport: [f32; 2],
+}
+
+/// The bars inside a plate, top to bottom, in physical pixels.
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub(crate) struct Bars {
+    pub(crate) shield: Option<Rect>,
+    pub(crate) health: Option<Rect>,
+    pub(crate) force: Option<Rect>,
+}
+
+/// A nameplate as a holo frame (design C, Sol's pick of 28/10/2026): a hexagon holding
+/// the picture, overlapping the left end of a plate with a cut top-right corner, which
+/// holds the name with its mark and, under it, the bars (or a dotted line without
+/// them); the power icons stand over the plate's right end. Far away the plate fades
+/// and a small hexagon and the name stay over a hairline. Physical pixels.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(crate) struct Holo {
+    /// The design's pixel in physical ones.
+    pub(crate) k: f32,
+    /// The plate's box, and its cut corner's run along either side.
+    pub(crate) plate: Rect,
+    pub(crate) cut: f32,
+    /// The hexagon's box.
+    pub(crate) hex: Option<Rect>,
+    /// Where the name runs: its left edge and the most it may take.
+    pub(crate) name: Rect,
+    /// The name's capitals are centred on this height.
+    pub(crate) middle: f32,
+    pub(crate) mark: Option<Rect>,
+    pub(crate) badge: Option<Rect>,
+    pub(crate) bars: Bars,
+    /// The dotted line under the name of a plate without bars.
+    pub(crate) dotted: Rect,
+    /// The hairline under a far plate's name.
+    pub(crate) hairline: Rect,
+}
+
+impl Holo {
+    pub(crate) fn new(spec: &HoloSpec) -> Self {
+        let k = spec.size / DESIGN_NAME;
+        let near = spec.proximity.clamp(0.0, 1.0);
+        let detail = if spec.rows.any() {
+            spec.detail.clamp(0.0, 1.0)
+        } else {
+            0.0
         };
-        let shield = bar(rows.shield, Self::SHIELD);
-        let health = bar(rows.health, Self::HEALTH);
-        let force = bar(rows.force, Self::FORCE);
+        let lerp = |from: f32, to: f32, t: f32| from + (to - from) * t;
+        let measure = |pick: fn(&Measures) -> f32| lerp(pick(&SHORT), pick(&TALL), detail) * k;
+        let line = |height: f32| (height * k).max(spec.least_bar);
+        let name_width = spec.name_width.clamp(0.0, NAME_MAX * k);
+        let mark_width = if spec.mark {
+            (MARK_GAP + MARK) * k
+        } else {
+            0.0
+        };
+        let left = if spec.picture {
+            measure(|m| m.left)
+        } else {
+            BARE_LEFT * k
+        };
+        let width = (PLATE_WIDTH * k)
+            .max(left + name_width + mark_width + PAD_RIGHT * k)
+            .min(spec.viewport[0]);
+        let bars = [
+            (spec.rows.shield, line(BAR_SHIELD)),
+            (spec.rows.health, line(BAR_HEALTH)),
+            (spec.rows.force, line(BAR_FORCE)),
+        ];
+        let short_height = (SHORT.top + NAME_ROW + DOTTED_GAP + DOTTED + SHORT.bottom) * k;
+        let tall_height = if spec.rows.any() {
+            (TALL.top + NAME_ROW + NAME_GAP + TALL.bottom) * k
+                + bars
+                    .iter()
+                    .filter(|(wanted, _)| *wanted)
+                    .map(|(_, height)| BAR_GAP * k + height)
+                    .sum::<f32>()
+        } else {
+            short_height
+        };
+        let height = lerp(short_height, tall_height, detail);
+        let near_hex = [
+            lerp(SHORT.hex[0], TALL.hex[0], detail) * k,
+            lerp(SHORT.hex[1], TALL.hex[1], detail) * k,
+        ];
+        let overlap = measure(|m| m.overlap);
+        // Near, the hexagon and the plate are centred together; far, the small hexagon
+        // and the name.
+        let fits = |left: f32, width: f32| left.clamp(0.0, (spec.viewport[0] - width).max(0.0));
+        let (hex_width, joined) = if spec.picture {
+            (near_hex[0], near_hex[0] - overlap + width)
+        } else {
+            (0.0, width)
+        };
+        let near_left = fits(spec.centre_x - joined * 0.5, joined);
+        let plate_x = near_left
+            + if spec.picture {
+                hex_width - overlap
+            } else {
+                0.0
+            };
+        let far_hex = if spec.picture {
+            FAR_HEX[0] * k + FAR_GAP * k
+        } else {
+            0.0
+        };
+        let far_width = far_hex + name_width + mark_width;
+        let far_left = fits(spec.centre_x - far_width * 0.5, far_width);
+        let plate = Rect::new(plate_x, spec.bottom - height, width, height);
+        let near_middle = plate.y + measure(|m| m.top) + NAME_ROW * 0.5 * k;
+        let hairline_y = spec.bottom - line(EDGE);
+        let far_middle = hairline_y - HAIRLINE_GAP * k - NAME_ROW * 0.5 * k;
+        let middle = lerp(far_middle, near_middle, near);
+        let name_x = lerp(far_left + far_hex, plate.x + left, near);
+        let hex = spec.picture.then(|| {
+            let size = [
+                lerp(FAR_HEX[0] * k, near_hex[0], near),
+                lerp(FAR_HEX[1] * k, near_hex[1], near),
+            ];
+            let centre = lerp(far_middle, plate.y + height * 0.5, near);
+            Rect::new(
+                lerp(far_left, near_left, near),
+                centre - size[1] * 0.5,
+                size[0],
+                size[1],
+            )
+        });
+        let name = Rect::new(
+            name_x,
+            middle - NAME_ROW * 0.5 * k,
+            name_width,
+            NAME_ROW * k,
+        );
+        let square = |left: f32, side: f32| Rect::new(left, middle - side * 0.5, side, side);
+        let mark = spec
+            .mark
+            .then(|| square(name.right() + MARK_GAP * k, MARK * k));
+        let badge = spec.duel.then(|| match hex {
+            Some(hex) => {
+                let side = lerp(FAR_BADGE, BADGE, near) * k;
+                let out = BADGE_OUT * k * side / (BADGE * k);
+                Rect::new(
+                    hex.right() + out - side,
+                    hex.bottom() + out - side,
+                    side,
+                    side,
+                )
+            }
+            None => square(
+                name.right() + mark_width + MARK_GAP * k,
+                lerp(FAR_BADGE, BADGE, near) * k,
+            ),
+        });
+        let inner_x = plate.x + left;
+        let inner_width = (plate.right() - PAD_RIGHT * k - inner_x).max(0.0);
+        // The bars stand on the plate's bottom, so they keep their places as it grows.
+        let mut cursor = plate.bottom() - measure(|m| m.bottom);
+        let mut stack = [None; 3];
+        for (slot, (wanted, height)) in stack.iter_mut().zip(bars).rev() {
+            if wanted {
+                cursor -= height;
+                *slot = Some(Rect::new(inner_x, cursor, inner_width, height));
+                cursor -= BAR_GAP * k;
+            }
+        }
+        let dotted = Rect::new(
+            inner_x,
+            near_middle + NAME_ROW * 0.5 * k + DOTTED_GAP * k,
+            inner_width,
+            line(DOTTED),
+        );
+        let hairline_width = HAIRLINE * k;
+        let hairline = Rect::new(
+            fits(
+                far_left + far_width * 0.5 - hairline_width * 0.5,
+                hairline_width,
+            ),
+            hairline_y,
+            hairline_width,
+            line(EDGE),
+        );
         Self {
-            frame: Rect::new(x, y, width, height),
-            health,
-            shield,
-            force,
+            k,
+            plate,
+            cut: CUT * k,
+            hex,
+            name,
+            middle,
+            mark,
+            badge,
+            bars: Bars {
+                shield: stack[0],
+                health: stack[1],
+                force: stack[2],
+            },
+            dotted,
+            hairline,
         }
     }
+
+    /// The plate's corners, clockwise from the top-left: its top-right one is cut.
+    pub(crate) fn outline(&self) -> [[f32; 2]; 5] {
+        let plate = self.plate;
+        let cut = self.cut.min(plate.height).min(plate.width);
+        [
+            [plate.x, plate.y],
+            [plate.right() - cut, plate.y],
+            [plate.right(), plate.y + cut],
+            [plate.right(), plate.bottom()],
+            [plate.x, plate.bottom()],
+        ]
+    }
+
+    /// The gold corner of a player who shares, along the top to the cut corner and
+    /// down the right side: its three points.
+    pub(crate) fn gold(&self) -> [[f32; 2]; 3] {
+        let plate = self.plate;
+        let cut = self.cut.min(plate.height);
+        let half = GOLD_WIDTH * self.k * 0.25;
+        [
+            [plate.right() - GOLD_ALONG * self.k, plate.y + half],
+            [plate.right() - cut, plate.y + half],
+            [
+                plate.right() - half,
+                plate.y + (GOLD_DOWN * self.k).min(plate.height),
+            ],
+        ]
+    }
+
+    /// The power icons' cells, `count` of them, over the plate's right end: the
+    /// first's rectangle and the step to the next.
+    pub(crate) fn chips(&self, count: usize, viewport: [f32; 2]) -> (Rect, f32) {
+        let side = CHIP * self.k;
+        let step = side + CHIP_GAP * self.k;
+        let width = count as f32 * step - CHIP_GAP * self.k;
+        let right = self.plate.right() - CHIP_RIGHT * self.k;
+        let left = (right - width).clamp(0.0, (viewport[0] - width).max(0.0));
+        (
+            Rect::new(left, self.plate.y - CHIP_LIFT * self.k - side, side, side),
+            step,
+        )
+    }
+}
+
+/// The plate's fill under a frame of colour `frame`: the frame's colour made dark, so
+/// a team's or a duel's plate is tinted with it as the design's are.
+pub(crate) fn plate_fill(frame: Color, alpha: f32) -> Color {
+    let dark = |channel: f32| channel * 0.1;
+    Color::new(dark(frame.r), dark(frame.g), dark(frame.b), alpha)
 }
 
 #[cfg(test)]
@@ -342,65 +679,219 @@ mod tests {
     }
 
     #[test]
-    fn a_broken_bar_has_gaps_and_stays_inside() {
-        let dashes: Vec<_> = broken_dashes().collect();
-        assert!(dashes.len() > 3);
-        for pair in dashes.windows(2) {
+    fn dashes_have_gaps_and_stay_in_their_run() {
+        let pieces: Vec<_> = dashes(10.0, 100.0, 9.0, 2.0).collect();
+        assert_eq!(pieces.len(), 10);
+        assert_eq!(pieces[0], (10.0, 19.0));
+        assert_eq!(pieces[1], (21.0, 30.0));
+        for pair in pieces.windows(2) {
             assert!(pair[0].1 < pair[1].0, "a gap between dashes");
         }
+        assert_eq!(pieces.last().unwrap().1, 110.0, "the last cut to the run");
+        assert_eq!(dashes(0.0, 0.0, 3.0, 4.0).count(), 0);
+        // A bar's segments are whole: the last ends at the bar's end, as long as the rest.
+        let bar: Vec<_> = segments(0.0, 123.0, 9.0, 2.0).collect();
+        assert_eq!(bar.len(), 11);
+        let first = bar[0].1 - bar[0].0;
+        let last = bar[10].1 - bar[10].0;
+        assert!((first - last).abs() < 1e-3 && (bar[10].1 - 123.0).abs() < 1e-3);
+    }
+
+    /// A plate near enough for its bars: 18-pixel names (`cg_nameplateScale` 0.5 at
+    /// 1080 lines), a picture and the seal.
+    fn spec(rows: Rows) -> HoloSpec {
+        HoloSpec {
+            centre_x: 960.0,
+            bottom: 500.0,
+            size: 18.0,
+            name_width: 60.0,
+            picture: true,
+            mark: true,
+            duel: false,
+            rows,
+            detail: 1.0,
+            proximity: 1.0,
+            least_bar: 2.0,
+            viewport: [1920.0, 1080.0],
+        }
+    }
+
+    const ALL: Rows = Rows {
+        health: true,
+        shield: true,
+        force: true,
+    };
+
+    fn inside(inner: Rect, outer: Rect) -> bool {
+        inner.x >= outer.x - 1e-3
+            && inner.y >= outer.y - 1e-3
+            && inner.right() <= outer.right() + 1e-3
+            && inner.bottom() <= outer.bottom() + 1e-3
+    }
+
+    /// The hexagon overlaps the plate's left end and is centred on it; the name and its
+    /// seal run in the plate's top row, the bars under them (shield on top, health the
+    /// thickest), and the whole stands centred on its bottom.
+    #[test]
+    fn a_holo_frame_holds_its_parts_in_order() {
+        let holo = Holo::new(&spec(ALL));
+        let (plate, hex) = (holo.plate, holo.hex.unwrap());
+        assert!((plate.bottom() - 500.0).abs() < 1e-3, "on the bottom");
         assert!(
-            dashes
-                .iter()
-                .all(|(start, end)| 0.0 <= *start && *end <= 1.0)
+            (hex.x + (plate.right() - hex.x) * 0.5 - 960.0).abs() < 1e-3,
+            "centred"
         );
-    }
-
-    #[test]
-    fn outlines_are_a_lighter_shade() {
-        let outline = lighter(Color::new(0.2, 0.4, 1.0, 1.0), 0.5, 0.75);
-        assert!((outline.r - 0.6).abs() < 1e-5 && (outline.g - 0.7).abs() < 1e-5);
-        assert_eq!((outline.b, outline.a), (1.0, 0.75));
-    }
-
-    #[test]
-    fn stacks_hold_only_the_wanted_bars_inside_their_frame() {
-        let viewport = [1920.0, 1080.0];
-        let all = Rows {
-            health: true,
-            shield: true,
-            force: true,
-        };
-        let stack = Stack::new(960.0, 500.0, all, 2.0, viewport);
-        assert!((stack.frame.x + stack.frame.width * 0.5 - 960.0).abs() < 1e-3);
-        assert!((stack.frame.y + stack.frame.height - 500.0).abs() < 1e-3);
-        let (hp, shield, force) = (
-            stack.health.unwrap(),
-            stack.shield.unwrap(),
-            stack.force.unwrap(),
+        assert!(
+            hex.x < plate.x && hex.right() > plate.x,
+            "over the plate's end"
         );
-        // Shield on top, then health, then Force.
-        assert!(shield.y > stack.frame.y && hp.y > shield.y + shield.height && force.y > hp.y);
-        assert!(force.y + force.height < stack.frame.y + stack.frame.height);
-
-        let only_force = Rows {
-            force: true,
-            ..Rows::default()
-        };
-        let slim = Stack::new(960.0, 500.0, only_force, 2.0, viewport);
-        assert!(slim.health.is_none() && slim.shield.is_none() && slim.force.is_some());
-        assert!(slim.frame.height < stack.frame.height);
-        assert_eq!(Stack::height(Rows::default(), 2.0), 0.0);
+        let centre = |rect: Rect| rect.y + rect.height * 0.5;
+        assert!((centre(hex) - centre(plate)).abs() < 1e-3);
+        // At the design's size the frame is the design's 40 high, 150 wide.
+        let k = holo.k;
+        assert!((plate.height - 40.0 * k).abs() < 1e-3, "{plate:?}");
+        assert!((plate.width - 150.0 * k).abs() < 1e-3);
+        assert!((hex.width - 44.0 * k).abs() < 1e-3);
+        let mark = holo.mark.unwrap();
+        assert!(holo.name.x > hex.right() && holo.name.right() < mark.x);
+        assert!(inside(mark, plate));
+        assert!((centre(mark) - holo.middle).abs() < 1e-3);
+        assert!(holo.badge.is_none());
+        let Bars {
+            shield,
+            health,
+            force,
+        } = holo.bars;
+        let (shield, health, force) = (shield.unwrap(), health.unwrap(), force.unwrap());
+        assert!(holo.name.bottom() <= shield.y);
+        assert!(shield.bottom() < health.y && health.bottom() < force.y);
+        for bar in [shield, health, force] {
+            assert!(inside(bar, plate), "{bar:?}");
+            assert!(bar.x > hex.right(), "clear of the hexagon");
+        }
+        assert!(health.height > shield.height, "health is the thickest");
+        // The plate's corners: its top-right one cut.
+        let outline = holo.outline();
+        assert_eq!(outline[0], [plate.x, plate.y]);
+        assert!(outline[1][0] < plate.right() && outline[2][1] > plate.y);
     }
 
+    /// No bars (names only, a player who does not share, a duel): the plate is the
+    /// design's 30 high with a smaller hexagon and a dotted line under the name, and it
+    /// grows to hold the bars only as they fade in.
     #[test]
-    fn stacks_stay_on_screen() {
-        let viewport = [1920.0, 1080.0];
-        let rows = Rows {
-            health: true,
-            ..Rows::default()
-        };
-        assert_eq!(Stack::new(5.0, 500.0, rows, 2.0, viewport).frame.x, 0.0);
-        let right = Stack::new(1915.0, 500.0, rows, 2.0, viewport).frame;
-        assert!((right.x + right.width - viewport[0]).abs() < 1e-3);
+    fn without_bars_the_plate_is_short_and_dotted() {
+        let short = Holo::new(&spec(Rows::default()));
+        let k = short.k;
+        assert!((short.plate.height - 30.0 * k).abs() < 1e-3);
+        assert!((short.hex.unwrap().height - 34.0 * k).abs() < 1e-3);
+        assert_eq!(short.bars, Bars::default());
+        assert!(short.dotted.y > short.name.bottom() && inside(short.dotted, short.plate));
+        let fading = Holo::new(&HoloSpec {
+            detail: 0.5,
+            ..spec(ALL)
+        });
+        assert!(fading.plate.height > short.plate.height);
+        assert!(fading.plate.height < Holo::new(&spec(ALL)).plate.height);
+        assert!((fading.plate.bottom() - 500.0).abs() < 1e-3);
+    }
+
+    /// At 1080 lines with the default text size no bar is thinner than two pixels,
+    /// even at the far edge of the bars' range, where the plate has shrunk.
+    #[test]
+    fn the_bars_are_never_under_two_pixels() {
+        let shrunk = distance_scale(1000.0, 3000.0, 0.6);
+        let holo = Holo::new(&HoloSpec {
+            size: 36.0 * 0.5 * shrunk,
+            ..spec(ALL)
+        });
+        for bar in [holo.bars.shield, holo.bars.health, holo.bars.force] {
+            assert!(bar.unwrap().height >= 2.0 - 1e-4, "{bar:?}");
+        }
+    }
+
+    /// The duel badge sits on the hexagon's bottom-right corner; with no picture (an
+    /// NPC) the name starts further in; far away a small hexagon and the name are
+    /// centred over a hairline.
+    #[test]
+    fn the_badge_and_the_far_plate_follow_the_hexagon() {
+        let duel = Holo::new(&HoloSpec {
+            duel: true,
+            rows: Rows::default(),
+            ..spec(ALL)
+        });
+        let (badge, hex) = (duel.badge.unwrap(), duel.hex.unwrap());
+        assert!(badge.right() > hex.right() && badge.bottom() > hex.bottom());
+        assert!(
+            badge.x < hex.right() && badge.y < hex.bottom(),
+            "on its corner"
+        );
+        let npc = Holo::new(&HoloSpec {
+            picture: false,
+            ..spec(ALL)
+        });
+        assert!(npc.hex.is_none());
+        assert!(npc.name.x > npc.plate.x);
+        let far = Holo::new(&HoloSpec {
+            proximity: 0.0,
+            ..spec(Rows::default())
+        });
+        let hex = far.hex.unwrap();
+        assert!((hex.height - 15.0 * far.k).abs() < 1e-3, "small");
+        assert!(far.name.x > hex.right());
+        let shown = (hex.x + far.mark.unwrap().right()) * 0.5;
+        assert!((shown - 960.0).abs() < 0.5, "{shown}");
+        let hairline = far.hairline;
+        assert!((hairline.x + hairline.width * 0.5 - 960.0).abs() < 0.5);
+        assert!(hairline.y > hex.bottom() && hairline.y > far.name.bottom());
+        assert!((hairline.bottom() - 500.0).abs() < 1e-3);
+    }
+
+    /// A long name widens the plate up to its widest, and a plate at the screen's edge
+    /// stays on it, its power icons too.
+    #[test]
+    fn plates_stay_on_screen() {
+        let long = Holo::new(&HoloSpec {
+            name_width: 5_000.0,
+            ..spec(ALL)
+        });
+        assert!(long.name.width < 300.0);
+        assert!(long.plate.width > 150.0 * long.k);
+        let left = Holo::new(&HoloSpec {
+            centre_x: 5.0,
+            ..spec(ALL)
+        });
+        assert_eq!(left.hex.unwrap().x, 0.0);
+        let right = Holo::new(&HoloSpec {
+            centre_x: 1915.0,
+            ..spec(ALL)
+        });
+        assert!((right.plate.right() - 1920.0).abs() < 1e-3);
+        // The power icons stand clear over the plate's right end.
+        let (chip, step) = right.chips(3, [1920.0, 1080.0]);
+        assert!(chip.bottom() < right.plate.y && step > chip.width);
+        assert!(chip.x + 2.0 * step + chip.width <= right.plate.right() + 1e-3);
+    }
+
+    /// A round-cut picture spread over a hexagon shows none of its clear outside: each
+    /// corner's texture coordinate is inside the disc.
+    #[test]
+    fn the_hexagon_stays_inside_a_round_picture() {
+        let box_ = Rect::new(0.0, 0.0, 40.0, 36.0);
+        let [low, high] = HEX_UV;
+        for [x, y] in hexagon(box_) {
+            let u = low[0] + (high[0] - low[0]) * x / box_.width;
+            let v = low[1] + (high[1] - low[1]) * y / box_.height;
+            let reach = (u - 0.5).hypot(v - 0.5);
+            assert!(reach <= 0.5 && reach > 0.45, "{reach}");
+        }
+    }
+
+    /// A frame's plate is its colour made dark: the design's blue team plate.
+    #[test]
+    fn a_plate_is_tinted_by_its_frame() {
+        let blue = plate_fill(Color::new(77.0 / 255.0, 153.0 / 255.0, 1.0, 1.0), 0.55);
+        assert!((blue.r * 255.0 - 8.0).abs() < 2.0 && (blue.b * 255.0 - 26.0).abs() < 2.0);
+        assert_eq!(blue.a, 0.55);
     }
 }

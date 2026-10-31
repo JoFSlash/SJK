@@ -141,6 +141,18 @@ impl GpuState {
                 return;
             }
         }
+        if button == PointerButton::Primary {
+            if state == ElementState::Released && std::mem::take(&mut self.spectator_follow_click) {
+                return;
+            }
+            if state == ElementState::Pressed {
+                self.spectator_follow_click = false;
+                if self.follow_aimed_spectator() {
+                    self.spectator_follow_click = true;
+                    return;
+                }
+            }
+        }
         self.route_stock_mouse_button(
             match button {
                 PointerButton::Primary => MouseButton::Left,
@@ -197,6 +209,10 @@ impl GpuState {
         self.cursor_policy.set_focus(focused);
         self.gameplay_input.focus(focused);
         if !focused {
+            // The window that took the focus takes the slider's release too.
+            if let Some(menu) = &mut self.client_menu {
+                menu.cancel_slider_peek();
+            }
             self.pending_generic_command = 0;
             self.generic_command_sent = 0;
             if let Some(console) = &mut self.console {
@@ -237,6 +253,7 @@ impl GpuState {
             || self.text_dialog.is_open()
             // The SJK team's window, which may show in the middle of play.
             || self.official.window.is_open()
+            || self.news.is_open()
             || self.chat.is_typing()
             || self
                 .console
@@ -304,6 +321,11 @@ impl GpuState {
         // The SJK team's window, over the console too.
         if self.official.window.is_open() {
             self.official_pointer(event);
+            return true;
+        }
+        // And the News panel.
+        if self.news.is_open() {
+            self.news_pointer(event);
             return true;
         }
         if self
@@ -382,11 +404,6 @@ impl GpuState {
         if self.log_request_card.is_open() {
             let choice = self.log_request_card.handle_pointer(event);
             self.log_request_card_choice(choice);
-            return true;
-        }
-        if self.whats_new_card.is_open() {
-            let choice = self.whats_new_card.handle_pointer(event);
-            self.whats_new_card_choice(choice);
             return true;
         }
         // The update card, over the menus: a click on it installs the update.
@@ -483,6 +500,31 @@ impl GpuState {
         }
     }
 
+    /// Follow the player directly under a free spectator camera's crosshair.
+    fn follow_aimed_spectator(&mut self) -> bool {
+        let Some(session) = &mut self.live_session else {
+            return false;
+        };
+        let aimed = self
+            .crosshair_scan
+            .aimed_client(session.latest_snapshot().server_time);
+        let Some(target) = spectator_follow_target(
+            session.latest_snapshot().player.is_spectator(),
+            session.game_state().client_num,
+            aimed,
+        ) else {
+            return false;
+        };
+        let command = format!("follow {target}");
+        if let Err(error) = session.send_reliable_command_from(
+            command.as_bytes(),
+            sjk_client::ReliableCommandOrigin::Input,
+        ) {
+            eprintln!("failed to follow crosshair player {target}: {error}");
+        }
+        true
+    }
+
     fn route_gameplay_wheel(&mut self, vertical: f32) {
         if self.live_session.is_none() || self.chat.is_typing() || self.game_menu {
             return;
@@ -505,6 +547,11 @@ fn normalize_button(button: MouseButton) -> Option<PointerButton> {
         MouseButton::Middle => Some(PointerButton::Middle),
         _ => None,
     }
+}
+
+fn spectator_follow_target(spectator: bool, local_client: i32, aimed: Option<u16>) -> Option<u16> {
+    let local_client = u16::try_from(local_client).ok()?;
+    aimed.filter(|target| spectator && *target < 32 && *target != local_client)
 }
 
 pub(crate) fn normalize_button_event(
@@ -561,5 +608,14 @@ mod tests {
         }
         let swipe = MouseScrollDelta::PixelDelta(PhysicalPosition::new(0.0, 60.0));
         assert_eq!(wheel_binding_direction(vertical(swipe)), Some(true));
+    }
+
+    #[test]
+    fn only_a_free_spectator_can_follow_the_aimed_player() {
+        assert_eq!(spectator_follow_target(true, 2, Some(7)), Some(7));
+        assert_eq!(spectator_follow_target(false, 2, Some(7)), None);
+        assert_eq!(spectator_follow_target(true, 2, None), None);
+        assert_eq!(spectator_follow_target(true, 2, Some(2)), None);
+        assert_eq!(spectator_follow_target(true, 2, Some(32)), None);
     }
 }

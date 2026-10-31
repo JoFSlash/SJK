@@ -203,6 +203,7 @@ impl GpuState {
         // User commands are made on the gameplay FPS's grid and wait for the next
         // `cl_maxpackets` packet (`command_rate`).
         let now = Instant::now();
+        crate::emote_end_debug::observe_frame(now);
         let server_time = self.server_clock.server_time(now);
         let step =
             self.console
@@ -246,9 +247,8 @@ impl GpuState {
         if let Some(yaw) = emplaced_view::forced_yaw(snapshot, self.camera_yaw.to_degrees()) {
             self.camera_yaw = yaw.to_radians();
         }
-        let weapon = self
-            .selected_weapon
-            .unwrap_or_else(|| snapshot.player.weapon());
+        let held_weapon = snapshot.player.weapon();
+        let weapon = self.selected_weapon.unwrap_or(held_weapon);
         let force_power = snapshot.player.selected_force_power();
         let known = self.gameplay_input.selection.known(&snapshot.player);
         let own_slot = u8::try_from(snapshot.player.client_num()).ok();
@@ -281,7 +281,10 @@ impl GpuState {
                 },
             );
             self.gameplay_input.apply_flip_kick(&mut command, flip_kick);
-            // In the cardboard box the player crouches (`cardboard_box`).
+            // In the cardboard box the player crouches (`cardboard_box`), but not
+            // while flying the free camera, whose `upmove` it would steer down.
+            self.cardboard_box
+                .set_flying(self.local_prediction.fake_noclip());
             self.cardboard_box.shape_command(&mut command);
             // A Hax hack starts and holds on `+use` (`hax`).
             self.hax.observe_use(&command);
@@ -306,17 +309,28 @@ impl GpuState {
                 .committed_state()
                 .map(crate::ghost_replay::Pose::of);
             // The Hax toy steers, or stands still while steering another (`hax`); a
-            // limp player's real body walks to their ragdoll (`ragdoll`).
+            // limp player's real body walks to their ragdoll (`ragdoll`), though not
+            // while they fly the free camera: the flight is theirs, and the server's body
+            // is held still (`command_for_server`).
+            let flying = self.local_prediction.fake_noclip();
             let origin = self
                 .local_prediction
                 .committed_state()
                 .map_or(snapshot_origin, |state| state.origin);
-            // A jump, attack or taunt gets a limp player up.
-            self.ragdoll.wake(&command);
+            // A jump, attack or taunt gets a limp player up, though not while flying the
+            // free camera, whose rise is `upmove` and whose speed key a wake button
+            // (#232's review: the first rise ended the ragdoll).
+            if !flying {
+                self.ragdoll.wake(&command);
+            }
             let replay = self
                 .hax
                 .drive(&command, delta_angles, (self.camera_pitch, self.camera_yaw))
-                .or_else(|| self.ragdoll.drive(&command, delta_angles, origin))
+                .or_else(|| {
+                    (!flying)
+                        .then(|| self.ragdoll.drive(&command, delta_angles, origin))
+                        .flatten()
+                })
                 .or_else(|| pose.and_then(|pose| self.ghost.drive(&command, &pose)));
             // Or the mimic copies another player (`mimic`).
             let replay = replay.or_else(|| {
@@ -339,6 +353,7 @@ impl GpuState {
             }
             let sent = self.local_prediction.command_for_server(command);
             session.queue_command(&sent);
+            crate::emote_end_debug::observe_command(&sent, held_weapon, now);
             // With `cg_emoteAttackStop`, an attack or alt attack ends the player's
             // own emote, here and, as `sjkemote stop` does, for the other SJK
             // players: the server attacks whatever the emote shows.
@@ -378,8 +393,32 @@ impl GpuState {
             }
         }
         self.gameplay_input.set_command_age(0);
+        self.report_emote_end(now);
         self.send_due_packet(now);
         self.sync_cursor_policy();
+    }
+
+    /// `cg_debugEmoteEnd`: say in the console what came before a JA+ emote let go of the
+    /// player ([`crate::emote_end_debug`]).
+    fn report_emote_end(&mut self, now: Instant) {
+        let (Some(session), Some(console)) = (&self.live_session, &mut self.console) else {
+            return;
+        };
+        let enabled = console.bool_cvar(crate::emote_end_debug::CVAR) == Some(true);
+        crate::emote_end_debug::set_enabled(enabled);
+        if !enabled {
+            return;
+        }
+        let movement_type = session.latest_snapshot().player.movement_type();
+        let context = crate::emote_end_debug::Context {
+            unfocused: console.bool_cvar("com_unfocused") == Some(true)
+                || console.bool_cvar("com_minimized") == Some(true),
+            console_open: console.is_open(),
+            collection_open: console.collection_stage_wish().is_some(),
+        };
+        if let Some(line) = crate::emote_end_debug::report(movement_type, context, now) {
+            console.push_log(line);
+        }
     }
 
     /// Send the queued user commands once `cl_maxpackets` allows a packet.

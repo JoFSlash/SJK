@@ -10,9 +10,15 @@ impl GpuState {
         // A chip naming a setting (the changelog page's, the what's-new card's) opens
         // Settings on it.
         self.open_chip_settings();
+        // Held mouse 4 and 5 repeat into the binds while the pointer and keys are the
+        // game's, as their presses went (`in_mouseRepeat`).
+        let mouse_repeat = self.pointer_captured && !self.text_has_keyboard();
         let Some(console) = &mut self.console else {
             return;
         };
+        if mouse_repeat {
+            console.repeat_held_mouse_buttons();
+        }
         // The Collection's Toys tab lights or puts out the holocron through the console.
         if let Some(on) = console.take_illuminate_request() {
             self.illuminate.set_on(on);
@@ -37,6 +43,9 @@ impl GpuState {
         }
         if let Some(on) = console.take_box_hunt_request() {
             self.box_hunt.set_on(on);
+        }
+        if let Some(on) = console.take_banana_request() {
+            self.banana.set_on(on);
         }
         // The boombox checks who may carry it, so it is switched once the console is let go.
         let boombox_request = console.take_boombox_request();
@@ -78,10 +87,10 @@ impl GpuState {
             self.toggle_boombox();
         }
         // `toy_illuminate` may have flipped it: tell the Toys tab. Order 66, the Hax, the
-        // Drone, the Monitor and Box hunt stay as last switched, across maps, servers and
-        // restarts (`toy_saved`).
+        // Drone, the Monitor, Box hunt and the Banana peel stay as last switched, across
+        // maps, servers and restarts (`toy_saved`).
         if let Some(console) = self.console.as_mut() {
-            let [order66, hax, drone, monitor, box_hunt] = &mut self.toys_saved;
+            let [order66, hax, drone, monitor, box_hunt, banana] = &mut self.toys_saved;
             let on = order66.sync(console, crate::toy_saved::ORDER66_CVAR, self.order66.on());
             self.order66.set_on(on);
             let on = hax.sync(console, crate::toy_saved::HAX_CVAR, self.hax.on());
@@ -92,6 +101,8 @@ impl GpuState {
             self.monitor.set_on(on);
             let on = box_hunt.sync(console, crate::toy_saved::BOX_HUNT_CVAR, self.box_hunt.on());
             self.box_hunt.set_on(on);
+            let on = banana.sync(console, crate::toy_saved::BANANA_CVAR, self.banana.on());
+            self.banana.set_on(on);
             console.set_illuminate_lit(self.illuminate.lit());
             console.set_cardboard_box_on(self.cardboard_box.on());
             console.set_order66_on(self.order66.on());
@@ -101,6 +112,7 @@ impl GpuState {
             console.set_boombox_on(self.boombox.on());
             console.set_monitor_on(self.monitor.on());
             console.set_box_hunt_on(self.box_hunt.on());
+            console.set_banana_on(self.banana.on());
         }
         let connection = self
             .console

@@ -461,6 +461,58 @@ mod tests {
     }
 
     #[test]
+    fn landing_and_hitting_a_wall_are_heard_as_knocks() {
+        let knocks = |wall| {
+            let mut flight = Flight::new(&throw(1_000));
+            let mut world = floor(wall);
+            (1..=MAX_STEPS)
+                .map(|step| {
+                    flight.run_to(step, &mut world);
+                    flight.knock
+                })
+                .filter(|knock| *knock > KNOCK_SPEED)
+                .count()
+        };
+        assert!(knocks(false) > 0);
+        assert!(knocks(true) > knocks(false));
+    }
+
+    /// The same in a map's brushes, as the game steps it (`ragdoll::Scene`).
+    #[test]
+    fn knocks_are_heard_against_a_maps_floor_and_wall() {
+        use sjk_bsp::{Bsp, CollisionShader, box_brush, write_collision_map};
+        let shaders = [CollisionShader {
+            name: "textures/test/solid".into(),
+            surface_flags: 0,
+            content_flags: 1,
+        }];
+        let bsp = Bsp::parse(&write_collision_map(
+            "{
+\"classname\" \"worldspawn\"
+}
+",
+            &shaders,
+            &[
+                box_brush([-2048.0, -2048.0, -64.0], [2048.0, 2048.0, 0.0], 0),
+                box_brush([400.0, -2048.0, 0.0], [464.0, 2048.0, 512.0], 0),
+            ],
+        ))
+        .expect("valid map");
+        let mut scratch = sjk_bsp::TraceScratch::default();
+        let mut movers = crate::ragdoll::Movers::default();
+        let mut world = crate::ragdoll::Scene::new(&bsp, &mut scratch, None, &mut movers);
+        let mut flight = Flight::new(&throw(1_000));
+        let mut knocks = Vec::new();
+        for step in 1..=MAX_STEPS {
+            flight.run_to(step, &mut world);
+            if flight.knock > KNOCK_SPEED {
+                knocks.push((step, flight.knock as i32));
+            }
+        }
+        assert!(knocks.len() >= 2, "{knocks:?}");
+    }
+
+    #[test]
     fn the_same_throw_flies_the_same_way_however_the_steps_are_taken() {
         let mut world = floor(true);
         let mut once = Flight::new(&throw(77));

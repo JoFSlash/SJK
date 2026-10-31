@@ -14,6 +14,7 @@
 
 pub mod known_servers;
 mod player;
+pub mod plugin_options;
 
 pub use known_servers::{KNOWN_SERVERS, KnownServer};
 pub use player::{Drawn, Player, resolve_player, strip_colours};

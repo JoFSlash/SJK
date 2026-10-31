@@ -16,10 +16,18 @@ impl Predictor {
         if self.state.health <= 0 || !matches!(self.state.movement_type, 0 | 1 | 2 | 4) {
             return;
         }
-        let top = if self.state.movement_flags & (PMF_DUCKED | 4) != 0 {
-            self.state.crouching_height
+        // CG_TouchTriggerPrediction uses the hull left by the final Pmove slice,
+        // not posture flags that PM_Footsteps may have changed afterwards.
+        let (minimums, maximums) = if self.legacy_prediction(predict_legacy::TRIGGER_HULL) {
+            // 2026.1028.1's box, rebuilt from the posture flags.
+            let top = if self.state.movement_flags & (PMF_DUCKED | 4) != 0 {
+                self.state.crouching_height
+            } else {
+                self.state.standing_height
+            };
+            ([-15.0, -15.0, -24.0], [15.0, 15.0, top])
         } else {
-            self.state.standing_height
+            self.box_bounds()
         };
         for entity in entities {
             if entity.kind == 2 && self.state.movement_type != 4 {
@@ -50,12 +58,7 @@ impl Predictor {
             } else if matches!(entity.kind, 4 | 5)
                 && entity.solid == 0x00ff_ffff
                 && entity.model > 0
-                && touches_brush(
-                    entity.model as usize,
-                    self.state.origin,
-                    [-15.0, -15.0, -24.0],
-                    [15.0, 15.0, top],
-                )
+                && touches_brush(entity.model as usize, self.state.origin, minimums, maximums)
             {
                 if entity.kind == 5 {
                     self.state.hyperspace = true;
@@ -75,5 +78,76 @@ impl MovementState {
     pub fn predicted_item_hidden(&self, entity: u16) -> bool {
         let number = usize::from(entity);
         number < 1024 && self.predicted_items[number / 64] & (1 << (number % 64)) != 0
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    struct Empty;
+    impl MovementCollision for Empty {
+        fn trace(
+            &self,
+            _: [f32; 3],
+            _: [f32; 3],
+            _: [f32; 3],
+            end: [f32; 3],
+            _: u32,
+        ) -> MovementTrace {
+            MovementTrace::miss(end)
+        }
+    }
+
+    #[test]
+    fn triggers_use_the_last_move_hull_even_after_posture_changes() {
+        // codemp/cgame/cg_predict.c:722 passes cg_pmove.mins/maxs verbatim.
+        for step in [8, 7, 4, 3] {
+            for (flags, top) in [(4, 40.0), (0, 16.0)] {
+                let mut predictor = Predictor::from_state(
+                    MovementState {
+                        health: 100,
+                        gravity: 800.0,
+                        standing_height: 40.0,
+                        crouching_height: 16.0,
+                        ground_entity_number: ENTITY_NUMBER_NONE,
+                        ..Default::default()
+                    },
+                    Default::default(),
+                );
+                predictor.predict_command(
+                    UserCommand {
+                        server_time: step,
+                        ..Default::default()
+                    },
+                    &Empty,
+                );
+                let hull = ([-15.0, -15.0, -24.0], [15.0, 15.0, top]);
+                predictor.set_box_bounds(hull);
+                predictor.state_mut().movement_flags = flags;
+                let entity =
+                    sjk_protocol::EntityState::zero(40, &sjk_protocol::LEGACY_ENTITY_FIELDS);
+                // Construct the trigger explicitly to avoid depending on netfield ordinals.
+                let mut trigger = crate::prediction_items::PredictionTrigger::from(&entity);
+                trigger.kind = 5;
+                trigger.model = 1;
+                trigger.solid = 0x00ff_ffff;
+                let mut queries = 0;
+                predictor.touch_prediction_triggers(
+                    &[trigger],
+                    step,
+                    0,
+                    true,
+                    |model, _, mins, maxs| {
+                        queries += 1;
+                        assert_eq!(model, 1);
+                        assert_eq!((mins, maxs), hull);
+                        true
+                    },
+                );
+                assert_eq!(queries, 1);
+                assert!(predictor.state().hyperspace);
+            }
+        }
     }
 }

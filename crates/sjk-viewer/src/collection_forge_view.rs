@@ -65,6 +65,12 @@ struct Item<'a> {
     /// Copies held, for a badge ("x3"); 0 or 1 for none.
     count: u32,
     look: Option<&'a crate::saber_skins::LoadedSkin>,
+    /// Its collection marks (29/10/2026): the star, the padlock, the New sticker and the
+    /// saber's mark for one worn.
+    favourite: bool,
+    locked: bool,
+    new: bool,
+    worn: bool,
 }
 
 impl Panel {
@@ -120,19 +126,24 @@ impl Panel {
     /// Read the sections' lists for this frame from what the player holds and the filters;
     /// keep each choice in range and in view.
     fn forge_lists(&mut self, inputs: &Inputs<'_>) {
+        self.follow_marks(inputs);
+        if !self.marks.kept {
+            // No favourites on a hub that keeps no marks.
+            self.forge.break_filter.shaders.favourite = false;
+        }
         let shards = self.forge.data.shards.unwrap_or(0);
         let craft = &self.forge.craft_filter;
-        self.forge.craft_list = craftable(&inputs.holdings, self.held_cards(inputs))
+        self.forge.craft_list = craftable(&inputs.holdings, self.held_cards(inputs), &self.marks)
             .into_iter()
-            .filter(|item| craft.shaders.passes(item.skin, false))
+            .filter(|item| craft.shaders.passes(item.skin, false, item.favourite))
             .filter(|item| !craft.only || item.cost <= shards)
             .collect();
-        let all = owned(&inputs.holdings, self.forge.data.last);
+        let all = owned(&inputs.holdings, self.forge.data.last, &self.marks);
         self.forge.spare = duplicates(&all);
         let breaks = &self.forge.break_filter;
         self.forge.break_list = all
             .into_iter()
-            .filter(|item| breaks.shaders.passes(item.skin, true))
+            .filter(|item| breaks.shaders.passes(item.skin, true, item.favourite))
             .filter(|item| !breaks.only || item.count > 1)
             .collect();
         if let Some(id) = self.forge.want.take() {
@@ -179,6 +190,9 @@ impl Panel {
             forge.break_list.len().div_ceil(per),
             shown,
         );
+        // A New one chosen is seen once the choice leaves it.
+        let chosen = self.forge.chosen_shader().map(|(id, _)| id);
+        self.view(chosen);
     }
 
     /// The section chips: Shop, Craft and Break down, the one on show gold; Break down
@@ -848,7 +862,7 @@ impl Panel {
 
     /// Craft: the filter, the shaders the player lacks, the one chosen up close.
     fn forge_craft(&mut self, frame: &Frame, inputs: &Inputs<'_>, seconds: f32) {
-        let all = craftable(&inputs.holdings, self.held_cards(inputs));
+        let all = craftable(&inputs.holdings, self.held_cards(inputs), &self.marks);
         let total = all.len();
         let shards = self.forge.data.shards.unwrap_or(0);
         let affordable = all.iter().filter(|item| item.cost <= shards).count();
@@ -860,7 +874,7 @@ impl Panel {
             )
         };
         self.forge_intro(frame, &line);
-        self.forge_filter(frame, "Affordable");
+        self.forge_filter(frame, "Affordable", false);
         let list = self.forge.craft_list.clone();
         if list.is_empty() {
             let (title, words) = if total == 0 {
@@ -892,6 +906,10 @@ impl Panel {
                 reach: item.cost <= shards,
                 count: 0,
                 look: skins.get(item.skin.id),
+                favourite: item.favourite,
+                locked: false,
+                new: false,
+                worn: false,
             };
             self.forge_item(frame, &shown, first, self.forge.craft, inputs, seconds);
         }
@@ -911,10 +929,10 @@ impl Panel {
             "Turn duplicate saber shaders into kyber shards: you keep your last copy.".to_owned()
         };
         self.forge_intro(frame, &line);
-        self.forge_filter(frame, "Duplicates");
+        self.forge_filter(frame, "Duplicates", self.marks.kept);
         let list = self.forge.break_list.clone();
         if list.is_empty() {
-            let any = !owned(&inputs.holdings, true).is_empty();
+            let any = !owned(&inputs.holdings, true, &self.marks).is_empty();
             let (title, words) = if any && !self.forge.data.last && copies == 0 {
                 (
                     "No duplicates yet",
@@ -924,7 +942,8 @@ impl Panel {
             } else if any || self.forge.break_filter.only {
                 (
                     "No shader matches",
-                    "T steps the tier, D shows only duplicates, / searches.",
+                    "T steps the tier, D shows only duplicates, Shift+F only favourites, / \
+                     searches.",
                 )
             } else {
                 (
@@ -947,9 +966,13 @@ impl Panel {
                 index,
                 skin: item.skin,
                 price: format!("+{}", crate::economy::shards_text(item.gives)),
-                reach: true,
+                reach: !item.locked,
                 count: item.count,
                 look: skins.get(item.skin.id),
+                favourite: item.favourite,
+                locked: item.locked,
+                new: item.new,
+                worn: item.worn,
             };
             self.forge_item(frame, &shown, first, self.forge.breaks, inputs, seconds);
         }
@@ -963,8 +986,9 @@ impl Panel {
     }
 
     /// The filter under the line: All and a chip a tier (in its colour), the section's own
-    /// chip (`only`), the search field at the line's right and the view switches.
-    fn forge_filter(&mut self, frame: &Frame, only: &str) {
+    /// chip (`only`), Favourites (`favourites`: Break down, on a hub that keeps marks), the
+    /// search field at the line's right and the view switches.
+    fn forge_filter(&mut self, frame: &Frame, only: &str, favourites: bool) {
         let s = frame.s;
         let filter = self.forge.filter().clone();
         let mut left = LEFT_X;
@@ -983,6 +1007,14 @@ impl Panel {
             ));
         }
         chips.push((ONLY_TOKEN, only.to_owned(), color::GOLD, filter.only));
+        if favourites {
+            chips.push((
+                FAVOURITES_TOKEN,
+                format!("{}  Favourites", symbols::EDITION),
+                color::GOLD,
+                filter.shaders.favourite,
+            ));
+        }
         for (token, label, colour, lit) in chips {
             let width = body_width(&label, 15.0) * self.widen + 30.0;
             let rect = frame.rect(left, CHIPS_Y, width, CHIP_HEIGHT);
@@ -1219,6 +1251,19 @@ impl Panel {
                 TextAlign::Center,
             );
         }
+        // The marks: the New sticker on the top edge, the star and the padlock at the
+        // blade's foot on the right, worn by the tier.
+        if item.new {
+            let _ = marks_view::new_sticker(&mut self.ui, frame, [x + 8.0, y - 8.0], 18.0);
+        }
+        let _ = marks_view::glyph_pill(
+            &mut self.ui,
+            frame,
+            [x + width - 6.0, y + 58.0],
+            24.0,
+            item.favourite,
+            item.locked,
+        );
         let name = item
             .skin
             .name
@@ -1244,6 +1289,18 @@ impl Panel {
             FontWeight::Semibold,
             TextAlign::Start,
         );
+        if item.worn {
+            text(
+                &mut self.ui,
+                TextFamily::Body,
+                format_args!("{}  Worn", symbols::SABER),
+                frame.rect(x + 10.0, y + 118.0, width - 20.0, 20.0),
+                14.0 * s,
+                color::GOLD_BRIGHT,
+                FontWeight::Semibold,
+                TextAlign::End,
+            );
+        }
         self.forge_price(frame, item, [x + 10.0, y + 152.0], 24.0);
         rarity_fx::draw(
             self.ui.draw_list_mut(),
@@ -1332,6 +1389,31 @@ impl Panel {
             FontWeight::Semibold,
             TextAlign::Start,
         );
+        // The marks: worn after the tier, the star and the padlock and the New sticker on
+        // the blade's left end.
+        if item.worn {
+            text(
+                &mut self.ui,
+                TextFamily::Body,
+                format_args!("{}  Worn", symbols::SABER),
+                frame.rect(x + 150.0, y + 54.0, 150.0, 20.0),
+                15.0 * s,
+                color::GOLD_BRIGHT,
+                FontWeight::Semibold,
+                TextAlign::Start,
+            );
+        }
+        let _ = marks_view::glyph_pill(
+            &mut self.ui,
+            frame,
+            [sx + sw - 6.0, sy + 6.0],
+            24.0,
+            item.favourite,
+            item.locked,
+        );
+        if item.new {
+            let _ = marks_view::new_sticker(&mut self.ui, frame, [sx + 6.0, sy + 6.0], 20.0);
+        }
         if item.count > 1 {
             text(
                 &mut self.ui,
@@ -1411,8 +1493,9 @@ impl Panel {
         });
     }
 
-    /// The chosen shader's card on the right: its tier, its blade big, its name, its facts,
-    /// what it is and its parts; returns where the words end (frame pixels).
+    /// The chosen shader's card on the right: its tier, its blade big, its name (the star
+    /// and the padlock at its right, on a hub that keeps them; the padlock while `owned`),
+    /// its facts, what it is and its parts; returns where the words end (frame pixels).
     fn forge_detail_head(
         &mut self,
         frame: &Frame,
@@ -1420,6 +1503,7 @@ impl Panel {
         facts: &[String],
         inputs: &Inputs<'_>,
         seconds: f32,
+        owned: bool,
     ) -> f32 {
         let s = frame.s;
         let [x0, y0, width0, height0] = DETAIL;
@@ -1499,11 +1583,37 @@ impl Panel {
             swatch::chroma_turn(look, swatch::rgb_bytes(inputs.stock)),
         );
         y += 168.0;
+        let mut name_width = width;
+        if self.marks.kept {
+            let toggles_x = x + width - marks_view::TOGGLES;
+            marks_view::toggle(
+                &mut self.ui,
+                frame,
+                [toggles_x, y + 6.0],
+                symbols::EDITION,
+                self.marks.favourite(skin.id),
+                true,
+                STAR_TOKEN,
+            );
+            marks_view::toggle(
+                &mut self.ui,
+                frame,
+                [
+                    toggles_x + marks_view::TOGGLE + marks_view::TOGGLE_GAP,
+                    y + 6.0,
+                ],
+                symbols::LOCK,
+                self.marks.locked(skin.id),
+                owned || self.marks.locked(skin.id),
+                PADLOCK_TOKEN,
+            );
+            name_width = toggles_x - 16.0 - x;
+        }
         text(
             &mut self.ui,
             TextFamily::Display,
             format_args!("{}", skin.name),
-            frame.rect(x, y, width, 58.0),
+            frame.rect(x, y, name_width, 58.0),
             46.0 * s,
             color::TEXT,
             FontWeight::Semibold,
@@ -1664,7 +1774,7 @@ impl Panel {
             facts.push("Takes your colour".to_owned());
         }
         facts.push(format!("Smith: {}", skin.smith));
-        let _ = self.forge_detail_head(frame, skin, &facts, inputs, seconds);
+        let _ = self.forge_detail_head(frame, skin, &facts, inputs, seconds, false);
         let shards = self.forge.data.shards.unwrap_or(0);
         let reach = shards >= item.cost;
         let [x0, y0, width0, height0] = DETAIL;
@@ -1767,31 +1877,42 @@ impl Panel {
     ) {
         let now = Instant::now();
         let skin = item.skin;
-        let worn = inputs
-            .holdings
-            .worn_blade_skin(inputs.setting)
-            .map(|worn| worn.id)
-            == Some(skin.id);
         let mut facts = vec![if item.count > 1 {
             format!("{} copies", item.count)
         } else {
             "Your only copy".to_owned()
         }];
-        if worn {
+        if item.worn {
             facts.push(format!("{}  Worn", symbols::SABER));
+        }
+        if item.new {
+            facts.push("New".to_owned());
         }
         if skin.chroma {
             facts.push("Takes your colour".to_owned());
         }
-        let _ = self.forge_detail_head(frame, skin, &facts, inputs, seconds);
+        let _ = self.forge_detail_head(frame, skin, &facts, inputs, seconds, true);
         let shards = self.forge.data.shards.unwrap_or(0);
         let [x0, y0, width0, height0] = DETAIL;
         let bottom = y0 + height0;
         let sums_y = bottom - PAD - 56.0 - 26.0 - 122.0;
-        let note = if item.last() {
+        let note = if item.locked {
             (
-                "Your only copy: it leaves your collection, and your saber if you wear it."
+                format!(
+                    "{}  Locked: you keep it until you unlock it (L).",
+                    symbols::LOCK
+                ),
+                color::GOLD_BRIGHT,
+            )
+        } else if item.last() && item.worn {
+            (
+                "Your only copy, and you wear it: it leaves your collection and your saber."
                     .to_owned(),
+                color::EMBER,
+            )
+        } else if item.last() {
+            (
+                "Your only copy: it leaves your collection.".to_owned(),
                 color::EMBER,
             )
         } else {
@@ -1822,7 +1943,9 @@ impl Panel {
         let press = Press::Break(skin.id);
         let armed = self.forge.is_armed(press, now);
         let waiting = self.forge.waiting();
-        let label = if waiting && self.forge.sent.is_some_and(|(_, sent)| sent == press) {
+        let label = if item.locked {
+            format!("{}  Locked", symbols::LOCK)
+        } else if waiting && self.forge.sent.is_some_and(|(_, sent)| sent == press) {
             "Breaking down...".to_owned()
         } else if item.last() {
             "Break down your last copy".to_owned()
@@ -1844,8 +1967,8 @@ impl Panel {
             frame,
             [x0 + PAD, button_y, 330.0, 56.0],
             &label,
-            open && !item.last(),
-            open && !waiting,
+            open && !item.last() && !item.locked,
+            open && !waiting && !item.locked,
             armed,
             ACTION_TOKEN,
         );
@@ -1943,22 +2066,26 @@ impl Panel {
         let (title, lines, gives, yes_label, no_label, yes, danger, shown) = match ask {
             Ask::Last { skin, yes } => {
                 let gives = crate::economy::shatter_yield(skin.tier);
-                let worn = inputs
-                    .holdings
-                    .worn_blade_skin(inputs.setting)
-                    .map(|worn| worn.id)
-                    == Some(skin.id);
-                let mut lines = vec![format!(
+                let mut lines = Vec::with_capacity(3);
+                // Worn on either saber (or staff half) is said first and plainly (Sol,
+                // 29/10/2026).
+                if self.marks.worn(skin.id) {
+                    lines.push(format!(
+                        "You wear this shader now: breaking it down puts your saber back to \
+                         the stock blade{}.",
+                        if inputs.pair == crate::saber_skins::Pair::None {
+                            ""
+                        } else {
+                            " (each saber or half that wears it)"
+                        }
+                    ));
+                }
+                lines.push(format!(
                     "Breaking down your {} gives you {} kyber shards, and the blade leaves your \
                      collection.",
                     skin.name,
                     crate::economy::shards_text(gives)
-                )];
-                if worn {
-                    lines.push(
-                        "You wear it now: your saber goes back to the stock blade.".to_owned(),
-                    );
-                }
+                ));
                 // Crafting it back costs less with a copy of its blade card.
                 let card = crate::economy::blade_card(
                     skin,
@@ -1994,8 +2121,19 @@ impl Panel {
                     crate::terms::say("Copies a medal or a card brings are never touched.")
                         .into_owned(),
                 ];
-                let shown: Vec<_> = owned(&inputs.holdings, false)
+                let all = owned(&inputs.holdings, false, &self.marks);
+                let kept = all.iter().filter(|item| item.locked).count();
+                let mut lines = lines;
+                if kept > 0 {
+                    lines.push(format!(
+                        "{}  Locked shaders are kept whole: {kept} {} skipped.",
+                        symbols::LOCK,
+                        if kept == 1 { "is" } else { "are" }
+                    ));
+                }
+                let shown: Vec<_> = all
                     .into_iter()
+                    .filter(|item| !item.locked)
                     .map(|item| (item.skin, item.count - 1))
                     .collect();
                 (
@@ -2010,6 +2148,8 @@ impl Panel {
                 )
             }
         };
+        // Worn: a pill beside the title, so it cannot be missed.
+        let worn_pill = matches!(ask, Ask::Last { skin, .. } if self.marks.worn(skin.id));
         // The card's height follows what it holds; it stands centred on the page.
         let wrapped: usize = lines
             .iter()
@@ -2029,6 +2169,32 @@ impl Panel {
             FontWeight::Semibold,
             TextAlign::Start,
         );
+        if worn_pill {
+            let words = format!("{}  You wear it", symbols::SABER);
+            let pill = crate::text::display_width(&words, 18.0) * self.widen + 36.0;
+            let rect = frame.rect(left + inner - pill, y + 48.0, pill, 34.0);
+            let _ = self.ui.draw_list_mut().push(DrawCommand::RoundedRect {
+                rect,
+                radius: 17.0 * s,
+                color: color::alpha(color::EMBER, 0.16),
+            });
+            let _ = self.ui.draw_list_mut().push(DrawCommand::Border {
+                rect,
+                radius: 17.0 * s,
+                width: 1.4 * s,
+                color: color::EMBER,
+            });
+            text(
+                &mut self.ui,
+                TextFamily::Display,
+                format_args!("{words}"),
+                frame.rect(left + inner - pill, y + 54.0, pill, 24.0),
+                18.0 * s,
+                color::EMBER,
+                FontWeight::Semibold,
+                TextAlign::Center,
+            );
+        }
         if danger {
             let look = shown.first().and_then(|(skin, _)| self.skins.get(skin.id));
             let _ = swatch::small_swatch(
@@ -2082,7 +2248,13 @@ impl Panel {
             }
         }
         let mut line_y = y + 112.0 + blades + 18.0;
-        for line in &lines {
+        for (index, line) in lines.iter().enumerate() {
+            // The worn line (the first) in ember, as the pill.
+            let colour = if worn_pill && index == 0 {
+                color::EMBER
+            } else {
+                color::MUTED
+            };
             line_y = left_lines(
                 &mut self.ui,
                 frame,
@@ -2090,7 +2262,7 @@ impl Panel {
                 [left, line_y, inner],
                 (86, 2),
                 18.0,
-                color::MUTED,
+                colour,
                 TextAlign::Start,
             );
         }
@@ -2204,6 +2376,10 @@ impl Panel {
                     )),
                 ],
             }),
+            STAR_TOKEN | PADLOCK_TOKEN | FAVOURITES_TOKEN => {
+                let chosen = self.forge.chosen_shader();
+                hover::mark_card(token_mark(token), &self.marks, chosen)
+            }
             token => {
                 let index = usize::from(token.checked_sub(TILE_BASE)?);
                 let skin = match self.forge.section {
@@ -2211,9 +2387,22 @@ impl Panel {
                     Section::Break => self.forge.break_list.get(index)?.skin,
                     Section::Shop => return None,
                 };
-                Some(hover::shader_card(Some(skin), &inputs.holdings))
+                Some(hover::shader_card(
+                    Some(skin),
+                    &inputs.holdings,
+                    &self.marks,
+                ))
             }
         }
+    }
+}
+
+/// Which of the marks' hover cards the Forge's `token` asks for.
+fn token_mark(token: u16) -> hover::MarkToken {
+    match token {
+        STAR_TOKEN => hover::MarkToken::Favourite,
+        PADLOCK_TOKEN => hover::MarkToken::Lock,
+        _ => hover::MarkToken::Favourites,
     }
 }
 

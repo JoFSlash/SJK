@@ -40,7 +40,7 @@ fifteen choices no longer fit. Seen in off-screen GPU renders on duel6 (world sh
 | How one is unlocked | The hub operator or staff grant it by hand (Staff page, operator command), and since 10/10/2026 a medal brings one while held: Bug Hunter the Glitch, Tester the Hologram, Contributor the Runic blade ([Medal shaders](#medal-shaders)). Achievements granting them are an idea for later, with harder goals than today's. Since 17/10/2026 holocrons drop every shader but the medals' ([Holocron shader drops](#holocron-shader-drops)). Since 25/10/2026 the Unique ones come only by hand, Sol's thank-you gifts ([Unique shaders](#unique-shaders)). |
 | How a look travels | Stored on the key's live claim, listed in presence for players who arrive later, and sent through the feed as a live event when it changes. |
 | Illuminate | Free for everyone, a toy (`toy_illuminate`); its lit state is part of the look so others see the holocron. |
-| Toys in the look | Since 16/10/2026 a look lists the toys out that others draw (`toys`, ids; the [cardboard box](client.md#cardboard-box)'s is `cardboard_box`, [Order 66](client.md#order-66)'s `order66`, the [Hax](client.md#hax)'s `hax`, `hax_away` when its trap holds while away, and since 26/10/2026 the [Monitor](client.md#monitor)'s `monitor` while its switch is on, so other clients foresee its hits), sent only when one is out, so older hubs see the look they know. A client draws the toys it knows (`looks::TOYS`) and ignores the rest. Free for everyone, like Illuminate. |
+| Toys in the look | Since 16/10/2026 a look lists the toys out that others draw (`toys`, ids; the [cardboard box](client.md#cardboard-box)'s is `cardboard_box`, [Order 66](client.md#order-66)'s `order66`, the [Hax](client.md#hax)'s `hax`, `hax_away` when its trap holds while away, since 26/10/2026 the [Monitor](client.md#monitor)'s `monitor` while its switch is on, so other clients foresee its hits, and since 30/10/2026 the [Banana peel](client.md#banana-peel)'s `banana` while it is on), sent only when one is out, so older hubs see the look they know. The hub takes up to 32 toy ids since 30/10/2026 (8 before, and a hub from before refuses a look listing more, as `bad_look`). A client draws the toys it knows (`looks::TOYS`) and ignores the rest. Free for everyone, like Illuminate. |
 | Feed with chat off | The feed reads while the player is on a game server whatever `cl_sjkChat` says (chat stays hidden); in the menus it reads only with chat on. |
 | Choosing | The Collection's Shaders tab (SJK UI look; the Unlockables page until 10/10/2026) lists every blade skin, owned or locked (a Unique one only to its holders), previews the chosen one on the player's own saber and equips owned ones; the Profile screen's Saber tab offers the owned blade skins too (10/10/2026); `cg_saberSkin` holds the choice. Since 23/10/2026 the Saber tab's Sounds row chooses the saber sounds apart from the blade (`cg_saberSounds`: follow it, stock, or an owned shader's; [Saber sounds](#saber-sounds)). |
 | Art (looks, sounds) | SJK's own, all rights reserved, not under the code's GPLv2: kept in the hub's private repository and served by the hub to registered SJK keys as packs. The code that draws it stays open and generic: no skin's values, sounds or pictures are in this repository or its history to come. |
@@ -243,6 +243,7 @@ came in.
 | 166 | `saber_varykino_blossom` | Varykino Blossom blade | Mythical | Sol | yes |
 | 167 | `saber_thousand_cranes` | Thousand Cranes blade | Unique | Sol | no |
 | 168 | `saber_hearth` | Hearth blade | Unique | Sol | no |
+| 169 | `saber_mystery` | Mystery blade | Legendary | Sol | no |
 
 A client ignores an id it does not know. Both catalogues' tests pin this exact list
 (ids, names, order), so a change to one fails until the other follows.
@@ -624,9 +625,9 @@ profile is read every ten minutes, and sooner (at most once every 30 seconds) af
 last one sent, with another blade skin (staff took it back; `Service::take_looks`
 hands it to the worker), so a relocked skin leaves the player's own blade within
 seconds; too many
-(429: `look_quota`, or the per-address `rate_limited` the chat and emotes share), a
-refused signature (401) and failures wait 10 seconds and go again; `not_on_server`
-waits for the next accepted claim;
+(429 `look_quota`) waits 1 second; the per-address `rate_limited` the chat and emotes
+share, a refused signature (401) and failures wait 10 seconds and go again;
+`not_on_server` asks for the claim again at once and the look goes with it;
 another refusal (an older hub) is not repeated until the look or the claim changes.
 Leaving the server sends nothing (the release drops the look).
 `Snapshot::look_outcome` holds what became of the last one. Unit tests against a fake
@@ -1567,6 +1568,12 @@ All of it is the Collection's Forge tab ([cards.md](cards.md#the-forge)); its re
 What the Forge lists counts the profile's `Unlock::count` when it has no `medal` and no
 `card`; a shader not listed is not held. The kyber shard's mark to draw beside a count is
 `cards::shard::draw` (or the symbol `symbols::SHARD` in text).
+
+**Collection marks** (29/10/2026, [sjk-ui.md](sjk-ui.md#marks)): a player stars their
+favourite shaders and locks the ones they want to keep; both are kept at the hub, which
+refuses to break down or trade a locked one. `shader_marks::Marks` is what a page shows
+(worn, favourite, locked, New), `sjk_identity::Service::set_mark` asks the hub, and the
+New marks are kept on the PC (`shader-seen.txt`).
 
 ## Planned, not built
 

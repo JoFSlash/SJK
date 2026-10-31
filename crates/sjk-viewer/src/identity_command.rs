@@ -252,13 +252,18 @@ mod tests {
             kyber: None,
             shop: None,
             trade: None,
+            marks: None,
+            marks_revision: 0,
+            mark_refusal: None,
             trades: None,
+            history: None,
             announcements: Vec::new(),
             announcements_revision: 0,
             rewards: None,
             rewards_revision: 0,
             claim: None,
             announce: None,
+            news_image: None,
             public_key: String::new(),
         }
     }

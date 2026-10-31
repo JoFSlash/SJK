@@ -59,6 +59,9 @@ pub struct Gradient {
     pub vertical: bool,
 }
 
+/// The most corners a [`DrawCommand::Polygon`] has.
+pub const POLYGON_POINTS: usize = 6;
+
 /// One renderer-independent drawing operation.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum DrawCommand {
@@ -155,6 +158,17 @@ pub enum DrawCommand {
         to: [f32; 2],
         width: f32,
         color: Color,
+    },
+    /// Filled convex polygon: the first `count` (3 to [`POLYGON_POINTS`]) of `points`,
+    /// in order round it, its edges anti-aliased by the renderer. With `texture`, the
+    /// texture is spread over the polygon's bounding box, the box's corners taking the
+    /// texture coordinates `uv` (top-left, bottom-right), and tinted by `color`. Like
+    /// explicit coordinates, a polygon is not clipped.
+    Polygon {
+        points: [[f32; 2]; POLYGON_POINTS],
+        count: u8,
+        color: Color,
+        texture: Option<(TextureId, [[f32; 2]; 2])>,
     },
     /// Begin clipping descendants.
     PushClip(Rect),

@@ -106,12 +106,15 @@ pub(crate) fn acquire(gpu: &GpuState) -> Result<Output, FrameStatus> {
     Ok(Output { frame, view, ui })
 }
 
-/// How the world pass starts on its colour target: cleared to the night tint.
-pub(crate) fn world_load() -> wgpu::LoadOp<wgpu::Color> {
+/// How the world pass starts on its colour target: cleared to the map's global fog
+/// colour as rd-vanilla clears (see [`crate::fog_volumes::Table::global_color`]), so
+/// open sky without a box shows the fog; to the night tint on a map without one.
+pub(crate) fn world_load(global_fog: Option<[f32; 3]>) -> wgpu::LoadOp<wgpu::Color> {
+    let [r, g, b] = global_fog.unwrap_or([0.015, 0.02, 0.035]);
     wgpu::LoadOp::Clear(wgpu::Color {
-        r: 0.015,
-        g: 0.02,
-        b: 0.035,
+        r: r.into(),
+        g: g.into(),
+        b: b.into(),
         a: 1.0,
     })
 }

@@ -199,6 +199,66 @@ fn textured(
     }
 }
 
+/// The renderer's convex polygon: full inside, fading across the last pixel inside
+/// its edges; `source` is spread over its bounding box from the texture coordinates
+/// given for the box's top-left and bottom-right.
+fn polygon(
+    image: &mut RgbaImage,
+    points: &[[f32; 2]],
+    source: Option<(&RgbaImage, [[f32; 2]; 2])>,
+    tint: [f32; 4],
+) {
+    if points.len() < 3 {
+        return;
+    }
+    let (mut low, mut high) = ([f32::MAX; 2], [f32::MIN; 2]);
+    for [x, y] in points {
+        low = [low[0].min(*x), low[1].min(*y)];
+        high = [high[0].max(*x), high[1].max(*y)];
+    }
+    let middle = points
+        .iter()
+        .fold([0.0, 0.0], |sum, [x, y]| [sum[0] + x, sum[1] + y])
+        .map(|sum| sum / points.len() as f32);
+    let size = [(high[0] - low[0]).max(1e-6), (high[1] - low[1]).max(1e-6)];
+    for y in (low[1].floor() as i64).max(0)..(high[1].ceil() as i64).min(i64::from(image.height()))
+    {
+        for x in
+            (low[0].floor() as i64).max(0)..(high[0].ceil() as i64).min(i64::from(image.width()))
+        {
+            let point = [x as f32 + 0.5, y as f32 + 0.5];
+            // The distance inside the nearest edge, each edge's inside being the middle's.
+            let inside = (0..points.len())
+                .map(|index| {
+                    let (from, to) = (points[index], points[(index + 1) % points.len()]);
+                    let along = [to[0] - from[0], to[1] - from[1]];
+                    let length = along[0].hypot(along[1]).max(1e-6);
+                    let side = |p: [f32; 2]| {
+                        ((p[0] - from[0]) * along[1] - (p[1] - from[1]) * along[0]) / length
+                    };
+                    side(point) * side(middle).signum()
+                })
+                .fold(f32::MAX, f32::min);
+            let coverage = inside.clamp(0.0, 1.0);
+            if coverage <= 0.0 {
+                continue;
+            }
+            let texel = source.map_or([1.0; 4], |(source, [uv0, uv1])| {
+                let s = (point[0] - low[0]) / size[0];
+                let t = (point[1] - low[1]) / size[1];
+                let u = (uv0[0] + (uv1[0] - uv0[0]) * s).clamp(0.0, 1.0);
+                let v = (uv0[1] + (uv1[1] - uv0[1]) * t).clamp(0.0, 1.0);
+                let tx = ((u * source.width() as f32) as u32).min(source.width() - 1);
+                let ty = ((v * source.height() as f32) as u32).min(source.height() - 1);
+                source.get_pixel(tx, ty).0.map(|c| f32::from(c) / 255.0)
+            });
+            let mut color = [0, 1, 2, 3].map(|c| texel[c] * tint[c]);
+            color[3] *= coverage;
+            blend(image, x, y, color);
+        }
+    }
+}
+
 /// The emblem's decoded layers as pictures, once its worker has finished.
 fn emblem_layers() -> HashMap<u32, (RgbaImage, bool)> {
     use crate::menu::emblem::EmblemLayer;
@@ -231,6 +291,8 @@ fn raster(
     let decoded = crate::menu::art::decoded();
     let full = Rect::new(0.0, 0.0, image.width() as f32, image.height() as f32);
     let mut clips = vec![full];
+    // Each clip's rounding: the renderer cuts lines to a rounded clip's corners.
+    let mut rounds: Vec<Option<(Rect, f32)>> = vec![None];
     let mut opacity = vec![1.0_f32];
     let color = |c: sjk_ui::Color, o: f32| [c.r, c.g, c.b, c.a * o];
     let emblem = EMBLEM.get_or_init(emblem_layers);
@@ -246,6 +308,7 @@ fn raster(
     };
     for command in list.commands() {
         let clip = *clips.last().unwrap_or(&full);
+        let round = rounds.last().copied().flatten();
         let o = *opacity.last().unwrap_or(&1.0);
         match command {
             DrawCommand::SolidRect { rect, color: c } => {
@@ -335,6 +398,23 @@ fn raster(
                         additive,
                     );
                 }
+            }
+            DrawCommand::Polygon {
+                points,
+                count,
+                color: c,
+                texture,
+            } => {
+                let source = texture.and_then(|(texture, uv)| Some((art(texture)?.0, uv)));
+                if texture.is_some() && source.is_none() {
+                    continue;
+                }
+                polygon(
+                    image,
+                    &points[..usize::from(*count).min(points.len())],
+                    source,
+                    color(*c, o),
+                );
             }
             DrawCommand::Arc {
                 center,
@@ -427,7 +507,11 @@ fn raster(
                     for x in xs.clone() {
                         let point = [x as f32 + 0.5 - from[0], y as f32 + 0.5 - from[1]];
                         let t = (point[0] * along[0] + point[1] * along[1]) / length;
-                        if !(0.0..=length).contains(&t) {
+                        if !(0.0..=length).contains(&t)
+                            || round.is_some_and(|(rect, radius)| {
+                                outside_rounded(rect, radius, [x as f32 + 0.5, y as f32 + 0.5])
+                            })
+                        {
                             continue;
                         }
                         let across = (point[0] * along[1] - point[1] * along[0]).abs() / length;
@@ -447,10 +531,15 @@ fn raster(
                     (rect.right().min(clip.right()) - x).max(0.0),
                     (rect.bottom().min(clip.bottom()) - y).max(0.0),
                 ));
+                rounds.push(match command {
+                    DrawCommand::PushRoundedClip { rect, radius } => Some((*rect, *radius)),
+                    _ => round,
+                });
             }
             DrawCommand::PopClip => {
                 if clips.len() > 1 {
                     clips.pop();
+                    rounds.pop();
                 }
             }
             // Snapshots draw a tilted card flat: its parts as laid out.
@@ -465,6 +554,14 @@ fn raster(
         }
     }
     raster_text(image, vertices, atlas);
+}
+
+/// Whether `point` lies outside `rect` with its corners rounded by `radius`.
+fn outside_rounded(rect: Rect, radius: f32, point: [f32; 2]) -> bool {
+    let radius = radius.min(rect.width * 0.5).min(rect.height * 0.5).max(0.0);
+    let dx = (rect.x + radius - point[0]).max(point[0] - (rect.right() - radius));
+    let dy = (rect.y + radius - point[1]).max(point[1] - (rect.bottom() - radius));
+    dx.max(0.0).hypot(dy.max(0.0)) > radius
 }
 
 /// Draw text `vertices` from `atlas` over `image`.
@@ -872,36 +969,94 @@ fn nameplate_snapshot() {
     nameplates(&mut shots, &vfs);
 }
 
-/// Nameplates over a match: a verified saber player in medium stance just spawned
-/// (overheal, 125) with estimated Force (grey haze), an enemy with a gun the estimate
-/// cannot place (yellow "?"), a duelling staff player farther off with an empty shield (broken
-/// grey), an SJK player who does not share (grey bars), and the player's own plate
-/// (`cg_nameplateSelf`) over a large shield (199).
+/// Nameplates over a match, in each style (holo frames, design C, 28/10/2026, in
+/// `nameplates.png`; `-capsule` and `-classic` the others): a verified player
+/// with a picture, just spawned (overheal, 125) with estimated Force (grey haze), a red
+/// enemy with no picture (their initial) whom the estimate cannot place
+/// (yellow "?"), a duelling staff player without SJK farther off (their model's head
+/// icon, the duel badge on the hexagon and a dotted line), an SJK player who does not
+/// share (the dotted line), the player's own plate (`cg_nameplateSelf`, blue team) over
+/// a large shield (199), and far away a player without SJK (a small grey hexagon and
+/// the name over a hairline).
 fn nameplates(shots: &mut Snapshot, vfs: &sjk_vfs::VirtualFileSystem) {
-    use crate::hud::nameplate::{PreviewPlate, State};
+    use crate::hud::nameplate::{PreviewPlate, State, Style};
     use sjk_ui::TextureId;
     let badge = RgbaImage::from_raw(128, 128, crate::ui_renderer::verified_badge_pixels())
         .expect("a full cell");
     shots
         .icons
         .insert(crate::ui_renderer::VERIFIED_TEXTURE.0, badge);
-    let mut weapons = Vec::new();
-    for (index, (weapon, path)) in [
-        (3_u8, "gfx/hud/w_icon_lightsaber.tga"),
-        (5, "gfx/hud/w_icon_blaster.tga"),
-    ]
-    .into_iter()
-    .enumerate()
-    {
-        if let Some(image) = decode(vfs, path) {
-            let texture = TextureId(900_000 + index as u32);
-            let cell =
-                image::imageops::resize(&image, 128, 128, image::imageops::FilterType::Triangle);
-            shots.icons.insert(texture.0, cell);
-            weapons.push((weapon, texture));
+    let colour = crate::ui_renderer::duel_badge::COLOURS[0];
+    let duel = RgbaImage::from_raw(
+        128,
+        128,
+        crate::ui_renderer::duel_badge::pixels(128, colour),
+    )
+    .expect("a full cell");
+    shots
+        .icons
+        .insert(crate::ui_renderer::duel_texture(0).0, duel);
+    // Two pictures as a hub serves them, and a head icon, each cut round in a cell.
+    let round = |mut cell: RgbaImage| {
+        crate::avatars::picture::round(&mut cell, 128);
+        cell
+    };
+    let picture = |from: [u8; 3], to: [u8; 3]| {
+        round(RgbaImage::from_fn(128, 128, |x, y| {
+            let t = (x + y) as f32 / 254.0;
+            let mix = |a: u8, b: u8| (f32::from(a) + (f32::from(b) - f32::from(a)) * t) as u8;
+            let ring = ((x as f32 - 64.0).hypot(y as f32 - 50.0) - 26.0).abs() < 6.0;
+            if ring {
+                Rgba([240, 240, 245, 255])
+            } else {
+                Rgba([
+                    mix(from[0], to[0]),
+                    mix(from[1], to[1]),
+                    mix(from[2], to[2]),
+                    255,
+                ])
+            }
+        }))
+    };
+    let pictures = [
+        (
+            TextureId(900_100),
+            Some(picture([230, 120, 40], [120, 40, 90])),
+        ),
+        (
+            TextureId(900_101),
+            Some(picture([40, 90, 200], [30, 160, 150])),
+        ),
+        (
+            TextureId(900_102),
+            decode(vfs, "models/players/kyle/icon_default.jpg").map(|icon| {
+                round(image::imageops::resize(
+                    &icon,
+                    128,
+                    128,
+                    image::imageops::FilterType::Triangle,
+                ))
+            }),
+        ),
+    ];
+    for (texture, cell) in &pictures {
+        if let Some(cell) = cell {
+            shots.icons.insert(texture.0, cell.clone());
         }
     }
-    let icons = crate::hud::icons::Icons::with_weapons(&weapons);
+    let shown = |index: usize| pictures[index].1.as_ref().map(|_| pictures[index].0);
+    // The Force powers' icons over the plates, as the Force wheel's.
+    let mut power_icons = [None; crate::hud::force_wheel::ICONS];
+    for (slot, name) in crate::hud::force_wheel::picture_names() {
+        let image = ["tga", "png", "jpg"]
+            .into_iter()
+            .find_map(|extension| decode(vfs, &format!("{name}.{extension}")));
+        if let Some(image) = image {
+            let id = TextureId(crate::ui_renderer::FORCE_WHEEL_ICON_FIRST + slot as u32);
+            shots.icons.insert(id.0, image);
+            power_icons[slot] = Some(id);
+        }
+    }
     let plates = [
         PreviewPlate {
             slot: 1,
@@ -910,13 +1065,15 @@ fn nameplates(shots: &mut Snapshot, vfs: &sjk_vfs::VirtualFileSystem) {
             health: Some([1.25, 1.25, 1.25]),
             shield: Some([0.25, 0.25, 0.25]),
             force: Some([0.35, 0.8, 0.85]),
-            weapon: 3,
-            style: 2,
+            powers: (1 << 2) | (1 << 9),
             verified: true,
             duelling: false,
             team: None,
             shared: true,
             withheld: false,
+            picture: shown(0),
+            stand_in: None,
+            sjk: true,
         },
         PreviewPlate {
             slot: 2,
@@ -925,13 +1082,15 @@ fn nameplates(shots: &mut Snapshot, vfs: &sjk_vfs::VirtualFileSystem) {
             health: Some([0.01, 1.0, 1.25]),
             shield: Some([0.0, 0.25, 1.0]),
             force: Some([0.1, 0.45, 0.6]),
-            weapon: 5,
-            style: 0,
+            powers: (1 << 6) | (1 << 13) | (1 << 7),
             verified: false,
             duelling: false,
             team: Some(true),
             shared: true,
             withheld: false,
+            picture: None,
+            stand_in: Some(('K', sjk_ui::Color::new(0.63, 0.36, 0.2, 1.0))),
+            sjk: true,
         },
         PreviewPlate {
             slot: 3,
@@ -940,13 +1099,15 @@ fn nameplates(shots: &mut Snapshot, vfs: &sjk_vfs::VirtualFileSystem) {
             health: Some([0.45, 0.5, 0.55]),
             shield: Some([0.0, 0.0, 0.0]),
             force: Some([1.0, 1.0, 1.0]),
-            weapon: 3,
-            style: 7,
+            powers: 0,
             verified: true,
             duelling: true,
             team: None,
             shared: false,
             withheld: false,
+            picture: shown(2),
+            stand_in: Some(('D', sjk_ui::Color::new(0.6, 0.27, 0.4, 1.0))),
+            sjk: false,
         },
         PreviewPlate {
             slot: 0,
@@ -955,13 +1116,15 @@ fn nameplates(shots: &mut Snapshot, vfs: &sjk_vfs::VirtualFileSystem) {
             health: Some([1.0, 1.0, 1.0]),
             shield: Some([1.99, 1.99, 1.99]),
             force: Some([0.64, 0.64, 0.64]),
-            weapon: 3,
-            style: 3,
+            powers: 0,
             verified: true,
             duelling: false,
             team: Some(false),
             shared: false,
             withheld: false,
+            picture: shown(1),
+            stand_in: None,
+            sjk: true,
         },
         PreviewPlate {
             slot: 4,
@@ -970,13 +1133,33 @@ fn nameplates(shots: &mut Snapshot, vfs: &sjk_vfs::VirtualFileSystem) {
             health: Some([0.0, 0.0, 0.0]),
             shield: Some([0.0, 0.0, 0.0]),
             force: Some([0.0, 0.0, 0.0]),
-            weapon: 3,
-            style: 1,
+            powers: 0,
             verified: false,
             duelling: false,
             team: None,
             shared: false,
             withheld: true,
+            picture: None,
+            stand_in: Some(('Q', sjk_ui::Color::new(0.18, 0.5, 0.45, 1.0))),
+            sjk: true,
+        },
+        // Far away, without SJK: a small grey hexagon and the name over a hairline.
+        PreviewPlate {
+            slot: 5,
+            point: [560.0, 520.0],
+            distance: 1500.0,
+            health: None,
+            shield: None,
+            force: None,
+            powers: 0,
+            verified: false,
+            duelling: false,
+            team: None,
+            shared: false,
+            withheld: false,
+            picture: shown(2),
+            stand_in: None,
+            sjk: false,
         },
     ];
     let names = [
@@ -984,22 +1167,32 @@ fn nameplates(shots: &mut Snapshot, vfs: &sjk_vfs::VirtualFileSystem) {
         "^5Kit^7 Fisto",
         "^1Bounty",
         "^3Darth^7Staff",
-        "^2Quiet",
+        // A black name, edged in its halo.
+        "^0Qu^7iet",
+        "Jaden",
     ];
-    let mut state = State::default();
-    let mut vertices = Vec::new();
     // The plates draw with the HUD font in game (`hud_runtime::append`).
     let hud = crate::text::load_classic().expect("build the HUD font");
     let menu = std::mem::replace(&mut shots.font, hud);
-    state.preview(
-        &plates,
-        &names,
-        &icons,
-        &shots.font.font,
-        &mut vertices,
-        VIEWPORT,
-    );
-    shots.save("nameplates", &state.list, &vertices, true);
+    // Each style (`cg_nameplateStyle`): the holo frame, the capsule, the classic plate.
+    for (name, style) in [
+        ("nameplates", Style::Holo),
+        ("nameplates-capsule", Style::Capsule),
+        ("nameplates-classic", Style::Classic),
+    ] {
+        let mut state = State::default();
+        state.set_style(style);
+        let mut vertices = Vec::new();
+        state.preview(
+            &plates,
+            &names,
+            &power_icons,
+            &shots.font.font,
+            &mut vertices,
+            VIEWPORT,
+        );
+        shots.save(name, &state.list, &vertices, true);
+    }
     shots.font = menu;
 }
 
@@ -1375,13 +1568,18 @@ fn identity_page(shots: &Snapshot, art: ArtSet) {
         kyber: None,
         shop: None,
         trade: None,
+        marks: None,
+        marks_revision: 0,
+        mark_refusal: None,
         trades: None,
+        history: None,
         announcements: Vec::new(),
         announcements_revision: 0,
         rewards: None,
         rewards_revision: 0,
         claim: None,
         announce: None,
+        news_image: None,
         public_key: String::new(),
     };
     let online = hub(Status::Online, "^1Sol", &["^4Vulpes", "Padawan"]);
@@ -1897,8 +2095,8 @@ fn save_sjk_shot(
 /// The SJK UI's Settings over the duel6 levelshot: Interface with a changed
 /// slider focused (its dot and reset arrow), Display with a list open, a
 /// search's results, Graphics scrolled to its weather, at 4:3, the weak-PC
-/// rows (Gameplay's stock blades, Display's menu FPS cap, Graphics' render scale)
-/// and Graphics' texture compression.
+/// rows (Gameplay's stock blades, Display's menu FPS cap, Graphics' render scale),
+/// Graphics' texture compression and Mods' plugin options.
 #[test]
 #[ignore = "reads the installed game data named by JKA_GAME_DATA"]
 fn sjk_settings_snapshot() {
@@ -2028,12 +2226,21 @@ fn sjk_settings_snapshot() {
     // Advanced's categories, then Simple's: Display, and Graphics on Vanilla and
     // on the SJK renderer, whose alpha warning the detail column shows.
     SettingsMode::Advanced.store(&mut console);
-    let simple: [Case; 5] = [
+    let simple: [Case; 6] = [
         (
             "sjk-settings-chat",
             VIEWPORT_WIDE,
             9,
             Some("cl_sjkChat"),
+            false,
+            None,
+        ),
+        // Mods, on the JA+ plugin options' Black sabers.
+        (
+            "sjk-settings-plugin-options",
+            VIEWPORT_WIDE,
+            11,
+            Some("japlus.plugin 3"),
             false,
             None,
         ),
@@ -2593,6 +2800,7 @@ fn in_game_menu(shots: &Snapshot, art: ArtSet) {
             page,
             selected_row,
             team: 1,
+            following: false,
             team_game,
             siege: false,
             red_players: 3,
@@ -2820,13 +3028,18 @@ fn medals_snapshot() {
         kyber: None,
         shop: None,
         trade: None,
+        marks: None,
+        marks_revision: 0,
+        mark_refusal: None,
         trades: None,
+        history: None,
         announcements: Vec::new(),
         announcements_revision: 0,
         rewards: None,
         rewards_revision: 0,
         claim: None,
         announce: None,
+        news_image: None,
         public_key: String::new(),
     };
     let with = hub(shot_medals());

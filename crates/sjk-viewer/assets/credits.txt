@@ -36,6 +36,7 @@ did: The classic menus and classic+, the settings and search, the retail-look co
 did: The SJK UI, Sol JK's own menus over the live map
 did: SJK's icon art: the quick wheels' and the settings' icons
 did: The HUD picker, the radial HUD, nameplates with shared bars and player cards
+did: Capsule nameplates: each player's picture, name and weapon, the shared bars on a tray
 did: JA+ and JoF server support: movement, sabers, grapple, Force wheel, flip kick
 did: Illuminate, SJK's own toy: a holocron that lights the way, art by Sol
 did: The cardboard box toy: hide in a carton, spotted with Use, tipping over
@@ -54,8 +55,10 @@ did: Mystery boxes on maps: open one with Use for credits, and maybe win big
 did: The mystery box's roll and its music box tune
 did: The mystery box's own chest and the words over it
 did: The Box hunt toy: kill the mark for a free mystery box roll
+did: The Banana peel toy: drop peels; opted-in players who walk onto one slip as ragdolls
 did: A macOS build for Apple Silicon, built by GitHub with every release (experimental)
 did: Medals from the SJK team, with medal pictures generated and chosen by Sol
+did: Card pictures drawn from the game: characters posed with lit sabers, weapons, moves
 did: Medal ranks I to V set by the SJK team, from Polished to Solar, pips on ribbons
 did: Clan tags: the JoF, JoFA, JAWA and {{S}} emblems beside tagged names
 did: Holocron drops: loot boxes earned by playing, in four tiers, with a Holocrons tab
@@ -75,8 +78,12 @@ did: The Mythical holocron's engram: gold plates breathing round a glowing core
 did: Blade cards craft their saber shader for less, and lead to it from the Cards tab
 did: Perk marks on cards: a badge for each thing a card brings
 did: The Forge: shop, crafting and breaking any saber shader down, in one tab
+did: The History tab: every drop, opening, credit and shard spent, box and trade
+did: Blade cost ranking: every Legendary and Mythical blade timed on the GPU
+did: Top-tier saber shaders made faster with the same look
 did: The four holocrons: the Jedi cube, the Great Holocron, the Sith pyramid, the kyber prism
 did: Grand finds told in SJK chat: who opened a holocron and got a grand prize
+did: The holocron limit resets for everyone at 9:00, Paris time
 did: Hover cards: how every collected thing is obtained
 did: Settings in Simple and Advanced, Vanilla or the SJK renderer, anonymous settings usage
 did: Card faces and the first card, art by Sol (AI-assisted)
@@ -128,6 +135,9 @@ did: Low FPS help (help_fps): EJK graphics offered on heavy maps
 did: Lighter memory on servers: the menu world dropped during matches
 did: Client mods: JA+ tools (admin teleports after JoF EJK) and JoF tools, loaded on their servers
 did: JoF content: JoF's maps, skins, hilts and packs from JoF's repository, opt in, after JoF's launcher
+did: The Sith cloud on the same card, with the SJK hub naming both collections' servers
+did: Automatic updates for JoF content and the Sith cloud: opt in, hourly, for the groups you mark
+did: The News panel: release recaps and announcements in one, with links into the game, pictures and switches
 did: Mythical shader parts: the Sun's and the Spectral's effects, each switched on or off
 did: The Sun's orbiting glints, circling its blade below the tip
 did: The Sun's plasma trail, and the Flare trail, embers and heat wake a Solar card 000 unlocks
@@ -182,6 +192,7 @@ did: Saber on/off spam quietened: four sounds, then one per half second
 did: Maps with external lightmaps (q3map2 -external) load and are lit (after EJK)
 did: Sky cloud layers: a sky shader's scrolling stages drawn over its box (after JKA)
 did: tcGen vector stages: textures projected in world space, as in JKA
+did: Collection marks: worn, favourite, locked and New saber shaders, the lock held by the hub
 link: https://github.com/Sol-Vulpes/SJK
 link: https://sol-vulpes.github.io/SJK/
 
@@ -189,7 +200,7 @@ link: https://sol-vulpes.github.io/SJK/
 
 [Creyon]
 github: Creyon94
-role: Contributor and tester: 58 merged pull requests, EternalJK parity
+role: Contributor and tester: 73 merged pull requests, EternalJK parity
 medal: early_contributor
 did: #2 #7 Duel challenges from names with symbols, centre prints kept whole
 did: #3 The third-person camera damped per frame as EternalJK (cg_cameraFPS)
@@ -224,6 +235,16 @@ did: #192 Normal blades in duels, each in its owner's colour (cg_duelStockBlades
 did: #191 Signature blades without the bright rim at the tip or hard edges round their effects
 did: #202 Bodies fade away as in EternalJK, with their Force side's glow and sounds
 did: #208 Formatting that unblocked CI
+did: #230 Black sabers in Profile > Saber and in game
+did: #231 The cardboard box with the free camera, crouched in the box
+did: #232 The limp body stays in sight from the free camera
+did: #210 The first to confirm a trade sees the swap at once
+did: #211 A trade refusal shown once, not at every map change
+did: #238 Exclusive fullscreen minimises on Alt+Tab
+did: #239 A blocked player's chat out of the console, BLOCKED in kill lines
+did: #269 RGB sliders for colourable models in Profile
+did: #259 Chat tabs: Admin and PM buttons, a tab showing only its channel
+did: #275 Movement keys on screen, as in JoF EJK
 did: #193 A blade skin for each saber and each half of a staff
 did: #197 Trading between players: duplicates (and later holocrons) swapped or given as gifts, from a game or the main menu
 did: Blade Lab rounds 15 to 22: every blade effect in 3D, richer mythicals, faster loading
@@ -231,11 +252,15 @@ did: The Saber ideas page: the concepts of the Tidal, Circuit, Aurora, Echo, Neb
 did: The Blade Lab page: the Neon, Peppermint, Soap Bubble, Lava Lamp, Reactor and Bleeding Kyber blades
 did: The Blade Lab page: the Sketch, Hourglass, Fiber Optic, Serpent, Monarch, Phoenix and Quantum blades
 did: The Blade Lab page: the Comic, Quicksilver and Obsidian Edge blades
+did: #297 Blade core thickness: a slider for the white core of a lit blade
+did: #296 Day and night follow the PC's clock, in every graphics preset
+did: #289 Toys say ON and OFF in colour; toy_help explains every toy
+did: #320 Hide chosen chat GIFs on this PC, a Hidden tab shows them again
 link: Creyon's pull requests | https://github.com/Sol-Vulpes/SJK/pulls?q=is%3Apr+author%3ACreyon94
 
 [Lumaya]
 github: lumayaa
-role: Contributor: 52 merged pull requests
+role: Contributor: 83 merged pull requests
 medal: early_contributor
 did: #24 Saber blades stop at walls instead of shining through them
 did: #29 Free camera: /freecam flies the camera away from your body
@@ -289,11 +314,23 @@ did: #149 JoF mod: EJK opt-in and Stasis/Repulse confirmations
 did: #165 Trusted chat media sources: GIFs, WebP, opt-in video
 did: #166 Shift+console at your console height, an option
 did: #195 The wall-grab camera holds on stock servers; cg_wallGrabLock locks it on JA+
+did: #249-#276 Prediction audit: 12 fixes checked against JA+ and jaPRO
+did: #265 #268 Rocket lock-on predicted as the server does
+did: #263 #264 Vehicle riders' weapons predicted
+did: #277 jaPRO race moves predicted as jaPRO cuts and rounds them
+did: #252-#273 Six more prediction fixes: saber locks, respawn, vehicles
+did: #279 #282 jaPRO movement styles and their jumps predicted
+did: #284 jaPRO new jetpack predicted
+did: #305 #307 #308 Prediction checked against a real JA+ server, two fixes backed out
+did: #313 #314 Each prediction fix explained; saber files read in the game's order
+did: #312 Copy a server's IP from the browser or the console
+did: #315 All chat in one colour of your choice
+did: #274 Riders and vehicles predicted with their own collision exclusions
 link: Lumaya's pull requests | https://github.com/Sol-Vulpes/SJK/pulls?q=is%3Apr+author%3Alumayaa
 
 [Lukas]
 github: LukasMoudry
-role: Contributor: 18 merged pull requests
+role: Contributor: 19 merged pull requests
 did: #115 Linux clipboard tools follow the desktop session; copy reports failures
 did: #108 clientlist and clientlistinfo, JoF EJK's player list commands
 did: #109 Two-key combo binds, such as bind K+L kill
@@ -312,11 +349,12 @@ did: #181 The chat key opens on All; remembering the channel is an option
 did: #190 JA+ anti-kiss: one Force Push breaks an amkiss
 did: #179 Holocron notifications: off, after duels or always
 did: #198 No more "Too many open files" after a long session
+did: #304 Spectators click the player under the crosshair to follow them
 link: Lukas's pull requests | https://github.com/Sol-Vulpes/SJK/pulls?q=is%3Apr+author%3ALukasMoudry
 
 [Slash]
 github: JoFSlash
-role: Contributor: 43 merged pull requests
+role: Contributor: 79 merged pull requests
 did: #114 Tab completes cfg file names after exec and writeconfig
 did: #113 CTF team saber colours, an option
 did: #153 The SJK scoreboard tells who won the Siege round or team match
@@ -363,6 +401,41 @@ did: #217 Own crosshair colour stays over targets
 did: #220 Screenshots saved opaque
 did: #221 No stray title over the Leave page
 did: #223 The DEMP2 alt fire's shock bubble
+did: #226 Each saber swing heard once across a combo's end
+did: #225 The jetpack's fuel bar, its flight on SJK's server, the jetpack cheat
+did: #227 A credits rail that fits any number of sections
+did: #237 The site's nav on one line on phones
+did: #242 oot's sand floor lit: a shader named twice keeps its first
+did: #234 Tab completes sjkemote's emote ids
+did: #235 Fogged skies take the fog's colour
+did: #233 The emote volume reaches emotes already playing
+did: #240 The Low FPS card ignores jumps and strafes
+did: #241 Synced emote music back from alt-tab in step
+did: #243 Force refills at g_forceRegenTime on hosted games
+did: #244 Going away leaves a chosen JA+ emote alone
+did: #245 The light side's body fade glow as in the original game
+did: #246 Light shafts without flickering floors
+did: #256 The chat card's Block buttons take their click
+did: #257 The mod notice ignores a jump as it opens
+did: #258 Blocked players' encrypted whispers stay out
+did: #248 Slider peek: a held slider shows the game behind the menu
+did: #272 The five saber style Master achievements
+did: #255 The console key opens the console over the chat
+did: #280 Name outline for nameplates: Off, Faint or Strong
+did: #281 Radial HUD spacing and height sliders
+did: #283 Laptops with two graphics cards start on the fast one
+did: #286 fs_restart: new PK3s without restarting SJK
+did: #310 Join the game while following a player
+did: #294 No glow on sabers: the dynamic glow without blades and trails
+did: #293 Quick wheel commands you name are remembered for any page
+did: #288 config.cfg edited or deleted while playing is no longer written over
+did: #290 Every settings search result takes a typed value
+did: #291 The Shaders wheel scrolls past the tier headings
+did: #298 No away emote while riding a vehicle
+did: #309 Force templates keep Force Speed on saber-only servers
+did: #299 A Change name button on the SJK Profile tab
+did: #322 A held melee kick no longer freezes on its last frame
+did: #323 No fakenoclip or freecam in duels
 link: Slash's pull requests | https://github.com/Sol-Vulpes/SJK/pulls?q=is%3Apr+author%3AJoFSlash
 
 [Milamber]
@@ -384,6 +457,19 @@ did: Made Solfox, Sol's fox player model, which every SJK player gets through th
 [Kushina]
 role: Ideas for SJK
 did: The Varykino Blossom blade: a blossom-pink blade, lavender mist, a flowering branch and blossoms shed as it swings
+did: Favourite and locked saber shaders: stars listed first, locks kept from break down and trades
+did: Plugin options as Settings switches, in place of typing a cp_pluginDisable number
+did: JoF EJK's saber hit sparks, mouse 4/5 repeat and lagometer modes 2 and 3 for players coming from EJK
+did: The Banana peel toy: drop peels that players who have it on slip on, cartoon style
+did: Prediction as in 2026.1028.1, a Settings choice for players who preferred it
+
+[Atrosex]
+role: Ideas for SJK
+did: The worn saber shader marked in the Forge's Break down, and said on the last copy's card
+
+[Creo]
+role: Ideas for SJK
+did: The chat's backdrop and text outline, so the chat reads over bright maps
 
 [Turin]
 role: Ideas for SJK
@@ -401,15 +487,28 @@ did: Click a name in the chat to whisper them
 role: Ideas for SJK
 did: Saber sounds of your choice, apart from your saber shader
 
+[g0dchris]
+role: Ideas for SJK
+did: No glow on sabers: the dynamic glow without the blades, so their details show
+
+[Dante]
+role: Ideas for SJK
+did: Quick wheel custom commands remembered in the command list
+
 == Testing
 
 [Glen]
 role: The first player of SJK on a Mac
 did: Reported the Mac build's fullscreen crash, its frame rate and Cmd+Tab
+did: Reported fullscreen on a Mac shrinking the game into a black screen
+did: His frame rate in fullscreen: Mac sizes and the world now count points (r_highDpi)
 
 [Blep]
-role: Tester
+role: Tester, tag artist and ideas for SJK
 did: Found encrypted whispers ending with a backslash going out unencrypted
+did: The player card on the inspect key only, never from a look (Key only)
+did: Drew the Gonk, EZ and Geyon tags
+did: Toys say when they are switched on or off
 
 == Made with
 
@@ -417,15 +516,17 @@ did: Found encrypted whispers ending with a backslash going out unencrypted
 role: Coding assistant, by Anthropic
 did: Wrote many of Sol's changes together with Sol
 
-[Inter, JetBrains Mono, Rajdhani, Exo 2 and Noto Sans]
-role: The fonts of the menus, the SJK UI and the console, under the SIL Open Font License
+[Inter, JetBrains Mono, Rajdhani, Exo 2, Fira Sans Condensed and Noto Sans]
+role: The fonts of the menus, the SJK UI, centre prints and the console, under the SIL Open Font License
 did: Inter by The Inter Project Authors, JetBrains Mono by The JetBrains Mono Project Authors
 did: Rajdhani by the Indian Type Foundry, Exo 2 by the Exo 2 Project Authors (Natanael Gama)
+did: Fira Sans Condensed by the Mozilla Foundation and Telefonica S.A., for centre prints
 did: Noto Sans JP, SC and KR by Adobe and Google, for Japanese, Chinese and Korean
 link: https://rsms.me/inter/
 link: https://www.jetbrains.com/lp/mono/
 link: https://fonts.google.com/specimen/Rajdhani
 link: https://fonts.google.com/specimen/Exo+2
+link: https://fonts.google.com/specimen/Fira+Sans+Condensed
 link: https://fonts.google.com/noto/specimen/Noto+Sans+JP
 
 [Twemoji]

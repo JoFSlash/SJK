@@ -128,6 +128,14 @@ pub(crate) const ACTIONS: &[BindableAction] = &[
     ),
     // Box hunt: the switch, the consent to hunt and be the mark.
     action(Interaction, "Toy: Box hunt", crate::box_hunt::COMMAND, ""),
+    // The Banana peel: the switch, the right to drop peels and the consent to slip.
+    action(Interaction, "Toy: Banana peel", crate::banana::COMMAND, ""),
+    action(
+        Interaction,
+        "Drop banana peel",
+        crate::banana::DROP_COMMAND,
+        "",
+    ),
     // The Tag: sticks the chosen tag where the player looks.
     action(Interaction, "Toy: Tag", crate::tags::COMMAND, ""),
     action(Interaction, "Item: Bacta", "use_bacta", ""),
@@ -209,6 +217,8 @@ pub(crate) const ACTIONS: &[BindableAction] = &[
     action(Other, "Whisper to crosshair player", "messagemode3", "u"),
     action(Other, "Whisper to last attacker", "messagemode4", ""),
     action(Other, "SJK chat", "messagemode5", "i"),
+    // SJK: admin chat (`amsay`, JA+ and jaPRO); no key by default.
+    action(Other, "Admin chat", "messagemode6", ""),
     // SJK: the SJK chat page, big, in a game or not; the wheel of favourite GIFs.
     action(Other, "SJK chat page", "sjkchat", ""),
     action(Other, "GIF wheel (hold)", "+gifwheel", ""),

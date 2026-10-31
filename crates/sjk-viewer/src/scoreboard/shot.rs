@@ -349,6 +349,7 @@ pub(super) fn append(gpu: &mut crate::GpuState, viewport: [f32; 2]) {
             ui.append_text_routed(
                 &mut gpu.game_fonts,
                 |_, text| Some(super::retail_font(text)),
+                |_| crate::text::CodePalette::Game,
                 &mut gpu.text_vertices,
                 &gpu.ui_font,
                 viewport,

@@ -17,7 +17,7 @@
 use super::Rarity;
 use crate::menu::emblem::MipChain;
 use serde::Deserialize;
-use sjk_ui::TextureId;
+use sjk_ui::{Color, TextureId};
 use sjk_vfs::VirtualFileSystem;
 use std::sync::{Arc, Mutex, MutexGuard};
 
@@ -121,9 +121,55 @@ pub(crate) struct Face {
     /// The saber shader a blade card is of (`saber_sun`; 20/10/2026): the hub drops it
     /// to whoever finds or reveals a Solar copy. `None` for other cards.
     pub(crate) blade: Option<String>,
+    /// What the client draws as its picture from the game's own models, in place of
+    /// [`Self::art`] ([`super::scene`]; 30/10/2026); `None` for most cards.
+    pub(crate) scene: Option<String>,
+    /// The rank it shows in place of its rarity (`rank` and `rank_colour`; 31/10/2026,
+    /// Sol's decision for the JoF collection): its rarity then only sets its odds.
+    pub(crate) rank: Option<Rank>,
+}
+
+/// A card's rank: the name and colour it shows in place of its rarity's.
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct Rank {
+    pub(crate) name: String,
+    pub(crate) colour: Color,
+}
+
+/// The longest rank name, as the hub checks.
+const RANK_MAX: usize = 24;
+
+/// The rank a card file's `rank` and `rank_colour` (`#RRGGBB`) make, or why not.
+fn rank(name: &str, colour: &str) -> Result<Rank, String> {
+    let name = name.trim();
+    if name.is_empty() || name.chars().count() > RANK_MAX {
+        return Err(format!("rank must be 1 to {RANK_MAX} characters"));
+    }
+    let value = colour
+        .strip_prefix('#')
+        .filter(|hex| hex.len() == 6 && hex.bytes().all(|byte| byte.is_ascii_hexdigit()))
+        .and_then(|hex| u32::from_str_radix(hex, 16).ok())
+        .ok_or_else(|| format!("rank_colour {colour:?} is not #RRGGBB"))?;
+    let channel = |shift: u32| ((value >> shift) & 0xff) as f32 / 255.0;
+    Ok(Rank {
+        name: name.to_owned(),
+        colour: Color::new(channel(16), channel(8), channel(0), 1.0),
+    })
 }
 
 impl Face {
+    /// How it reads and is coloured: its rank's, else its rarity's ([`super::Tone`]).
+    pub(crate) fn tone(&self) -> super::Tone<'_> {
+        match &self.rank {
+            Some(rank) => super::Tone {
+                name: &rank.name,
+                colour: rank.colour,
+                mark: None,
+            },
+            None => self.rarity.tone(),
+        }
+    }
+
     /// What it brings, as its hover card and the Cards tab say it ("Brings the Sun blade
     /// while you hold it."), when it brings an unlockable this client knows.
     pub(crate) fn brings(&self) -> Option<String> {
@@ -198,6 +244,12 @@ struct File {
     grants: Option<String>,
     #[serde(default)]
     blade: Option<String>,
+    #[serde(default)]
+    scene: Option<String>,
+    #[serde(default)]
+    rank: Option<String>,
+    #[serde(default)]
+    rank_colour: Option<String>,
 }
 
 /// The card file `text` of card `id`, read.
@@ -222,6 +274,33 @@ fn parse(id: &str, text: &str) -> Result<Face, String> {
     let kind = Kind::from_id(&file.kind).ok_or_else(|| format!("unknown kind {}", file.kind))?;
     let rarity =
         Rarity::from_id(&file.rarity).ok_or_else(|| format!("unknown rarity {}", file.rarity))?;
+    // A scene this client cannot read leaves the card its pack's picture.
+    let scene = file
+        .scene
+        .map(|text| text.trim().to_owned())
+        .filter(|text| !text.is_empty())
+        .filter(|text| match super::scene::parse(text) {
+            Ok(_) => true,
+            Err(why) => {
+                crate::log::progress(format_args!("cards: {id}: scene left out: {why}"));
+                false
+            }
+        });
+    // A rank comes with its colour; a bad pair leaves the card its rarity's look.
+    let rank = match (file.rank, file.rank_colour) {
+        (None, None) => None,
+        (Some(name), Some(colour)) => rank(&name, &colour)
+            .inspect_err(|why| {
+                crate::log::progress(format_args!("cards: {id}: rank left out: {why}"));
+            })
+            .ok(),
+        _ => {
+            crate::log::progress(format_args!(
+                "cards: {id}: rank left out: rank and rank_colour come together"
+            ));
+            None
+        }
+    };
     Ok(Face {
         id: id.to_owned(),
         name: file.name,
@@ -239,6 +318,8 @@ fn parse(id: &str, text: &str) -> Result<Face, String> {
         art: file.art,
         grants: file.grants.filter(|id| !id.trim().is_empty()),
         blade: file.blade.filter(|id| !id.trim().is_empty()),
+        scene,
+        rank,
     })
 }
 
@@ -331,6 +412,12 @@ impl Faces {
         Self::new(list, pictures, 1)
     }
 
+    /// Let face `index`'s picture be asked for again after it failed: its scene was just
+    /// drawn ([`super::scene`]).
+    pub(crate) fn retry(&self, index: usize) {
+        self.lock_art().failed.retain(|failed| *failed != index);
+    }
+
     /// The decoded picture of face `index`, taken for upload: `None` until a [`request`]
     /// for it has been decoded. The worker keeps no copy.
     pub(crate) fn take_art(&self, index: usize) -> Option<MipChain> {
@@ -394,9 +481,15 @@ fn work(faces: &Faces) {
             art.decoding = Some(index);
             index
         };
-        let decoded = match faces.pictures.get(index).and_then(Option::as_deref) {
-            Some(bytes) => decode_guarded(bytes, texture_edge()),
-            None => Err("missing".to_owned()),
+        // The drawing of the card's scene when the client keeps one, else the pack's.
+        let drawn =
+            scene_picture(&faces.list[index]).map(|bytes| decode_guarded(&bytes, texture_edge()));
+        let decoded = match drawn {
+            Some(Ok(chain)) => Ok(chain),
+            _ => match faces.pictures.get(index).and_then(Option::as_deref) {
+                Some(bytes) => decode_guarded(bytes, texture_edge()),
+                None => Err("missing".to_owned()),
+            },
         };
         let mut art = faces.lock_art();
         art.decoding = None;
@@ -408,6 +501,26 @@ fn work(faces: &Faces) {
             }
         }
     }
+}
+
+/// The drawing of `face`'s scene when the client keeps one ([`super::scene`]). When it
+/// does not, the drawing is asked for, and the pack's picture shows until it is ready.
+fn scene_picture(face: &Face) -> Option<Vec<u8>> {
+    let text = face.scene.as_deref()?;
+    let path = super::scene::cache_path(&face.id, text)?;
+    if let Ok(bytes) = std::fs::read(&path) {
+        return Some(bytes);
+    }
+    let scene = super::scene::parse(text).ok()?;
+    let colour = face.tone().colour;
+    super::scene::want(super::scene::Job {
+        id: face.id.clone(),
+        scene,
+        path,
+        tint: [colour.r, colour.g, colour.b]
+            .map(|channel| (channel.clamp(0.0, 1.0) * 255.0).round() as u8),
+    });
+    None
 }
 
 /// [`decode`], a panic in it failing that picture alone: the worker goes on and clears
@@ -644,6 +757,54 @@ mod tests {
         // A field the client does not know yet is read past.
         let later = FILE.replace("\"artist\"", "\"frame\": \"gold\", \"artist\"");
         assert!(parse("x", &later).is_ok());
+    }
+
+    #[test]
+    fn a_rank_takes_the_rarity_s_place_and_a_bad_one_is_left_out() {
+        let plain = parse("sjk_alpha_010", FILE).unwrap();
+        assert_eq!(plain.rank, None);
+        let tone = plain.tone();
+        assert_eq!((tone.name, tone.mark), ("Legendary", Some('\u{E003}')));
+        assert_eq!(tone.to_string(), "\u{E003} Legendary");
+        let ranked = |rank: &str| {
+            FILE.replace("\"legendary\"", "\"mythical\"")
+                .replace("\"artist\"", &format!("{rank}, \"artist\""))
+        };
+        let leader = parse(
+            "jof_001",
+            &ranked(r##""rank": " Leader ", "rank_colour": "#22D3ee""##),
+        )
+        .unwrap();
+        assert_eq!(
+            leader.rarity.id, "mythical",
+            "the rarity stays, for the odds"
+        );
+        let rank = leader.rank.as_ref().unwrap();
+        assert_eq!(rank.name, "Leader");
+        let [r, g, b] = [rank.colour.r, rank.colour.g, rank.colour.b]
+            .map(|channel| (channel * 255.0).round() as u8);
+        assert_eq!([r, g, b], [0x22, 0xD3, 0xEE]);
+        let tone = leader.tone();
+        assert_eq!(
+            (tone.name, tone.mark, tone.colour),
+            ("Leader", None, rank.colour)
+        );
+        assert_eq!(tone.to_string(), "Leader", "no rarity mark, no rarity name");
+        // A rank without its colour, a bad colour or a name too long: the card still
+        // reads, with its rarity's look.
+        for bad in [
+            r#""rank": "Leader""#,
+            r##""rank_colour": "#22D3EE""##,
+            r#""rank": "Leader", "rank_colour": "22D3EE""#,
+            r##""rank": "Leader", "rank_colour": "#22D3EG""##,
+            r##""rank": "Leader", "rank_colour": "#22D3E""##,
+            r##""rank": " ", "rank_colour": "#22D3EE""##,
+            r##""rank": "A rank name far too long to read", "rank_colour": "#22D3EE""##,
+        ] {
+            let face = parse("x", &ranked(bad)).unwrap();
+            assert_eq!(face.rank, None, "{bad}");
+            assert_eq!(face.tone().name, "Mythical", "{bad}");
+        }
     }
 
     #[test]

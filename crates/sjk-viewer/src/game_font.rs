@@ -22,6 +22,10 @@
 //! SJK Chat, bundled vector replacements for the retail `ergoec` and `ocr_a`
 //! bitmaps that keep their layout ([`text::retail_font`]); they need no game
 //! data. A font that fails to load leaves its surfaces on Inter.
+//! Centre prints and the words in the world (over mystery boxes, the box hunt's
+//! mark) are SJK's headline text, drawn in Fira Sans Condensed
+//! ([`RetailFont::Headline`], [`text::HEADLINE`]) whatever `ui_gameFont` says:
+//! close to `ergoec`, but a real typeface rather than a tracing of a bitmap.
 //! `cg_classicHudFont` keeps its own scope, the status HUD's `arialnb`, whose
 //! replacement is SJK HUD.
 //!
@@ -44,6 +48,11 @@ pub(crate) const CVAR: &str = "ui_gameFont";
 /// packed neighbouring glyphs would bleed into each other.
 const MIN_MIP_SIZE: u32 = 512;
 
+/// How much larger than retail's `ergoec` line centre prints set the headline
+/// font: its capitals fill 0.936 of a line, SJK Menu's (the `ergoec` layout) a
+/// little more, so this keeps centre prints' capitals the size they were.
+pub(crate) const HEADLINE_GROWTH: f32 = 1.07;
+
 /// The retail font a text surface was drawn with.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum RetailFont {
@@ -53,16 +62,20 @@ pub(crate) enum RetailFont {
     Small,
     /// The console character set.
     Console,
+    /// Not a retail font: SJK's headline face for centre prints and the words in
+    /// the world, on whether `ui_gameFont` is or not.
+    Headline,
 }
 
 impl RetailFont {
-    const ALL: [Self; 3] = [Self::Medium, Self::Small, Self::Console];
+    const ALL: [Self; 4] = [Self::Medium, Self::Small, Self::Console, Self::Headline];
 
     const fn index(self) -> usize {
         match self {
             Self::Medium => 0,
             Self::Small => 1,
             Self::Console => 2,
+            Self::Headline => 3,
         }
     }
 }
@@ -217,6 +230,8 @@ pub(crate) struct GameFonts {
     menu: Option<Layer>,
     chat: Option<Layer>,
     console: Option<Layer>,
+    /// The headline family, loaded with the SJK UI's ([`RetailFont::Headline`]).
+    headline: Option<Layer>,
     /// The SJK UI's families were loaded or failed to: they load the first
     /// time `ui_menuStyle sjk` is on ([`SjkFonts`]).
     sjk_attempted: bool,
@@ -280,6 +295,7 @@ impl GameFonts {
                 None
             }
         };
+        self.headline = layer(&text::HEADLINE);
         self.sjk = match (layer(&text::DISPLAY), layer(&text::BODY)) {
             (Some(display), Some(body)) => Some(SjkLayers { display, body }),
             _ => None,
@@ -348,6 +364,7 @@ impl GameFonts {
             RetailFont::Medium => &self.menu,
             RetailFont::Small => &self.chat,
             RetailFont::Console => &self.console,
+            RetailFont::Headline => &self.headline,
         }
     }
 
@@ -356,19 +373,26 @@ impl GameFonts {
             RetailFont::Medium => &mut self.menu,
             RetailFont::Small => &mut self.chat,
             RetailFont::Console => &mut self.console,
+            RetailFont::Headline => &mut self.headline,
         }
+    }
+
+    /// Whether `font` is on this frame: the retail ones with `ui_gameFont`, the
+    /// headline always.
+    fn on(&self, font: RetailFont) -> bool {
+        self.enabled || font == RetailFont::Headline
     }
 
     /// Whether `font` is on and loaded this frame.
     pub(crate) fn active(&self, font: RetailFont) -> bool {
-        self.enabled && self.slot(font).is_some()
+        self.on(font) && self.slot(font).is_some()
     }
 
     /// Layout metrics of `font` when it is on and loaded.
     pub(crate) fn font(&self, font: RetailFont) -> Option<&UiFont> {
         self.slot(font)
             .as_ref()
-            .filter(|_| self.enabled)
+            .filter(|_| self.on(font))
             .map(|layer| &layer.font)
     }
 
@@ -380,8 +404,8 @@ impl GameFonts {
         vertices: &'a mut Vec<TextVertex>,
         inter: &'a UiFont,
     ) -> (&'a mut Vec<TextVertex>, &'a UiFont) {
-        let enabled = self.enabled;
-        target(enabled, self.slot_mut(font), vertices, inter)
+        let on = self.on(font);
+        target(on, self.slot_mut(font), vertices, inter)
     }
 
     /// Drop the text every retail font holds this frame, for a screen that covers
@@ -405,13 +429,15 @@ impl GameFonts {
     /// for it when that font is on and loaded, and everything else to
     /// `fallback`. With the option off this is the single pass it replaces.
     /// Under a card (`cover`, [`crate::menu_widgets::MenuCanvas::cover`]): the
-    /// runs before it less what the card covers, then the card's own.
+    /// runs before it less what the card covers, then the card's own. Each command's
+    /// colour codes draw in the palette `palette_of` gives for it.
     #[allow(clippy::too_many_arguments)]
     pub(crate) fn append_routed<'s>(
         &mut self,
         draw_list: &DrawList,
         resolve: impl Fn(TextId) -> &'s str + Copy,
         font_of: impl Fn(TextId, &str) -> Option<RetailFont> + Copy,
+        palette_of: impl Fn(TextId) -> text::CodePalette + Copy,
         fallback: (&mut Vec<TextVertex>, &UiFont),
         viewport: [f32; 2],
         style: text::TextStyle,
@@ -439,7 +465,7 @@ impl GameFonts {
                 }
                 if let Some(layer) = self.slot_mut(font) {
                     let start = layer.vertices.len();
-                    crate::ui_renderer::append_text_commands_where(
+                    crate::ui_renderer::append_text_commands_paletted(
                         draw_list,
                         resolve,
                         |id, text| in_pass(id) && font_of(id, text) == Some(font),
@@ -447,13 +473,13 @@ impl GameFonts {
                         &layer.font,
                         viewport,
                         style,
-                        text::CodePalette::Game,
+                        palette_of,
                     );
                     drop_under(&mut layer.vertices, start);
                 }
             }
             let start = vertices.len();
-            crate::ui_renderer::append_text_commands_where(
+            crate::ui_renderer::append_text_commands_paletted(
                 draw_list,
                 resolve,
                 |id, text| {
@@ -463,7 +489,7 @@ impl GameFonts {
                 fallback_font,
                 viewport,
                 style,
-                text::CodePalette::Game,
+                palette_of,
             );
             drop_under(vertices, start);
         }
@@ -478,6 +504,7 @@ impl GameFonts {
             .iter_mut()
             .chain(self.chat.iter_mut())
             .chain(self.console.iter_mut())
+            .chain(self.headline.iter_mut())
             .chain(sjk)
     }
 
@@ -506,7 +533,7 @@ impl GameFonts {
         }
     }
 
-    /// Draw the uploaded medium and small font text, which sits under the Inter
+    /// Draw the uploaded medium, small and headline font text, which sits under the Inter
     /// text: distance-field atlases with `sdf_pipeline`, coverage atlases with
     /// the plain text `pipeline`.
     pub(crate) fn draw(
@@ -515,7 +542,7 @@ impl GameFonts {
         pipeline: &wgpu::RenderPipeline,
         sdf_pipeline: &wgpu::RenderPipeline,
     ) {
-        for layer in self.menu.iter().chain(self.chat.iter()) {
+        for layer in self.menu.iter().chain(&self.chat).chain(&self.headline) {
             layer.draw(pass, pipeline, sdf_pipeline);
         }
         if let Some(layers) = &self.sjk {
@@ -652,6 +679,7 @@ mod tests {
             &list,
             |_| "ab",
             |id, _| (id.0 == 1).then_some(RetailFont::Medium),
+            |_| text::CodePalette::Game,
             (&mut vertices, &inter),
             [640.0, 480.0],
             text::TextStyle::NEUTRAL,
@@ -666,12 +694,26 @@ mod tests {
             &list,
             |_| "ab",
             |id, _| (id.0 == 1).then_some(RetailFont::Medium),
+            |_| text::CodePalette::Game,
             (&mut vertices, &inter),
             [640.0, 480.0],
             text::TextStyle::NEUTRAL,
             Some((sjk_ui::Rect::new(0.0, 0.0, 200.0, 40.0), 2)),
         );
         assert_eq!(vertices.len(), 2 * 2 * 6);
+    }
+
+    #[test]
+    fn the_headline_font_draws_capitals_as_tall_as_sjk_menu() {
+        // Centre prints keep their size (`CENTER_FONT_1080`, set for `ergoec`'s line)
+        // in the headline font: grown by `HEADLINE_GROWTH`, its capitals are as tall
+        // as SJK Menu's, within 2 %.
+        let headline = text::load_family(&text::HEADLINE, 1.0, None).unwrap().font;
+        let menu = retail_font::load(&retail_font::MENU).unwrap().font;
+        let capitals =
+            |font: &UiFont| font.glyph(text::TextFace::Semibold, b'H').height / font.height;
+        let ratio = capitals(&headline) * HEADLINE_GROWTH / capitals(&menu);
+        assert!((0.98..=1.02).contains(&ratio), "capitals {ratio}");
     }
 
     #[test]

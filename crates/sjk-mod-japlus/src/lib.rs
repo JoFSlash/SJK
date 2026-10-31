@@ -2,13 +2,15 @@
 //! clients made for it, as an SJK mod (`japlus.*`, `docs/mods.md`).
 //!
 //! What a JA+ server needs to be played correctly stays in the core client (its
-//! movement rules, `cjp_client`, `cp_pluginDisable`, saber colours and cosmetics):
-//! this mod adds commands a player types, the JA+ family's passwords the console
-//! masks ([`secrets`]) and JoF EternalJK's anti-kiss ([`anti_kiss`]).
+//! movement rules, `cjp_client`, `cp_pluginDisable` and its default, saber colours and
+//! cosmetics): this mod adds commands a player types, the JA+ family's passwords the
+//! console masks ([`secrets`]), JoF EternalJK's anti-kiss ([`anti_kiss`]) and the JA+
+//! plugin options Settings switches ([`plugin`]).
 
 pub mod anti_kiss;
 mod login;
 mod options;
+pub mod plugin;
 mod secrets;
 mod server_commands;
 mod teleport;
@@ -50,7 +52,7 @@ const COMMANDS: &[Command] = &[
     ),
     command(
         "japlus.plugin",
-        "List or toggle JA+ plugin features (cp_pluginDisable): japlus.plugin [id]",
+        "List the JA+ plugin options (cp_pluginDisable) or switch one: japlus.plugin [number]",
     ),
 ];
 
@@ -183,7 +185,7 @@ impl ClientMod for JaPlus {
             "japlus.recall" => self.mark.ok_or("No mark set: japlus.mark first")?.recall(),
             "japlus.autologin" => return login::auto_login(host),
             "japlus.serverconfig" => return options::server_config(host),
-            "japlus.plugin" => return options::plugin(args, host),
+            "japlus.plugin" => return plugin::OPTIONS.run(args, host),
             _ => return Err(format!("Unknown JA+ tools command {name}")),
         };
         host.send(&command)?;

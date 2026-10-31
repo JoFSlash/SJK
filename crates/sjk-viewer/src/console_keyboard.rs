@@ -65,15 +65,89 @@ pub(crate) fn open_console_key(
     }
 }
 
+/// What a key pressed in the chat composer is, for [`console_key_leaves_chat`].
+#[derive(Clone, Copy, Debug, Default)]
+pub(crate) struct ChatConsoleKey {
+    /// A configured console key with the modifiers held ([`ViewerConsole::configured_console_key`]).
+    pub(crate) configured: bool,
+    /// The same key would be a console key without Shift.
+    pub(crate) configured_without_shift: bool,
+    /// Bound to `toggleconsole`.
+    pub(crate) bound: bool,
+    /// It types a character.
+    pub(crate) printable: bool,
+    /// The character is a letter or a digit.
+    pub(crate) alphanumeric: bool,
+    pub(crate) escape: bool,
+    pub(crate) shift: bool,
+    pub(crate) repeat: bool,
+}
+
+/// Whether a key pressed in the chat composer opens the console over it. Stock's
+/// console key goes before the message field (`cl_keys.cpp:1318`) and leaves the field
+/// and its draft under the console (`Con_ToggleConsole_f` only adds `KEYCATCH_CONSOLE`),
+/// Shift+Escape included. The composer keeps what a player types: a letter or digit
+/// (the key under Escape types `0` on Hungarian), a printable key bound to
+/// `toggleconsole` (as the open console lets it type), and Shift with a key that opens
+/// the console alone, so `~` can be written; where the console key needs Shift (a `^`
+/// layout, `cl_consoleShiftRequirement`) Shift opens it.
+pub(crate) fn console_key_leaves_chat(key: ChatConsoleKey) -> bool {
+    if key.repeat {
+        return false;
+    }
+    if key.escape {
+        return key.configured;
+    }
+    if key.alphanumeric {
+        return false;
+    }
+    if key.configured {
+        return !(key.shift && key.configured_without_shift);
+    }
+    key.bound && !key.printable
+}
+
 impl ViewerConsole {
+    /// Whether `event`, pressed while the chat composer is open, opens the console over
+    /// it ([`console_key_leaves_chat`]); never with `con_overChat` off, where the
+    /// composer takes every key as it did before.
+    pub(crate) fn leaves_chat_for_console(&self, event: &KeyEvent) -> bool {
+        if self.bool_cvar(super::console_options::OVER_CHAT_CVAR) == Some(false) {
+            return false;
+        }
+        let PhysicalKey::Code(key) = event.physical_key else {
+            return false;
+        };
+        let text = event.text.as_deref();
+        event.state == ElementState::Pressed
+            && console_key_leaves_chat(ChatConsoleKey {
+                configured: self.configured_console_key(event, key),
+                configured_without_shift: self.console_key_with_shift(event, key, false),
+                bound: self.bound_to_toggle(event, key),
+                printable: matches!(
+                    event.logical_key,
+                    winit::keyboard::Key::Character(_) | winit::keyboard::Key::Dead(_)
+                ),
+                alphanumeric: text.is_some_and(|text| text.chars().any(char::is_alphanumeric)),
+                escape: key == KeyCode::Escape,
+                shift: self.shift,
+                repeat: event.repeat,
+            })
+    }
+
     /// Stock console keys: Shift+Escape (`cl_keys.cpp:1318`), the physical key
     /// under Escape with `cl_consoleUseScanCode` (EternalJK's default, so layouts
     /// where it types `0`, as Hungarian, open the console too), or else a
     /// `cl_consoleKeys` character. Layouts where the key types `^` keep that
     /// character for colour codes and open the console with Shift.
     pub(super) fn configured_console_key(&self, event: &KeyEvent, key: KeyCode) -> bool {
+        self.console_key_with_shift(event, key, self.shift)
+    }
+
+    /// [`Self::configured_console_key`] as if Shift were `shift`.
+    fn console_key_with_shift(&self, event: &KeyEvent, key: KeyCode, shift: bool) -> bool {
         if key == KeyCode::Escape {
-            return self.shift;
+            return shift;
         }
         let native = self.integer_cvar("cl_consoleusescancode").unwrap_or(1) != 0;
         if native
@@ -81,7 +155,7 @@ impl ViewerConsole {
             && super::client_options::native_console(
                 self.integer_cvar("cl_consoleshiftrequirement").unwrap_or(0),
                 types_caret(&event.key_without_modifiers()),
-                self.shift,
+                shift,
                 self.open,
             )
         {
@@ -376,6 +450,65 @@ mod dead_key_tests {
 
     fn character(text: &str) -> Key {
         Key::Character(SmolStr::new(text))
+    }
+
+    #[test]
+    fn the_console_key_opens_the_console_over_the_chat_composer() {
+        use super::{ChatConsoleKey as Key, console_key_leaves_chat as leaves};
+        let backquote = Key {
+            configured: true,
+            configured_without_shift: true,
+            printable: true,
+            ..Key::default()
+        };
+        assert!(leaves(backquote));
+        assert!(
+            !leaves(Key {
+                repeat: true,
+                ..backquote
+            }),
+            "a held key does nothing more"
+        );
+        // Shift+` types ~ where ` alone opens the console.
+        assert!(!leaves(Key {
+            shift: true,
+            ..backquote
+        }));
+        // On a ^ layout the console key needs Shift, and Shift opens it.
+        let caret = Key {
+            configured: true,
+            configured_without_shift: false,
+            shift: true,
+            printable: true,
+            ..Key::default()
+        };
+        assert!(leaves(caret));
+        // The key under Escape types 0 on Hungarian: the composer keeps it.
+        assert!(!leaves(Key {
+            alphanumeric: true,
+            ..backquote
+        }));
+        // A printable key bound to toggleconsole types; F1 bound to it opens.
+        assert!(!leaves(Key {
+            bound: true,
+            printable: true,
+            ..Key::default()
+        }));
+        assert!(leaves(Key {
+            bound: true,
+            ..Key::default()
+        }));
+        // Shift+Escape opens, Escape alone is the composer's.
+        assert!(leaves(Key {
+            escape: true,
+            configured: true,
+            shift: true,
+            ..Key::default()
+        }));
+        assert!(!leaves(Key {
+            escape: true,
+            ..Key::default()
+        }));
     }
 
     #[test]

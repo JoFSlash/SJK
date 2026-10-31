@@ -1,5 +1,5 @@
 //! The box hunt (Sol's idea, 27/10/2026; `docs/mystery-boxes.md`, "Box hunt"): players
-//! with the Box hunt toy on (`crate::box_hunt`) take part. Every few minutes the hub
+//! with the Box hunt toy on (`crate::box_hunt`) take part. Every 10 minutes at most the hub
 //! picks one of them on the server as the mark; another who kills the mark wins a free
 //! mystery box roll. Only players with it on see the mark or can be it. The hub never
 //! sees kills: this client tells it who killed its player when its player is the mark,
@@ -37,6 +37,24 @@ pub(crate) struct Hunt {
     obituaries: u64,
     /// The mark last told to the player, so each is told once.
     told: Option<u8>,
+    /// The mark the card at the top of the screen names, while they are the mark.
+    card: Option<Card>,
+    /// Where a box's price went when it blew up, told when its roll stops on the teddy
+    /// bear rather than at the opening (Sol, 30/10/2026): when, centred or not, the text.
+    laughs: Vec<(Instant, bool, String)>,
+}
+
+/// The card at the top of the screen naming the mark (Sol's idea, 28/10/2026), from the
+/// moment the player is told of them until they are hunted or the hub picks another.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(super) struct Card {
+    pub(super) slot: u8,
+    /// Their worn name, colour codes and all.
+    pub(super) name: String,
+    /// The player is the mark.
+    pub(super) own: bool,
+    /// When they were told: the card pulses as it arrives.
+    pub(super) since: Instant,
 }
 
 impl Hunt {
@@ -45,6 +63,33 @@ impl Hunt {
             .as_ref()
             .filter(|(_, state)| state.hunting)
             .and_then(|(_, state)| state.mark.as_ref())
+    }
+
+    /// The card to draw: the told mark's, while the player takes part.
+    pub(super) fn card(&self) -> Option<&Card> {
+        self.card.as_ref()
+    }
+
+    /// A new mark told at `now`: the card names them.
+    fn tell(&mut self, slot: u8, own: u8, name: &str, now: Instant) -> (bool, String) {
+        self.told = Some(slot);
+        self.card = Some(Card {
+            slot,
+            name: name.to_owned(),
+            own: slot == own,
+            since: now,
+        });
+        mark_words(slot, own, name)
+    }
+
+    /// The mark was hunted: no mark until the hub picks the next one, so the last read
+    /// does not tell the hunted one again.
+    fn hunted(&mut self) {
+        self.told = None;
+        self.card = None;
+        if let Some((_, state)) = &mut self.state {
+            state.mark = None;
+        }
     }
 
     /// Whether the hunt should be read at `now`.
@@ -72,6 +117,35 @@ fn mark_words(slot: u8, own: u8, name: &str) -> (bool, String) {
     }
 }
 
+/// What a hunter is told when the box the player on slot `opener` (named `opener_name`)
+/// opened blew up and `credits` went to the hunter on `to` (named `to_name`); `own` is
+/// the player's slot. Nothing for the opener: their own box says it.
+fn laugh_words(
+    opener: u8,
+    to: Option<u8>,
+    credits: u64,
+    own: u8,
+    opener_name: &str,
+    to_name: &str,
+) -> Option<(bool, String)> {
+    if opener == own {
+        return None;
+    }
+    Some(match to {
+        Some(to) if to == own && credits > 0 => (
+            true,
+            format!("{opener_name}^7's box blew up!\nYou get their {credits} credits"),
+        ),
+        Some(_) if credits > 0 => (
+            false,
+            format!(
+                "Box hunt: {opener_name}^7's box blew up, and {to_name}^7 gets their {credits} credits"
+            ),
+        ),
+        _ => (false, format!("Box hunt: {opener_name}^7's box blew up")),
+    })
+}
+
 impl GpuState {
     /// The frame's box hunt: read the hunt, take the hub's events of it (`events`, this
     /// server's toy events), tell the hub who killed the player when they are the mark.
@@ -97,6 +171,15 @@ impl GpuState {
             hunt.seen = serial;
             self.mystery_boxes.free = state.free;
             hunt.state = Some((read_on, state));
+            // The hub has no mark now, or another one (told below): not this card.
+            let read_slot = hunt.mark().map(|mark| mark.slot);
+            if hunt
+                .card
+                .as_ref()
+                .is_some_and(|card| Some(card.slot) != read_slot)
+            {
+                hunt.card = None;
+            }
         }
         if hunt
             .state
@@ -105,7 +188,9 @@ impl GpuState {
         {
             hunt.state = None;
             hunt.told = None;
+            hunt.card = None;
         }
+        let told_before = hunt.told;
         let mut lines = Vec::new();
         for event in events.iter().filter(|event| event.toy == wire::HUNT_TOY) {
             let Some(said) = wire::parse_hunt_event(&event.event) else {
@@ -117,11 +202,10 @@ impl GpuState {
             }
             match said {
                 HuntEvent::Mark(slot) if hunt.told != Some(slot) => {
-                    hunt.told = Some(slot);
-                    lines.push(mark_words(slot, own, &event.claimed_name));
+                    lines.push(hunt.tell(slot, own, &event.claimed_name, now));
                 }
                 HuntEvent::Hunted { slot, won } => {
-                    hunt.told = None;
+                    hunt.hunted();
                     lines.push(if slot == own && won {
                         (
                             true,
@@ -141,6 +225,22 @@ impl GpuState {
                         )
                     });
                 }
+                HuntEvent::Laugh {
+                    opener,
+                    to,
+                    credits,
+                } => {
+                    let opener_name = self
+                        .chat
+                        .player_name(u16::from(opener))
+                        .unwrap_or("Someone")
+                        .to_owned();
+                    if let Some((centre, text)) =
+                        laugh_words(opener, to, credits, own, &opener_name, &event.claimed_name)
+                    {
+                        hunt.laughs.push((now + super::ROLL, centre, text));
+                    }
+                }
                 HuntEvent::Mark(_) => {}
             }
         }
@@ -150,9 +250,25 @@ impl GpuState {
             && let Some((slot, name)) = read_mark
             && hunt.told != Some(slot)
         {
-            hunt.told = Some(slot);
-            lines.push(mark_words(slot, own, &name));
+            lines.push(hunt.tell(slot, own, &name, now));
         }
+        // Where the price of a box that blew up went, once its roll has stopped (the box
+        // laughs there, `super::MysteryBoxes::tick`).
+        let due = hunt.laughs.iter().filter(|(at, ..)| *at <= now).count();
+        lines.extend(
+            hunt.laughs
+                .drain(..due)
+                .map(|(_, centre, text)| (centre, text)),
+        );
+        // A new mark rings the hunt's alarm, for the player alone.
+        if hunt.told.is_some() && hunt.told != told_before {
+            self.mystery_boxes.cues.push(super::Cue {
+                path: super::HUNT_MARK,
+                origin: None,
+                source: super::HUNT_SOURCE,
+            });
+        }
+        let hunt = &mut self.mystery_boxes.hunt;
         // The player, the mark, killed by another player: the hub is told by whom.
         let decoded = self.obituaries.decoded();
         let new = decoded.saturating_sub(hunt.obituaries).min(8) as usize;
@@ -186,6 +302,7 @@ impl GpuState {
         }
         if !on {
             self.mystery_boxes.hunt.told = None;
+            self.mystery_boxes.hunt.card = None;
         }
         for (centre, text) in lines {
             if centre {
@@ -194,6 +311,17 @@ impl GpuState {
                 self.mystery_box_print(text);
             }
         }
+    }
+
+    /// The mark's client slot while the player takes part and someone else is the mark:
+    /// their body is ringed in red ([`crate::hud::team_outline`]).
+    pub(crate) fn box_hunt_outlined(&self) -> Option<u16> {
+        if !self.box_hunt.on() {
+            return None;
+        }
+        let slot = self.mystery_boxes.hunt.mark()?.slot;
+        let own = self.live_session.as_ref()?.game_state().client_num;
+        (i32::from(slot) != own).then_some(u16::from(slot))
     }
 
     /// The mark's label over their head, while the player takes part and someone else
@@ -236,6 +364,57 @@ mod tests {
         let (centre, words) = mark_words(3, 5, "Kyle");
         assert!(!centre);
         assert!(words.contains("Kyle^7 is the mark"));
+    }
+
+    #[test]
+    fn a_box_that_blew_up_is_told_to_the_other_hunters() {
+        // The hunter who got the credits, in the centre.
+        let (centre, words) = laugh_words(2, Some(4), 100, 4, "Kyle", "Jan").unwrap();
+        assert!(centre);
+        assert_eq!(words, "Kyle^7's box blew up!\nYou get their 100 credits");
+        // Another hunter, in the chat.
+        let (centre, words) = laugh_words(2, Some(4), 100, 6, "Kyle", "Jan").unwrap();
+        assert!(!centre);
+        assert!(words.contains("Jan^7 gets their 100 credits"));
+        // Nobody got them, or a free roll passed nothing.
+        assert_eq!(
+            laugh_words(2, None, 0, 6, "Kyle", "Kyle").unwrap().1,
+            "Box hunt: Kyle^7's box blew up"
+        );
+        assert!(!laugh_words(2, Some(4), 0, 4, "Kyle", "Jan").unwrap().0);
+        // The opener's own box tells them.
+        assert_eq!(laugh_words(2, Some(4), 100, 2, "Kyle", "Jan"), None);
+    }
+
+    #[test]
+    fn a_told_mark_gets_the_card_until_hunted() {
+        let now = Instant::now();
+        let mut hunt = Hunt::default();
+        let (centre, _) = hunt.tell(4, 2, "^1Kyle", now);
+        assert!(!centre);
+        let card = hunt.card().expect("a card");
+        assert_eq!(
+            (card.slot, card.name.as_str(), card.own),
+            (4, "^1Kyle", false)
+        );
+        // The player as the mark: their own card.
+        hunt.tell(2, 2, "Sol", now);
+        assert!(hunt.card().is_some_and(|card| card.own));
+        // Hunted: no card, and the last read's mark is not told again.
+        hunt.state = Some((
+            "server".to_owned(),
+            HuntState {
+                hunting: true,
+                mark: Some(wire::HuntMark {
+                    slot: 2,
+                    name: "Sol".to_owned(),
+                    until: 0,
+                }),
+                ..HuntState::default()
+            },
+        ));
+        hunt.hunted();
+        assert!(hunt.card().is_none() && hunt.told.is_none() && hunt.mark().is_none());
     }
 
     #[test]

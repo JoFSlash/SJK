@@ -62,7 +62,7 @@ fn blade_skin(id: &str) -> Option<&'static str> {
 /// The toys a look can have out that this client draws, by id (`PROTOCOL.md`, "Looks"):
 /// a toy's bit in [`Worn::toys`] is its place here. A look naming another id (a newer
 /// client's toy) draws nothing more.
-pub(crate) const TOYS: [&str; 8] = [
+pub(crate) const TOYS: [&str; 9] = [
     crate::cardboard_box::TOY,
     crate::order66::TOY,
     crate::hax::TOY,
@@ -73,12 +73,14 @@ pub(crate) const TOYS: [&str; 8] = [
     crate::monitor::TOY,
     // Box hunt's switch: the hub picks the mark among the players whose look has it.
     crate::box_hunt::TOY,
+    // The Banana peel's switch (since 30/10/2026: hubs before took 8 toy ids at most).
+    crate::banana::TOY,
 ];
-// A bit each in a `u8`: this is as many as there is room for.
-const _: () = assert!(TOYS.len() <= u8::BITS as usize);
+// A bit each in a `u32`: as many as a hub look holds (32 toy ids since 30/10/2026).
+const _: () = assert!(TOYS.len() <= u32::BITS as usize);
 
 /// The bit of toy `id` in [`Worn::toys`], if this client knows it.
-fn toy_bit(id: &str) -> Option<u8> {
+fn toy_bit(id: &str) -> Option<u32> {
     TOYS.iter()
         .position(|toy| *toy == id)
         .map(|place| 1 << place)
@@ -94,7 +96,7 @@ pub(crate) struct Worn {
     /// The blade skin's options its wearer switched off (`crate::saber_skin_options`).
     pub(crate) options_off: crate::saber_skin_options::OptionsOff,
     /// The toys out, a bit per [`TOYS`] entry.
-    pub(crate) toys: u8,
+    pub(crate) toys: u32,
     /// What the second saber wears (since 21/10/2026: `saber2`).
     pub(crate) second: SecondSkin,
     /// The second saber's skin's options its wearer switched off.
@@ -328,6 +330,9 @@ pub(crate) struct Looks {
     /// Client slots muted on this PC (bits, `muted_players.rs`): their looks are not
     /// drawn.
     muted: u32,
+    /// Other players' toys not shown on this PC ([`crate::toy_sight`]): bits of
+    /// [`Unseen`].
+    unseen: u8,
     /// `cg_saberSkinOptions` as last read (twice a second), for the skins the
     /// Collection shows on the model.
     own_options: String,
@@ -352,6 +357,7 @@ impl Default for Looks {
             feed_generation: None,
             revision: 0,
             muted: 0,
+            unseen: 0,
             own_options: String::new(),
             own_settings: (String::new(), String::new()),
             #[cfg(test)]
@@ -393,12 +399,26 @@ impl Looks {
     /// Whether the player in `client` has their Illuminate holocron lit (and is not
     /// muted on this PC).
     pub(crate) fn illuminated(&self, client: usize) -> bool {
-        self.shown(client).is_some_and(|worn| worn.illuminate)
+        !self.unseen_by(client, Unseen::ILLUMINATE)
+            && self.shown(client).is_some_and(|worn| worn.illuminate)
     }
 
-    /// Whether the player in `client` has toy `id` out (and is not muted on this PC).
+    /// Whether the player in `client` has toy `id` out (and is not muted on this PC, nor
+    /// is the toy hidden here, [`Self::set_unseen`]).
     pub(crate) fn toy(&self, client: usize, id: &str) -> bool {
-        self.shown(client).is_some_and(|worn| worn.has_toy(id))
+        !self.unseen_by(client, Unseen::of(id))
+            && self.shown(client).is_some_and(|worn| worn.has_toy(id))
+    }
+
+    /// Other players' toys `unseen` (bits of [`Unseen`]) are not shown on this PC, never
+    /// the local player's own (called every frame, [`crate::toy_sight`]).
+    pub(crate) fn set_unseen(&mut self, unseen: u8) {
+        self.unseen = unseen;
+    }
+
+    /// Whether `bit` of [`Unseen`] hides it on the player in `client`, another player.
+    fn unseen_by(&self, client: usize, bit: u8) -> bool {
+        self.unseen & bit != 0 && self.own_slot.map(usize::from) != Some(client)
     }
 
     /// The tag another player in `client` stuck on the world, as the hub relayed it:
@@ -579,6 +599,24 @@ impl Looks {
     }
 }
 
+/// The toys [`Looks::set_unseen`] hides on other players, as bits.
+pub(crate) struct Unseen;
+
+impl Unseen {
+    pub(crate) const ILLUMINATE: u8 = 1;
+    pub(crate) const CARDBOARD_BOX: u8 = 1 << 1;
+    pub(crate) const BOOMBOX: u8 = 1 << 2;
+
+    /// The bit of toy `id`, none for a toy that is not hidden so.
+    fn of(id: &str) -> u8 {
+        match id {
+            crate::cardboard_box::TOY => Self::CARDBOARD_BOX,
+            crate::boombox::TOY => Self::BOOMBOX,
+            _ => 0,
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -615,6 +653,53 @@ mod tests {
         assert!(looks.toy(3, "cardboard_box") && !looks.toy(5, "cardboard_box"));
         looks.set_muted(1 << 3);
         assert!(!looks.toy(3, "cardboard_box"), "muted here: nothing drawn");
+    }
+
+    /// Every toy this client knows goes out in the look and comes back from it, all of
+    /// them at once too: nine since the Banana peel, more than the 8 hubs took before
+    /// 30/10/2026.
+    #[test]
+    fn every_toy_goes_both_ways_all_at_once() {
+        assert!(TOYS.contains(&crate::banana::TOY));
+        let all = TOYS
+            .iter()
+            .fold(Worn::default(), |worn, toy| worn.with_toy(toy, true));
+        let look = all.to_look("");
+        assert_eq!(look.toys, TOYS);
+        let back = Worn::of(&look);
+        assert!(TOYS.iter().all(|toy| back.has_toy(toy)));
+        let peel_away = back.with_toy(crate::banana::TOY, false);
+        assert!(!peel_away.has_toy(crate::banana::TOY) && peel_away.has_toy(crate::box_hunt::TOY));
+        assert_eq!(peel_away.to_look("").toys, TOYS[..TOYS.len() - 1]);
+    }
+
+    /// Other players' boxes, boomboxes and holocrons hidden on this PC are not drawn on
+    /// them; the player's own still are, and other toys are not touched.
+    #[test]
+    fn toys_hidden_here_are_not_drawn_on_others() {
+        let worn = Look {
+            toys: vec![
+                "cardboard_box".to_owned(),
+                "boombox".to_owned(),
+                "hax".to_owned(),
+            ],
+            illuminate: true,
+            ..Look::default()
+        };
+        let mut looks = Looks::default();
+        looks.replace_roster([(3, "^2Sol", Some(&worn))]);
+        looks.rebuild(shown);
+        looks.set_unseen(Unseen::CARDBOARD_BOX | Unseen::BOOMBOX | Unseen::ILLUMINATE);
+        assert!(!looks.toy(3, "cardboard_box") && !looks.toy(3, "boombox"));
+        assert!(!looks.illuminated(3));
+        assert!(looks.toy(3, "hax"), "only the toys hidden");
+        // The player's own slot keeps them.
+        looks.set_own(Some(3), Worn::of(&worn));
+        assert!(looks.toy(3, "cardboard_box") && looks.illuminated(3));
+        looks.set_own(None, Worn::default());
+        looks.rebuild(shown);
+        looks.set_unseen(0);
+        assert!(looks.toy(3, "boombox") && looks.illuminated(3));
     }
 
     /// The game shows `^2Sol` in slot 3 and `Fox` in slot 5.

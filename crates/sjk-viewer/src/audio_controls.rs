@@ -103,9 +103,10 @@ pub(super) fn event_handle(
 }
 
 impl GameAudio {
-    /// Apply the live archived `s_volume`, `s_musicvolume` and `s_volumeVoice` values,
-    /// and the emote channel's gain: 1 (emotes carry `s_emoteVolume` themselves, apart
-    /// from `s_volume`, #163), 0 while the window is muted.
+    /// Apply the live archived `s_volume`, `s_musicvolume`, `s_volumeVoice` and
+    /// `s_emoteVolume` values (the emote channel's own gain, apart from `s_volume`,
+    /// #163, so a change reaches the emotes already playing, #188); all 0 while the
+    /// window is muted.
     pub(crate) fn set_gains(&mut self, effects: f32, music: f32, voice: f32, emotes: f32) {
         self.output
             .send(AudioCommand::Gains(effects, music, voice, emotes));
@@ -177,10 +178,14 @@ impl GameAudio {
         let voice = console
             .and_then(|console| console.float_cvar(VOICE_VOLUME_CVAR))
             .unwrap_or(1.0) as f32;
+        let emotes = console
+            .and_then(|console| console.float_cvar(crate::emotes::VOLUME_CVAR))
+            .unwrap_or(crate::emotes::DEFAULT_VOLUME)
+            .clamp(0.0, crate::emotes::MAX_VOLUME) as f32;
         if console.is_some_and(ViewerConsole::window_muted) {
             self.set_gains(0.0, 0.0, 0.0, 0.0);
         } else {
-            self.set_gains(effects, music, voice, 1.0);
+            self.set_gains(effects, music, voice, emotes);
         }
         self.footsteps = console
             .and_then(|console| console.bool_cvar("cg_footsteps"))
@@ -296,8 +301,9 @@ impl GameAudio {
 
     /// Play an emote's sound on player `slot` from `offset` in (a synced emote's
     /// music joining), at the very sample player `align`'s voice plays it when they
-    /// lead a synced emote, `volume` times as loud as recorded, on the channel
-    /// [`EMOTE_CHANNEL`] so [`Self::stop_emote`] can cut it; a muted player's stays
+    /// lead a synced emote, on the channel [`EMOTE_CHANNEL`], whose gain is
+    /// `s_emoteVolume` ([`Self::sync_gains`]), so [`Self::stop_emote`] can cut it and a
+    /// volume change reaches it while it plays (#188); a muted player's stays
     /// silent. Another player's is placed at `origin` and follows them (the snapshot
     /// moves their source); the player's own (`origin` `None`: their entity is not in
     /// the snapshot to move it) plays in both ears.
@@ -306,18 +312,18 @@ impl GameAudio {
         path: &str,
         slot: u8,
         origin: Option<[f32; 3]>,
-        volume: f32,
         offset: std::time::Duration,
         align: Option<u8>,
     ) {
+        const VOLUME: f32 = 1.0;
         let source = SourceId(u32::from(slot));
         if self.mute.silences(source, None) {
             return;
         }
         if offset.is_zero() && align.is_none() {
             match origin {
-                Some(origin) => self.play_on_channel(path, volume, origin, source, EMOTE_CHANNEL),
-                None => self.play_local(path, volume, source, EMOTE_CHANNEL),
+                Some(origin) => self.play_on_channel(path, VOLUME, origin, source, EMOTE_CHANNEL),
+                None => self.play_local(path, VOLUME, source, EMOTE_CHANNEL),
             }
             return;
         }
@@ -331,7 +337,7 @@ impl GameAudio {
                 origin,
                 source,
                 channel: EMOTE_CHANNEL,
-                volume,
+                volume: VOLUME,
                 attenuation: match origin {
                     Some(_) => sjk_client::legacy_sound_attenuation(EMOTE_CHANNEL.0),
                     None => sjk_audio::Attenuation::None,
@@ -368,6 +374,37 @@ impl GameAudio {
             Some(origin) => self.play_on_channel(path, volume, origin, source, channel),
             None => self.play_local(path, volume, source, channel),
         }
+    }
+
+    /// [`Self::play_toy`] at `origin` with its own `attenuation`, for a toy sound that
+    /// must carry farther than the game's own (the Monitor's knocks on the world).
+    #[allow(clippy::too_many_arguments)]
+    pub(crate) fn play_toy_reaching(
+        &mut self,
+        toy: crate::toy_sounds::Toy,
+        path: &str,
+        volume: f32,
+        origin: [f32; 3],
+        source: SourceId,
+        channel: ChannelId,
+        attenuation: sjk_audio::Attenuation,
+    ) {
+        let Some(volume) = self.toy_sounds.gain(toy, volume) else {
+            return;
+        };
+        let Some(handle) = self.find_handle(path) else {
+            return;
+        };
+        self.output.send(AudioCommand::Play(
+            handle,
+            PlayRequest {
+                origin: Some(origin),
+                source,
+                channel,
+                volume,
+                attenuation,
+            },
+        ));
     }
 
     /// Stop the toy sound playing on `source`'s `channel`.
@@ -590,6 +627,47 @@ mod listener_tests {
                 "{channel:?}: {level} against {want}"
             );
         }
+    }
+
+    /// Hub report #188 (KãTsumøTø): lowering `s_emoteVolume` left the emotes already
+    /// playing as loud until their player was far away. The emote channel's gain is
+    /// `s_emoteVolume` itself, so a change reaches a sound while it plays, louder than
+    /// recorded above 1.
+    #[test]
+    fn an_emote_playing_follows_the_emote_volume() {
+        let directory = tempfile::tempdir().unwrap();
+        let mut console = ViewerConsole::new(directory.path().join("config.cfg")).unwrap();
+        assert!(console.set_cvar("s_volume", "0.5"));
+        assert!(console.set_cvar(crate::emotes::VOLUME_CVAR, "2"));
+        let (output, mut source) = AudioOutput::test_output();
+        let mut audio = GameAudio::with_output(output);
+        audio.sync_gains(Some(&console));
+        let mut vfs = VirtualFileSystem::new();
+        vfs.mount_memory("synthetic", [("sound/emote.wav", constant_wav())])
+            .unwrap();
+        audio.register_vfs_async(&vfs, "sound/emote.wav").unwrap();
+        // Started again until the sound is decoded and sounds.
+        let deadline = Instant::now() + std::time::Duration::from_secs(10);
+        let level = loop {
+            audio.play_emote("sound/emote.wav", 1, None, std::time::Duration::ZERO, None);
+            if let Some(level) = (0..2048)
+                .map(|_| source.next().unwrap())
+                .find(|sample| sample.abs() > 0.001)
+            {
+                break level;
+            }
+            assert!(Instant::now() < deadline, "the sound did not start");
+            std::thread::yield_now();
+        };
+        assert!((level - 0.5).abs() < 1e-3, "{level} against 0.5");
+        // Turned down while it plays: silent from the next mix block, not restarted.
+        assert!(console.set_cvar(crate::emotes::VOLUME_CVAR, "0"));
+        audio.sync_gains(Some(&console));
+        let _ = (0..4096).map(|_| source.next().unwrap()).count();
+        let loudest = (0..4096)
+            .map(|_| source.next().unwrap().abs())
+            .fold(0.0_f32, f32::max);
+        assert!(loudest < 1e-4, "still heard at {loudest}");
     }
 }
 

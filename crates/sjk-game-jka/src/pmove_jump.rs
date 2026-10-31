@@ -3,14 +3,85 @@
 //! ([`super::force_jump`]), the special jumps off walls
 //! ([`super::wall_moves`]) and the ordinary jump.
 //!
-//! Not ported: the `PMF_RESPAWNED` gate (`:1785-1788`), because this port clears that latch only where
-//! it predicts the weapon (`pmove_weapon::adjust_attack_flags`), not unconditionally as
-//! `PmoveSingle` does (`:10517-10522`); and the zero-gravity push (`:2070-2085`) — in the
-//! air a player at gravity 0 or less is pushed twice a jump's speed along its view on
-//! *every* command it does not hold jump — which would set adrift the players the
-//! server's synthetic tests float at gravity 0 in an empty world.
+//! Jumping observes the respawn latch before Force-jump upkeep. The
+//! zero-gravity push-off is not predicted: snapshot initialization can temporarily
+//! supply zero gravity, so applying its impulse there corrupts ordinary movement.
 
 use super::wall_moves::JumpRules;
+#[cfg(test)]
+mod respawn_tests {
+    use super::*;
+    use crate::pmove::{MovementConfig, MovementState, MovementTrace};
+    struct Floor;
+    impl MovementCollision for Floor {
+        fn trace(
+            &self,
+            start: [f32; 3],
+            _: [f32; 3],
+            _: [f32; 3],
+            end: [f32; 3],
+            _: u32,
+        ) -> MovementTrace {
+            if end[2] < start[2] && start[2] <= 24.0 {
+                MovementTrace {
+                    fraction: 0.0,
+                    end_position: start,
+                    plane_normal: [0.0, 0.0, 1.0],
+                    entity_number: super::super::ENTITY_NUMBER_WORLD,
+                    ..MovementTrace::miss(end)
+                }
+            } else {
+                MovementTrace::miss(end)
+            }
+        }
+    }
+    #[test]
+    fn respawn_jump_waits_for_attack_and_use_release() {
+        for step in [8, 7, 4, 3] {
+            for button in [1, 4] {
+                let mut predictor = Predictor::from_state(
+                    MovementState {
+                        health: 100,
+                        gravity: 800.0,
+                        origin: [0.0, 0.0, 24.0],
+                        standing_height: 40.0,
+                        crouching_height: 16.0,
+                        ground_entity_number: super::super::ENTITY_NUMBER_WORLD,
+                        movement_flags: PMF_RESPAWNED,
+                        ..MovementState::default()
+                    },
+                    MovementConfig::default(),
+                );
+                predictor.predict_command(
+                    UserCommand {
+                        server_time: step,
+                        up_move: 127,
+                        buttons: button,
+                        ..UserCommand::default()
+                    },
+                    &Floor,
+                );
+                assert_eq!(
+                    predictor.state().movement_flags & PMF_RESPAWNED,
+                    PMF_RESPAWNED
+                );
+                assert_eq!(predictor.state().velocity[2], 0.0);
+                predictor.predict_command(
+                    UserCommand {
+                        server_time: step * 2,
+                        up_move: 127,
+                        ..UserCommand::default()
+                    },
+                    &Floor,
+                );
+                assert_eq!(predictor.state().movement_flags & PMF_RESPAWNED, 0);
+                assert!(predictor.state().velocity[2] > 0.0);
+            }
+        }
+    }
+}
+/// `PMF_RESPAWNED` (`codemp/game/bg_public.h`).
+const PMF_RESPAWNED: u16 = 512;
 use super::{
     Bounds, GroundState, JUMP_VELOCITY, MAX_CLIENTS, MoveContext, MovementCollision, PMF_JUMP_HELD,
     Predictor,
@@ -64,6 +135,14 @@ impl Predictor {
                 HANDEXTEND_KNOCKDOWN | HANDEXTEND_PRETHROWN | HANDEXTEND_POSTTHROWN
             )
             || state.movement_type == PM_JETPACK
+            || self.new_jetpack_active()
+        {
+            return false;
+        }
+        // `PM_CheckJump`, before Force-jump upkeep: attack/use must first release
+        // PmoveSingle's respawn latch, even if jump itself has already been released.
+        if state.movement_flags & PMF_RESPAWNED != 0
+            && !self.legacy_prediction(crate::pmove::predict_legacy::RESPAWN_JUMP)
         {
             return false;
         }
@@ -73,30 +152,43 @@ impl Predictor {
         {
             return false;
         }
-        let rules = JumpRules::of(state, context);
+        let mut rules = JumpRules::of(state, context);
+        if self.config.ja_pro.enabled
+            && state.ja_pro.restrictions & crate::pmove_japro::RESTRICT_BHOP != 0
+        {
+            rules = rules.without_wall_moves();
+        }
+        let ja_pro_jump = self.japro_jump_rules();
         self.force_jump_upkeep(command.server_time);
         if self.state.force_jump_flip {
             self.force_jump_flip(command, rules.flips);
             return true;
         }
-        if self.check_force_jump(command, rules.flips) {
+        if self.check_force_jump(command, rules.flips)
+            && !ja_pro_jump.is_some_and(|rules| rules.held_jump)
+        {
             command.up_move = 0;
             return false;
         }
         let grounded =
             |predictor: &Self| predictor.state.ground_entity_number != ENTITY_NUMBER_NONE;
-        if command.up_move < 10 && grounded(self) {
+        if ja_pro_jump.is_none() && command.up_move < 10 && grounded(self) {
             return false;
         }
         // Must wait for the jump to be released.
-        if self.state.movement_flags & PMF_JUMP_HELD != 0 {
+        if ja_pro_jump.is_some() {
+            if self.japro_jump_blocked(command) {
+                return false;
+            }
+        } else if self.state.movement_flags & PMF_JUMP_HELD != 0 {
             command.up_move = 0;
             return false;
         }
-        // Zero gravity pushes off in the direction faced instead (`bg_pmove.c:2070-2085`),
-        // which is not ported (see the module's notes): no special jump either way.
         if self.state.gravity > 0.0
             && command.up_move > 0
+            && ja_pro_jump.is_none_or(|rules| {
+                rules.force_special && self.state.movement_flags & PMF_JUMP_HELD == 0
+            })
             && self.state.water_level < 2
             && self.state.levitation_level > 0
             && matches!(self.state.weapon, WP_SABER | WP_MELEE)
@@ -117,7 +209,9 @@ impl Predictor {
         }
         if command.up_move > 0 {
             // No special jump.
-            self.state.velocity[2] = JUMP_VELOCITY;
+            if !self.japro_jump_takeoff(ground) {
+                self.state.velocity[2] = JUMP_VELOCITY;
+            }
             self.set_force_jump_start(self.state.origin[2]);
             self.state.movement_flags |= PMF_JUMP_HELD;
         }
@@ -134,5 +228,63 @@ impl Predictor {
             crate::pmove_locomotion::jump_for_direction(&mut self.state, command, lengths);
         }
         true
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::pmove::{MovementConfig, MovementState, MovementTrace};
+
+    struct Empty;
+    impl MovementCollision for Empty {
+        fn trace(
+            &self,
+            _: [f32; 3],
+            _: [f32; 3],
+            _: [f32; 3],
+            end: [f32; 3],
+            _: u32,
+        ) -> MovementTrace {
+            MovementTrace::miss(end)
+        }
+    }
+
+    #[test]
+    fn uninitialized_spawn_does_not_accumulate_zero_gravity_impulses() {
+        // Initial JA+ spawn snapshot: gravity/base speed zero, PMF_RESPAWNED |
+        // PMF_TIME_KNOCKBACK. The next initialized snapshot has gravity 800.
+        for step in [8, 7, 4, 3] {
+            let mut predictor = Predictor::from_state(
+                MovementState {
+                    health: 125,
+                    weapon: WP_SABER,
+                    gravity: 0.0,
+                    speed: 0.0,
+                    base_speed: 0.0,
+                    origin: [0.0, 0.0, 33.0],
+                    movement_flags: 576,
+                    ground_entity_number: ENTITY_NUMBER_NONE,
+                    ..MovementState::default()
+                },
+                MovementConfig::default(),
+            );
+            for slice in 1..=8 {
+                predictor.predict_command(
+                    UserCommand {
+                        server_time: step * slice,
+                        weapon: WP_SABER,
+                        ..UserCommand::default()
+                    },
+                    &Empty,
+                );
+                assert_eq!(
+                    predictor.state().velocity,
+                    [0.0; 3],
+                    "{step} ms, slice {slice}"
+                );
+                assert_eq!(predictor.state().origin, [0.0, 0.0, 33.0]);
+            }
+        }
     }
 }

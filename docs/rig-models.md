@@ -418,7 +418,11 @@ plays its glTF's animations on its own skeleton.
   own entity is not in the snapshot to move it (until 14/10/2026 it stayed where it
   started). Settings > Sound > Emotes: Emote volume (`s_emoteVolume`, 1 by default,
   0 to 3, 1 as recorded) sets its loudness apart from the effects volume: the emote
-  channel takes its own gain in the mixer, as the voices take `s_volumeVoice`. Until
+  channel takes its own gain in the mixer, as the voices take `s_volumeVoice`, and
+  each sound plays as recorded on it, so a change reaches the emotes already playing
+  (until 28/10/2026 the loudness went in with each sound as it started, and a lowered
+  volume was heard only once the player had walked out of earshot, KãTsumøTø's report
+  #188; the bus goes up to `sjk_audio::MAX_CHANNEL_GAIN`, 4). Until
   27/10/2026 it was times `s_volume`, so a player who lowered the game's sounds could
   not make an emote loud (Rollembones's report #163); a saved value moved once to what
   it gave (times the saved `s_volume`; a profile that never saved one keeps the

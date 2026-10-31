@@ -273,6 +273,16 @@ once). The look, keys and states are in [sjk-ui.md](sjk-ui.md#collection); the r
 and refusals in the hub's `PROTOCOL.md` ("Shards and the shop"). Checked by unit tests and
 world shots (`world_shot::forge_shots`); not tried in a game.
 
+Since 29/10/2026 (collection marks, the ideas of the players Atrosex and Kushina extended
+by Sol; [sjk-ui.md](sjk-ui.md#marks), the hub's `PROTOCOL.md` "Collection marks"): Break
+down marks the shader the player wears (on either saber or staff half) and its last
+copy's card says so first; the player's favourites are listed first in Craft and Break
+down, with a Favourites chip on Break down; and a shader the player locked is never broken
+down, one copy or the last, nor counted among all duplicates, nor offered in a trade, until
+they unlock it. The hub holds the lock (409 `locked`), so a client cannot get round it; the
+Forge shows the button dimmed with "Locked". Against a hub without marks, nothing of the
+star or the padlock shows.
+
 Fixed 22/10/2026, #117 (Nib: the Forge flickered on the last lines of Craft): Craft's grid
 on its Legendary and Mythical lines, its fifteen swatches drawn rather than live pictures
 (the menu pictures on, or before a live picture is ready), took up to about 2,100 draw
@@ -306,8 +316,8 @@ was "Sol lore" before). Its numbers 000 to 012 are the credits: Sol, Bishop (the
 of JKR, which SJK forked), Creyon, the early team and the projects and people SJK builds
 on; `sjk_alpha_010` is the Toxiee meme card (Legendary, it was `sol_lore_001`), and
 `sjk_alpha_000`, Sol's, brings the Sun blade while held (20/10/2026). Sol edits the cards
-himself since 20/10/2026 with the hub's Card Studio (`scripts/card_studio.py`), so the
-hub's `assets/dist/cards.json` is the list as it stands, not this page.
+on the live hub since 29/10/2026 (from 20/10/2026 with a card editor on their PC), so the
+hub's catalogue is the list as it stands, not this page.
 
 **Credits cards (20/10/2026, Sol's decision):** so that no credit reads as ranked above
 another, every credits card is Mythical (the hub's import and pack build refuse any other
@@ -403,20 +413,23 @@ not know is kept but named nowhere; `Face::blade` in
   knows); the binder's kind filter offers "Kind: Blade" once the packs have one. The
   opening and the reveal show the blade a Solar copy brought ([The ceremony](#in-the-client)).
 
-- **Where cards are made:** Sol keeps each card's picture and words in `card_import/`
-  at the repository's root, which git ignores (`card_import/README.txt` says the format):
-  `cards/card1.png` (1020 x 850, the 6:5 art window, framed as it will show) and
-  `cards/card1.txt` (`number`, `collection`, `kind`, `rarity`, `title`, `art`,
-  `description`, optional `artist`), the full paintings in `sources/`, a white canvas
-  and a frame overlay to frame new ones in `templates/`.
-- **How they reach players:** the hub's `scripts/import_cards.py <card_import>` writes
-  them into the hub's `sjk_cards` pack sources (`cards/<id>.card` JSON and
-  `cards/<id>.jpg`, id `<set>_<NNN>` such as `sjk_alpha_001`), and its
-  `scripts/build_packs.py` builds `sjk_cards.pk3` and the hub's catalogue
-  `cards.json` (id, set, number, rarity). The hub serves the pack like the blade skins'
-  (`GET /v1/assets`), so every SJK client downloads it into `assets/` beside
-  `identity.key` and mounts it; adding a card is a new pack and a hub restart, no client
-  release.
+- **Where cards are made:** on the live hub since 29/10/2026, which keeps each card's
+  picture (1020 x 850, the 6:5 art window, framed as it will show) and words (`number`,
+  `collection`, `kind`, `rarity`, `title`, `description`, optional `artist`). Before,
+  Sol kept them in `card_import/` at the repository's root, which git ignores
+  (`card_import/README.txt` says the format: `cards/card1.png` and `cards/card1.txt`, the
+  full paintings in `sources/`, a white canvas and a frame overlay in `templates/`).
+- **How they reach players:** the hub serves each card's `cards/<id>.card` JSON and
+  `cards/<id>.jpg` (id `<set>_<NNN>` such as `sjk_alpha_001`) in its `sjk_cards` pack,
+  and since 29/10/2026 in `sjk_cards_2`, `sjk_cards_3`... once one pack is full (the
+  client reads every pack's `cards/` alike, and a card pack once listed stays listed).
+  The hub serves them like the blade skins' (`GET /v1/assets`), so every SJK client
+  downloads them into `assets/` beside `identity.key` and mounts them. Since 29/10/2026 a
+  card edited, added or retired changes the hub's catalogue and card packs at once: no
+  hub restart and no client release; clients take the new packs at their next check (at
+  start, then every 6 hours). Until then the hub's `scripts/import_cards.py` and
+  `scripts/build_packs.py` turned `card_import/` into `sjk_cards.pk3` and the catalogue
+  `cards.json`, shipped with a hub restart; they now only seed a new hub.
 - **The hub picks:** opening a holocron rolls the copy's rarity and finish as before,
   then picks a card of that rarity from the catalogue (since 20/10/2026 a set first, then
   a card in it, [SJK Blades](#sjk-blades)); a rarity with no card yet stays sealed. `POST /v1/cards/reveal` gives the person's sealed copies of a
@@ -424,6 +437,68 @@ not know is kept but named nowhere; `Face::blade` in
   holocrons (staff only for now).
 - **Each card has one rarity** (Bishop is Mythical, the Toxiee card Legendary): the
   first set needs cards of every rarity before every copy can be revealed.
+
+### Ranks
+
+Since 31/10/2026 (Sol's decision, for the JoF collection) a card may show a rank in
+place of its rarity: its file carries `rank` (the name players read, 1 to 24
+characters, "Leader") and `rank_colour` (`#RRGGBB`), always together. Its `rarity`
+stays and only sets its odds (JoF's Leaders are Mythical, its Council Legendary): a
+ranked card never shows a rarity's name, mark or colour. Its rank's name stands at its
+foot and on its tile, "Rank card" in its hover (no mark), its rank's colour edges its
+plate, tile and badges, its drawn scene's backdrop, the opening's title and flourish and
+the grand find's chat line ("a Leader card"; the hub's `finds` carry the card's id).
+A rarity chip leaves ranked cards out of the binder, and their hover gives the card's
+own odds ("about 1 in N holocrons found holds this card": the rarity's share, split
+among the sets that have cards of it, then the set's cards of it). A sealed copy is not a
+card yet and still shows its rolled rarity, as does the crate's spin. Ranks are data on
+the card, so a new rank needs no client release (`cards::Tone`, `cards::faces::Rank`).
+A rank without its colour, or a bad one, is left out (logged) and the card shows its
+rarity. Older clients read past the two keys and show the rarity.
+
+### Scenes
+
+Since 30/10/2026 (Sol's idea) a card's file may name a `scene`: the client then draws
+the card's picture itself, from the player's own Jedi Academy data, instead of the
+pack's picture. Nothing of the game travels: no one ships, uploads or hosts it, each
+client draws its own copy once and keeps it as a JPEG in `card_scenes/` beside the
+packs' folder, named by the card and 16 hex of the scene's hash (and the drawing's
+version, `cards::scene::VERSION`), so a changed scene is drawn again. The pack's
+picture stays: older clients draw it, and this one shows it until the drawing is ready,
+or for good this session when the game data lacks a model or the drawing fails (named
+in the log). The JKA Characters and JKA Arsenal sets use scenes.
+
+A scene is one line of at most 200 ASCII characters: up to three figures joined by
+`+`, each a kind, a name and options, and the camera's options anywhere.
+
+| Part | Meaning |
+| --- | --- |
+| `player <model>[/<skin>]` | a player model of `models/players/`, the game's own whatever rig model a pack lays over it |
+| `anim=<NAME>` and `at=<0..1>` | the pose: an `animation.cfg` animation and how far through it (its idle at its start by default) |
+| `saber=<hilt>`, `saber2=<hilt>` | a `.sab` hilt (`single_1`, `dual_1` for a staff, `luke`) in the right and left hand |
+| `blade=<colour>`, `blade2=<colour>` | the blades' colours: red, orange, yellow, green, blue or purple (blue; the second as the first) |
+| `model <path>` | any `.md3` or `.glm` under `models/` (a weapon's world model, an item) |
+| `yaw`, `pitch`, `zoom` | the camera: turned round the figures from in front (-180 to 180, 25 by default), raised (-60 to 60, 8) and brought nearer (0.5 to 3, 1) |
+
+For example `player luke anim=BOTH_STAND2 saber=luke blade=green`,
+`player jedi_tf + player jedi_zf` or `model models/weapons2/disruptor/disruptor_w.glm`.
+Weapons draw from their world models (`_w.glm`): the first-person models of most are
+made of tagged parts and come out in pieces.
+
+The figures stand side by side, framed by their own camera so they fill most of the
+6:5 window, lit from the camera's upper left whatever the map, and drawn as the model
+preview draws (`menu_stage/preview.rs`'s encode, with the blades through its blade
+layer); the picture is read back and laid over the card's backdrop (a deep space
+gradient with a glow of the rarity's colour behind the figures and round their
+outline, so dark costumes stand out). Surfaces that write no depth (glass, a bacta
+tank's) come out clear. One drawing at a time, recorded and submitted on its own inside
+validation scopes, so a broken model fails that picture alone. Code:
+[cards/scene.rs](../crates/sjk-viewer/src/cards/scene.rs) (the grammar, the cache,
+the queue, the camera, the backdrop) and
+[card_scenes.rs](../crates/sjk-viewer/src/card_scenes.rs) (the drawing). World shot:
+`world_shot::card_scenes_shots::card_scenes_drawn_from_the_game_models`
+(`SJK_SCENE` draws one scene, `SJK_SCENES` a file of `name<TAB>scene` lines, as
+contact sheets of twelve).
 
 ## In the client
 
@@ -437,6 +512,7 @@ not know is kept but named nowhere; `Face::blade` in
 | Kyber shards, shattering, crafting and the tables | [economy.rs](../crates/sjk-viewer/src/economy.rs); wire and requests in [wire.rs](../crates/sjk-identity/src/wire.rs), [hub.rs](../crates/sjk-identity/src/hub.rs), [service.rs](../crates/sjk-identity/src/service.rs) (`Service::shatter`, `craft`, `read_shop`, `buy`, `Snapshot::shop`, `Snapshot::trade`) |
 | The kyber shard's mark | [cards/shard.rs](../crates/sjk-viewer/src/cards/shard.rs) |
 | The Forge: the shop, crafting and breaking down (the shop was the Holocrons tab's overlay, `holocrons_panel_shop.rs`, until 21/10/2026) | [collection_forge.rs](../crates/sjk-viewer/src/collection_forge.rs), [collection_forge_view.rs](../crates/sjk-viewer/src/collection_forge_view.rs) |
+| The Collection's History tab (31/10/2026): what came, was opened, spent and traded, `GET /v1/history` ([History](#history)) | [history.rs](../crates/sjk-identity/src/history.rs), [service.rs](../crates/sjk-identity/src/service.rs) (`Service::read_history`, `Snapshot::history`); [collection_history.rs](../crates/sjk-viewer/src/collection_history.rs), [collection_history_view.rs](../crates/sjk-viewer/src/collection_history_view.rs) |
 | The Collection's Cards tab | [collection_cards.rs](../crates/sjk-viewer/src/collection_cards.rs); its tiles, filter and sets' progress in [cards/binder.rs](../crates/sjk-viewer/src/cards/binder.rs) |
 | `debug_open` | [cards/rehearsal.rs](../crates/sjk-viewer/src/cards/rehearsal.rs) |
 | The faces from the packs, their pictures decoded on a worker when drawn | [cards/faces.rs](../crates/sjk-viewer/src/cards/faces.rs), mounted by [sjk_packs.rs](../crates/sjk-viewer/src/sjk_packs.rs) |
@@ -735,6 +811,48 @@ not know is kept but named nowhere; `Face::blade` in
   with made-up cards (or shaders, or piles of kyber shards) on the Holocrons tab; nothing is
   sent or kept. A card comes as a pack, with made-up shards from the tier's card shards. A rarity the packs have
   faces of shows one of them, as the hub would pick.
+
+## History
+
+Since 31/10/2026 (Sol: "a general inventory history: what they got, opened, what they
+spent credits and shards on, and the drops"), the Collection's last tab, History, lists
+the player's economy as the hub keeps it, newest first.
+
+The hub answers `GET /v1/history` (signed as `GET /v1/holocrons` is; its `PROTOCOL.md`,
+"History") with `{"lines":[...],"more":bool,"before":<unix s>}`: a page is 100 lines
+plus the rest of its oldest second (one second's lines are never split), and while
+`more` is true `GET /v1/history?before=<before>` brings the older ones. A line has `at`
+and `kind`:
+
+| Kind | What it is | Its fields |
+| --- | --- | --- |
+| `came` | a holocron or kyber crystal came (not through a trade: the trade's line says it; one found then traded away stays) | `holocron`, `tier`, `source` (`play`, `staff`, `achievement`, `bought`, `box`, `reward`), `note`, `price` (what a bought one cost, its row's amount), `traded` |
+| `opened` | the player opened one | `holocron`, `tier`, `credits`, `shards`, `card` (`card`, null while sealed; `rarity`, `finish`; or null), `unlock` ("" for none) |
+| `credits` | a credits ledger line no other kind covers | `delta` (signed), `reason` (`staff`, `reward`, `mystery_box` with `note` `explode_gift`), `note` |
+| `shards` | a kyber shard ledger line no other kind covers | `delta`, `reason` (`shatter`, `craft`, `shop` with the shader's id as `note`, `staff`, `reward`), `note` |
+| `box` | a mystery box opened | `outcome` ([mystery-boxes.md](mystery-boxes.md)), `price` (0 a free roll), `won`, `shards` |
+| `trade` | a finished trade | `trade`, `with` (`name` with colour codes, `verified`), `gave` and `got` (the trade items of `GET /v1/trades`, `value` included) |
+
+The client skips a line of a kind it does not know, or one it cannot read, and takes a
+missing field as empty, so the hub can add kinds. No key id comes ([No keys in
+game](identity.md)). An unknown key gets 403 `not_registered`; a hub from before the
+history answers 404, and the tab says "This SJK hub keeps no history yet."
+
+The tab reads the newest page each time it is shown (and on R), and Load older, the
+list's last row while the hub has more, the next page (`HistoryState::take` adds a page
+only when it follows what was read, so a second press adds nothing twice). A row is one
+line: a chip of its kind (Drop, Opened, Credits, Shards, Box, Trade) in the tier's colour
+(holocrons, crystals) or the kind's, a sentence ("Opened a Rare Holocron: card Sol
+(Holo), Sun blade", "Bought a holocron", "Shattered Sun blade", "Mystery box: double,
+paid 100, won 200", "Traded with Nib: gave a Rare Holocron, got Sun blade"), what it moved
+("+120 credits", "-400 credits", "+15 shards", gains green and spends red) and when, in
+this PC's time (`dd/mm/yyyy HH:MM`). Consecutive openings of one second (Open all) are one
+row, "Opened 37 Holocrons (5 Rare, 32 Uncommon): 30 cards, 7 unlocks" with their totals,
+and so are holocrons that came in one second the same way; Enter or a click opens it on
+its lines. The filter (All, Drops, Opened, Credits, Shards, Trades, Boxes; Left and Right)
+works on what was read: Credits and Shards keep every line that moved them, openings and
+boxes included. The rows' words are made once for what was read, the filter and the rows
+opened, not each frame. World shot: `world_shot::collection::duel6_sjk_collection_history`.
 
 ## Planned, not built
 

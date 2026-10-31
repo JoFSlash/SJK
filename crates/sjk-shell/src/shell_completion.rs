@@ -5,18 +5,46 @@
 //! other commands in [`FILE_ARGUMENTS`] completes the same way from the files the
 //! caller lists (`Cmd_CompleteCfgName`, `qcommon/cmd.cpp`), and the map argument of
 //! `devmap` from the maps it lists (`SV_CompleteMapName`, `server/sv_ccmds.cpp`).
+//! The caller adds commands of its own the same way, each with an
+//! [`ArgumentSource`] (`sjkemote` and its emote ids, in the viewer).
 
 use super::{ConsoleLineKind, Shell, ascii_starts_with_ignore_case, builtin_commands};
+
+/// A command whose first argument Tab completes from names the caller lists.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct ArgumentSource {
+    /// The command, any case.
+    pub command: &'static str,
+    /// What the caller is asked to list: a file extension, [`MAP_EXTENSION`] for
+    /// maps, or a name of the caller's own.
+    pub list: &'static str,
+    /// The label of a listing row, at most six characters (`File`, `Map`).
+    pub label: &'static str,
+}
+
+impl ArgumentSource {
+    const fn file(command: &'static str, extension: &'static str) -> Self {
+        Self {
+            command,
+            list: extension,
+            label: "File",
+        }
+    }
+}
 
 /// Commands whose first argument names a file, with the extension of the files it
 /// completes from, as the completion functions `Cmd_Init`, `Com_Init` and
 /// `SV_AddOperatorCommands` register. [`MAP_EXTENSION`] asks for maps.
-const FILE_ARGUMENTS: &[(&str, &str)] = &[
-    ("exec", "cfg"),
-    ("execq", "cfg"),
-    ("writeconfig", "cfg"),
-    ("write", "cfg"),
-    ("devmap", MAP_EXTENSION),
+const FILE_ARGUMENTS: &[ArgumentSource] = &[
+    ArgumentSource::file("exec", "cfg"),
+    ArgumentSource::file("execq", "cfg"),
+    ArgumentSource::file("writeconfig", "cfg"),
+    ArgumentSource::file("write", "cfg"),
+    ArgumentSource {
+        command: "devmap",
+        list: MAP_EXTENSION,
+        label: "Map",
+    },
 ];
 
 /// The extension a map argument asks the caller's file list for. The caller answers
@@ -78,14 +106,27 @@ impl Shell {
         key: CompletionKey,
         files: impl FnOnce(&str) -> Vec<String>,
     ) -> Option<String> {
-        let (replaced, name, listing) = match typed_file_argument(line) {
+        self.complete_line_with_arguments(line, key, &[], files)
+    }
+
+    /// [`Self::complete_line_with_files`], with the first argument of the caller's
+    /// own commands in `sources` completing too: `lists` is asked for the names of
+    /// the source's `list`, as for a file extension.
+    pub fn complete_line_with_arguments(
+        &mut self,
+        line: &str,
+        key: CompletionKey,
+        sources: &[ArgumentSource],
+        lists: impl FnOnce(&str) -> Vec<String>,
+    ) -> Option<String> {
+        let (replaced, name, listing) = match typed_argument(line, sources) {
             Some(argument) if key == CompletionKey::Tab => {
-                let names = files(argument.extension);
+                let names = lists(argument.source.list);
                 let typed = &line[argument.start..];
-                let (name, listing) = if argument.extension == MAP_EXTENSION {
-                    map_completion(typed, &names)?
+                let (name, listing) = if argument.source.list == MAP_EXTENSION {
+                    map_completion(typed, &names, argument.source.label)?
                 } else {
-                    file_completion(typed, &names)?
+                    word_completion(typed, &names, argument.source.label)?
                 };
                 (argument.start, name, listing)
             }
@@ -240,17 +281,19 @@ fn last_command(line: &str) -> Option<usize> {
     (!quoted && !escaped).then_some(segment)
 }
 
-/// The file argument being typed to a command in [`FILE_ARGUMENTS`].
-struct TypedFileArgument {
+/// The argument being typed to a command in [`FILE_ARGUMENTS`] or the caller's
+/// sources.
+struct TypedArgument {
     /// Byte offset in the line of the argument; it runs to the end of the line.
     start: usize,
-    /// Extension of the files it completes from.
-    extension: &'static str,
+    /// What it completes from.
+    source: ArgumentSource,
 }
 
-/// The first argument of the last command on `line` when that command takes a file
-/// and nothing follows the argument. The argument may still be empty.
-fn typed_file_argument(line: &str) -> Option<TypedFileArgument> {
+/// The first argument of the last command on `line` when [`FILE_ARGUMENTS`] or
+/// `sources` name that command and nothing follows the argument. The argument may
+/// still be empty.
+fn typed_argument(line: &str, sources: &[ArgumentSource]) -> Option<TypedArgument> {
     let command = line[last_command(line)?..].trim_start_matches(|c: char| c.is_ascii_whitespace());
     let command = command.strip_prefix(['/', '\\']).unwrap_or(command);
     let (name, rest) = command.split_once(|c: char| c.is_ascii_whitespace())?;
@@ -261,20 +304,22 @@ fn typed_file_argument(line: &str) -> Option<TypedFileArgument> {
     {
         return None;
     }
-    let &(_, extension) = FILE_ARGUMENTS
+    let &source = FILE_ARGUMENTS
         .iter()
-        .find(|(command, _)| command.eq_ignore_ascii_case(name))?;
-    Some(TypedFileArgument {
+        .chain(sources)
+        .find(|source| source.command.eq_ignore_ascii_case(name))?;
+    Some(TypedArgument {
         start: line.len() - argument.len(),
-        extension,
+        source,
     })
 }
 
-/// The completed file name and, when it is not unique, the lines listing the
-/// candidates, as `PrintFileMatches` (`qcommon/common.cpp`) prints them. A name met
-/// twice, in any letter case, is listed once, as first met. A unique name replaces
-/// the typed text; several only extend it, keeping the letter case typed so far.
-fn file_completion(prefix: &str, names: &[String]) -> Option<(String, Vec<String>)> {
+/// The completed name and, when it is not unique, the lines listing the
+/// candidates under `label`, as `PrintFileMatches` (`qcommon/common.cpp`) prints
+/// files. A name met twice, in any letter case, is listed once, as first met. A
+/// unique name replaces the typed text; several only extend it, keeping the letter
+/// case typed so far.
+fn word_completion(prefix: &str, names: &[String], label: &str) -> Option<(String, Vec<String>)> {
     let mut candidates = names
         .iter()
         .filter(|name| ascii_starts_with_ignore_case(name, prefix))
@@ -292,7 +337,7 @@ fn file_completion(prefix: &str, names: &[String]) -> Option<(String, Vec<String
     let completed = format!("{prefix}{}", &shared[prefix.len()..]);
     let listing = candidates
         .iter()
-        .map(|name| format!("^9File  ^7{name}"))
+        .map(|name| format!("^9{label:<6}^7{name}"))
         .collect();
     Some((completed, listing))
 }
@@ -301,8 +346,8 @@ fn file_completion(prefix: &str, names: &[String]) -> Option<(String, Vec<String
 /// candidates. A map matches when its name starts with `prefix`, or, for a prefix
 /// without a `/`, when the name after its folder does: `siege_ho` finds
 /// `mp/siege_hoth`. A unique map replaces the typed text; several extend it to their
-/// shared start when that still holds what was typed, and are listed as `Map` rows.
-fn map_completion(prefix: &str, names: &[String]) -> Option<(String, Vec<String>)> {
+/// shared start when that still holds what was typed, and are listed under `label`.
+fn map_completion(prefix: &str, names: &[String], label: &str) -> Option<(String, Vec<String>)> {
     fn base(name: &str) -> &str {
         name.rsplit_once('/').map_or(name, |(_, base)| base)
     }
@@ -330,7 +375,7 @@ fn map_completion(prefix: &str, names: &[String]) -> Option<(String, Vec<String>
     };
     let listing = candidates
         .iter()
-        .map(|name| format!("^9Map   ^7{name}"))
+        .map(|name| format!("^9{label:<6}^7{name}"))
         .collect();
     Some((completed, listing))
 }
@@ -525,6 +570,56 @@ mod tests {
                 "^9Map   ^7mp/siege_hoth",
                 "^9Map   ^7sjk_arena1",
             ]
+        );
+    }
+
+    const EMOTES: &[super::ArgumentSource] = &[super::ArgumentSource {
+        command: "sjkemote",
+        list: "emote",
+        label: "Emote",
+    }];
+
+    fn emotes(list: &str) -> Vec<String> {
+        assert_eq!(list, "emote");
+        ["autumn_tea", "stop", "sync", "comrade"]
+            .map(str::to_owned)
+            .to_vec()
+    }
+
+    #[test]
+    fn a_callers_command_completes_its_first_argument_from_its_list() {
+        let mut shell = shell();
+        let completed =
+            shell.complete_line_with_arguments("sjkemote aut", CompletionKey::Tab, EMOTES, emotes);
+        assert_eq!(completed.as_deref(), Some("sjkemote autumn_tea "));
+        let completed =
+            shell.complete_line_with_arguments("/SJKEMOTE Com", CompletionKey::Tab, EMOTES, emotes);
+        assert_eq!(completed.as_deref(), Some("/SJKEMOTE comrade "));
+        let completed =
+            shell.complete_line_with_arguments("sjkemote s", CompletionKey::Tab, EMOTES, emotes);
+        assert_eq!(completed.as_deref(), Some("sjkemote s"));
+        let lines: Vec<_> = shell.lines().map(|line| line.text.as_str()).collect();
+        assert_eq!(lines, ["]sjkemote s", "^9Emote ^7stop", "^9Emote ^7sync"]);
+        for line in ["sjkemote stop x", "sjkemote nothing"] {
+            assert_eq!(
+                shell.complete_line_with_arguments(line, CompletionKey::Tab, EMOTES, emotes),
+                None,
+                "{line}"
+            );
+        }
+        assert_eq!(
+            shell.complete_line_with_arguments(
+                "sjkemote aut",
+                CompletionKey::Enter,
+                EMOTES,
+                emotes
+            ),
+            None
+        );
+        // Without the caller's sources the command's argument is left alone.
+        assert_eq!(
+            shell.complete_line_with_files("sjkemote aut", CompletionKey::Tab, emotes),
+            None
         );
     }
 

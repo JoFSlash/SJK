@@ -200,6 +200,9 @@ pub(crate) const BODY: u32 = 0x100;
 pub(crate) const BODY_AND_PLAYER_CLIP: u32 = 0x100 | 0x10;
 
 impl<C: MovementCollision> MovementCollision for WithoutBodies<'_, C> {
+    fn rocket_lock_target(&self, entity: u16) -> Option<super::RocketLockTarget> {
+        self.0.rocket_lock_target(entity)
+    }
     fn point_contents(&self, point: [f32; 3]) -> u32 {
         self.0.point_contents(point)
     }

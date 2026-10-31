@@ -199,12 +199,6 @@ impl GpuState {
             (None, None) => None,
         }
         .and_then(|own| u8::try_from(own).ok());
-        let volume = self
-            .console
-            .as_ref()
-            .and_then(|console| console.float_cvar(emotes::VOLUME_CVAR))
-            .unwrap_or(emotes::DEFAULT_VOLUME)
-            .clamp(0.0, emotes::MAX_VOLUME) as f32;
         for cue in cues {
             match cue {
                 emotes::Cue::Start {
@@ -219,7 +213,7 @@ impl GpuState {
                             .map(|entity| entity.current().transform.translation)
                             .unwrap_or_default()
                     });
-                    audio.play_emote(&sound, slot, origin, volume, offset, align);
+                    audio.play_emote(&sound, slot, origin, offset, align);
                 }
                 emotes::Cue::Stop { slot } => audio.stop_emote(slot),
             }

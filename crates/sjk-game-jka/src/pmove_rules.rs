@@ -59,6 +59,9 @@ impl MovementConfig {
         self.roll_rules = crate::RollRules::from_game_state(game);
         self.roll_rules.saber_forbids_rolls = no_rolls;
         self.ja_plus = crate::pmove_japlus::JaPlusRules::from_game_state(game);
+        let player_bhop = self.ja_pro.player_bhop;
+        self.ja_pro = crate::pmove_japro::JaProRules::from_game_state(game);
+        self.ja_pro.player_bhop = player_bhop;
     }
 
     /// CG_PredictPlayerState's fixed-step timestamp ceiling (:1239-1241).

@@ -14,7 +14,9 @@ pub(crate) const SWAP_CVAR: &str = "cg_holsteredstaffswap";
 
 /// Server-specific evidence: JoF EJK f21eee8, CG_HolsteredSaberVisible and
 /// CG_StaffHolsteredOnBack. JA+ repurposes EF_NOT_USED_3 as no owned saber;
-/// plugin disable bits 13 and 9 suppress all holsters and staff back reach.
+/// plugin disable bits 29 (`JAPRO_PLUGIN_HOLSTEREDSABERS`) and 9
+/// (`JAPRO_PLUGIN_HOLSTEREDSABER`) suppress all holsters and staff back reach. Bit 13
+/// is JA+'s single-player cartwheel, a server move, not a holster switch.
 struct Contract {
     matches: fn(&str) -> bool,
     absent_flag: u32,
@@ -27,7 +29,7 @@ const CONTRACTS: &[Contract] = &[Contract {
     // ownership flags are unverified.
     matches: crate::actor_world_submission::force_powers::flame::ja_plus_itself,
     absent_flag: 0x1000,
-    disable_all: 1 << 13,
+    disable_all: 1 << 29,
     disable_back: 1 << 9,
     // teams.h: Desann, Jedi, Kyle, Luke, Reborn, Tavion; EJK #267 visibility list.
     npc_classes: &[6, 18, 19, 22, 37, 47],
@@ -181,7 +183,9 @@ mod tests {
         assert!(Policy::resolve(true, 2, detect("basejka"), 0, 0.45).enabled);
         assert!(!Policy::resolve(true, 3, None, 0, 0.45).enabled);
         assert!(!Policy::resolve(true, 0, detect("JA+ Mod"), 0, 0.45).enabled);
-        assert!(!Policy::resolve(true, 2, None, 8192, 0.45).enabled);
+        assert!(!Policy::resolve(true, 2, None, 1 << 29, 0.45).enabled);
+        // Bit 13 (no single-player cartwheel) leaves the holsters alone.
+        assert!(Policy::resolve(true, 2, None, 1 << 13, 0.45).enabled);
         assert!(!Policy::resolve(true, 2, None, 512, 0.45).back);
         assert!(!Policy::resolve(false, 2, None, 0, 0.45).enabled);
     }

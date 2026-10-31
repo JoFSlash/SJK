@@ -195,7 +195,8 @@ pub use force_profile_negotiation::{
     server_legal_forcepowers,
 };
 pub use force_rank_reply::{
-    ForceRankReply, force_rank_reply, force_rules_from_serverinfo, server_force_rules,
+    ForceRankReply, force_rank_reply, force_rules_from_serverinfo, free_saber_event,
+    server_force_rules, serverinfo_shows_free_saber,
 };
 pub use ghoul2_pose::{LegacyGhoul2Animator, LegacyGhoul2PosePolicy};
 pub use impact_events::{
@@ -283,9 +284,9 @@ pub use saber_clash_flare::{
 };
 pub use saber_command::{SaberChangeNotifier, profile_accepts_saber_command, saber_command};
 pub use saber_definitions::{
-    LegacySaberColor, LegacySaberDefinition, LegacySaberType, legacy_saber_definitions,
-    legacy_saber_hands, legacy_saber_movement, legacy_sabers_forbid_rolls,
-    shared_saber_definitions,
+    LegacySaberColor, LegacySaberDefinition, LegacySaberType, legacy_saber_combat,
+    legacy_saber_definitions, legacy_saber_hands, legacy_saber_movement,
+    legacy_sabers_forbid_rolls, shared_saber_definitions,
 };
 pub use saber_move::legacy_saber_trail_length;
 pub use server_address::{LegacyAddressError, LegacyServerAddress};

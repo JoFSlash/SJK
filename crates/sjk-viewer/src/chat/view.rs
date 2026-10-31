@@ -1,5 +1,6 @@
 //! Floating message typography and deterministic motion on the shared canvas.
 
+mod backdrop;
 mod composer;
 mod draft;
 mod name;
@@ -21,6 +22,8 @@ pub(super) fn tint(channel: Channel, alpha: f32) -> Color {
         Channel::Whisper => Color::new(0.84, 0.68, 1.0, alpha),
         // The SJK UI's gold (`#E8B84A`), apart from the game's blues.
         Channel::Sjk => Color::new(0.91, 0.72, 0.29, alpha),
+        // jaPRO's `<Admin>` yellow, softened.
+        Channel::Admin => Color::new(0.98, 0.88, 0.40, alpha),
     }
 }
 
@@ -78,9 +81,11 @@ impl ChatOverlay {
             self.scoreboard_layout,
             crate::scoreboard::behavior::ChatLayout::Classic { hide_feed: true }
         );
+        let feed_start = self.ui.next_text_id();
         if !hide_feed && (self.is_typing() || (draw_feed && self.options.lifetime != 0)) {
             self.build_feed(font, &g, ms);
         }
+        let feed_text = (feed_start, self.ui.next_text_id());
         let center_start = self.ui.next_text_id();
         if let Some((text, received)) = &self.center {
             let age = ms.saturating_sub(*received);
@@ -106,7 +111,7 @@ impl ChatOverlay {
                     self.ui.text_aligned(
                         line,
                         Rect::new(32.0, y, viewport[0] - 64.0, row),
-                        CENTER_FONT_1080 * center_scale * size,
+                        CENTER_FONT_1080 * crate::game_font::HEADLINE_GROWTH * center_scale * size,
                         color,
                         FontWeight::Semibold,
                         0.0,
@@ -123,6 +128,7 @@ impl ChatOverlay {
         if !self.scoreboard_layout.active() {
             self.draw_plums();
         }
+        let composer_start = self.ui.next_text_id();
         if self.is_typing() {
             // JoF's message input is independent of its chat feed. Keep SJK's
             // composer inside the window when the feed sits at virtual y=475.
@@ -139,6 +145,7 @@ impl ChatOverlay {
             self.build_composer(font, &g, ms);
             g.scale = feed_scale;
         }
+        self.chat_text = [feed_text, (composer_start, self.ui.next_text_id())];
         // A name under the pointer shows its profile card, over everything.
         self.follow_card(self.is_typing(), ms);
         self.build_card(font, &g, viewport);
@@ -155,7 +162,7 @@ impl ChatOverlay {
         let mut skipped = 0;
         for index in (0..self.lines.len()).rev() {
             let line = &self.lines[index];
-            if !self.pm_visible(line) {
+            if !self.shown(line) {
                 continue;
             }
             if skipped < self.scroll {
@@ -198,18 +205,38 @@ impl ChatOverlay {
             count += 1;
             bottom = top;
         }
-        for (token, (index, top, alpha, gif)) in visible[..count].iter().copied().enumerate().rev()
-        {
+        // Where each shown line is drawn this frame, as it slides in and moves up.
+        let mut origins = [[0.0_f32; 2]; MAX_VISIBLE];
+        for (origin, &(index, top, ..)) in origins.iter_mut().zip(&visible[..count]) {
             let line = &mut self.lines[index];
             let age = ms.saturating_sub(line.received_ms);
             let y = line.y.get_or_insert_with(|| Tween::settled(top));
             if (y.target() - top).abs() > 0.1 {
                 y.retarget(top, ms, ENTER_MS, Easing::EaseOutCubic);
             }
-            let y = y.sample(ms);
             let slide =
                 Tween::new(14.0 * g.scale, 0.0, 0, ENTER_MS, Easing::EaseOutCubic).sample(age);
-            let x = g.left + slide;
+            *origin = [g.left + slide, y.sample(ms)];
+        }
+        // Every band before any line, under the pictures of the rows next to it.
+        if self.options.backdrop > 0.0 {
+            for (&origin, &(index, _, alpha, _)) in origins.iter().zip(&visible[..count]) {
+                let line = &self.lines[index];
+                let prefix = line_marks(line, &self.slot_marks)
+                    .map(|(name, marks)| sjk_line::Prefix::new(name, marks, font, g));
+                backdrop::draw(
+                    &mut self.ui,
+                    line,
+                    prefix.as_ref(),
+                    font,
+                    g,
+                    origin,
+                    self.options.backdrop * alpha,
+                );
+            }
+        }
+        for (token, (index, _, alpha, gif)) in visible[..count].iter().copied().enumerate().rev() {
+            let [x, y] = origins[token];
             let line = &self.lines[index];
             let Some((name, marks)) = line_marks(line, &self.slot_marks) else {
                 // No sender: the server's own words, as one text.
@@ -218,6 +245,7 @@ impl ChatOverlay {
                     body_row(
                         &mut self.ui,
                         BodyRow {
+                            forced: line.incoming_colour(self.options.incoming),
                             text: &line.body[range.clone()],
                             carry: line.wrap.carry[row],
                             marks: &line.emojis,
@@ -256,6 +284,7 @@ impl ChatOverlay {
                     emojis: self.options.emojis.then_some(&self.emojis),
                     hovered,
                     colour,
+                    forced: line.incoming_colour(self.options.incoming),
                     label_colour: if line.encrypted {
                         encrypted_pink(alpha * 0.85)
                     } else {
@@ -367,7 +396,7 @@ fn line_marks<'a>(
             _ if line.encrypted => "ENCRYPTED",
             Channel::Team => "TEAM",
             Channel::Whisper => "WHISPER",
-            Channel::Global | Channel::Sjk => "",
+            Channel::Global | Channel::Sjk | Channel::Admin => "",
         },
         emoji: mark.map_or("", |mark| mark.emoji.as_str()),
         accent: false,
@@ -380,6 +409,7 @@ fn line_marks<'a>(
 
 /// One wrapped row of a message body and the emojis its marks stand for.
 struct BodyRow<'a> {
+    forced: Option<Color>,
     text: &'a str,
     /// The colour code in force where the row starts: a wrapped message goes on in
     /// the colour the row before it ended in, not in the base colour.
@@ -405,11 +435,21 @@ fn body_row(
     size: f32,
     color: Color,
 ) {
+    let color = super::incoming_color::colour(color, row.forced);
+    let carry = if row.forced.is_some() {
+        Carry::NONE
+    } else {
+        row.carry
+    };
     let ellipsis = if row.truncated { "..." } else { "" };
     let is_mark = |character: char| emoji::mark_index(character).is_some();
     if !row.text.contains(is_mark) {
         ui.text_fmt_aligned(
-            format_args!("{}{}{ellipsis}", row.carry, row.text),
+            format_args!(
+                "{}{}{ellipsis}",
+                carry,
+                super::incoming_color::Body(row.text, row.forced.is_some())
+            ),
             rect,
             size,
             color,
@@ -420,14 +460,17 @@ fn body_row(
         return;
     }
     let mut x = rect.x;
-    let mut colour = row.carry;
+    let mut colour = carry;
     let mut rest = row.text;
     loop {
         let (run, after) = rest.split_at(rest.find(is_mark).unwrap_or(rest.len()));
         let tail = if after.is_empty() { ellipsis } else { "" };
         if !run.is_empty() || !tail.is_empty() {
             ui.text_fmt_aligned(
-                format_args!("{colour}{run}{tail}"),
+                format_args!(
+                    "{colour}{}{tail}",
+                    super::incoming_color::Body(run, row.forced.is_some())
+                ),
                 Rect::new(x, rect.y, (rect.right() - x).max(1.0), rect.height),
                 size,
                 color,
@@ -442,7 +485,9 @@ fn body_row(
                 TextFace::Regular,
                 row.spacing,
             );
-            colour = colour.after(run);
+            if row.forced.is_none() {
+                colour = colour.after(run);
+            }
         }
         let Some(mark) = after.chars().next() else {
             break;
@@ -475,7 +520,9 @@ fn row_box(g: &Geometry) -> f32 {
 /// EternalJK draws it: `CG_DrawCenterString` (JoF EJK `cg_draw.c:6985`) draws
 /// `ergoec` (`FONT_MEDIUM`) at scale `cg_centerSize`, and `ergoec`'s line is 22
 /// retail pixels (`mHeight`), which SJK Menu keeps (`text::retail_font::MENU`): 49.5
-/// px at 1080 lines, capitals about 29 px. Before 19/10/2026 it was 22 px.
+/// px at 1080 lines, capitals about 29 px. Before 19/10/2026 it was 22 px. The
+/// headline font draws it grown by [`crate::game_font::HEADLINE_GROWTH`], to the
+/// same capitals.
 pub(super) const CENTER_FONT_1080: f32 = 22.0 * 1080.0 / 480.0;
 
 /// Pitch of centre-print rows in 1080p pixels for `size`: EternalJK advances
@@ -577,6 +624,7 @@ mod tests {
         body_row(
             &mut ui,
             BodyRow {
+                forced: None,
                 text: &text,
                 carry,
                 marks: &marks,
@@ -700,6 +748,77 @@ mod tests {
         assert!(glyphs.iter().all(|colour| *colour == first));
     }
 
+    /// `cg_chatBoxOutline` edges the feed's and the field's letters in a dark outline,
+    /// eight copies round each in place of its shadow; the centre print keeps its
+    /// shadow, and with the setting off (the default) every letter keeps it.
+    #[test]
+    fn the_outline_replaces_the_shadow_in_the_feed_and_the_field_only() {
+        use crate::text::CodePalette;
+        let font = crate::text::test_font();
+        let viewport = [1920.0, 1080.0];
+        let built = |outline: bool| {
+            let mut chat = ChatOverlay::new();
+            chat.options.outline = outline;
+            let now = Instant::now();
+            chat.receive(ServerEventKind::Chat, "plain words".to_owned(), None, now);
+            chat.receive(ServerEventKind::CenterPrint, "centre".to_owned(), None, now);
+            chat.draft_for_shot("hi");
+            chat.build(true, &font, viewport, 1_000);
+            let palette_of = chat.palette_of();
+            let palettes: Vec<(String, CodePalette)> = chat
+                .ui
+                .draw_list()
+                .commands()
+                .iter()
+                .filter_map(|command| match command {
+                    DrawCommand::Text { text, .. } => {
+                        Some((chat.ui.stored_text(*text).to_owned(), palette_of(text.0)))
+                    }
+                    _ => None,
+                })
+                .collect();
+            let mut vertices = Vec::new();
+            chat.append_built(
+                &mut crate::game_font::GameFonts::default(),
+                &mut vertices,
+                &font,
+                viewport,
+            );
+            // Quads of each colour: six vertices a quad.
+            let quads = |rgb: [f32; 3]| {
+                vertices
+                    .iter()
+                    .filter(|vertex| vertex.colour()[..3] == rgb)
+                    .count()
+                    / 6
+            };
+            let shadows = quads([0.0, 0.0, 0.0]);
+            let rings = quads([0.04, 0.04, 0.06]);
+            (palettes, vertices.len() / 6, shadows, rings)
+        };
+        let palette = |palettes: &[(String, CodePalette)], text: &str| {
+            palettes
+                .iter()
+                .find(|(run, _)| run == text)
+                .unwrap_or_else(|| panic!("{text:?} in {palettes:?}"))
+                .1
+        };
+        let (palettes, all, shadows, rings) = built(false);
+        assert!(palettes.iter().all(|(_, p)| *p == CodePalette::Game));
+        assert_eq!((shadows * 2, rings), (all, 0), "a shadow a letter");
+        let (palettes, _, outlined_shadows, rings) = built(true);
+        for run in ["plain words", "hi"] {
+            assert_eq!(palette(&palettes, run), CodePalette::DarkOutlined, "{run}");
+        }
+        assert_eq!(palette(&palettes, "centre"), CodePalette::Game);
+        // Each outlined letter traded its shadow for eight ring copies.
+        assert_eq!(rings % 8, 0);
+        let outlined = rings / 8;
+        assert!(outlined >= "plainwordshi".len(), "{outlined}");
+        assert_eq!(outlined_shadows + outlined, shadows);
+        assert!(outlined_shadows >= "centre".len(), "the centre print's");
+    }
+
     #[test]
     fn switched_off_the_pictures_leave_their_blanks() {
         let (texts, pictures) = drawn_shown(&[":x:"], "hi :x: there", false, false);
@@ -804,5 +923,36 @@ mod tests {
         let (_, marks) = super::line_marks(line, &slots).expect("marks");
         assert!(marks.sjk && marks.mark.is_some());
         assert_eq!(marks.emoji, "x");
+    }
+
+    /// A centre print in the headline font (Fira Sans Condensed), rendered off screen
+    /// at 1080p and 4K, with `ui_gameFont` on and off (it draws the same either way).
+    #[test]
+    #[ignore = "renders with the GPU and the installed game data named by JKA_GAME_DATA"]
+    fn centre_print_shot() {
+        for (size, suffix) in [([1920, 1080], "1080p"), ([3840, 2160], "4k")] {
+            for game_font in ["1", "0"] {
+                crate::world_shot::on_big_stack(move || {
+                    let Some((mut gpu, _profile)) = crate::world_shot::open(
+                        "maps/mp/duel6.bsp",
+                        size,
+                        None,
+                        &[(crate::game_font::CVAR, game_font), ("cg_centertime", "60")],
+                    ) else {
+                        return;
+                    };
+                    gpu.chat.for_shot = true;
+                    gpu.chat.receive(
+                        ServerEventKind::CenterPrint,
+                        "^1You are the mark!\n^7Hunters: Solol, dart_mario 0123456789".to_owned(),
+                        None,
+                        Instant::now(),
+                    );
+                    let name = format!("centre-print-{suffix}-gamefont{game_font}");
+                    let path = crate::world_shot::shoot(&mut gpu, 10, &name);
+                    println!("{}", path.display());
+                });
+            }
+        }
     }
 }

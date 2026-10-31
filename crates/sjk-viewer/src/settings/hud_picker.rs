@@ -841,6 +841,17 @@ fn moved(command: DrawCommand, offset: [f32; 2]) -> Option<DrawCommand> {
             width,
             color,
         },
+        DrawCommand::Polygon {
+            points,
+            count,
+            color,
+            texture: None,
+        } => DrawCommand::Polygon {
+            points: points.map(point),
+            count,
+            color,
+            texture: None,
+        },
         DrawCommand::PushClip(rect) => DrawCommand::PushClip(shift(rect)),
         DrawCommand::PushRoundedClip { rect, radius } => DrawCommand::PushRoundedClip {
             rect: shift(rect),
@@ -853,6 +864,7 @@ fn moved(command: DrawCommand, offset: [f32; 2]) -> Option<DrawCommand> {
         | DrawCommand::TexturedQuad { .. }
         | DrawCommand::TexturedQuadUv { .. }
         | DrawCommand::TexturedQuadTurned { .. }
+        | DrawCommand::Polygon { .. }
         | DrawCommand::StrafeAura { .. }
         | DrawCommand::CardShine { .. }
         | DrawCommand::PushTransform(_)

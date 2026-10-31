@@ -3,7 +3,8 @@
 //! as the drone's pilot names are: projected over the point, hidden behind walls and far
 //! away.
 
-use super::{Here, Opening, ROLL};
+use super::hunt::Card;
+use super::{Here, Opening, ROLL, wire};
 use crate::GpuState;
 use glam::Vec3;
 use sjk_ui::{Color, DrawCommand, DrawList, FontWeight, Rect, TextAlign, TextId, TextOverflow};
@@ -16,6 +17,12 @@ const RANGE: f32 = 1_400.0;
 const FADE_FROM: f32 = 1_000.0;
 /// Most labels a frame: the boxes in view and the mark.
 const MOST: usize = 16;
+/// The box hunt's card at the top of the screen, in pixels at 1080 lines: its size and
+/// top, and how long it pulses as a new mark arrives.
+const CARD_WIDTH: f32 = 380.0;
+const CARD_HEIGHT: f32 = 66.0;
+const CARD_TOP: f32 = 56.0;
+const CARD_PULSE: f32 = 2.0;
 
 /// How a label's headline is coloured.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -61,7 +68,8 @@ pub(crate) struct Labels {
 impl Default for Labels {
     fn default() -> Self {
         Self {
-            list: DrawList::new(MOST * 4),
+            // Each label two lines over their shadows, and the hunt's card.
+            list: DrawList::new(MOST * 4 + 8),
             lines: Vec::new(),
         }
     }
@@ -80,7 +88,7 @@ pub(super) fn box_label(
         return Label {
             headline: "MYSTERY BOX".to_owned(),
             line: if free {
-                "Free roll: press Use".to_owned()
+                "Free roll".to_owned()
             } else {
                 format!("{price} credits")
             },
@@ -109,17 +117,32 @@ fn came_out(opening: &Opening, pays: impl Fn(&str) -> Option<u64>) -> Label {
         "double" => ("DOUBLE!", Tone::Win),
         "refund" => ("CREDITS BACK", Tone::Win),
         "empty" => ("EMPTY", Tone::Empty),
+        wire::EXPLODE => ("BOOM!", Tone::Jackpot),
+        wire::HOLOCRON => ("HOLOCRON!", Tone::Jackpot),
+        wire::SHARD_PILE => ("KYBER SHARDS", Tone::Win),
+        wire::AGAIN => ("FREE BOX!", Tone::Win),
+        wire::BLADE => ("MYSTERY BLADE!", Tone::Jackpot),
         _ if won > 0 => ("PRIZE", Tone::Win),
         _ => ("EMPTY", Tone::Empty),
     };
-    let mut line = if won > 0 {
-        format!("+{won} credits")
-    } else {
-        "Nothing inside".to_owned()
+    let tier = opening
+        .mine
+        .as_ref()
+        .and_then(|prize| prize.holocron.as_deref())
+        .and_then(crate::holocrons::name);
+    let shards = opening.mine.as_ref().and_then(|prize| prize.shards);
+    let line = match opening.outcome.as_str() {
+        wire::EXPLODE => "It blew up".to_owned(),
+        wire::HOLOCRON => tier.unwrap_or("A holocron").to_owned(),
+        wire::SHARD_PILE | wire::BLADE if shards.is_some() => {
+            format!("+{} kyber shards", shards.unwrap_or(0))
+        }
+        wire::SHARD_PILE => "A pile of kyber shards".to_owned(),
+        wire::AGAIN => "The next roll is free".to_owned(),
+        wire::BLADE => "The box's own saber shader".to_owned(),
+        _ if won > 0 => format!("+{won} credits"),
+        _ => "Nothing inside".to_owned(),
     };
-    if opening.mine.is_some() {
-        line.push_str(" - press Use to take it");
-    }
     Label {
         headline: headline.to_owned(),
         line,
@@ -213,18 +236,112 @@ impl GpuState {
                 }
             }
         }
+        if let Some(card) = self.mystery_boxes.hunt.card() {
+            let since = now.saturating_duration_since(card.since).as_secs_f32();
+            push_card(&mut self.mystery_boxes.labels, card, since, viewport, unit);
+        }
         if self.mystery_boxes.labels.list.commands().is_empty() {
             return;
         }
         let labels = &self.mystery_boxes.labels;
-        crate::ui_renderer::append_text_commands(
-            &labels.list,
-            |id| labels.lines.get(id.0 as usize).map_or("", String::as_str),
+        // In the headline font, as centre prints are (Inter until it loads).
+        let (vertices, font) = self.game_fonts.target(
+            crate::game_font::RetailFont::Headline,
             &mut self.text_vertices,
             &self.ui_font,
+        );
+        // The menus' lifted colours, so a black name reads on the dark card and plates.
+        crate::ui_renderer::append_text_commands_where(
+            &labels.list,
+            |id| labels.lines.get(id.0 as usize).map_or("", String::as_str),
+            |_, _| true,
+            vertices,
+            font,
             viewport,
             crate::text::TextStyle::NEUTRAL,
+            crate::text::CodePalette::Legible,
         );
+    }
+}
+
+/// What the box hunt's card says: a caption, then the mark's name, or that the player is
+/// the mark.
+fn card_words(card: &Card) -> (&'static str, String) {
+    if card.own {
+        ("BOX HUNT", "YOU ARE THE MARK".to_owned())
+    } else {
+        ("BOX HUNT \u{b7} THE MARK", format!("{}^7", card.name))
+    }
+}
+
+/// Push the box hunt's card, `since` seconds after it arrived: a dark plate edged in red
+/// at the top centre (red itself when the player is the mark), its edge flashing for
+/// [`CARD_PULSE`] seconds.
+fn push_card(labels: &mut Labels, card: &Card, since: f32, viewport: [f32; 2], unit: f32) {
+    let width = (CARD_WIDTH * unit).min(viewport[0]);
+    let height = CARD_HEIGHT * unit;
+    let rect = Rect::new((viewport[0] - width) * 0.5, CARD_TOP * unit, width, height);
+    let pulse = (1.0 - since / CARD_PULSE).clamp(0.0, 1.0);
+    let flash = pulse * (0.5 + 0.5 * (since * std::f32::consts::TAU * 2.0).cos());
+    let fill = if card.own {
+        Color::new(0.42, 0.05, 0.04, 0.88)
+    } else {
+        Color::new(0.06, 0.04, 0.04, 0.82)
+    };
+    let radius = 10.0 * unit;
+    let _ = labels.list.push(DrawCommand::RoundedRect {
+        rect,
+        radius,
+        color: fill,
+    });
+    let _ = labels.list.push(DrawCommand::Border {
+        rect,
+        radius,
+        width: (2.0 + 3.0 * flash) * unit,
+        color: Tone::Mark.colour(0.55 + 0.45 * flash),
+    });
+    let (caption, line) = card_words(card);
+    let id = labels.lines.len() as u32;
+    // Each line's shadow is the line without its colour codes, all of it dark.
+    let plain = crate::text::Plain(&line).to_string();
+    labels.lines.push(caption.to_owned());
+    labels.lines.push(line);
+    labels.lines.push(plain);
+    let pad = 14.0 * unit;
+    let small = 15.0 * unit;
+    let big = 28.0 * unit;
+    let top = rect.y + 7.0 * unit;
+    let rows = [
+        (top, small, id, id, Tone::Box.colour(1.0)),
+        (
+            top + small * 1.3,
+            big,
+            id + 1,
+            id + 2,
+            Color::new(1.0, 1.0, 1.0, 1.0),
+        ),
+    ];
+    for (y, size, text, shadow, colour) in rows {
+        for (offset, text, color) in [
+            (1.5 * unit, shadow, Color::new(0.0, 0.0, 0.0, 0.7)),
+            (0.0, text, colour),
+        ] {
+            let _ = labels.list.push(DrawCommand::Text {
+                rect: Rect::new(
+                    rect.x + pad + offset,
+                    y + offset,
+                    width - 2.0 * pad,
+                    size * 1.3,
+                ),
+                text: TextId(text),
+                size,
+                color,
+                align: TextAlign::Center,
+                overflow: TextOverflow::Ellipsis,
+                weight: FontWeight::Semibold,
+                letter_spacing: 0.0,
+            });
+        }
     }
 }
 
@@ -248,10 +365,12 @@ mod tests {
         Opening {
             started,
             outcome: outcome.to_owned(),
-            prize: prize(outcome, true),
+            prize: prize(outcome, true, None),
             seed: 0,
             mine,
+            opener: None,
             revealed: false,
+            blasted: false,
         }
     }
 
@@ -266,7 +385,7 @@ mod tests {
         );
         assert_eq!(
             box_label(&here(None), 100, true, pays, now).line,
-            "Free roll: press Use"
+            "Free roll"
         );
         let rolling = here(Some(opening("jackpot", None, now)));
         assert_eq!(
@@ -286,11 +405,12 @@ mod tests {
             price: 100,
             won: 200,
             balance: 300,
+            ..Prize::default()
         };
         let own = here(Some(opening("double", Some(mine), now)));
         assert_eq!(
             box_label(&own, 100, false, pays, later).line,
-            "+200 credits - press Use to take it"
+            "+200 credits"
         );
         let empty = here(Some(opening("empty", None, now)));
         let empty = box_label(&empty, 100, false, pays, later);
@@ -298,5 +418,55 @@ mod tests {
             (empty.headline.as_str(), empty.tone),
             ("EMPTY", Tone::Empty)
         );
+        // A box that blew up, and a holocron: the opener's names its tier.
+        let blown = here(Some(opening(wire::EXPLODE, None, now)));
+        let blown = box_label(&blown, 100, false, pays, later);
+        assert_eq!(
+            (blown.headline.as_str(), blown.line.as_str()),
+            ("BOOM!", "It blew up")
+        );
+        let found = Prize {
+            holocron: Some("rare".to_owned()),
+            ..Prize::default()
+        };
+        let found = here(Some(opening(wire::HOLOCRON, Some(found), now)));
+        let found = box_label(&found, 100, false, pays, later);
+        assert_eq!(found.headline, "HOLOCRON!");
+        assert!(found.line == "Rare Holocron", "{}", found.line);
+    }
+
+    #[test]
+    fn the_hunt_card_names_the_mark_or_tells_the_player_they_are_it() {
+        let card = |own| Card {
+            slot: 3,
+            name: "^1Ky^7le".to_owned(),
+            own,
+            since: Instant::now(),
+        };
+        let (caption, line) = card_words(&card(false));
+        assert!(caption.ends_with("THE MARK"));
+        // The name's colours do not run past it.
+        assert_eq!(line, "^1Ky^7le^7");
+        assert_eq!(card_words(&card(true)).1, "YOU ARE THE MARK");
+        // A plate, its edge, then two lines over their shadows, at the top centre.
+        let mut labels = Labels::default();
+        push_card(&mut labels, &card(false), 0.0, [1920.0, 1080.0], 1.0);
+        let commands = labels.list.commands();
+        assert_eq!(commands.len(), 6);
+        let DrawCommand::RoundedRect { rect, .. } = commands[0] else {
+            panic!("{:?}", commands[0]);
+        };
+        assert_eq!((rect.x + rect.width * 0.5, rect.y), (960.0, CARD_TOP));
+        // The edge is widest as the card arrives and settles once it has pulsed.
+        let edge = |since| {
+            let mut labels = Labels::default();
+            push_card(&mut labels, &card(false), since, [1920.0, 1080.0], 1.0);
+            match labels.list.commands()[1] {
+                DrawCommand::Border { width, .. } => width,
+                other => panic!("{other:?}"),
+            }
+        };
+        assert_eq!(edge(0.0), 5.0);
+        assert_eq!(edge(CARD_PULSE + 1.0), 2.0);
     }
 }

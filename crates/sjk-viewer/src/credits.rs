@@ -271,6 +271,8 @@ pub(crate) struct Panel {
     notice_y: f32,
     /// The SJK UI's look (`credits_sjk.rs`), else the classic one.
     sjk: bool,
+    /// The first section the SJK UI's rail shows when it has more than fit.
+    rail_first: usize,
     opened_at: f64,
     /// The clock at the last frame, for smooth scrolling.
     last_frame: f64,
@@ -323,6 +325,7 @@ impl Panel {
             content: 0.0,
             notice_y: 0.0,
             sjk: false,
+            rail_first: 0,
             opened_at: 0.0,
             last_frame: 0.0,
             ui: MenuCanvas::with_capacities(512, 384, 2_048),
@@ -343,6 +346,7 @@ impl Panel {
         self.folds.clear();
         self.laid_out_for = None;
         self.reveal = None;
+        self.rail_first = 0;
         self.opened_at = motion::seconds();
         emblem::request();
     }

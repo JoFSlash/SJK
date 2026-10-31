@@ -12,7 +12,10 @@ struct Camera {
 @group(1) @binding(6) var close_world_map: texture_depth_2d;
 struct Input { @location(0) position: vec3<f32>, @location(1) normal: vec3<f32> };
 struct Output {
-    @builtin(position) position: vec4<f32>, @location(0) world: vec3<f32>,
+    // Invariant: this pass redraws the world and tests for *equal* depth against what the
+    // stage program wrote. Without it a driver may round the position differently, so
+    // the shade misses a speckle of the floor that changes as the camera moves (#193).
+    @builtin(position) @invariant position: vec4<f32>, @location(0) world: vec3<f32>,
     @location(1) normal: vec3<f32>,
 };
 @vertex fn vertex(input: Input) -> Output {

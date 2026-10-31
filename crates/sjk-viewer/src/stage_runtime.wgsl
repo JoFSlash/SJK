@@ -153,6 +153,9 @@ fn entity_vertex(input: VertexInput, instance: InstanceInput, index: u32) -> Ver
     let disintegrate = (instance.view_flags >> 24u) & 3u;
     if disintegrate != 0u { disintegrate_vertex(&output, vertex, instance, disintegrate); }
     if (instance.view_flags & (1u << 26u)) != 0u { volumetric_vertex(&output, vertex.normal, instance); }
+    // Display-space `GL_DST_COLOR GL_ONE` (`DISPLAY_FILTER_ADD`, `body_fade.rs`): told to
+    // `stage_fragment` by entity_control.y = -1, which no forced-alpha test reads.
+    if (instance.view_flags & (1u << 27u)) != 0u { output.entity_control.y = -1.0; }
     // A secondary map view must not inherit the main camera's view weapon.
     if !instance_visible(instance) { output.position = vec4(2.0, 2.0, 2.0, 1.0); }
     return output;
@@ -385,8 +388,26 @@ fn stage_fragment(input: VertexOutput) -> vec4<f32> {
     if input.entity_control.x > 2.5 && input.entity_control.x < 3.5 && output.a < 0.5 {
         discard;
     }
+    // rd-vanilla blends `GL_DST_COLOR GL_ONE` on display values: the scene times one plus
+    // the stage's display colour. The scene here is linear, where that factor is the sRGB
+    // decode of (1 + display), extended past 1, so the stage writes that less one; blended
+    // as written, it would brighten the scene far less, leaving only the texture's
+    // brightest texels visible. An 8-bit scene (`r_sceneHdr 0`) clamps what is written
+    // to 1, so there a stage lifts the scene at most twice in linear light.
+    if input.entity_control.y < -0.5 {
+        let source = vec3(1.0) + max(stage_display_value(texel.rgb) * generated_color(input).rgb,
+            vec3(0.0));
+        output = vec4(pow((source + 0.055) / 1.055, vec3(2.4)) - vec3(1.0), output.a);
+    }
     if stage.secondary_control.w > 0.5 {
         output = vec4(output.rgb * (vec3(1.0) + dynamic_light_modulation(input)), output.a);
     }
     return output;
+}
+
+// The sRGB display value of linear `c`, as the stage's sRGB image held it.
+fn stage_display_value(c: vec3<f32>) -> vec3<f32> {
+    let unit = clamp(c, vec3(0.0), vec3(1.0));
+    return select(unit * 12.92, 1.055 * pow(unit, vec3(1.0 / 2.4)) - 0.055,
+        unit > vec3(0.0031308));
 }

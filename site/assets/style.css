@@ -527,8 +527,14 @@ h3 {
   .detail { order: -1; }
 }
 @media (max-width: 640px) {
-  .nav { justify-content: center; }
+  .nav { justify-content: center; padding-inline: 1rem; }
   .nav-brand { display: none; }
+  /* One line on phones: the links shrink with the screen and, on the very
+     narrowest, scroll sideways rather than wrap. */
+  .nav ul { flex-wrap: nowrap; gap: 0 clamp(0.5rem, 2.4vw, 1rem); max-width: 100%; overflow-x: auto; scrollbar-width: none; }
+  .nav ul::-webkit-scrollbar { display: none; }
+  .nav li { flex: none; }
+  .nav a { font-size: clamp(0.7rem, 3.3vw, 0.95rem); white-space: nowrap; }
   .ring { width: min(72vw, 320px); }
   .download { font-size: 1.25rem; padding: 0 1.5rem; }
 }

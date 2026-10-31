@@ -20,7 +20,6 @@ pub(crate) fn append(
         Some(font) => gpu.hud.nameplate.append(
             &gpu.chat,
             &power_icons,
-            &gpu.hud.icons,
             &mut gpu.classic_text_vertices,
             font,
             viewport,
@@ -28,7 +27,6 @@ pub(crate) fn append(
         None => gpu.hud.nameplate.append(
             &gpu.chat,
             &power_icons,
-            &gpu.hud.icons,
             &mut gpu.text_vertices,
             &gpu.ui_font,
             viewport,
@@ -54,6 +52,41 @@ pub(crate) fn append(
             &gpu.ui_font,
             viewport,
         );
+    }
+}
+
+/// Cut the head icon the nameplates want this frame, if any
+/// ([`hud::nameplate::State::head_to_cut`]): the icon of a model worn by a player
+/// without SJK, read from the game data, cut round and kept in the pictures' cache
+/// ([`crate::avatars::insert_local`]); without one their plate shows their initial.
+fn cut_nameplate_head(
+    nameplate: &mut hud::nameplate::State,
+    vfs: Option<&sjk_vfs::VirtualFileSystem>,
+    shaders: &sjk_shader::ShaderCatalog,
+    game: &sjk_protocol::GameState,
+) {
+    let Some((slot, key)) = nameplate.head_to_cut() else {
+        return;
+    };
+    if crate::avatars::has_local(key) {
+        return;
+    }
+    let Some(vfs) = vfs else {
+        return;
+    };
+    let model = game
+        .config_string(1131 + usize::from(slot))
+        .and_then(|info| sjk_client::LegacyClientInfo::new(info).bytes("model"))
+        .unwrap_or_default();
+    match hud::portrait::icon_path(model)
+        .and_then(|path| hud::icons::assets::decode(vfs, shaders, &path))
+    {
+        Some(icon) => {
+            let mut rgba = icon.into_raw();
+            crate::avatars::picture::round(&mut rgba, crate::ui_renderer::ICON_SIZE);
+            crate::avatars::insert_local(key, rgba);
+        }
+        None => nameplate.head_missing(slot, key, game),
     }
 }
 
@@ -187,6 +220,7 @@ pub(crate) fn update(
             plates_hidden,
             |logo| gpu.hud.icons.team_logo(logo),
         );
+        let mark = gpu.box_hunt_outlined();
         gpu.hud.team_outline.update(
             snapshot,
             session.game_state(),
@@ -194,6 +228,7 @@ pub(crate) fn update(
             i64::from(presentation_time),
             camera,
             plates_hidden,
+            mark,
         );
         let logo_tops = gpu.hud.team_logo.tops();
         gpu.hud.identification.set_logo_tops(logo_tops);
@@ -213,7 +248,11 @@ pub(crate) fn update(
         gpu.hud
             .nameplate
             .refresh_marks(i64::from(presentation_time), || {
-                player_identity::slot_marks(session.game_state())
+                let game_state = session.game_state();
+                (
+                    player_identity::slot_marks(game_state),
+                    player_identity::slot_pictures(game_state),
+                )
             });
         gpu.hud
             .nameplate
@@ -246,6 +285,12 @@ pub(crate) fn update(
                 .filter(|_| !detached_flight)
                 .map(|state| state.force_powers_active),
             plates_hidden,
+        );
+        cut_nameplate_head(
+            &mut gpu.hud.nameplate,
+            gpu.vfs.as_deref(),
+            &gpu.shaders,
+            session.game_state(),
         );
         gpu.hud.rocket_lock.update(
             hud::rocket_lock::input(
@@ -417,6 +462,7 @@ pub(crate) fn update(
             i64::from(presentation_time),
             camera,
             plates_hidden,
+            None,
         );
         let logo_tops = gpu.hud.team_logo.tops();
         gpu.hud.identification.set_logo_tops(logo_tops);
@@ -447,6 +493,12 @@ pub(crate) fn update(
             &mut gpu.trace_scratch,
             None,
             plates_hidden,
+        );
+        cut_nameplate_head(
+            &mut gpu.hud.nameplate,
+            gpu.vfs.as_deref(),
+            &gpu.shaders,
+            session.game_state(),
         );
         gpu.hud.rocket_lock.update(
             hud::rocket_lock::input(
@@ -647,6 +699,34 @@ pub(crate) fn update(
         .as_ref()
         .and_then(|_| gpu.local_prediction.guide_input());
     gpu.hud.restrict_guides(!japro, keys);
+    // The movement keys: the own command while playing, a guess while following or in
+    // a demo, with the map's floor under the player for a guessed jump.
+    let viewed = gpu
+        .live_session
+        .as_ref()
+        .map(|s| (s.latest_snapshot(), false))
+        .or_else(|| {
+            gpu.demo_session
+                .as_ref()
+                .map(|s| (s.snapshot_at_or_before(presentation_time), true))
+        });
+    if let Some((snapshot, demo)) = viewed {
+        let player = &snapshot.player;
+        let own = gpu
+            .local_prediction
+            .movement_keys_input()
+            .filter(|_| !demo && !hud::movement_keys::following(player));
+        let (bsp, scratch) = (&gpu.bsp, &mut gpu.trace_scratch);
+        gpu.hud
+            .movement_keys
+            .update(player, game, own, gpu.console.as_ref(), |origin| {
+                // `PM_GroundDistance2`: straight down 4096 units against solid map.
+                let mut end = origin;
+                end[2] -= 4096.0;
+                let trace = bsp.trace_box_with(scratch, origin, end, sjk_bsp::Aabb::POINT, 1);
+                Vec3::from_array(origin).distance(Vec3::from_array(trace.end_position))
+            });
+    }
     gpu.hud.guide_camera(
         view_target - view_position,
         view_up,

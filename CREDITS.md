@@ -78,6 +78,11 @@ includes:
 - the Tag toy: premade tags stuck on walls and floors, TF2 style, seen by every SJK
   player on the map, three free and the rest dropped by holocrons, with a Collection tab
   to choose them (27/10/2026);
+- the Banana peel toy (29/10/2026, after Kushina's idea): banana peels dropped on the
+  floor, or tossed ahead while running, that a player who has the toy on and walks onto
+  slips on, feet up, as a ragdoll; three a player, two minutes each, none by a spawn
+  point; the peel modelled and the slip sound synthesized by a script, nothing taken from
+  another game;
 - mystery boxes: boxes placed on maps through the hub, chests of SJK's own with glowing
   question marks, opened by players for credits to a music box tune of SJK's own while
   the roll slows to a stop on what came out, with a roll the hub makes and every SJK
@@ -97,6 +102,10 @@ includes:
 - medals, the recognition the SJK team gives players, on the scoreboard, the
   player card and the Identity page, with medal pictures generated and chosen by
   Sol;
+- card pictures drawn from the game (30/10/2026): a card naming a scene has its picture
+  drawn by SJK from the player's own Jedi Academy models (characters posed with their
+  sabers lit, weapons and items, Force powers and saber moves), kept on disk, so
+  nothing of the game is shipped or hosted;
 - medal ranks (27/10/2026): every medal held has a rank from I to V that the SJK
   team sets, each with its own look (Polished, Engraved, Holo, Solar) and a pip on
   the ribbon in small places, and Tester and Contributor named without "Early";
@@ -106,7 +115,8 @@ includes:
   the name since 22/10/2026); the {{S}} clan's tag with its red Sith emblem and
   JoF's green logo (22/10/2026);
 - holocron drops, loot boxes earned by playing: four tiers, drops announced in
-  the SJK chat and a Holocrons tab on the Profile screen with a 3D holocron;
+  the SJK chat and a Holocrons tab on the Profile screen with a 3D holocron; since
+  29/10/2026 the daily limit resets for everyone at 9:00, Paris time (Sol's decision);
 - opening holocrons: sealed cards (Normal, Holo and Solar finishes, the Alpha
   Edition) and credits, the ceremony and the Collection's Cards tab, and a loot
   table with every chance; credits will buy droppable cosmetics as a fix for bad
@@ -191,7 +201,8 @@ includes:
 - nameplates with estimated health, shield and Force, held-weapon and Force
   power icons, and player cards; then bars shared through the hub, shown only for
   players who share them (15/10/2026), and grey on SJK players who do not
-  (16/10/2026);
+  (16/10/2026); since 28/10/2026 capsules holding each player's picture, name and
+  weapon, with a sharer's bars on a tray under them;
 - 125 Hz user commands on the server's 8 ms grid (after JoF EJK's
   `cl_cmdratecap`) and a working `cl_maxpackets`; then the gameplay FPS, the
   movement of 125, 142, 250, 333 or any frame rate apart from the frames drawn,
@@ -252,7 +263,14 @@ includes:
   JoF tools (`jof.*`, completion of the JoF servers' commands);
 - JoF content (`jof.downloads`): JoF's maps, skins, hilts and packs downloaded from
   JoF's repository into SJK's own folder and checked by MD5, opt in, after JoF's
-  launcher;
+  launcher; the Sith cloud (`sith.cloud`), the S community's own maps, skins and
+  extras on the same card, and the SJK hub naming both collections' servers so they
+  can move or be switched off without a release; and their automatic updates
+  (`jof.contentAuto`, `sith.cloudAuto`, 31/10/2026), opt in, at start and every hour
+  for the groups the player marks Auto;
+- the News panel (`news`, 31/10/2026): release recaps and the SJK team's announcements in
+  one panel, with links into the UI only the SJK team writes, pictures and switches, and
+  announcing open to every staff member;
 - Mythical shader parts: the Sun's prominences, rising sparks, glints circling its
   blade below the tip and heat haze, the Void's orbiting black holes, warped space,
   gravity pulse and afterimages, the Spectral's wisps, souls, smoky edge, cold rim and swaying echo, each a part
@@ -379,6 +397,22 @@ includes:
   compiled with q3map2's `-external` load their `lm_NNNN.tga` pages instead of failing;
 - chat name actions (23/10/2026, after Bishop's and Sanjisan's ideas): a click on a
   player's name in the chat pins their card, to Whisper or Block them;
+- collection marks (29/10/2026, after Atrosex's and Kushina's ideas): the shader worn
+  marked in the Forge's Break down, on the Shaders tab and in the trade window, and said
+  first on the last copy's card; favourite shaders starred and listed first with a
+  Favourites filter, and locked ones the SJK hub never breaks down or trades until
+  unlocked, both kept at the hub; a New sticker on shaders gained since the player last
+  looked, kept on the PC;
+- the player card's Key only (29/10/2026, after Blep's idea): `cg_playerCard 2` opens
+  the card from the `inspect` key alone, never from a look;
+- three JoF EJK options (29/10/2026, after Kushina's idea): saber hit sparks
+  (`cg_fleshSparks`), a held mouse 4 or 5 repeating its bind (`in_mouseRepeat`, 20 times
+  a second at any frame rate) and the lagometer's numbers and speed graph
+  (`cg_lagometer` 2 and 3);
+- blade cost ranking (31/10/2026): `scripts/blade_cost.py` times every Legendary and
+  Mythical blade on the GPU and ranks them, and every blade change is timed against
+  `main` from now on; the top-tier blades then drawn about a quarter faster with the same
+  look (the blade's hiding worked out once per pixel, far lightning bolts skipped);
 - SJK Alpha (19/10/2026), the first collection of cards: the Mythical rarity, the
   Credits and Meme kinds, and card 1, "Bishop", honouring the author of JKR (art by
   Sol, AI-assisted: a rusted helmet portrait).
@@ -388,7 +422,7 @@ includes:
 Creyon and Lumaya wear the SJK team's Contributor medal, shown on their
 cards of the in-game credits page.
 
-Creyon ([Creyon94](https://github.com/Creyon94)), contributor and tester, has 58
+Creyon ([Creyon94](https://github.com/Creyon94)), contributor and tester, has 73
 pull requests merged into SJK, most of them bringing SJK in line with EternalJK
 ([all of them](https://github.com/Sol-Vulpes/SJK/pulls?q=is%3Apr+author%3ACreyon94)):
 
@@ -468,6 +502,26 @@ pull requests merged into SJK, most of them bringing SJK in line with EternalJK
   game or from the main menu; the request card, the trade window with what each side is
   worth, Ready and Confirm, the daily limits with their reset clock, the resale countdown
   on a traded holocron and the window's size setting;
+- #230 black sabers (JA+'s colour 11): a black chip in Profile > Saber, black blades in the
+  menu and in game, on SJK's own server too, as JoF EJK draws them (hub report #130);
+- #231 the cardboard box with the free camera, and a boxed player drawn crouched in the
+  box while the server stands them up to talk (hub report #152);
+- #232 a limp body (Ragdoll toy) stays in sight from the free camera, which flies freely
+  while limp;
+- #210 the first to confirm a trade sees the swap at once: the list that first shows it
+  done reads the profile and holocron progress;
+- #211 a trade refusal shown once, not again at every map change: the trade state goes on
+  to the next map's world;
+- #238 exclusive fullscreen minimises to the taskbar on Alt+Tab and Win+D, as SDL does in
+  OpenJK (hub report #131);
+- #239 a blocked player's chat stays out of the console as out of the chat box, and the
+  console's kill lines name them BLOCKED (hub report #191);
+- #269 Red, Green and Blue sliders in Profile > Character for a model that can be
+  coloured, shown on the stage at once, as JoF EJK's profile has them;
+- #259 chat tabs: an Admin (`amsay`) button and key, a PM button for replies, the
+  buttons chosen in Settings, and a tab showing only its channel while you type;
+- #275 JoF EJK's movement keys (`cg_movementKeys`), lit from the own command or guessed
+  from a followed player's state, in jaPRO's pictures where installed;
 - #102 a formatting fix that unblocked every pull request's checks.
 - the Saber ideas page, whose concepts became the Tidal, Circuit, Aurora, Echo, Nebula,
   Cinder, Venom, Sakura and Firefly blades, and the twelve that followed (Slate, Amber,
@@ -477,8 +531,17 @@ pull requests merged into SJK, most of them bringing SJK in line with EternalJK
   the Neon, Peppermint, Soap Bubble, Lava Lamp, Reactor and Bleeding Kyber blades, and
   its next seven the Sketch, Hourglass, Fiber Optic, Serpent, Monarch, Phoenix and Quantum
   blades, and its last three the Comic, Quicksilver and Obsidian Edge blades.
+- #297 Blade core thickness (`cg_saberCoreSize`, 0.5 to 2): the white core of every lit
+  blade drawn thinner or bolder, its glow unchanged, after the #ideas recap of 29/10/2026.
+- #296 day and night follow the PC's clock (`r_dayClock`): the sun moves with Sun and sky
+  on; without it the world darkens and the sky turns to night, in the SJK and Vanilla
+  presets too.
+- #289 every toy says its name and ON in green or OFF in red when switched, and `toy_help`
+  lists every toy with what it does, after Blep's idea.
+- #320 hide chosen chat GIFs on this PC, with a Hidden tab in the GIF picker to show them
+  again.
 
-Lumaya ([lumayaa](https://github.com/lumayaa)), contributor, has 52 pull requests
+Lumaya ([lumayaa](https://github.com/lumayaa)), contributor, has 83 pull requests
 merged into SJK
 ([all of them](https://github.com/Sol-Vulpes/SJK/pulls?q=is%3Apr+author%3Alumayaa)):
 
@@ -588,8 +651,28 @@ merged into SJK
 - #195 (with #196) the wall-grab camera no longer comes loose on stock servers when a snapshot
   catches up, JA+'s free look kept; `cg_wallGrabLock` (off) locks it there too and faces the
   wall. At the merge the facing runs only with the option on.
+- #249-#276 prediction audit against codemp, checked against JA+ (JoF EJK) and jaPRO (TaystJK) sources:
+  the server's game type (#249), surrounding players and NPCs (#250), the zero-gravity push-off (#251),
+  the trigger hull (#254), input frozen while carried (#261), the gesture (#262), vehicle riders' blaster
+  and weapons (#263, #264), rocket locking (#265, #268), moving brush contents (#270), passengers without
+  a predicted vehicle (#276), and the audit's record in networking.md (#271).
+- #277 the first jaPRO prediction layer: race-mode command slicing and velocity precision
+  from TaystJK, only on servers that advertise jaPRO.
+- #252-#273 the rest of the prediction audit: frozen view on a command-history gap (#252),
+  saber-lock facing (#253), the respawn jump latch (#260), the dual jump-attack hull (#266),
+  the equipped saber definitions (#267) and remote vehicle hulls (#273).
+- #279, #282, #284 jaPRO prediction from TaystJK: movement-style acceleration and friction,
+  style jumps and only-bhop, and the new jetpack, only on servers that advertise jaPRO.
+- #305, #307, #308 the prediction regression audit: all 25 prediction PRs of 29/10 checked
+  against an original JA+ server, and the two that broke dual jump attacks and joining
+  (#266, #251) backed out; #313 then gave each of the 25 its reason; #314 makes duplicate
+  saber names follow the original game's file order.
+- #312 Copy IP in both server browsers (and Ctrl+C), and `copyServerIP` for the server you
+  are on: the address and port only, never a password.
+- #315 All chat colour (`cg_chatColor`): public All chat in one colour of your choice.
+- #274 each predicted rider and vehicle leaves out its own pilot or chassis, as in OpenJK.
 
-Lukas ([LukasMoudry](https://github.com/LukasMoudry)), contributor, has 18 pull requests
+Lukas ([LukasMoudry](https://github.com/LukasMoudry)), contributor, has 19 pull requests
 merged into SJK
 ([all of them](https://github.com/Sol-Vulpes/SJK/pulls?q=is%3Apr+author%3ALukasMoudry)):
 
@@ -628,9 +711,13 @@ merged into SJK
   a private duel or always, duels included; the holocron still waits for the game menu. At the
   merge a card that comes during a duel waits for the duel's end instead of being dropped.
 - #198 "Too many open files" after a long session: the Profile menu's model icons, cosmetics and
-  Force templates let go of the previous map's game files (its PK3 reopening part held back).
+  Force templates let go of the previous map's game files (its PK3 reopening part held back);
+  its second part raises the open-file limit on Mac and Linux, lets cancelled map loads let go
+  of their game files sooner, and logs how many game-file sets are still held.
+- #304 a free spectator sees the name of the player under the crosshair and follows them
+  with a left click; a click on nobody does what it did.
 
-Slash ([JoFSlash](https://github.com/JoFSlash)), contributor, has 43 pull requests merged
+Slash ([JoFSlash](https://github.com/JoFSlash)), contributor, has 79 pull requests merged
 into SJK ([all of them](https://github.com/Sol-Vulpes/SJK/pulls?q=is%3Apr+author%3AJoFSlash)):
 
 - #114 Tab completes the cfg file argument of `exec`, `execq`, `writeconfig` and `write`
@@ -713,6 +800,71 @@ into SJK ([all of them](https://github.com/Sol-Vulpes/SJK/pulls?q=is%3Apr+author
 - #220 screenshots are written opaque, so tinted skins keep their colour.
 - #221 the in-game menu's Leave page no longer draws its name over the arc.
 - #223 the DEMP2 alt fire's shock bubble, as `FX_DEMP2_AltDetonate` draws it.
+- #226 each saber swing is heard once across a combo's end: no extra swing after it, no
+  silent first swing of the next (hub report #171), as the cues hand over between the
+  predicted and the server's animation.
+- #225 the jetpack's fuel bar after JoF EJK's `CG_DrawJetpackFuel`, shown only while it burns
+  and at the HUD scale; the jetpack flies on SJK's own server as stock (`tryJetPack`), and
+  the `jetpack` cheat gives or takes one.
+- #227 the credits page's section rail stays clear of Expand all: rows draw closer as
+  sections are added, and past ten a still window with dots for the hidden ones.
+- #237 the site's top nav on one line on phones.
+- #242 a shader named twice in one script keeps its first definition, as rd-vanilla's
+  `FindShaderInShaderText`: oot's sand floor drawn lit again (hub reports #175, #177).
+- #234 Tab completes `sjkemote`'s emote ids, through a table of client commands whose
+  first argument completes.
+- #235 the world cleared to the map's global fog colour, as rd-vanilla clears: taspir1's
+  sky is its fog (hub reports #179, #180, #184).
+- #233 the emote volume reaches emotes already playing: the emote channel's gain is
+  `s_emoteVolume` (hub report #188).
+- #240 the Low FPS card chooses nothing on Space or D and takes no input for 0.6 s after
+  it opens (hub report #194).
+- #241 synced emote music back from alt-tab starts at the sample its group plays (hub
+  report #195).
+- #243 the hosted server refills Force at `g_forceRegenTime`, and in private duels at
+  EternalJK's `g_saberDuelForceRegenTime`, both handed to it at launch.
+- #244 going away leaves a JA+ emote the player chose alone, and `cg_debugEmoteEnd` to
+  catch what ends one (hub report #196).
+- #245 the light side's body fade glow blends as rd-vanilla's display-space
+  `GL_DST_COLOR GL_ONE` (hub report #190).
+- #246 the sun shadow receiver's position `@invariant` for its equal depth test, the
+  likely cause of floors flickering with light shafts (hub report #193).
+- #256 the chat card's Block for this map and Block for all buttons take their click.
+- #257 the mod notice takes no input for 0.6 s after it opens, and Space no longer closes it.
+- #258 encrypted whispers from a player blocked for the map or by staff stay out.
+- #248 slider peek: a held Settings slider fades the rest of the menu away over a match
+  (Blep's idea).
+- #272 Blue, Yellow, Red, Dual Sabers and Staff Master: 50 duels won with the saber in
+  each style (Dante's idea).
+- #255 the console key opens the console over the chat composer, which keeps its draft,
+  as stock (`con_overChat` turns it off).
+- #280 a Name outline setting for nameplates (`cg_nameplateOutline`): Off, Faint (the
+  default, as before) or Strong, every name ringed dark, after Lex's idea.
+- #281 Radial HUD spacing and height sliders (`cg_hudRadialSpread`, `cg_hudRadialHeight`)
+  move the radial HUD's meters apart and up or down, after Lex's idea.
+- #283 laptops with two graphics cards: sjk.exe asks NVIDIA and AMD drivers for the fast
+  card, tries the other cards when one cannot open, and says why when none starts.
+- #286 `fs_restart` mounts the game files again without restarting SJK: new PK3s and the
+  asset browser's pack choices reach the menus and the next map, after Blep's idea.
+- #310 joining the game while following a player: the join menu and the match card read your
+  own team, not the followed player's (hub report #207, Jaykmeit).
+- #294 No glow on sabers (`r_dynamicGlowNoSabers`): the dynamic glow leaves saber blades
+  and their trails out, after g0dchris' idea.
+- #293 the quick wheel's custom commands remembered under Your own in Settings > Quick
+  wheel, kept when the default pages are restored, after Dante's idea.
+- #288 `config.cfg` edited or deleted while the game runs is no longer written over with
+  the old name, field of view and camera at exit (hub report #199).
+- #290 every Settings search result takes a typed value, not only the first hundred (hub
+  report #203).
+- #291 the mouse wheel in Collection > Shaders scrolls past the tiers' headings (hub report
+  #201).
+- #298 no away emote while riding a vehicle, which broke its animations (hub report #205).
+- #309 Force templates keep Force Speed on saber-only servers: free saber skills come from the
+  server's own word, as in the original game (hub report #206).
+- #299 a Change name button on the SJK Profile tab (hub report #202, Nib).
+- #322 holding the melee kick no longer freezes it on its last frame.
+- #323 no `fakenoclip` or `freecam` in duels, where JoF's servers spared the player all
+  damage (hub report #209).
 
 His Peek work in #199 (closed 24/10/2026, not merged) shaped the Drone toy: a player is
 asked before being peeked, told who watches, and can end it. His #206 (closed 25/10/2026,
@@ -741,6 +893,11 @@ serves it to every SJK player in the `sjk_solfox` pack (16/10/2026), so anyone m
 wear it and SJK players see it on each other. Reyced keeps the rights to the model;
 it is distributed with his permission and is not part of SJK's code or its licence.
 
+Blep, a player, drew the Gonk, EZ and Geyon tags (Geyon for Creyon) and proposed them
+in the Discord's #tag-proposals; Sol picked them (30/10/2026), and the SJK hub serves
+them to every SJK player in the `sjk_tags` pack. Blep keeps the rights to them; they
+are not part of SJK's code or its licence.
+
 ## Ideas
 
 Kushina, a player, sent Sol the idea of a blossom blade (15/10/2026): a locked blossom
@@ -748,6 +905,16 @@ palette with pink as its main colour, light purple and white mist, afterimages m
 falling blossoms like the Spectral's, and a branch with a flower where the blade starts
 (and one day a wooden hilt). Sol built it as the Varykino Blossom, a Mythical saber shader
 (blade 166, 21/10/2026), with all of it but the hilt, which waits for custom hilts.
+Kushina also asked for JA+ and jaPRO plugin options she would not have to type as a
+`cp_pluginDisable` number: Sol built them as Settings switches named after each feature,
+with JoF EJK's `plugin` command (29/10/2026). She asked too for three JoF EJK options that
+players coming from EJK rely on: Sol built them as `cg_fleshSparks`, `in_mouseRepeat` (at
+20 presses a second rather than with the frame rate) and `cg_lagometer` 2 and 3
+(29/10/2026). Her idea of a banana peel toy, peels that players slip on, Sol approved and
+built as the Banana peel (29/10/2026): opted-in players who walk onto a peel slip and fall
+as ragdolls.
+Kushina asked for a way back to 2026.1028.1's prediction for players who preferred it:
+Sol built it as Settings > Game options > Prediction and `cg_predictLegacy` (31/10/2026).
 
 Turin, a player, asked for private messages to be heard with the public chat sounds off:
 Sol built chat sounds by kind, each with its own sound (23/10/2026).
@@ -761,12 +928,41 @@ built it as the pinned chat card's Whisper button (23/10/2026).
 Nib, a player, asked to choose the saber sounds apart from the saber shader (18/10/2026,
 and hub report #109): Sol built it as the Saber tab's Sounds row (23/10/2026).
 
+Dante, a player, asked for the quick wheel's custom commands to be remembered in the
+command list once made, and for duels won in each saber style to count as achievements:
+Slash built the first (#293, 30/10/2026), Sol the style masters (29/10/2026).
+
+g0dchris, a player, asked for the dynamic glow on everything but the sabers, whose glow
+hid the blades' details: Slash built it as No glow on sabers (#294, 30/10/2026).
+
+Blep, a player, asked for the player card to come only from the `inspect` key, not from
+looking at a player: Sol built it as Key only, `cg_playerCard 2` (29/10/2026). Blep
+also asked for every toy to say when it is switched on or off: Creyon built it (#289,
+30/10/2026), each toy's name and ON in green or OFF in red.
+
+Atrosex, a player, asked for the Forge's Break down to mark the saber shader the player
+wears, and its last copy's card to say plainly that it is worn; Kushina asked for favourite
+shaders and a lock against breaking one down by mistake. Sol built both as collection marks
+(29/10/2026): Worn, a star and a padlock on every listed shader, the lock held by the SJK
+hub (breaking down and trading refused), and a New sticker on what was gained since the
+player last looked.
+
+Creo, a player, found the chat often hard to read over bright maps, with vanilla graphics
+too: Sol built two Settings > Chat options for it (29/10/2026), Chat backdrop
+(`cg_chatBoxBackdrop`), a dark band behind each row of the chat as long as its words, and
+Chat text outline (`cg_chatBoxOutline`), a dark edge round every letter instead of its
+shadow.
+
 ## Testing
 
 Glen, a player, was the first to play SJK on a Mac (25/10/2026), on a MacBook Pro
 with Apple Silicon, and reported that the game aborted on choosing fullscreen, its
 frame rate on Metal and that Cmd+Tab did not work. Sol kept macOS to borderless
-fullscreen after that crash report (25/10/2026).
+fullscreen after that crash report (25/10/2026). Glen then reported fullscreen
+showing the game as a small window in the middle of a black screen (29/10/2026):
+the client asked the fullscreen window for the `r_resolution` size. Glen's frame
+rate once fullscreen worked led to `r_highDpi` (29/10/2026): on a Mac, window sizes
+and the world's resolution count the screen's points, as in EternalJK.
 
 Blep, a player, reported that a whisper ending with a backslash left unencrypted
 through the game server; Sol fixed it (26/10/2026).
@@ -787,7 +983,10 @@ Mono by The JetBrains Mono Project Authors, keeps its
 fonts, Rajdhani by the Indian Type Foundry and Exo 2 by the Exo 2 Project Authors (Natanael
 Gama), keep theirs ([Rajdhani](crates/sjk-viewer/assets/fonts/Rajdhani-OFL.txt),
 [Exo 2](crates/sjk-viewer/assets/fonts/Exo2-OFL.txt); Exo 2's static weights are instances
-of its variable font, unchanged otherwise), Noto Sans JP, SC and KR by Adobe and Google,
+of its variable font, unchanged otherwise), the headline font of centre prints and the
+words in the world, Fira Sans Condensed by the Mozilla Foundation and Telefonica S.A., keeps
+its [SIL Open Font License](crates/sjk-viewer/assets/fonts/FiraSansCondensed-OFL.txt)
+(SemiBold and Bold, subset with fontTools to Windows-1252, unchanged otherwise), Noto Sans JP, SC and KR by Adobe and Google,
 which draw kana, kanji, hanzi and Hangul, keep their
 [SIL Open Font License](crates/sjk-viewer/assets/fonts/NotoSansJP-OFL.txt) (subset with
 fontTools to kana, kanji, CJK punctuation and full-width forms, to the GB 2312 hanzi Noto

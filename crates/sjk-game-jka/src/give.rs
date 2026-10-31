@@ -6,6 +6,7 @@
 //! waits on items. The `weapons` driver hands its shooter the blaster and the bowcaster
 //! this way, so the whole-game transcript's dumps hold `give`'s results.
 
+use crate::holdables::{HI_JETPACK, Packs};
 use crate::userinfo::atoi;
 use sjk_protocol::PlayerState;
 
@@ -16,6 +17,9 @@ const STAT_ARMOR: usize = 5;
 const STAT_MAX_HEALTH: usize = 8;
 /// `HI_NUM_HOLDABLE`.
 const HOLDABLES: u32 = 12;
+/// `playerState_t::jetpackFuel`, and a full tank.
+const PS_JETPACK_FUEL: usize = 39;
+const FULL_TANK: u32 = 100;
 /// `LAST_USEABLE_WEAPON`: `WP_BRYAR_OLD`.
 const LAST_USEABLE_WEAPON: u32 = 16;
 /// `AMMO_BLASTER..AMMO_MAX`.
@@ -40,6 +44,23 @@ pub enum Given {
     Done,
     /// The name is an item's, which is spawned and touched in the reference: not ported.
     Item,
+}
+
+/// SJK's `jetpack` cheat (stock has none; `give all` holds one among everything): the
+/// jetpack given with a full tank, or taken away switched off with the tank full again,
+/// so its fuel bar goes with it. Returns the line the player is printed.
+pub fn toggle_jetpack(state: &mut PlayerState, packs: &mut Packs) -> &'static [u8] {
+    let bit = 1 << HI_JETPACK;
+    state.stats[STAT_HOLDABLE_ITEMS] ^= bit;
+    state.set_raw_field(PS_JETPACK_FUEL, FULL_TANK);
+    if state.stats[STAT_HOLDABLE_ITEMS] & bit != 0 {
+        b"print \"jetpack ON
+\""
+    } else {
+        packs.jetpack_on = false;
+        b"print \"jetpack OFF
+\""
+    }
 }
 
 /// `G_Give` for `name` with `arguments` (the words after it; `argc == 3` means exactly
@@ -101,4 +122,44 @@ pub fn give(state: &mut PlayerState, health: &mut i32, name: &[u8], arguments: &
         }
     }
     if all { Given::Done } else { Given::Item }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn the_jetpack_cheat_gives_and_takes_the_jetpack_with_a_full_tank() {
+        let mut state = PlayerState::default();
+        let mut packs = Packs::default();
+        state.stats[STAT_HOLDABLE_ITEMS] = 1 << 5;
+        state.set_raw_field(PS_JETPACK_FUEL, 30);
+        assert_eq!(
+            toggle_jetpack(&mut state, &mut packs),
+            b"print \"jetpack ON\n\""
+        );
+        assert_eq!(
+            state.stats[STAT_HOLDABLE_ITEMS],
+            (1 << 5) | (1 << HI_JETPACK)
+        );
+        assert_eq!(state.raw_field(PS_JETPACK_FUEL), Some(FULL_TANK));
+        // Taken away while burning: switched off, and the tank full so no bar stays.
+        packs.jetpack_on = true;
+        state.set_raw_field(PS_JETPACK_FUEL, 40);
+        assert_eq!(
+            toggle_jetpack(&mut state, &mut packs),
+            b"print \"jetpack OFF\n\""
+        );
+        assert_eq!(state.stats[STAT_HOLDABLE_ITEMS], 1 << 5);
+        assert_eq!(state.raw_field(PS_JETPACK_FUEL), Some(FULL_TANK));
+        assert!(!packs.jetpack_on);
+    }
+
+    #[test]
+    fn give_all_holds_the_jetpack() {
+        let mut state = PlayerState::default();
+        let mut health = 100;
+        assert_eq!(give(&mut state, &mut health, b"all", &[]), Given::Done);
+        assert_ne!(state.stats[STAT_HOLDABLE_ITEMS] & (1 << HI_JETPACK), 0);
+    }
 }

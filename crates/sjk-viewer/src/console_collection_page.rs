@@ -132,6 +132,15 @@ impl ViewerConsole {
             PanelAction::SeeAndShare(on) => {
                 self.set_cvar("cg_nameplate", if on { "1" } else { "0" });
             }
+            PanelAction::NameplateStyle(style) => {
+                self.set_cvar(
+                    crate::hud::nameplate::STYLE_CVAR,
+                    &style.value().to_string(),
+                );
+            }
+            PanelAction::ToySight { cvar, seen } => {
+                self.set_cvar(cvar, if seen { "1" } else { "0" });
+            }
             PanelAction::ShaderView(grid) => {
                 self.set_cvar(
                     super::collection_panel::SHADER_VIEW_CVAR,
@@ -140,6 +149,12 @@ impl ViewerConsole {
             }
             PanelAction::Bind { command, key } => self.rebind_action(command, 0, &key),
             PanelAction::Unbind(command) => self.clear_action(command, 0),
+            PanelAction::Mark { id, mark, on } => {
+                // The snapshot shows it at once; the hub's answer (or refusal) follows.
+                let _ = crate::player_identity::with_service(|service| {
+                    service.set_mark(id, mark, on);
+                });
+            }
             PanelAction::Illuminate(on) => {
                 self.pending_illuminate = Some(on);
                 // The page shows it at once; the viewer applies it next frame.
@@ -176,6 +191,10 @@ impl ViewerConsole {
             PanelAction::BoxHunt(on) => {
                 self.pending_box_hunt = Some(on);
                 self.box_hunt_on = on;
+            }
+            PanelAction::Banana(on) => {
+                self.pending_banana = Some(on);
+                self.banana_on = on;
             }
             PanelAction::ChooseTag(id) => {
                 self.set_cvar(crate::tags::CVAR, id);
@@ -289,6 +308,16 @@ impl ViewerConsole {
         self.pending_box_hunt.take()
     }
 
+    /// The viewer says whether the Banana peel is on, once a frame.
+    pub(crate) fn set_banana_on(&mut self, on: bool) {
+        self.banana_on = on;
+    }
+
+    /// The Toys tab asked to turn the Banana peel on (`true`) or off, once.
+    pub(crate) fn take_banana_request(&mut self) -> Option<bool> {
+        self.pending_banana.take()
+    }
+
     /// Give a pressed key to the open page; false when the page is closed.
     pub(super) fn collection_panel_key(&mut self, event: &KeyEvent) -> bool {
         if !self.collection_panel.is_open() {
@@ -331,11 +360,11 @@ impl ViewerConsole {
 
     /// The stock blade's colour, from `color1`, for its swatch.
     fn stock_blade(&self) -> sjk_ui::Color {
+        // The whole number, as the game reads it: a black blade's 11 read as 1 (orange).
         let index = self
             .text_value("color1")
-            .map(str::trim)
-            .and_then(|value| value.get(..1))
-            .and_then(|digit| digit.parse::<u8>().ok())
+            .map(|value| sjk_client::split_color_value(value).0)
+            .and_then(|colour| u8::try_from(colour).ok())
             .unwrap_or(4);
         crate::player_menu::saber_color(index, [255, 255, 255])
     }
@@ -366,6 +395,7 @@ impl ViewerConsole {
         let boombox = self.boombox_on;
         let monitor = self.monitor_on;
         let box_hunt = self.box_hunt_on;
+        let banana = self.banana_on;
         let stock = self.stock_blade();
         // Tiles unless the list is chosen (`ui_shaderList 1`).
         let grid = self.integer_cvar(super::collection_panel::SHADER_VIEW_CVAR) != Some(1);
@@ -374,6 +404,8 @@ impl ViewerConsole {
         } else {
             Vec::new()
         };
+        let toys_unseen =
+            super::collection_panel::toys_unseen(|cvar| crate::toy_sight::seen(Some(self), cvar));
         let options = self
             .text_cvar(crate::saber_skin_options::CVAR)
             .unwrap_or_default()
@@ -396,6 +428,10 @@ impl ViewerConsole {
         };
         let enabled = self.bool_cvar("cl_identity") == Some(true);
         let share = crate::hud::nameplate::see_and_share(self);
+        let nameplate_style = crate::hud::nameplate::Style::of(
+            self.integer_cvar(crate::hud::nameplate::STYLE_CVAR)
+                .unwrap_or(0),
+        );
         let snapshot =
             crate::player_identity::collection_snapshot(crate::debug_collectibles::wanted(self));
         let held = snapshot
@@ -424,6 +460,7 @@ impl ViewerConsole {
                 boombox,
                 monitor,
                 box_hunt,
+                banana,
                 name: &name,
                 stock,
                 grid,
@@ -431,7 +468,9 @@ impl ViewerConsole {
                 second: &second,
                 pair,
                 share,
+                nameplate_style,
                 toy_keys: &toy_keys,
+                toys_unseen,
                 tag: &tag,
             };
             self.collection_panel.append_sjk(&inputs, target, viewport);
@@ -454,6 +493,7 @@ impl ViewerConsole {
             boombox,
             monitor,
             box_hunt,
+            banana,
             name: &name,
             stock,
             grid,
@@ -461,7 +501,9 @@ impl ViewerConsole {
             second: &second,
             pair,
             share,
+            nameplate_style,
             toy_keys: &toy_keys,
+            toys_unseen,
             tag: &tag,
         };
         self.collection_panel.append_sjk(&inputs, target, viewport);
@@ -486,7 +528,9 @@ impl ViewerConsole {
     }
 
     /// Give the Forge what the hub said this frame, read the shop when it asks, and take a
-    /// shader whose last copy was just broken down off the saber when it is worn.
+    /// shader whose last copy was just broken down off the saber when it is worn: the
+    /// first saber goes back to the stock blade, and since 29/10/2026 a second saber (or the
+    /// staff's other half) wearing it by its own choice too.
     fn follow_forge(&mut self, enabled: bool, snapshot: Option<&sjk_identity::Snapshot>) {
         let known = snapshot.is_some_and(|snapshot| snapshot.economy.is_some());
         self.collection_panel.set_trade_known(known);
@@ -502,10 +546,27 @@ impl ViewerConsole {
         {
             let _ = crate::player_identity::read_shop();
         }
-        if let Some(id) = self.collection_panel.take_forge_unequip()
-            && self.text_cvar(SABER_SKIN_CVAR).is_ok_and(|worn| worn == id)
+        // The History tab's read (31/10/2026), asked by its last frame.
+        if let Some(before) = self.collection_panel.take_history_ask()
+            && !crate::player_identity::read_history(before)
         {
-            crate::unlockables::wear(self, "");
+            self.collection_panel.history_not_sent();
+        }
+        // A star or a padlock the hub refused (29/10/2026): said once; the hub's marks
+        // come back with its next answer.
+        if let Some(words) = self.collection_panel.take_mark_refusal(snapshot) {
+            self.push_log(format!("^3Collection: {words}"));
+        }
+        if let Some(id) = self.collection_panel.take_forge_unequip() {
+            if self
+                .text_cvar(crate::looks::SECOND_CVAR)
+                .is_ok_and(|worn| worn.trim() == id)
+            {
+                let _ = self.set_cvar(crate::looks::SECOND_CVAR, crate::looks::STOCK_SECOND);
+            }
+            if self.text_cvar(SABER_SKIN_CVAR).is_ok_and(|worn| worn == id) {
+                crate::unlockables::wear(self, "");
+            }
         }
     }
 
@@ -527,6 +588,22 @@ impl ViewerConsole {
         data: Option<super::collection_panel::forge::ForgeData>,
     ) {
         self.collection_panel.preview_forge(data);
+    }
+
+    /// Show `state` on the History tab in place of the identity's (`None` lets go), for
+    /// a world shot.
+    #[cfg(test)]
+    pub(crate) fn preview_history(
+        &mut self,
+        state: Option<std::sync::Arc<sjk_identity::HistoryState>>,
+    ) {
+        self.collection_panel.preview_history(state);
+    }
+
+    /// Open or close the History tab's row `index` and choose it, for a world shot.
+    #[cfg(test)]
+    pub(crate) fn history_activate_for_shot(&mut self, index: usize) {
+        self.collection_panel.history_activate_for_shot(index);
     }
 
     /// Show the Forge's `section`, for a world shot.
@@ -555,6 +632,19 @@ impl ViewerConsole {
     #[cfg(test)]
     pub(crate) fn forge_search_for_shot(&mut self, query: &str, only: bool) {
         self.collection_panel.forge_search_for_shot(query, only);
+    }
+
+    /// Light Break down's Favourites chip (or not), for a world shot.
+    #[cfg(test)]
+    pub(crate) fn forge_favourites_for_shot(&mut self, on: bool) {
+        self.collection_panel.forge_favourites_for_shot(on);
+    }
+
+    /// Choose shader `id` on Break down and ask before its last copy goes, for a world
+    /// shot.
+    #[cfg(test)]
+    pub(crate) fn forge_ask_last_for_shot(&mut self, id: &str) {
+        self.collection_panel.forge_ask_last_for_shot(id);
     }
 
     /// Show `unlocks` (`None`: the live ones) whenever the page opens, its swatches drawn
@@ -620,6 +710,12 @@ impl ViewerConsole {
         self.collection_panel.tilt_card_for_shot(key, at);
     }
 
+    /// Choose the Toys tab's toy `index` (0 Illuminate), for a world shot.
+    #[cfg(test)]
+    pub(crate) fn collection_toy_for_shot(&mut self, index: usize) {
+        self.collection_panel.choose_toy_for_shot(index);
+    }
+
     /// Show the hover card of the Collection tab's thing `index`, for a world shot.
     #[cfg(test)]
     pub(crate) fn collection_hover_for_shot(&mut self, index: Option<usize>) {
@@ -630,6 +726,13 @@ impl ViewerConsole {
     #[cfg(test)]
     pub(crate) fn collection_trade_for_shot(&mut self, known: bool) {
         self.collection_panel.trade_known_for_shot(known);
+    }
+
+    /// Show `marks` (worn, favourite, locked, New) on the Shaders tab and the Forge in
+    /// place of the live ones (`None` lets go), for a world shot.
+    #[cfg(test)]
+    pub(crate) fn collection_marks_for_shot(&mut self, marks: Option<crate::shader_marks::Marks>) {
+        self.collection_panel.marks_for_shot(marks);
     }
 
     /// Hold the Shaders tab's lone saber turned so (`None` lets go), for a world shot.
@@ -665,6 +768,22 @@ impl ViewerConsole {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// #230's review: Collection's stock-blade swatch read only the first digit of
+    /// `color1`, so a black blade (11) showed orange (1).
+    #[test]
+    fn the_stock_blade_swatch_reads_the_whole_colour() {
+        let directory = tempfile::tempdir().unwrap();
+        let mut console = ViewerConsole::new(directory.path().join("config.cfg")).unwrap();
+        for (value, index) in [("11", 11), ("1", 1), ("6", 6), ("4", 4)] {
+            console.set_cvar("color1", value);
+            assert_eq!(
+                console.stock_blade(),
+                crate::player_menu::saber_color(index, [255, 255, 255]),
+                "{value}"
+            );
+        }
+    }
 
     #[test]
     fn the_page_opens_alone_and_its_actions_set_the_cvars_and_ask_for_the_holocron() {

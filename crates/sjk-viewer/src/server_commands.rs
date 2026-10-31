@@ -138,7 +138,14 @@ pub(crate) fn consume_messages(
         }
     }
     for event in events {
-        if let Some(console) = &mut console {
+        let text = localization.translate(&event.text);
+        // A blocked player's chat stays out of the console and its alerts, as it stays
+        // out of the chat box (hub report #191).
+        let blocked = matches!(
+            event.kind,
+            sjk_client::ServerEventKind::Chat | sjk_client::ServerEventKind::TeamChat
+        ) && chat.sent_by_muted(&text, event.sender);
+        if !blocked && let Some(console) = &mut console {
             console.notify_server_text(&event.kind, &event.text);
         }
         if event.kind == sjk_client::ServerEventKind::Print
@@ -146,7 +153,6 @@ pub(crate) fn consume_messages(
         {
             duel_starts.push(event.text.clone());
         }
-        let text = localization.translate(&event.text);
         if let Some(console) = &mut console {
             console.log_chat(&event.kind, &text);
         }
@@ -175,7 +181,7 @@ pub(crate) fn consume_messages(
             sjk_client::ServerEventKind::Chat | sjk_client::ServerEventKind::TeamChat => {
                 let own_whisper = chat.own_whisper_body(&event.kind, &text, event.sender);
                 let private = event.is_private;
-                if let Some(console) = &mut console {
+                if !blocked && let Some(console) = &mut console {
                     console.push_chat_line(
                         sjk_client::chat_display_text(&text),
                         &text,

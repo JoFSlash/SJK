@@ -68,6 +68,12 @@ pub(crate) fn in_knockdown(legs_anim: u16, legs_timer: i32) -> bool {
         || legs_timer != 0 && (matches!(legs_anim, 1_224..=1_228 | 1_231..=1_236 | 1_238..=1_246))
 }
 
+/// TaystJK `BG_InKnockDown(anim)` for jaPRO: includes FORCE_GETUP_B6 (1237),
+/// excludes the crouched get-up (1238), and does not inspect the legs timer.
+pub(crate) fn knockdown_animation(legs_anim: u16) -> bool {
+    matches!(legs_anim, 1_219..=1_228 | 1_231..=1_237 | 1_239..=1_246)
+}
+
 /// The block, before anything else `PM_Weapon` does. Returns whether the weapon code
 /// is done for this command (a pose held), as the reference's `return` has it.
 pub(crate) fn hand_extend(

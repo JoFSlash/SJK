@@ -15,6 +15,10 @@ pub(crate) const COPY_COLORS_CVAR: &str = "con_copyColors";
 /// Archived switch: Shift plus the console key opens to `con_height` and
 /// Shift+Escape a quarter screen; off, EternalJK's way round.
 pub(crate) const SHIFT_HEIGHT_CVAR: &str = "con_shiftHeight";
+/// Archived switch, on by default: the console key opens the console over the chat
+/// composer, which keeps its draft, as stock (`console_key_leaves_chat`); off, the
+/// composer takes the key as it did before 29/10/2026 (Sol's request on PR #255).
+pub(crate) const OVER_CHAT_CVAR: &str = "con_overChat";
 
 /// How the console looks and behaves (`con_style`).
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
@@ -148,6 +152,13 @@ pub(super) fn register(cvars: &mut CvarRegistry) -> Result<(), sjk_shell::CvarEr
         CvarFlags::ARCHIVE,
         "Shift+console opens to con_height and Shift+Escape a quarter screen (off: the \
          other way round, after EternalJK)",
+    ))?;
+    cvars.register(CvarDefinition::new(
+        OVER_CHAT_CVAR,
+        true,
+        CvarFlags::ARCHIVE,
+        "The console key opens the console over the chat while you type, keeping your \
+         message (off: the chat takes the key)",
     ))?;
     for (name, value, help) in [
         ("con_notifylines", 3_i64, "Maximum visible notify lines"),
@@ -303,6 +314,18 @@ mod tests {
         drop(console);
         let console = ViewerConsole::new(path).unwrap();
         assert_eq!(console.bool_cvar(SHIFT_HEIGHT_CVAR), Some(true));
+    }
+
+    #[test]
+    fn console_over_chat_is_on_by_default_and_saved() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("config.cfg");
+        let mut console = ViewerConsole::new(path.clone()).unwrap();
+        assert_eq!(console.bool_cvar(OVER_CHAT_CVAR), Some(true));
+        assert!(console.set_cvar(OVER_CHAT_CVAR, "0"));
+        drop(console);
+        let console = ViewerConsole::new(path).unwrap();
+        assert_eq!(console.bool_cvar(OVER_CHAT_CVAR), Some(false));
     }
 
     /// The registered default, a saved `classic` from before `auto` existed and

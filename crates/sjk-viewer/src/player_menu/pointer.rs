@@ -184,6 +184,15 @@ impl PlayerMenu {
         token: u16,
         pointer_x: f32,
     ) -> bool {
+        // The model's colour sliders on the Character page (`model_rgb.rs`).
+        if let Some(channel) = self.model_channel(usize::from(token)) {
+            let Some(rect) = self.canvas.rect_for(token) else {
+                return false;
+            };
+            let ratio = Self::sjk_slider_ratio(rect, pointer_x);
+            self.set_model_channel(channel, (ratio * 255.0).round() as u8);
+            return true;
+        }
         if self.page != ProfilePage::Saber {
             return false;
         }

@@ -11,7 +11,9 @@
 //!
 //! The cache holds [`SLOTS`] pictures, the ones used least recently making room; one
 //! more cell holds the preview of a picture the player is about to upload
-//! ([`set_preview`]).
+//! ([`set_preview`]). Pictures made on this PC share it: the nameplates' head icons of
+//! players without SJK, cut round ([`insert_local`]). A screen that draws many pictures
+//! a frame asks for them all under one lock ([`textures`]).
 
 pub(crate) mod picture;
 pub(crate) mod store;
@@ -50,6 +52,21 @@ struct Slot {
     used: u64,
     /// The renderer whose atlas holds it.
     uploaded_into: Option<u64>,
+    /// A picture made on this PC ([`insert_local`]), by its key: never asked of the
+    /// worker, its key id and version left empty so no hub picture matches it.
+    local: Option<u64>,
+}
+
+/// A picture a screen wants ([`textures`]).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub(crate) enum Wanted<'a> {
+    /// None.
+    #[default]
+    Nothing,
+    /// A player's picture at the hub: their key id and its version.
+    Hub(&'a str, &'a str),
+    /// A picture made on this PC, by the key it was kept under ([`insert_local`]).
+    Local(u64),
 }
 
 /// What the worker is asked.
@@ -146,6 +163,7 @@ impl Avatars {
             state: State::Loading,
             used: frame,
             uploaded_into: None,
+            local: None,
         };
         if index == self.slots.len() {
             self.slots.push(slot);
@@ -168,6 +186,41 @@ impl Avatars {
             .filter(|(_, slot)| slot.used + 1 < self.frame)
             .min_by_key(|(_, slot)| slot.used)
             .map(|(index, _)| index)
+    }
+
+    /// The texture of the picture made on this PC under `key`, once it is in the current
+    /// renderer's atlas; `None` until then and when it is not kept (made room for).
+    fn local_texture(&mut self, key: u64) -> Option<TextureId> {
+        let index = self.slots.iter().position(|slot| slot.local == Some(key))?;
+        let (frame, renderer) = (self.frame, self.renderer);
+        let slot = &mut self.slots[index];
+        slot.used = frame;
+        (slot.uploaded_into.is_some() && slot.uploaded_into == renderer)
+            .then(|| slot_texture(index))
+    }
+
+    /// Keep `rgba` as the picture made on this PC under `key` ([`insert_local`]).
+    fn insert_local(&mut self, key: u64, rgba: Vec<u8>) {
+        let size = sjk_identity::avatar::SIZE as usize;
+        if rgba.len() != size * size * 4 || self.slots.iter().any(|slot| slot.local == Some(key)) {
+            return;
+        }
+        let Some(index) = self.room() else {
+            return;
+        };
+        let slot = Slot {
+            key_id: String::new(),
+            version: String::new(),
+            state: State::Ready(rgba.into()),
+            used: self.frame,
+            uploaded_into: None,
+            local: Some(key),
+        };
+        if index == self.slots.len() {
+            self.slots.push(slot);
+        } else {
+            self.slots[index] = slot;
+        }
     }
 
     /// Ask the worker for slot `index`'s picture, starting it the first time.
@@ -238,6 +291,7 @@ impl Avatars {
             state: State::Ready(preview),
             used: self.frame,
             uploaded_into: None,
+            local: None,
         };
         if index == self.slots.len() {
             self.slots.push(slot);
@@ -273,6 +327,31 @@ impl Avatars {
 /// picture asks the worker for it.
 pub(crate) fn texture(key_id: &str, version: &str) -> Option<TextureId> {
     lock().texture(key_id, version)
+}
+
+/// [`texture`] for each of `wanted` (and the pictures made on this PC), under one lock:
+/// for a screen that draws many a frame, the nameplates.
+pub(crate) fn textures<const N: usize>(wanted: &[Wanted<'_>; N]) -> [Option<TextureId>; N] {
+    let mut avatars = lock();
+    wanted.map(|wanted| match wanted {
+        Wanted::Nothing => None,
+        Wanted::Hub(key_id, version) => avatars.texture(key_id, version),
+        Wanted::Local(key) => avatars.local_texture(key),
+    })
+}
+
+/// Whether a picture made on this PC is kept under `key` ([`insert_local`]), shown yet
+/// or not.
+pub(crate) fn has_local(key: u64) -> bool {
+    lock().slots.iter().any(|slot| slot.local == Some(key))
+}
+
+/// Keep `rgba` ([`sjk_identity::avatar::SIZE`] square, already cut round) as a picture
+/// made on this PC under `key`, such as a model's head icon: it takes a cell as a hub
+/// picture does (none while every cell holds a picture on screen) and gives it up the
+/// same way, after which the screen makes it again. Nothing when one is kept under `key`.
+pub(crate) fn insert_local(key: u64, rgba: Vec<u8>) {
+    lock().insert_local(key, rgba);
 }
 
 impl Avatars {
@@ -509,6 +588,7 @@ mod tests {
                 },
                 used: 1,
                 uploaded_into: Some(7),
+                local: None,
             });
         }
         avatars.drop_missing();
@@ -564,6 +644,37 @@ mod tests {
         assert_eq!(avatars.slots[0].key_id, key(99));
         assert!(matches!(avatars.slots[0].state, State::Loading));
         assert_eq!(inbox.try_iter().count(), SLOTS + 1);
+    }
+
+    /// A picture made on this PC is never asked of the worker, matches no hub picture,
+    /// shows once uploaded, is kept once, and gives up its cell like the others.
+    #[test]
+    fn a_picture_made_here_shares_the_cells_and_asks_nobody() {
+        let size = sjk_identity::avatar::SIZE as usize;
+        let (mut avatars, inbox) = cache();
+        assert_eq!(avatars.local_texture(5), None, "not kept");
+        avatars.insert_local(5, vec![9; size * size * 4]);
+        avatars.insert_local(5, vec![1; size * size * 4]);
+        avatars.insert_local(6, vec![1; 3]);
+        assert_eq!(
+            avatars.slots.len(),
+            1,
+            "kept once, and only a whole picture"
+        );
+        assert!(inbox.try_recv().is_err(), "nothing asked");
+        assert_eq!(avatars.local_texture(5), None, "not uploaded yet");
+        avatars.slots[0].uploaded_into = Some(7);
+        assert_eq!(avatars.local_texture(5), Some(slot_texture(0)));
+        // No hub picture is it.
+        assert_eq!(avatars.texture(&key(0), &version(0)), None);
+        assert_eq!(avatars.slots[0].local, Some(5));
+        // Off screen for two frames, it makes room.
+        avatars.frame += 2;
+        for n in 0..SLOTS as u64 {
+            avatars.texture(&key(n), &version(1));
+        }
+        assert!(avatars.slots.iter().all(|slot| slot.local.is_none()));
+        assert_eq!(avatars.local_texture(5), None);
     }
 
     #[test]

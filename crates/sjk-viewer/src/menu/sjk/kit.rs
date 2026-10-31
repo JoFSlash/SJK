@@ -550,12 +550,16 @@ pub(crate) fn cycler(
 }
 
 /// Colour chips across `rect`, one circle centred in each equal share of it
-/// (so a click's share is its chip), the `active` one ringed gold.
+/// (so a click's share is its chip), the `active` one ringed gold. A chip with a
+/// non-empty entry in `labels` carries that word (the saber page's custom chip says
+/// "RGB"), dark on a light chip and light on a dark one.
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn chips(
     canvas: &mut MenuCanvas,
     frame: &Frame,
     rect: [f32; 4],
     colours: &[Color],
+    labels: &[&str],
     active: usize,
     focused: bool,
 ) {
@@ -591,6 +595,19 @@ pub(crate) fn chips(
             [centre - size * 0.5, middle - size * 0.5, size, size],
             *colour,
         );
+        if let Some(label) = labels.get(index).filter(|label| !label.is_empty()) {
+            let light = 0.2126 * colour.r + 0.7152 * colour.g + 0.0722 * colour.b > 0.5;
+            text(
+                canvas,
+                TextFamily::Body,
+                format_args!("{label}"),
+                frame.rect(centre - size * 0.5, middle - size * 0.5, size, size),
+                size * 0.36 * frame.s,
+                if light { color::SPACE } else { color::TEXT },
+                FontWeight::Semibold,
+                TextAlign::Center,
+            );
+        }
     }
 }
 

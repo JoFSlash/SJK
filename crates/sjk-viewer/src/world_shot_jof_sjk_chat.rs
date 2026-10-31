@@ -1,6 +1,7 @@
 //! World shots of SJK chat on JoF servers (`docs/mods.md`, "SJK chat on JoF servers")
 //! over duel6: the notice card over the game menu, and the in-play chat box with an
-//! ALL/SJK line, SJK-only lines (one from JoF EternalJK, with its icon) and an All line,
+//! ALL/SJK line, SJK-only lines (one from JoF EternalJK and one from the SJK Launcher,
+//! each with its icon) and an All line,
 //! then with the composer open on the SJK channel and its red note. Off-screen renders
 //! (no game window), ignored like the other world shots: they need a GPU adapter and the
 //! installed game data named by `JKA_GAME_DATA`.
@@ -113,6 +114,12 @@ fn duel6_jof_sjk_chat_feed() {
         all.push(message(2, "^5Milamber", "hello from JoF EternalJK", "ejk"));
         all.push(message(
             3,
+            "^2Jaden",
+            "hello from the SJK Launcher",
+            "launcher",
+        ));
+        all.push(message(
+            4,
             "^3Lumaya",
             "SJK chat only, from the menus",
             "sjk",

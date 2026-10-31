@@ -144,6 +144,8 @@ pub(super) fn command(command: &str, values: Option<&Values>, time: LocalTime) -
         (ChatDestination::Global, 1)
     } else if name.eq_ignore_ascii_case("say_team") {
         (ChatDestination::Team, 1)
+    } else if name.eq_ignore_ascii_case("amsay") {
+        (ChatDestination::Admin, 1)
     } else if name.eq_ignore_ascii_case("tell") && tokens.len() >= 3 {
         let Ok(slot) = tokens[1].parse::<u16>() else {
             return command.to_owned();

@@ -824,6 +824,40 @@ pub(crate) fn slot_marks(game_state: &GameState) -> SlotMarks {
 /// Each slot's mark after its nameplate's name ([`slot_marks`]).
 pub(crate) type SlotMarks = [Option<sjk_ui::TextureId>; MAX_CLIENTS];
 
+/// The pictures of the SJK players on this server, by slot, for their nameplates: each
+/// one whose claim names the name the game shows there, and the local player's own slot
+/// from their profile. A slot the hub knows nobody in is `None`: its nameplate shows the
+/// model's head icon.
+pub(crate) fn slot_pictures(game_state: &GameState) -> crate::hud::nameplate::SlotPictures {
+    use crate::hud::nameplate::SlotPicture;
+    let mut pictures = [None; MAX_CLIENTS];
+    let runtime = lock();
+    let Some(service) = runtime.service.as_ref() else {
+        return pictures;
+    };
+    service.with_snapshot(|snapshot| {
+        for player in snapshot
+            .players
+            .iter()
+            .filter(|player| usize::from(player.slot) < MAX_CLIENTS)
+            .filter(|player| {
+                shown_name(game_state, usize::from(player.slot))
+                    .is_some_and(|shown| sjk_identity::names_match(&player.claimed_name, &shown))
+            })
+        {
+            pictures[usize::from(player.slot)] =
+                SlotPicture::new(&player.key_id, &player.avatar, &player.name);
+        }
+        if let Some(me) = snapshot.me.as_ref()
+            && let Ok(own) = usize::try_from(game_state.client_num)
+            && own < MAX_CLIENTS
+        {
+            pictures[own] = SlotPicture::new(&snapshot.key_id, &me.avatar, &me.name);
+        }
+    });
+    pictures
+}
+
 /// How long the hub's list of sharers stays good without a new answer: a little over
 /// the life of its entries.
 const SHARED_FRESH: Duration = Duration::from_secs(6);
@@ -1117,6 +1151,13 @@ pub(crate) fn buy(id: &str) -> bool {
 /// started. They arrive in the snapshot's `shop`.
 pub(crate) fn read_shop() -> bool {
     with_service(Service::read_shop).is_some()
+}
+
+/// Ask the hub for a page of the player's history: the newest (`None`) or the one before
+/// `before`; false when the service has not started. It arrives in the snapshot's
+/// `history`.
+pub(crate) fn read_history(before: Option<i64>) -> bool {
+    with_service(|service| service.read_history(before)).is_some()
 }
 
 /// What became of the last reveal of sealed cards, if the service has started.

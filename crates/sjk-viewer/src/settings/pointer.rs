@@ -11,6 +11,13 @@ impl SettingsMenu {
         console: &mut ViewerConsole,
     ) -> SettingsResult {
         let was_searching = self.searching;
+        // Letting go (or leaving the window) ends a slider's hold.
+        if matches!(
+            event,
+            InputEvent::PointerRelease { .. } | InputEvent::PointerLeave
+        ) {
+            self.peek.release(std::time::Instant::now());
+        }
         self.usage.recording = true;
         let result = self.pointer(event, console);
         self.usage.recording = false;
@@ -94,6 +101,7 @@ impl SettingsMenu {
                 self.settle_numeric(console);
             }
             self.press_elsewhere(self.setting_row(token));
+            self.arm_peek(console, token, event.position);
         }
         if event.kind == UiEventKind::Activate {
             if let Some(row) = crate::menu_widgets::numeric::value_row(token) {
@@ -195,8 +203,8 @@ impl SettingsMenu {
                         return SettingsResult::OpenIdentity;
                     } else if matches!(setting.kind(), ValueKind::AssetBrowser) {
                         return SettingsResult::OpenAssets;
-                    } else if matches!(setting.kind(), ValueKind::JofContent) {
-                        return SettingsResult::OpenJofContent;
+                    } else if matches!(setting.kind(), ValueKind::ContentCard) {
+                        return SettingsResult::OpenContent(setting.cvar);
                     } else if matches!(setting.kind(), ValueKind::ImportPage) {
                         return SettingsResult::OpenImport;
                     } else if matches!(setting.kind(), ValueKind::GameplayFps) {
@@ -217,6 +225,35 @@ impl SettingsMenu {
             }
         }
         SettingsResult::None
+    }
+
+    /// A press on token `token` at `position`: on a slider's control in the
+    /// SJK UI, over a match, with Slider peek on, the hold that peeks begins
+    /// ([`super::slider_peek`]). A press on its typed number does not.
+    fn arm_peek(&mut self, console: &ViewerConsole, token: u16, position: Option<sjk_ui::Vec2>) {
+        let row = usize::from(token);
+        let on_control = matches!(
+            (self.sjk_controls, position),
+            (Some(controls), Some(point)) if point.x >= controls
+        );
+        let slider = self.shows_row(row)
+            && self.rows().get(row).is_some_and(|setting| {
+                matches!(
+                    setting.kind(),
+                    ValueKind::Integer { .. } | ValueKind::Float { .. }
+                )
+            });
+        let enabled = console.bool_cvar(super::slider_peek::CVAR) != Some(false);
+        if self.peek_world && on_control && slider && enabled && !self.popup() {
+            self.peek.press(row, std::time::Instant::now());
+        } else {
+            self.peek.release(std::time::Instant::now());
+        }
+    }
+
+    /// Whether `row` is a row of the screen on show.
+    fn shows_row(&self, row: usize) -> bool {
+        row < self.rows().len() && self.shows(row)
     }
 
     /// Which way a click at `x` turns row `row`: a cycler steps the way the

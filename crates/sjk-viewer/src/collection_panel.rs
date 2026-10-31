@@ -41,8 +41,14 @@ mod cards;
 pub(crate) mod forge;
 #[path = "collection_forge_view.rs"]
 mod forge_view;
+#[path = "collection_history.rs"]
+pub(crate) mod history;
+#[path = "collection_history_view.rs"]
+mod history_view;
 #[path = "collection_hover.rs"]
 mod hover;
+#[path = "collection_marks_view.rs"]
+mod marks_view;
 #[path = "collection_medals.rs"]
 mod medals;
 #[path = "collection_nameplates.rs"]
@@ -61,7 +67,7 @@ mod toys;
 mod view;
 
 pub(crate) use spin::SaberTurn;
-pub(crate) use toys::COMMANDS as TOY_COMMANDS;
+pub(crate) use toys::{COMMANDS as TOY_COMMANDS, unseen as toys_unseen};
 pub(crate) use view::{MODEL_AREA, SABER_AREA, row_labels};
 
 /// The things' tokens: the medals, the achievements, the shaders' rows, the shader's
@@ -70,7 +76,13 @@ pub(crate) use view::{MODEL_AREA, SABER_AREA, row_labels};
 /// `duel6_sjk_forge_drawn_swatches_fit`).
 pub(crate) const DRAW_COMMANDS: usize = 4_096;
 const MEDAL_BASE: u16 = 1_200;
-const ACHIEVEMENT_BASE: u16 = 1_240;
+/// The achievements' medallions (6000 to 6199, room to grow; at 1240 they ran into the
+/// toys' tokens past 60) and the board's pages' switch.
+const ACHIEVEMENT_BASE: u16 = 6_000;
+const ACHIEVEMENT_PAGE_BASE: u16 = 6_200;
+const _: () = assert!(
+    ACHIEVEMENT_BASE as usize + crate::achievements::ALL.len() <= ACHIEVEMENT_PAGE_BASE as usize
+);
 /// The shaders' rows have a range of their own, 7000 to 7299, for a catalogue of up
 /// to 299 skins (the stock blade is row 0).
 const SHADER_BASE: u16 = 7_000;
@@ -83,6 +95,8 @@ fn ui_cues_click() {
 const WEAR_TOKEN: u16 = 1_300;
 const TOY_TOKEN: u16 = 1_310;
 const TOY_SWITCH_TOKEN: u16 = 1_311;
+/// The chosen toy's card's second switch: other players' toy seen or not.
+const TOY_SIGHT_TOKEN: u16 = 1_305;
 /// The cardboard box's niche on Toys (Illuminate's is [`TOY_TOKEN`]).
 const BOX_TOKEN: u16 = 1_314;
 /// Order 66's niche on Toys.
@@ -99,6 +113,8 @@ const BOOMBOX_TOKEN: u16 = 1_307;
 const MONITOR_TOKEN: u16 = 1_303;
 /// Box hunt's niche on Toys.
 const BOX_HUNT_TOKEN: u16 = 1_304;
+/// The Banana peel's niche on Toys.
+const BANANA_TOKEN: u16 = 1_375;
 /// The Shaders tab's lone saber, where the pointer takes hold of it to turn it.
 const SABER_TOKEN: u16 = 1_316;
 /// The shader card's way to the Forge: Craft in the Forge (one not held) or Break down
@@ -106,6 +122,8 @@ const SABER_TOKEN: u16 = 1_316;
 const FORGE_LINK_TOKEN: u16 = 1_317;
 /// The Nameplates tab's See and share nameplates switch.
 const SHARE_TOKEN: u16 = 1_319;
+/// The Nameplates tab's style choices, one per [`crate::hud::nameplate::Style`].
+const STYLE_BASE: u16 = 1_380;
 /// The target switch over the lone saber: the first saber (or half), the second (1_303,
 /// 1_304, 1_307 and 1_308 are the Monitor's, Box hunt's, the Boombox's and the Drone's).
 const TARGET_FIRST_TOKEN: u16 = 1_301;
@@ -115,8 +133,8 @@ const BOTH_TOKEN: u16 = 1_306;
 /// How far (frame pixels) a press on the lone saber may move and still be a click.
 const CLICK_SLOP: f32 = 6.0;
 /// The toys the Toys tab shows: Illuminate, the cardboard box, Order 66, the Hax, the
-/// Ragdoll, the Drone, the Boombox, the Monitor, then Box hunt.
-const TOY_COUNT: usize = 9;
+/// Ragdoll, the Drone, the Boombox, the Monitor, Box hunt, then the Banana peel.
+const TOY_COUNT: usize = 10;
 /// Each toy's row, in the order of [`Panel::toy`].
 const TOY_TOKENS: [u16; TOY_COUNT] = [
     TOY_TOKEN,
@@ -128,6 +146,7 @@ const TOY_TOKENS: [u16; TOY_COUNT] = [
     BOOMBOX_TOKEN,
     MONITOR_TOKEN,
     BOX_HUNT_TOKEN,
+    BANANA_TOKEN,
 ];
 /// Each toy row's own switch (25/10/2026): it turns that toy on or off in place.
 const TOY_SWITCH_BASE: u16 = 1_360;
@@ -135,6 +154,11 @@ const TOY_SWITCH_BASE: u16 = 1_360;
 /// second (the key that executes the order).
 const BIND_TOKEN: u16 = 1_370;
 const BIND_SECOND_TOKEN: u16 = 1_371;
+/// The chosen shader's star and padlock on the Shaders tab's card (29/10/2026, collection
+/// marks), and Mark all seen beside the New count.
+const FAVOURITE_TOKEN: u16 = 1_372;
+const LOCK_TOKEN: u16 = 1_373;
+const SEEN_ALL_TOKEN: u16 = 1_374;
 /// The Shaders tab's view switches: the list and the wall of tiles.
 const LIST_VIEW_TOKEN: u16 = 1_312;
 const GRID_VIEW_TOKEN: u16 = 1_313;
@@ -186,6 +210,11 @@ const SEARCH_TOKEN: u16 = 7_311;
 const FILTER_CHROMA_TOKEN: u16 = 7_312;
 const SORT_BASE: u16 = 7_313;
 const _: () = assert!(SORT_BASE as usize + ShaderSort::ALL.len() < CARD_BASE as usize);
+/// The favourites-only chip (29/10/2026, collection marks).
+const FILTER_FAVOURITE_TOKEN: u16 = 7_320;
+const _: () =
+    assert!(SORT_BASE as usize + ShaderSort::ALL.len() <= FILTER_FAVOURITE_TOKEN as usize);
+const _: () = assert!(FILTER_FAVOURITE_TOKEN < CARD_BASE);
 /// The most characters a search holds.
 const SEARCH_MAX: usize = 24;
 /// The tiers the Forge's chips filter by, after All, the commonest first, as its Craft
@@ -216,28 +245,39 @@ const STRIP_TIERS_WITH_UNIQUE: [unlockables::Rarity; 6] = [
     unlockables::Rarity::Common,
 ];
 
-/// What the Shaders tab lists: a tier, the shaders held only, the chromas only, and words
-/// of a name (or a tier) or a blade's number the search names. The stock blade is always
-/// the first row.
+/// What the Shaders tab lists: a tier, the shaders held only, the chromas only, the
+/// favourites only (29/10/2026), and words of a name (or a tier) or a blade's number the
+/// search names. The stock blade is always the first row.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub(super) struct ShaderFilter {
     pub(super) tier: Option<unlockables::Rarity>,
     pub(super) owned: bool,
     pub(super) chroma: bool,
+    pub(super) favourite: bool,
     pub(super) query: String,
 }
 
 impl ShaderFilter {
     /// Whether anything is filtered out.
     pub(super) fn active(&self) -> bool {
-        self.tier.is_some() || self.owned || self.chroma || !self.query.trim().is_empty()
+        self.tier.is_some()
+            || self.owned
+            || self.chroma
+            || self.favourite
+            || !self.query.trim().is_empty()
     }
 
-    /// Whether `skin` (held or not) stays in the list.
-    pub(super) fn passes(&self, skin: &unlockables::Unlockable, owned: bool) -> bool {
+    /// Whether `skin` (held or not, a favourite or not) stays in the list.
+    pub(super) fn passes(
+        &self,
+        skin: &unlockables::Unlockable,
+        owned: bool,
+        favourite: bool,
+    ) -> bool {
         if self.tier.is_some_and(|tier| tier != skin.tier)
             || (self.owned && !owned)
             || (self.chroma && !skin.chroma)
+            || (self.favourite && !favourite)
         {
             return false;
         }
@@ -340,6 +380,9 @@ pub(crate) enum PanelAction {
     /// Turn Box hunt on (`true`) or off: the same as `toy_boxhunt`, set rather than
     /// toggled.
     BoxHunt(bool),
+    /// Turn the Banana peel on (`true`) or off: the same as `toy_banana`, set rather than
+    /// toggled.
+    Banana(bool),
     /// Set `cg_tag` to this tag's id: the one `toy_tag` sticks.
     ChooseTag(&'static str),
     /// Show a tab another page draws: the Holocrons page.
@@ -369,6 +412,14 @@ pub(crate) enum PanelAction {
     /// See and share nameplates on (`true`) or off: `cg_nameplate`
     /// ([`crate::hud::nameplate::see_and_share`]).
     SeeAndShare(bool),
+    /// The nameplates' look: `cg_nameplateStyle` ([`crate::hud::nameplate::Style`]).
+    NameplateStyle(crate::hud::nameplate::Style),
+    /// Other players' toy seen (`true`) or hidden on this PC: set the toy's `cvar`
+    /// ([`crate::toy_sight`]).
+    ToySight {
+        cvar: &'static str,
+        seen: bool,
+    },
     /// Bind `key` (its console name) to a toy's `command`, in place of the first key it
     /// had, as the key-binding editor does.
     Bind {
@@ -377,6 +428,49 @@ pub(crate) enum PanelAction {
     },
     /// Clear the first key bound to a toy's command.
     Unbind(&'static str),
+    /// Set (`on`) or clear a collection mark on this shader at the hub (29/10/2026): a
+    /// star or a padlock.
+    Mark {
+        id: &'static str,
+        mark: sjk_identity::Mark,
+        on: bool,
+    },
+}
+
+/// What the marks a frame shows were read from ([`Panel::follow_marks`]).
+#[derive(Clone, Debug, PartialEq)]
+struct MarksFrom {
+    /// The identity's marks' and own profile's revisions.
+    hub: Option<(u64, u64)>,
+    /// The seen-list's revision.
+    seen: u64,
+    worn: [Option<&'static str>; 2],
+    debug: bool,
+    /// How many unlocks the holdings list (they change with the profile, and in tests).
+    known: usize,
+}
+
+/// What a press of the star (`Favourite`) or the padlock (`Locked`) does on shader `id`
+/// (`owned` whether the player holds it): set the mark it lacks, or clear the one it has;
+/// nothing while the hub keeps no marks, nor a lock on a shader not held.
+pub(super) fn mark_action(
+    marks: &crate::shader_marks::Marks,
+    id: &'static str,
+    mark: sjk_identity::Mark,
+    owned: bool,
+) -> PanelAction {
+    if !marks.kept {
+        return PanelAction::None;
+    }
+    let on = match mark {
+        sjk_identity::Mark::Favourite => !marks.favourite(id),
+        sjk_identity::Mark::Locked => !marks.locked(id),
+    };
+    if on && mark == sjk_identity::Mark::Locked && !owned {
+        return PanelAction::None;
+    }
+    ui_cues_click();
+    PanelAction::Mark { id, mark, on }
 }
 
 /// Where the player's model stands behind Shaders, Toys and Nameplates this frame, as
@@ -449,6 +543,8 @@ pub(crate) struct Inputs<'a> {
     pub(crate) monitor: bool,
     /// Box hunt is on now (kept as [`Self::illuminate`] is).
     pub(crate) box_hunt: bool,
+    /// The Banana peel toy is on now (kept as [`Self::illuminate`] is).
+    pub(crate) banana: bool,
     /// The `name` cvar, for the nameplate.
     pub(crate) name: &'a str,
     /// The stock blade's colour (`color1`), for its swatch.
@@ -465,9 +561,15 @@ pub(crate) struct Inputs<'a> {
     /// See and share nameplates (`cg_nameplate`): the player sees nameplates and shares
     /// their health, shield and Force.
     pub(crate) share: bool,
+    /// The nameplates' look (`cg_nameplateStyle`), which the Nameplates tab draws and
+    /// offers to change.
+    pub(crate) nameplate_style: crate::hud::nameplate::Style,
     /// The keys bound to the toys' commands, as players read them ("F5", "F5 / K"), in
     /// the order of [`toys::COMMANDS`]; empty for none (or none known).
     pub(crate) toy_keys: &'a [String],
+    /// The toys whose other players' are hidden on this PC, as bits in the Toys tab's
+    /// order (each one's "See" switch off, [`crate::toy_sight`]).
+    pub(crate) toys_unseen: u16,
     /// `cg_tag`: the tag `toy_tag` sticks.
     pub(crate) tag: &'a str,
 }
@@ -504,9 +606,12 @@ pub(crate) struct Panel {
     /// The achievements on the wall as the last frame laid them out, in its reading
     /// order (`collection_achievements.rs`): the arrows and Tab follow it.
     achievement_slots: Vec<achievements::Slot>,
+    /// The achievements board's page on show.
+    achievement_page: crate::achievements::Page,
     shader: usize,
     /// The toy chosen on Toys: 0 Illuminate, 1 the cardboard box, 2 Order 66, 3 the Hax,
-    /// 4 the Ragdoll, 5 the Drone, 6 the Boombox, 7 the Monitor, 8 Box hunt.
+    /// 4 the Ragdoll, 5 the Drone, 6 the Boombox, 7 the Monitor, 8 Box hunt, 9 the Banana
+    /// peel.
     toy: usize,
     /// The tag chosen on Tags, in `tags::CATALOGUE`'s order, and which tags the last
     /// frame showed as held (Enter picks only one of those).
@@ -528,8 +633,13 @@ pub(crate) struct Panel {
     monitor_on: bool,
     /// Box hunt was on, as the last frame's inputs said.
     box_hunt_on: bool,
+    /// The Banana peel was on, as the last frame's inputs said.
+    banana_on: bool,
     /// See and share nameplates was on, as the last frame's inputs said.
     share_on: bool,
+    /// The toys (bits by the Toys tab's order) whose other players' are hidden here, as
+    /// the last frame's inputs said.
+    toys_unseen: u16,
     /// The tile chosen on Cards (in the list the filter shows), how many tiles the last
     /// frame's list held, and the first line of them shown (the grid scrolls a line at a
     /// time).
@@ -590,6 +700,8 @@ pub(crate) struct Panel {
     /// The shaders the tab lists now (the filter's), the stock blade's row 0 before them,
     /// and how many rows that makes; read again each frame.
     shader_list: Vec<&'static unlockables::Unlockable>,
+    /// The ones of them the player holds, as the last frame's rows said (a lock needs one).
+    shader_owned: Vec<&'static str>,
     shader_count: usize,
     shader_filter: ShaderFilter,
     /// The Shaders tab offers Unique's chip: the player holds a Unique shader, as the last
@@ -623,12 +735,27 @@ pub(crate) struct Panel {
     forge_link: Option<(forge::Section, &'static str)>,
     /// Whether the hub's economy is known (the Shaders tab's way to the Forge shows then).
     trade_known: bool,
+    /// What the Shaders tab and the Forge show on each shader (worn, favourite, locked,
+    /// New; `crate::shader_marks`), and what it was read from, read again only when that
+    /// changes.
+    marks: crate::shader_marks::Marks,
+    marks_from: Option<MarksFrom>,
+    /// The shader chosen on Shaders or in the Forge while it was New: seen once it has
+    /// stayed chosen a second (`shader_marks::Look`), not when a sweep passes over it.
+    viewing: crate::shader_marks::Look,
+    /// The count of the last refused change of a mark the console was told of.
+    mark_refusal_seen: u64,
+    /// The marks a world shot or a test shows in place of the live ones.
+    #[cfg(test)]
+    pub(crate) preview_marks: Option<crate::shader_marks::Marks>,
     /// How much wider than the display family the page's text face is drawn.
     widen: f32,
     epoch: Instant,
     /// The blade skins the hub's packs brought, the swatches' looks (`sjk_packs.rs`);
     /// taken again only when they change ([`Panel::follow_skins`]).
     pub(super) skins: std::sync::Arc<crate::saber_skins::LoadedSkins>,
+    /// The History tab: its filter, rows and reads ([`history`]).
+    history: history::History,
     /// What a world shot shows in place of the own profile's unlocks.
     #[cfg(test)]
     pub(crate) preview: Option<Vec<sjk_identity::Unlock>>,
@@ -666,11 +793,13 @@ impl Panel {
             // frames, which flickered.
             // The Shaders tab's wall shows up to thirty tiles, each its name on two lines
             // and its state: 320 text runs leave the rest of the page its room.
-            ui: MenuCanvas::with_capacities(320, 220, DRAW_COMMANDS),
+            // The marks (29/10/2026) add a sticker and a pill to a tile at most.
+            ui: MenuCanvas::with_capacities(400, 220, DRAW_COMMANDS),
             medal: 0,
             // The first frame chooses the one nearest to unlocking.
             achievement: usize::MAX,
             achievement_slots: Vec::with_capacity(crate::achievements::ALL.len()),
+            achievement_page: crate::achievements::Page::General,
             shader: 0,
             toy: 0,
             tag: 0,
@@ -683,7 +812,9 @@ impl Panel {
             boombox_on: false,
             monitor_on: false,
             box_hunt_on: false,
+            banana_on: false,
             share_on: false,
+            toys_unseen: 0,
             card: 0,
             cards_shown: 0,
             card_first: 0,
@@ -711,6 +842,7 @@ impl Panel {
             shader_rows: [ShaderRow::default(); SHADER_ROWS],
             // Until the first frame reads the holdings: what a player who holds nothing sees.
             shader_list: Holdings::IdentityOff.listed().collect(),
+            shader_owned: Vec::new(),
             shader_count: 1 + Holdings::IdentityOff.listed_count(),
             shader_filter: ShaderFilter::default(),
             unique_chip: false,
@@ -726,9 +858,16 @@ impl Panel {
             forge: forge::Forge::default(),
             forge_link: None,
             trade_known: false,
+            marks: Default::default(),
+            marks_from: None,
+            viewing: crate::shader_marks::Look::default(),
+            mark_refusal_seen: 0,
+            #[cfg(test)]
+            preview_marks: None,
             widen: 1.0,
             epoch: Instant::now(),
             skins: Default::default(),
+            history: Default::default(),
             #[cfg(test)]
             preview: None,
             #[cfg(test)]
@@ -775,6 +914,7 @@ impl Panel {
     pub(crate) fn show(&mut self, tab: Tab) {
         if tab.screen() == crate::profile_hub::Screen::Collection && tab != Tab::Holocrons {
             if tab != self.tab {
+                self.leave_viewing();
                 self.leave_search();
                 self.forge.leave_search();
                 self.forge.ask = None;
@@ -802,7 +942,10 @@ impl Panel {
 
     /// Hide the page; returns whether it had opened the console.
     pub(crate) fn close(&mut self) -> bool {
+        self.leave_viewing();
         let owned = self.open && self.owns_console;
+        // Shown again, the History tab reads the newest lines.
+        self.history.shown = false;
         self.open = false;
         self.owns_console = false;
         self.backstage = Backstage::None;
@@ -812,6 +955,13 @@ impl Panel {
     /// Where the model stands this frame.
     pub(crate) fn set_backstage(&mut self, backstage: Backstage) {
         self.backstage = backstage;
+    }
+
+    /// Show `marks` in place of the live ones (`None` lets go), for a world shot.
+    #[cfg(test)]
+    pub(crate) fn marks_for_shot(&mut self, marks: Option<crate::shader_marks::Marks>) {
+        self.preview_marks = marks;
+        self.marks_from = None;
     }
 
     /// Whether the hub's economy is known this frame: the Shaders tab's way to the Forge
@@ -878,6 +1028,17 @@ impl Panel {
     }
 
     /// What Enter (or a click on the button) does on the tab on show.
+    /// The chosen toy's "See" switch: other players' toy hidden on this PC, or seen again.
+    fn toy_sight(&self) -> PanelAction {
+        let Some(cvar) = toys::sight_cvar(self.toy) else {
+            return PanelAction::None;
+        };
+        PanelAction::ToySight {
+            cvar,
+            seen: self.toys_unseen & 1 << self.toy != 0,
+        }
+    }
+
     fn activate(&mut self, illuminate: bool) -> PanelAction {
         match self.tab {
             Tab::Shaders => self
@@ -893,6 +1054,7 @@ impl Panel {
             Tab::Toys if self.toy == 6 => PanelAction::Boombox(!self.boombox_on),
             Tab::Toys if self.toy == 7 => PanelAction::Monitor(!self.monitor_on),
             Tab::Toys if self.toy == 8 => PanelAction::BoxHunt(!self.box_hunt_on),
+            Tab::Toys if self.toy == 9 => PanelAction::Banana(!self.banana_on),
             Tab::Toys => PanelAction::Illuminate(!illuminate),
             Tab::Nameplates => PanelAction::SeeAndShare(!self.share_on),
             Tab::Tags => self.choose_tag(),
@@ -976,6 +1138,15 @@ impl Panel {
         }
     }
 
+    /// Show the achievements board's `page`, its nearest to unlocking chosen.
+    fn set_achievement_page(&mut self, page: crate::achievements::Page) {
+        if self.achievement_page != page {
+            self.achievement_page = page;
+            // Not on the new page's wall: the board chooses afresh.
+            self.achievement = usize::MAX;
+        }
+    }
+
     /// Move the choice `by` things: wrapping round for Tab, stopping at the ends for
     /// the arrows.
     fn step(&mut self, by: isize, wrap: bool) {
@@ -1016,12 +1187,25 @@ impl Panel {
         };
         self.hover.keyed();
         if self.tab == Tab::Forge {
+            if !control
+                && !self.forge.search_focus
+                && self.forge.ask.is_none()
+                && let Some(action) = self.forge_mark_key(key, shift)
+            {
+                return action;
+            }
             let action = self
                 .forge
                 .key(event.text.as_deref(), key, shift, control, self.grid);
             if let PanelAction::ShaderView(grid) = action {
                 return self.set_grid(grid);
             }
+            return action;
+        }
+        if self.tab == Tab::History
+            && !control
+            && let Some(action) = self.history_key(key, shift)
+        {
             return action;
         }
         if self.tab == Tab::Cards && self.card_inspect {
@@ -1053,6 +1237,12 @@ impl Panel {
             match key {
                 KeyCode::Slash => return self.focus_search(),
                 KeyCode::KeyF if control => return self.focus_search(),
+                KeyCode::KeyF if shift => return self.toggle_favourites_only(),
+                KeyCode::KeyF => return self.toggle_mark(sjk_identity::Mark::Favourite),
+                KeyCode::KeyL if !control => {
+                    return self.toggle_mark(sjk_identity::Mark::Locked);
+                }
+                KeyCode::KeyN if !control => return self.see_all(),
                 KeyCode::KeyT => return self.cycle_tier(shift),
                 KeyCode::KeyO => return self.toggle_owned(),
                 KeyCode::KeyC if !control => return self.toggle_chroma(),
@@ -1184,6 +1374,118 @@ impl Panel {
     fn toggle_owned(&mut self) -> PanelAction {
         self.shader_filter.owned = !self.shader_filter.owned;
         self.filter_changed()
+    }
+
+    /// Show only the favourites, or all again (Shift+F); only while the hub keeps marks.
+    fn toggle_favourites_only(&mut self) -> PanelAction {
+        if !self.marks.kept && !self.shader_filter.favourite {
+            return PanelAction::None;
+        }
+        self.shader_filter.favourite = !self.shader_filter.favourite;
+        self.filter_changed()
+    }
+
+    /// Star or unstar (F), lock or unlock (L) the shader chosen on the Shaders tab: a blade
+    /// skin, and only one the player holds for a lock, while the hub keeps marks.
+    fn toggle_mark(&mut self, mark: sjk_identity::Mark) -> PanelAction {
+        let Some(skin) = self.skin_at(self.shader) else {
+            return PanelAction::None;
+        };
+        let owned = self.shader_list_owned(skin.id);
+        mark_action(&self.marks, skin.id, mark, owned)
+    }
+
+    /// Whether the player holds shader `id`, as the last frame's rows said.
+    fn shader_list_owned(&self, id: &'static str) -> bool {
+        self.shader_owned.contains(&id)
+    }
+
+    /// Mark every New shader seen (N, or Mark all seen).
+    fn see_all(&mut self) -> PanelAction {
+        if self.marks.new_count() > 0 {
+            crate::shader_marks::see_all(self.marks.new_ids());
+            ui_cues_click();
+        }
+        PanelAction::None
+    }
+
+    /// The marks for `inputs` this frame: read again only when what they come from
+    /// changed (the hub's marks, the own profile, the seen-list, the blades worn).
+    fn follow_marks(&mut self, inputs: &Inputs<'_>) {
+        #[cfg(test)]
+        if let Some(marks) = &self.preview_marks {
+            self.marks = marks.clone();
+            return;
+        }
+        let owned = match inputs.holdings {
+            Holdings::Known(owned) => owned,
+            _ => &[],
+        };
+        let worn = crate::shader_marks::worn_of(inputs.setting, inputs.second, owned);
+        let snapshot = inputs.snapshot.filter(|_| inputs.enabled);
+        let from = MarksFrom {
+            hub: snapshot.map(|snapshot| (snapshot.marks_revision, snapshot.me_revision)),
+            seen: crate::shader_marks::revision(),
+            worn,
+            debug: inputs.holdings.debug(),
+            known: owned.len(),
+        };
+        if self.marks_from.as_ref() == Some(&from) {
+            return;
+        }
+        let kept = snapshot.is_some_and(|snapshot| {
+            snapshot
+                .economy
+                .as_ref()
+                .is_some_and(|economy| economy.can(sjk_identity::MARKS_ABILITY))
+        });
+        self.marks = crate::shader_marks::with_seen(|seen| {
+            crate::shader_marks::Marks::of(
+                snapshot.and_then(|snapshot| snapshot.marks.as_ref()),
+                kept,
+                owned,
+                seen,
+                from.debug,
+                worn,
+            )
+        });
+        self.marks_from = Some(from);
+    }
+
+    /// The shader chosen on Shaders or in the Forge is now `chosen` (each frame): a New one
+    /// is seen once it has stayed chosen a second.
+    fn view(&mut self, chosen: Option<&'static str>) {
+        let new = chosen.is_some_and(|id| self.marks.is_new(id));
+        if let Some(id) = self.viewing.observe(chosen, new, self.look_clock()) {
+            crate::shader_marks::see(id);
+        }
+    }
+
+    /// The milliseconds the New marks' second is counted on ([`Self::view`]).
+    fn look_clock(&self) -> u64 {
+        u64::try_from(self.epoch.elapsed().as_millis()).unwrap_or(u64::MAX)
+    }
+
+    /// Why the hub refused the last change of a mark, once, when it is new since the last
+    /// call (the console says it).
+    pub(crate) fn take_mark_refusal(
+        &mut self,
+        snapshot: Option<&sjk_identity::Snapshot>,
+    ) -> Option<String> {
+        let (serial, words) = snapshot?.mark_refusal.as_ref()?;
+        if *serial <= self.mark_refusal_seen {
+            return None;
+        }
+        self.mark_refusal_seen = *serial;
+        Some(words.clone())
+    }
+
+    /// The choice left the page (another tab, the page closed): the shader it was on is
+    /// seen only if it had stayed chosen a second.
+    fn leave_viewing(&mut self) {
+        if let Some(id) = self.viewing.leave(self.look_clock()) {
+            crate::shader_marks::see(id);
+        }
     }
 
     /// A key while the search field has the typing: Escape or Enter leave it (Escape
@@ -1322,6 +1624,15 @@ impl Panel {
         match key {
             KeyCode::Escape => return PanelAction::Close,
             KeyCode::KeyV if self.tab == Tab::Shaders => return self.set_grid(!self.grid),
+            // F turns the achievements board's page: General, Fun.
+            KeyCode::KeyF if self.tab == Tab::Achievements => {
+                let fun = self.achievement_page == crate::achievements::Page::General;
+                self.set_achievement_page(if fun {
+                    crate::achievements::Page::Fun
+                } else {
+                    crate::achievements::Page::General
+                });
+            }
             // K waits for a key to bind to the chosen toy.
             KeyCode::KeyK if self.tab == Tab::Toys => self.bind_wait = Some(0),
             KeyCode::KeyR if self.tab == Tab::Cards => return self.reveal(),
@@ -1462,6 +1773,15 @@ impl Panel {
             return PanelAction::None;
         }
         if let InputEvent::PointerWheel { delta, .. } = event
+            && self.tab == Tab::History
+        {
+            // The wheel scrolls the list three rows a notch.
+            if delta.y != 0.0 {
+                self.history.scroll(if delta.y > 0.0 { -3 } else { 3 });
+            }
+            return PanelAction::None;
+        }
+        if let InputEvent::PointerWheel { delta, .. } = event
             && self.tab == Tab::Cards
         {
             if self.card_inspect {
@@ -1499,11 +1819,32 @@ impl Panel {
         let Some(token) = event.token else {
             return PanelAction::None;
         };
+        if self.tab == Tab::History
+            && let Some(action) = self.history_token(
+                token,
+                event.kind == UiEventKind::Activate,
+                matches!(event.kind, UiEventKind::HoverEnter | UiEventKind::Hover),
+            )
+        {
+            return action;
+        }
         if self.tab == Tab::Forge && (forge::forge_token(token) || self.forge.ask.is_some()) {
             let activate = event.kind == UiEventKind::Activate;
             let resting = matches!(event.kind, UiEventKind::HoverEnter | UiEventKind::Hover);
             if !(activate || resting) {
                 return PanelAction::None;
+            }
+            if activate && self.forge.ask.is_none() {
+                match token {
+                    forge::STAR_TOKEN => {
+                        return self.forge_mark(sjk_identity::Mark::Favourite);
+                    }
+                    forge::PADLOCK_TOKEN => return self.forge_mark(sjk_identity::Mark::Locked),
+                    forge::FAVOURITES_TOKEN => {
+                        return self.forge.toggle_favourites(self.marks.kept);
+                    }
+                    _ => {}
+                }
             }
             return match self.forge.token(token, activate, now) {
                 Some(PanelAction::ShaderView(grid)) => self.set_grid(grid),
@@ -1538,6 +1879,9 @@ impl Panel {
             if token == FILTER_CHROMA_TOKEN {
                 return self.toggle_chroma();
             }
+            if token == FILTER_FAVOURITE_TOKEN {
+                return self.toggle_favourites_only();
+            }
             if let Some(sort) = token
                 .checked_sub(SORT_BASE)
                 .and_then(|index| ShaderSort::ALL.get(usize::from(index)))
@@ -1555,6 +1899,13 @@ impl Panel {
             }
             if token == TAG_CHOOSE_TOKEN {
                 return self.choose_tag();
+            }
+            if let Some(page) = token
+                .checked_sub(ACHIEVEMENT_PAGE_BASE)
+                .and_then(|index| crate::achievements::Page::ALL.get(usize::from(index)))
+            {
+                self.set_achievement_page(*page);
+                return PanelAction::None;
             }
             if let Some(toy) = token
                 .checked_sub(TOY_SWITCH_BASE)
@@ -1621,6 +1972,12 @@ impl Panel {
         if event.kind != UiEventKind::Activate {
             return PanelAction::None;
         }
+        if let Some(style) = token
+            .checked_sub(STYLE_BASE)
+            .and_then(|index| crate::hud::nameplate::Style::ALL.get(usize::from(index)))
+        {
+            return PanelAction::NameplateStyle(*style);
+        }
         if let Some(index) = token
             .checked_sub(OPTION_BASE)
             .map(usize::from)
@@ -1633,13 +1990,17 @@ impl Panel {
             LIST_VIEW_TOKEN => self.set_grid(false),
             GRID_VIEW_TOKEN => self.set_grid(true),
             WEAR_TOKEN | TOY_SWITCH_TOKEN | SHARE_TOKEN => self.activate(illuminate),
+            TOY_SIGHT_TOKEN => self.toy_sight(),
             TARGET_FIRST_TOKEN => self.set_target(false),
             TARGET_SECOND_TOKEN => self.set_target(true),
             BOTH_TOKEN => self.toggle_both(),
             FORGE_LINK_TOKEN => self.open_forge_link(),
+            FAVOURITE_TOKEN => self.toggle_mark(sjk_identity::Mark::Favourite),
+            LOCK_TOKEN => self.toggle_mark(sjk_identity::Mark::Locked),
+            SEEN_ALL_TOKEN => self.see_all(),
             // A toy's row chooses it; its own switch runs it.
             TOY_TOKEN | BOX_TOKEN | ORDER_TOKEN | HAX_TOKEN | RAGDOLL_TOKEN | DRONE_TOKEN
-            | BOOMBOX_TOKEN | MONITOR_TOKEN => {
+            | BOOMBOX_TOKEN | MONITOR_TOKEN | BOX_HUNT_TOKEN | BANANA_TOKEN => {
                 self.toy = TOY_TOKENS.iter().position(|&row| row == token).unwrap_or(0);
                 PanelAction::None
             }
@@ -1774,9 +2135,20 @@ impl Panel {
             Tab::Cards => CARD_BASE,
             // The Forge's shots name the token itself.
             Tab::Forge => 0,
-            _ => TOY_TOKEN,
+            // A toy's row, by its place in the tab.
+            _ => {
+                self.hover
+                    .pin(index.and_then(|index| TOY_TOKENS.get(index).copied()));
+                return;
+            }
         };
         self.hover.pin(index.map(|index| base + index as u16));
+    }
+
+    /// Choose the Toys tab's toy `index` (0 Illuminate), for a world shot.
+    #[cfg(test)]
+    pub(crate) fn choose_toy_for_shot(&mut self, index: usize) {
+        self.toy = index.min(TOY_COUNT - 1);
     }
 
     /// Hold the lone saber turned so, still, as a drag would (`None` lets go), for a
@@ -1807,6 +2179,7 @@ impl Panel {
             Tab::Tags => TAG_BASE + self.tag.min(crate::tags::CATALOGUE.len() - 1) as u16,
             Tab::Cards if self.cards_shown > 0 => CARD_BASE + self.card as u16,
             Tab::Nameplates => SHARE_TOKEN,
+            Tab::History => self.history_focus(),
             Tab::Forge => match self.forge.ask {
                 Some(ask) => {
                     if matches!(
@@ -1857,6 +2230,7 @@ mod tests {
             boombox: false,
             monitor: false,
             box_hunt: false,
+            banana: false,
             name: "^1Sol^7Vulpes",
             stock: sjk_ui::Color::new(0.16, 0.48, 1.0, 1.0),
             grid: false,
@@ -1864,7 +2238,9 @@ mod tests {
             second: "",
             pair: crate::saber_skins::Pair::None,
             share: true,
+            nameplate_style: crate::hud::nameplate::Style::Holo,
             toy_keys: &[],
+            toys_unseen: 0,
             tag: "",
         }
     }
@@ -1919,7 +2295,7 @@ mod tests {
             ..ShaderFilter::default()
         };
         let found: Vec<_> = unlockables::blade_skins()
-            .filter(|skin| filter.passes(skin, false))
+            .filter(|skin| filter.passes(skin, false, false))
             .map(|skin| skin.number)
             .collect();
         assert_eq!(found, [2]);
@@ -2379,6 +2755,76 @@ mod tests {
             all.contains("toy_order66") && all.contains("In the order"),
             "{all}"
         );
+        // The Hax acts only on players who have it on: its card has no "See" switch.
+        redraw(&mut panel, &shown);
+        assert!(panel.ui.rect_for(TOY_SIGHT_TOKEN).is_none());
+        // The Monitor's hides the monitors, and shows them again.
+        let _ = click(&mut panel, MONITOR_TOKEN);
+        redraw(&mut panel, &shown);
+        assert_eq!(
+            click(&mut panel, TOY_SIGHT_TOKEN),
+            PanelAction::ToySight {
+                cvar: crate::monitor::SHOW_CVAR,
+                seen: false,
+            }
+        );
+        shown.toys_unseen = 1 << 7;
+        redraw(&mut panel, &shown);
+        assert_eq!(
+            click(&mut panel, TOY_SIGHT_TOKEN),
+            PanelAction::ToySight {
+                cvar: crate::monitor::SHOW_CVAR,
+                seen: true,
+            }
+        );
+        assert_eq!(
+            toys::unseen(|cvar| cvar != crate::toy_sight::DRONE),
+            1 << 5,
+            "the Drone's bit"
+        );
+    }
+
+    /// The Nameplates tab's Style row offers every nameplate style, the one in use
+    /// lit, and a click on another asks for it; each style's plate fits the page.
+    #[test]
+    fn the_style_row_chooses_the_nameplates_look() {
+        use crate::hud::nameplate::Style;
+        for style in Style::ALL {
+            let shown = Inputs {
+                nameplate_style: style,
+                ..inputs(Holdings::Known(&[]), "")
+            };
+            let mut panel = drawn(Tab::Nameplates, &shown);
+            assert!(!panel.ui.overflowed(), "{style:?}");
+            for (index, other) in Style::ALL.into_iter().enumerate() {
+                let rect = panel
+                    .ui
+                    .rect_for(STYLE_BASE + index as u16)
+                    .expect("a style's segment");
+                let at = sjk_ui::Vec2::new(rect.x + rect.width * 0.5, rect.y + rect.height * 0.5);
+                let button = sjk_ui::PointerButton::Primary;
+                let action = [
+                    InputEvent::PointerMove(at),
+                    InputEvent::PointerPress {
+                        position: at,
+                        button,
+                    },
+                    InputEvent::PointerRelease {
+                        position: at,
+                        button,
+                    },
+                ]
+                .into_iter()
+                .map(|event| panel.pointer_at(event, true, Instant::now()))
+                .find(|action| *action != PanelAction::None);
+                assert_eq!(action, Some(PanelAction::NameplateStyle(other)));
+            }
+            let all = panel.ui.text_runs().collect::<Vec<_>>().join(
+                "
+",
+            );
+            assert!(all.contains("Capsule") && all.contains("Classic"), "{all}");
+        }
     }
 
     /// The Nameplates tab's See and share nameplates switch, clicked or with Enter, flips the
@@ -2942,6 +3388,68 @@ mod tests {
         }
         assert_eq!(panel.shader_first, 0);
         assert!(first > 0);
+    }
+
+    /// Hub report #201: the wheel scrolls on over the tiers' headings, as each frame
+    /// draws in between, on the wall and the list, all shaders or the Owned ones.
+    #[test]
+    fn the_wheel_scrolls_past_the_headings_frame_after_frame() {
+        let held: Vec<Unlock> = unlockables::blade_skins()
+            .take(80)
+            .map(|skin| Unlock {
+                id: skin.id.into(),
+                count: 1,
+                ..sun()
+            })
+            .collect();
+        let fonts = crate::text::load_modern(1.0, None).expect("Inter");
+        let notch = |panel: &mut Panel, y: f32| {
+            let _ = panel.handle_pointer(
+                InputEvent::PointerWheel {
+                    position: sjk_ui::Vec2::new(500.0, 500.0),
+                    delta: sjk_ui::Vec2::new(0.0, y),
+                },
+                false,
+            );
+        };
+        for grid in [false, true] {
+            for owned in [false, true] {
+                let shown = Inputs {
+                    grid,
+                    ..inputs(Holdings::Known(&held), "")
+                };
+                let mut panel = drawn(Tab::Shaders, &shown);
+                if owned {
+                    let _ = panel.toggle_owned();
+                }
+                panel.build(&shown, &fonts.font, [1920.0, 1080.0]);
+                let lines = panel.shader_lines.len();
+                let mut tops = vec![panel.shader_first];
+                for _ in 0..lines {
+                    notch(&mut panel, -1.0);
+                    panel.build(&shown, &fonts.font, [1920.0, 1080.0]);
+                    tops.push(panel.shader_first);
+                }
+                let end = *tops.last().unwrap();
+                // The wheel reached the end: the last shader is drawn.
+                let last = SHADER_BASE + (panel.shader_count - 1) as u16;
+                assert!(
+                    panel.ui.rect_for(last).is_some(),
+                    "grid {grid}, owned {owned}: {tops:?}"
+                );
+                // Each notch moved on a line until the end.
+                let stop = tops.iter().position(|top| *top == end).unwrap();
+                assert!(
+                    tops[..=stop].windows(2).all(|pair| pair[1] == pair[0] + 1),
+                    "grid {grid}, owned {owned}: {tops:?}"
+                );
+                for _ in 0..lines {
+                    notch(&mut panel, 1.0);
+                    panel.build(&shown, &fonts.font, [1920.0, 1080.0]);
+                }
+                assert_eq!(panel.shader_first, 0, "grid {grid}, owned {owned}: back up");
+            }
+        }
     }
 
     #[test]

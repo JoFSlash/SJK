@@ -88,6 +88,8 @@ pub(super) fn register_daily_cvars(cvars: &mut CvarRegistry) -> Result<(), sjk_s
     crate::assets::search_paths::register(cvars)?;
     #[cfg(feature = "mod-jof")]
     crate::jof_content::register(cvars)?;
+    #[cfg(feature = "mod-jof")]
+    crate::sith_cloud::register(cvars)?;
     super::client_options::register(cvars)?;
     super::ui_options::register(cvars)?;
     crate::hud::icons::register(cvars)?;
@@ -322,6 +324,12 @@ pub(super) fn register_daily_cvars(cvars: &mut CvarRegistry) -> Result<(), sjk_s
             archive,
             "Lock wall-grab look even when the server allows free look; off follows the server profile",
         ),
+        CvarDefinition::new(
+            "cg_predictLegacy",
+            0_i64,
+            archive,
+            "Prediction changes since 2026.1028.1 turned back off, one bit each (255 all): 1 saber files, 2 saber-lock facing, 4 respawn jump, 8 trigger box, 16 gesture, 32 held, 64 other players, 128 history gap",
+        ),
         // EternalJK's: write prediction misses to the log (`cg_predict.c:1534`).
         CvarDefinition::new(
             "cg_showMiss",
@@ -340,6 +348,18 @@ pub(super) fn register_daily_cvars(cvars: &mut CvarRegistry) -> Result<(), sjk_s
             0.7_f64,
             archive,
             "Size multiplier for the HUD (0.25 to 2)",
+        ),
+        CvarDefinition::new(
+            crate::hud::RadialPlacement::SPREAD_CVAR,
+            0.0_f64,
+            archive,
+            "SJK radial HUD: how much farther from the crosshair its meters sit on each side, in HUD pixels (0 to 250)",
+        ),
+        CvarDefinition::new(
+            crate::hud::RadialPlacement::HEIGHT_CVAR,
+            0.0_f64,
+            archive,
+            "SJK radial HUD: how much higher its meters sit, in per cent of the screen (-20 lower to 40 higher)",
         ),
         CvarDefinition::new(
             "cg_thirdPersonRange",
@@ -583,6 +603,12 @@ pub(super) fn register_daily_cvars(cvars: &mut CvarRegistry) -> Result<(), sjk_s
             "Play mystery box sounds (SJK)",
         ),
         CvarDefinition::new(
+            crate::toy_sounds::Toy::Banana.cvar(),
+            true,
+            archive,
+            "Play Banana peel sounds (SJK)",
+        ),
+        CvarDefinition::new(
             crate::held_view::LOOK_CVAR,
             crate::held_view::DEFAULT_LOOK,
             archive,
@@ -690,6 +716,14 @@ pub(super) fn register_daily_cvars(cvars: &mut CvarRegistry) -> Result<(), sjk_s
             archive,
             "Holding a push or pull key uses it again as soon as its cooldown is over",
         ),
+        // EternalJK's `in_mouserepeat` (`sdl_input.cpp`), at a fixed rate
+        // ([`crate::input::mouse_repeat`]).
+        CvarDefinition::new(
+            crate::input::mouse_repeat::CVAR,
+            0_i64,
+            archive,
+            "Held mouse 4 and 5 press their bind again 20 times a second: 0 off, 1 both, 2 mouse 4 only",
+        ),
         CvarDefinition::new(
             crate::input::idrive::DELAY_CVAR,
             0_i64,
@@ -720,6 +754,26 @@ pub(super) fn register_daily_cvars(cvars: &mut CvarRegistry) -> Result<(), sjk_s
             archive,
             "Chance (0-100) that games you host cut off limbs",
         ),
+        // The reference's `g_forceRegenTime` default (`g_xcvar.h`), and EternalJK's for
+        // its duels.
+        CvarDefinition::new(
+            crate::connection::local_server::FORCE_REGEN_CVARS[0],
+            200_i64,
+            archive,
+            "Milliseconds a point of Force takes to come back in games you host",
+        ),
+        CvarDefinition::new(
+            crate::connection::local_server::FORCE_REGEN_CVARS[1],
+            200_i64,
+            archive,
+            "Milliseconds a point of Force takes to come back in private duels in games you host",
+        ),
+        CvarDefinition::new(
+            crate::connection::local_server::FORCE_REGEN_CVARS[2],
+            200_i64,
+            archive,
+            "Milliseconds a point of Force takes to come back in full-force duels in games you host",
+        ),
         CvarDefinition::new("cg_drawGun", true, archive, "Draw the first-person weapon"),
         CvarDefinition::new(
             "cg_debugMissiles",
@@ -732,6 +786,12 @@ pub(super) fn register_daily_cvars(cvars: &mut CvarRegistry) -> Result<(), sjk_s
             0_i64,
             CvarFlags::NONE,
             "Log each effect as it plays, with its shaders and sizes (diagnostics)",
+        ),
+        CvarDefinition::new(
+            crate::emote_end_debug::CVAR,
+            false,
+            CvarFlags::NONE,
+            "Say what came just before a JA+ emote let go of you (diagnostics)",
         ),
         CvarDefinition::new(
             crate::debug_collectibles::CVAR,
@@ -784,11 +844,13 @@ pub(super) fn register_daily_cvars(cvars: &mut CvarRegistry) -> Result<(), sjk_s
             archive,
             "flipkick: user command at which the second jump starts",
         ),
+        // JoF EJK's modes (`cg_draw.c` `CG_DrawLagometer`, `CG_DrawSpeedGraph`;
+        // [`crate::hud::lagometer`]).
         CvarDefinition::new(
-            "cg_lagometer",
-            false,
+            crate::hud::lagometer::CVAR,
+            0_i64,
             archive,
-            "Display frame interpolation and snapshot latency samples",
+            "Lagometer: 0 off, 1 graph, 2 graph with average ping, interpolation and a speed graph, 3 the same without the backdrop",
         ),
         CvarDefinition::new(
             "cg_saberTrail",
@@ -808,6 +870,20 @@ pub(super) fn register_daily_cvars(cvars: &mut CvarRegistry) -> Result<(), sjk_s
             1.0_f64,
             archive,
             "Saber clash flare size, 0 to 2",
+        ),
+        CvarDefinition::new(
+            crate::saber_core::CVAR,
+            1.0_f64,
+            archive,
+            "Blade core thickness: the white line down a lit blade, 0.5 to 2 (1 as in the original game)",
+        ),
+        // EternalJK's (JoF EJK `cg_xcvar.h`, `cg_event.c` `EV_SABER_HIT`): the red sparks
+        // of a saber hit on a body ([`crate::impacts::flesh_sparks`]).
+        CvarDefinition::new(
+            crate::impacts::FLESH_SPARKS_CVAR,
+            i64::from(crate::impacts::FLESH_SPARKS_ALL),
+            archive,
+            "Red sparks of a saber hit on a body: 0 none to 7 all (default, as stock), as EternalJK",
         ),
         CvarDefinition::new(
             crate::effect_flash::REDUCE_CVAR,
@@ -861,13 +937,56 @@ pub(super) fn register_daily_cvars(cvars: &mut CvarRegistry) -> Result<(), sjk_s
             crate::toy_saved::BOX_HUNT_CVAR,
             false,
             archive,
-            "Box hunt is on: you may become the mark every few minutes, and killing the mark wins you a free mystery box roll (toy_boxhunt switches it)",
+            "Box hunt is on: you may become the mark (one every 10 minutes), and killing the mark wins you a free mystery box roll (toy_boxhunt switches it)",
+        ),
+        CvarDefinition::new(
+            crate::toy_saved::BANANA_CVAR,
+            false,
+            archive,
+            "The Banana peel toy is on: you may drop banana peels (banana_drop) and slip on the ones you walk onto (toy_banana switches it)",
+        ),
+        // Other players' toys seen (Collection > Toys).
+        CvarDefinition::new(
+            crate::toy_sight::CVARS[0].0,
+            true,
+            archive,
+            crate::toy_sight::CVARS[0].1,
+        ),
+        CvarDefinition::new(
+            crate::toy_sight::CVARS[1].0,
+            true,
+            archive,
+            crate::toy_sight::CVARS[1].1,
+        ),
+        CvarDefinition::new(
+            crate::toy_sight::CVARS[2].0,
+            true,
+            archive,
+            crate::toy_sight::CVARS[2].1,
+        ),
+        CvarDefinition::new(
+            crate::toy_sight::CVARS[3].0,
+            true,
+            archive,
+            crate::toy_sight::CVARS[3].1,
+        ),
+        CvarDefinition::new(
+            crate::toy_sight::CVARS[4].0,
+            true,
+            archive,
+            crate::toy_sight::CVARS[4].1,
         ),
         CvarDefinition::new(
             crate::monitor::SHOW_CVAR,
             true,
             archive,
             "Monitors are seen (0: no Monitor toy monitor is drawn, nor its sounds in the world heard, on this PC; SJK)",
+        ),
+        CvarDefinition::new(
+            crate::banana::SHOW_CVAR,
+            true,
+            archive,
+            "Banana peels are seen (0: no Banana peel toy peel is drawn, nor its sounds in the world heard, on this PC; SJK)",
         ),
         CvarDefinition::new(
             crate::tags::CVAR,
@@ -1052,16 +1171,22 @@ pub(super) fn register_daily_cvars(cvars: &mut CvarRegistry) -> Result<(), sjk_s
             "Internal migration marker for the two-pass shield flash default",
         ),
         CvarDefinition::new(
-            crate::whats_new_card::SEEN_CVAR,
+            crate::news_panel::SEEN_CVAR,
             "",
             archive,
-            "The SJK version whose update recap (the what's-new card) you closed; empty shows the current one once",
+            "The SJK version whose update recap (the News panel) you closed; empty shows the current one once",
         ),
         CvarDefinition::new(
-            crate::whats_new_card::RESET_CVAR,
+            crate::news_panel::RESET_CVAR,
             "",
             archive,
-            "The SJK version whose update put the settings it changed back to their default (the what's-new card's Settings to review), so they are reset once",
+            "The SJK version whose update put the settings it changed back to their default (the News panel's Settings to review), so they are reset once",
+        ),
+        CvarDefinition::new(
+            crate::settings::slider_peek::CVAR,
+            true,
+            archive,
+            "Over a match, holding a Settings slider for a moment fades the rest of the screen away so its change shows on the game (0 keeps the screen)",
         ),
         CvarDefinition::new(
             crate::support_links::CVAR,

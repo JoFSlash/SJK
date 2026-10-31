@@ -344,7 +344,8 @@ pub trait Hub: Send {
             "this hub client does not claim rewards".to_owned(),
         ))
     }
-    /// The creator's announcement (`POST /v1/creator/announce`, 25/10/2026), checked by
+    /// The SJK team's announcement (`POST /v1/staff/announce`, 31/10/2026; the
+    /// creator's `POST /v1/creator/announce` on an older hub), checked by
     /// [`crate::news::check`] first; the hub answers it as stored.
     fn announce(
         &mut self,
@@ -353,6 +354,24 @@ pub trait Hub: Send {
     ) -> Result<crate::news::Announcement, HubError> {
         Err(HubError::Protocol(
             "this hub client does not announce".to_owned(),
+        ))
+    }
+    /// Store a news picture for an announcement (`PUT /v1/staff/news-image`): `bytes`,
+    /// a PNG or a JPEG as `mime` says.
+    fn upload_news_image(
+        &mut self,
+        _identity: &Identity,
+        _bytes: &[u8],
+        _mime: &str,
+    ) -> Result<crate::news::NewsImage, HubError> {
+        Err(HubError::Protocol(
+            "this hub client does not upload news pictures".to_owned(),
+        ))
+    }
+    /// News picture `id` as the hub serves it (`GET /v1/news-image/<id>`).
+    fn news_image(&mut self, _id: &str) -> Result<Vec<u8>, HubError> {
+        Err(HubError::Protocol(
+            "this hub client does not read news pictures".to_owned(),
         ))
     }
     /// Make `png` (already cropped and scaled, `crate::avatar`) the identity's picture;
@@ -475,6 +494,20 @@ pub trait Hub: Send {
         ))
     }
 
+    /// Set (`on`) or clear `mark` on saber shader `id` (`POST /v1/unlocks/marks`,
+    /// 29/10/2026, hubs whose economy says `marks`): the hub answers every mark after.
+    fn set_mark(
+        &mut self,
+        _identity: &Identity,
+        _id: &str,
+        _mark: crate::wire::Mark,
+        _on: bool,
+    ) -> Result<crate::wire::UnlockMarks, HubError> {
+        Err(HubError::Protocol(
+            "this hub client does not keep collection marks".to_owned(),
+        ))
+    }
+
     /// The shop's offers of the day (`GET /v1/shop`, 17/10/2026).
     fn shop(&mut self, _identity: &Identity) -> Result<crate::wire::ShopDay, HubError> {
         Err(HubError::Protocol(
@@ -567,6 +600,18 @@ pub trait Hub: Send {
     ) -> Result<crate::wire::HolocronBuyAnswer, HubError> {
         Err(HubError::Protocol(
             "this hub client does not buy holocrons".to_owned(),
+        ))
+    }
+
+    /// A page of the player's history (`GET /v1/history`, 31/10/2026): the newest, or
+    /// the one before `before` (unix seconds, [`crate::HistoryPage::before`]).
+    fn history(
+        &mut self,
+        _identity: &Identity,
+        _before: Option<i64>,
+    ) -> Result<crate::history::HistoryPage, HubError> {
+        Err(HubError::Protocol(
+            "status 404: this hub client does not read the history".to_owned(),
         ))
     }
 
@@ -1601,6 +1646,22 @@ impl Hub for HttpHub {
         )?)
     }
 
+    fn set_mark(
+        &mut self,
+        identity: &Identity,
+        id: &str,
+        mark: crate::wire::Mark,
+        on: bool,
+    ) -> Result<crate::wire::UnlockMarks, HubError> {
+        let answer: crate::wire::MarksAnswer = parse(self.send(
+            Some(identity),
+            "POST",
+            "/v1/unlocks/marks",
+            Some(json!({ "id": id, "mark": mark.id(), "on": on })),
+        )?)?;
+        Ok(answer.marks)
+    }
+
     fn shop(&mut self, identity: &Identity) -> Result<crate::wire::ShopDay, HubError> {
         parse(self.send(Some(identity), "GET", "/v1/shop", None)?)
     }
@@ -1636,12 +1697,42 @@ impl Hub for HttpHub {
         identity: &Identity,
         request: &crate::news::AnnounceRequest,
     ) -> Result<crate::news::Announcement, HubError> {
-        parse(self.send(
+        match self.send(
             Some(identity),
             "POST",
-            "/v1/creator/announce",
+            "/v1/staff/announce",
             Some(announce_body(request)),
-        )?)
+        ) {
+            // A hub before 31/10/2026 takes announcements from the creator only.
+            Err(HubError::Rejected { status: 404, .. }) => parse(self.send(
+                Some(identity),
+                "POST",
+                "/v1/creator/announce",
+                Some(announce_body(request)),
+            )?),
+            answer => parse(answer?),
+        }
+    }
+
+    fn upload_news_image(
+        &mut self,
+        identity: &Identity,
+        bytes: &[u8],
+        mime: &str,
+    ) -> Result<crate::news::NewsImage, HubError> {
+        parse(self.send_bytes(Some(identity), "PUT", "/v1/staff/news-image", bytes, mime)?)
+    }
+
+    fn news_image(&mut self, id: &str) -> Result<Vec<u8>, HubError> {
+        if !crate::news_markup::image_id_ok(id) {
+            return Err(HubError::Protocol(
+                "a news picture is named by 16 hex digits".to_owned(),
+            ));
+        }
+        self.fetch(
+            &crate::news::news_image_path(id),
+            crate::news::NEWS_IMAGE_MAX,
+        )
     }
 
     fn buy_offer(
@@ -1756,6 +1847,15 @@ impl Hub for HttpHub {
 
     fn trades(&mut self, identity: &Identity) -> Result<crate::trades::TradesAnswer, HubError> {
         parse(self.send(Some(identity), "GET", "/v1/trades", None)?)
+    }
+
+    fn history(
+        &mut self,
+        identity: &Identity,
+        before: Option<i64>,
+    ) -> Result<crate::history::HistoryPage, HubError> {
+        let path = crate::history::path(before);
+        parse(self.send(Some(identity), "GET", &path, None)?)
     }
 
     fn trade_ask(

@@ -39,12 +39,13 @@ const MAX_SIDE: u32 = 1_024;
 const SIDE_STEP: u32 = 16;
 /// Camera flags (`CameraUniform::_padding`): a secondary view without probe
 /// reflections.
-const VIEW_FLAGS: f32 = 17.0;
+pub(crate) const VIEW_FLAGS: f32 = 17.0;
 
-/// The encode pipeline, made for one scene format.
-struct Encode {
-    format: wgpu::TextureFormat,
-    pipeline: wgpu::RenderPipeline,
+/// The encode pipeline, made for one scene format (the card scenes' drawings use it too,
+/// `crate::card_scenes`).
+pub(crate) struct Encode {
+    pub(crate) format: wgpu::TextureFormat,
+    pub(crate) pipeline: wgpu::RenderPipeline,
     /// The same, for while the speed trail's see-through copies are drawn
     /// (`preview.wgsl`'s `TRAIL`).
     trail_pipeline: wgpu::RenderPipeline,
@@ -56,19 +57,20 @@ struct Encode {
 }
 
 /// One target size's textures and bindings.
-struct Target {
-    size: [u32; 2],
-    color: wgpu::TextureView,
-    depth: wgpu::TextureView,
+pub(crate) struct Target {
+    pub(crate) size: [u32; 2],
+    pub(crate) color: wgpu::TextureView,
+    pub(crate) depth: wgpu::TextureView,
     /// The blades, in the effect layer's 8-bit display values.
-    blades: wgpu::TextureView,
+    pub(crate) blades: wgpu::TextureView,
     /// The speed trail's two copies, nearer then farther, each drawn whole on its own
     /// with its own depth, so the picture fades each as one (`preview.wgsl`'s `TRAIL`).
     copies: [(wgpu::TextureView, wgpu::TextureView); 2],
-    display: wgpu::TextureView,
-    camera: wgpu::Buffer,
-    camera_bind: wgpu::BindGroup,
-    encode_bind: wgpu::BindGroup,
+    /// What the UI draws; it can be copied out (a card scene's drawing is read back).
+    pub(crate) display: wgpu::TextureView,
+    pub(crate) camera: wgpu::Buffer,
+    pub(crate) camera_bind: wgpu::BindGroup,
+    pub(crate) encode_bind: wgpu::BindGroup,
 }
 
 /// Preview state on [`MenuStage`].
@@ -102,7 +104,11 @@ pub(crate) struct Preview {
 
 /// Run `create` inside validation and out-of-memory scopes: `None`, with the
 /// error logged, when wgpu reported one.
-fn guarded<T>(device: &wgpu::Device, what: &str, create: impl FnOnce() -> T) -> Option<T> {
+pub(crate) fn guarded<T>(
+    device: &wgpu::Device,
+    what: &str,
+    create: impl FnOnce() -> T,
+) -> Option<T> {
     crate::gpu_guard::capture(device, create)
         .inspect_err(|error| {
             crate::log::progress(format_args!(
@@ -165,7 +171,7 @@ fn copy_entry(binding: u32, sample_type: wgpu::TextureSampleType) -> wgpu::BindG
 }
 
 impl Encode {
-    fn new(device: &wgpu::Device, format: wgpu::TextureFormat) -> Self {
+    pub(crate) fn new(device: &wgpu::Device, format: wgpu::TextureFormat) -> Self {
         let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some("SJK model preview encode"),
             source: wgpu::ShaderSource::Wgsl(include_str!("preview.wgsl").into()),
@@ -307,7 +313,7 @@ impl Encode {
 }
 
 impl Target {
-    fn new(
+    pub(crate) fn new(
         device: &wgpu::Device,
         encode: &Encode,
         camera_layout: &wgpu::BindGroupLayout,
@@ -353,7 +359,7 @@ impl Target {
         let display = texture(
             "SJK model preview display",
             crate::ui_target::TEXTURE_FORMAT,
-            attachment,
+            attachment | wgpu::TextureUsages::COPY_SRC,
         );
         let camera = device.create_buffer(&wgpu::BufferDescriptor {
             label: Some("SJK model preview camera"),
@@ -468,6 +474,14 @@ impl GpuState {
         preview.probed = probed.is_some();
         preview.failed = probed.is_none();
         preview.ready = probed.is_some();
+    }
+
+    /// Put the model preview's own blades back in the blade renderer's preview slot,
+    /// after a card scene's drawing borrowed it (`crate::card_scenes`).
+    pub(crate) fn restore_preview_blades(&mut self) {
+        let mut blades = std::mem::take(&mut self.menu_stage.preview.blades);
+        self.saber_gpu.prepare_preview(&self.queue, &mut blades);
+        self.menu_stage.preview.blades = blades;
     }
 
     /// Make the encode pipeline and the target for `wanted` pixels unless
