@@ -324,6 +324,12 @@ pub(super) fn register_daily_cvars(cvars: &mut CvarRegistry) -> Result<(), sjk_s
             archive,
             "Lock wall-grab look even when the server allows free look; off follows the server profile",
         ),
+        CvarDefinition::new(
+            "cg_predictLegacy",
+            0_i64,
+            archive,
+            "Prediction changes since 2026.1028.1 turned back off, one bit each (255 all): 1 saber files, 2 saber-lock facing, 4 respawn jump, 8 trigger box, 16 gesture, 32 held, 64 other players, 128 history gap",
+        ),
         // EternalJK's: write prediction misses to the log (`cg_predict.c:1534`).
         CvarDefinition::new(
             "cg_showMiss",

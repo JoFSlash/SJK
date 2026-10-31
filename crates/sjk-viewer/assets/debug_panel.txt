@@ -24,6 +24,17 @@
 
 # ---- Console & chat ----
 
+[predict-legacy]
+area: Gameplay
+title: Prediction as in 2026.1028.1 (cg_predictLegacy, after Kushina's request)
+change: Settings > Game options > Prediction: Current (0) or As in 2026.1028.1 (255).
+change: Bits: 1 saber files, 2 lock facing, 4 respawn jump, 8 trigger box, 16 gesture, 32 held.
+change: 64 other players, 128 history gap. A server's own move ignores them.
+test: Settings > Game options > Prediction: As in 2026.1028.1 sets cg_predictLegacy 255.
+test: On a JA+ server with 255: strafe jumps, swings and dual jump attacks feel as on 1028.1.
+test: Respawn holding attack and jump with 4 set: you jump at once (the server may correct it).
+test: Back to Current: cg_predictLegacy 0, and the miss log (cg_showMiss 1) stays quiet.
+
 [pr-batch-1031]
 area: Gameplay
 title: PRs 31/10: chat colour, GIF hiding, Change name, melee kick, duel noclip, vehicle clips

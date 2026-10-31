@@ -456,6 +456,7 @@ did: Favourite and locked saber shaders: stars listed first, locks kept from bre
 did: Plugin options as Settings switches, in place of typing a cp_pluginDisable number
 did: JoF EJK's saber hit sparks, mouse 4/5 repeat and lagometer modes 2 and 3 for players coming from EJK
 did: The Banana peel toy: drop peels that players who have it on slip on, cartoon style
+did: Prediction as in 2026.1028.1, a Settings choice for players who preferred it
 
 [Atrosex]
 role: Ideas for SJK

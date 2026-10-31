@@ -740,6 +740,37 @@ five wall-stop endpoint disagreements in the 8 ms capture. These are not cleared
 by this review. No full base, jaPRO, custom-hilt, multiplayer-interaction or
 complete movement/animation parity claim follows from these checks.
 
+## Prediction as in 2026.1028.1 (`cg_predictLegacy`)
+
+Some players preferred how 2026.1028.1 predicted their own movement. Each
+change since then that a player on foot can feel has one bit of
+`cg_predictLegacy` (archived, default 0). A set bit brings back that release's
+behaviour for that change only. Settings > Game options > Prediction offers
+Current (0) and As in 2026.1028.1 (255), and the console takes any mix:
+
+| Bit | PR | Turned back off |
+| --- | --- | --- |
+| 1 | #267 | the equipped sabers' `.sab` move overrides and restrictions |
+| 2 | #253 | facing the opponent during a saber lock |
+| 4 | #260 | no jump after respawning until attack and use are released |
+| 8 | #254 | triggers touched with the last move's box (the box comes from the posture flags again) |
+| 16 | #262 | the gesture button starting its taunt |
+| 32 | #261 | movement held still while another client holds the player |
+| 64 | #250 | other players' and NPCs' animations and kinds for bounces and kicks |
+| 128 | #252 | the freeze after a command history overflow |
+
+The bits live in `MovementConfig::predict_legacy`
+([pmove.rs](../crates/sjk-game-jka/src/pmove.rs), `predict_legacy`). A server's
+own move (`authoritative`) never reads them. The viewer applies 2, 64 and 128
+in `LocalPrediction::set_predict_legacy`. Every set bit predicts some moves that
+the server then corrects, since the server runs the current behaviour. The
+vehicle, rocket and jaPRO changes have no bit, because they cannot change how
+a player moves on foot. The two changes that broke JA+ (#251, #266) were
+already rolled back in 2026.1030.2.
+
+The bits are there to find out which change players feel: someone on 255 can
+clear them one at a time. A change no one misses can then lose its bit.
+
 ## Prediction source comparison
 
 The 29/10/2026 review compares SJK `main` `e702b0b1` with OpenJK
