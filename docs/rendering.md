@@ -3057,6 +3057,20 @@ the sheets to `SJK_SIGNATURE_PREVIEW` (`SJK_SIGNATURES` picks some); and
 third-person camera and from first person looking along the blade, saving to
 `SJK_VIEWS` (`SJK_VIEW_SKINS` picks some).
 
+`python scripts/blade_cost.py` ranks blades by GPU cost (31/10/2026, to find the top-tier
+blades that eat the frame): it runs `signature_gpu_cost_against_stock` once per scene
+(`game`, `close`, `along`) with `SJK_COST_TIERS` (Legendary and Mythical by default,
+`--tiers all`, or `--ids`) and writes `target/blade-cost/blade-cost.md`, each blade's
+milliseconds per frame and multiple of the stock blade in every scene, worst first, beside
+the CSV. With `SJK_COST_TIERS` the test measures blades with no signature too (drawn by the
+shared pipelines, their files from the hub's packs in `SJK_TEST_PACKS`; without them they
+are named as skipped), and every blade's frame draws the passes its file adds as
+`saber_gpu.rs` does: solid, black hole horizon and lens, heat haze (into the same target,
+bending a blank scene image, where the game draws haze and lenses into the effect layer in
+their own pass). Left out: the glow pass (one shared pipeline for every skin), trails,
+afterimages and lights. GPU timestamps on a non-exclusive GPU: compare blades within one
+run.
+
 ### Falling blossoms
 
 Built 21/10/2026 for the Varykino Blossom (blade 166, Kushina's idea: "the afterimage like
