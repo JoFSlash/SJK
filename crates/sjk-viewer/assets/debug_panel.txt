@@ -8007,3 +8007,10 @@ title: tcGen vector stages projected in world space
 change: Stages with tcGen vector use the position dotted with their axes, not the base UVs.
 test: Forgotten_City_02: caustics on crystals and glass panels are small ripples, not a wash.
 test: Retail maps look the same as before (no retail shader uses tcGen vector).
+
+[whats-new-switch]
+area: Menus & settings
+title: What's new: Settings to review switches flip
+change: A setting held in a number cvar (r_dynamicGlowNoSabers) showed Off and never flipped.
+test: whatsnew: on Settings to review, click each switch: it flips On and Off and stays.
+test: Settings: the same setting shows the value the card set.

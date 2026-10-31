@@ -1206,7 +1206,7 @@ fn wheel_pages_text(console: &ViewerConsole) -> String {
 }
 
 /// Whether a switch row's cvar is on: true, or any nonzero number.
-fn switch_on(value: &CvarValue) -> bool {
+pub(crate) fn switch_on(value: &CvarValue) -> bool {
     match value {
         CvarValue::Bool(value) => *value,
         CvarValue::Integer(value) => *value != 0,
