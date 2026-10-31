@@ -888,6 +888,11 @@ pub(super) const HUD: &[Setting] = &[
         },
     },
     Setting {
+        label: "Incoming chat colour",
+        cvar: crate::chat::incoming_color::CVAR,
+        kind: ValueKind::Choice(crate::chat::incoming_color::CHOICES),
+    },
+    Setting {
         label: "Chat text outline",
         cvar: crate::chat::options::OUTLINE_CVAR,
         kind: ValueKind::Bool,

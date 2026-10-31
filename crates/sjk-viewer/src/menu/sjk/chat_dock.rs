@@ -443,7 +443,7 @@ impl DockCache {
             )
         });
         let gifs = crate::chat_gifs::enabled();
-        let sources = crate::chat_gifs::sources::revision();
+        let sources = crate::chat_gifs::shown_revision();
         if self.mark == Some(mark) && self.gifs == gifs && self.sources == sources {
             return;
         }

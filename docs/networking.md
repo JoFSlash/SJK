@@ -449,6 +449,25 @@ model slot and refreshed on encountered model-configstring changes, outside
 command replay. The local vehicle shares the geometry helper and keeps its
 clearance check; remote collision follows stock's no-clearance-callback path.
 
+### Vehicle and rider trace exclusions
+
+Prediction applies codemp `CG_VehicleClipCheck` to the actor making each trace.
+A vehicle's chassis ignores its linked riders, while a rider ignores its linked
+vehicle. Rider/rider and unrelated-actor contacts retain stock behavior. The
+pilot's collision view and the chassis view borrow the same world and scratch
+storage without changing each other's context. Committed, replayed and preview
+commands use these views; local passengers also receive the rider exclusions
+when no locally predicted chassis is available.
+Both views retain snapshot rocket-target metadata, and both moves retain the
+snapshot NPC/animation context.
+
+The 30/10/2026 original JA+ 2.4 B7 comparison of PR #274 against `58c2e386`
+observed identical endpoints at 8/7/4/3 ms, including a swoop pilot and a
+shuttle pilot/passenger. Passenger carrier exclusions were exercised, but no
+endpoint improvement was demonstrated. Shared shuttle residuals remain;
+this is limited regression evidence, not full vehicle parity. See the
+[verification record](status.md#prediction-vehiclerider-trace-exclusions).
+
 ### When prediction steps aside
 
 These cases show the server's state instead of predicting, as JoF EternalJK's
@@ -480,8 +499,11 @@ its trace mask, so the client no longer stops where the server walks on.
 noclip while the server is sent a still player: zero movement, `BUTTON_TALK` and the view
 held from the moment it began, with the command time intact. The predicted state is not
 reseeded from snapshots, every map area is drawn, and turning it off (or dying,
-spectating or boarding a vehicle) snaps back to the server's position without error
-smoothing. Turbo (attack held) sets the velocity along the aim directly.
+spectating, boarding a vehicle or a duel starting) snaps back to the server's position
+without error smoothing. It is refused in a duel: JoF's JA+ servers spare a player
+with the talk balloon up any damage, so a flying duellist took none of the opponent's
+(Nib's hub report #209, 30/10/2026); jaPRO's own chat protection leaves duels out
+(`g_godChat`, `!ps.duelInProgress`). Turbo (attack held) sets the velocity along the aim directly.
 The flight ignores the animations that hold a body still (a taunt, a JA+ emote, a kick, a
 saber lock): `pmove_input_freeze` does not run for a fake-noclip predictor, so the camera
 flies while the real body stays in its emote.
@@ -510,8 +532,8 @@ Your body remains at its server entity, with no view weapon. It is hidden
 from the main view while the camera is within 32 units of its eye, so the
 initial view stays clear; it becomes visible after flying away. Turning
 it off returns to the real player on the next snapshot and restores the chosen
-first/third-person mode. It is available while alive and on foot; death,
-spectating or entering a vehicle ends flight. It is temporary and mutually
+first/third-person mode. It is available while alive, on foot and out of a duel;
+death, spectating, entering a vehicle or a duel starting ends flight. It is temporary and mutually
 exclusive with `/fakenoclip`. Generic actions, weapon changes and Force-wheel reliable commands are suppressed.
 Disconnecting, reconnecting or changing maps clears it. `/freecam off` also
 works from the menu. This does not change server noclip permissions.

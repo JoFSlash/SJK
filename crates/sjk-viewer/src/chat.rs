@@ -6,6 +6,7 @@ mod editing;
 mod editor;
 pub(crate) mod emoji;
 mod feed_gif;
+pub(crate) mod incoming_color;
 
 pub(crate) mod client_icons;
 mod interaction;

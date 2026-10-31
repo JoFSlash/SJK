@@ -900,14 +900,24 @@ impl Panel {
         let Some((at, column)) = line_of(lines, self.shader) else {
             return;
         };
-        if (first..first + shown).contains(&at) {
+        // A line may keep the choice when it is in view, but not as the top line with its
+        // tier's heading scrolled off: the next frame's [`line_window`] would bring the
+        // heading back and undo the notch, and the wheel would stop at every tier
+        // (hub report #201).
+        let keeps = |line: usize| {
+            (first..first + shown).contains(&line)
+                && !(line == first && line > 0 && matches!(lines[line - 1], Line::Head(_)))
+        };
+        if keeps(at) {
             return;
         }
-        let mut in_view = (first..first + shown).filter_map(|index| match lines.get(index) {
-            Some(Line::Things(start, end)) => Some((*start, *end)),
-            _ => None,
-        });
-        let target = if at < first {
+        let mut in_view = (first..first + shown)
+            .filter(|index| keeps(*index))
+            .filter_map(|index| match lines.get(index) {
+                Some(Line::Things(start, end)) => Some((*start, *end)),
+                _ => None,
+            });
+        let target = if at <= first {
             in_view.clone().next()
         } else {
             in_view.next_back()
