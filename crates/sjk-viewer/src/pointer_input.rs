@@ -171,6 +171,18 @@ impl GpuState {
                 .scrolled(delta.y, std::time::Instant::now());
             return;
         }
+        // A model the map editor grabbed turns with the wheel instead of changing weapon.
+        if let Some(up) = wheel_binding_direction(delta.y)
+            && !self.map_edit_panel_open()
+        {
+            let fine = self
+                .console
+                .as_ref()
+                .is_some_and(|console| console.shift_held());
+            if self.map_edit_wheel(up, fine) {
+                return;
+            }
+        }
         if let Some(up) = wheel_binding_direction(delta.y)
             && self
                 .client_menu

@@ -249,6 +249,10 @@ pub struct Snapshot {
     /// Counts the map edit documents written or removed in the folder given to
     /// [`Service::keep_map_edits`], so the viewer reads the loaded map's again.
     pub map_edits_revision: u64,
+    /// What the last look at the hub's map edits did: its summary
+    /// ([`crate::map_edits::Refresh::summary`]), or why it fell short, for the log and the
+    /// editor. Map edits are cosmetic: a failure shows here, never in [`Snapshot::status`].
+    pub map_edits_note: Option<Result<String, String>>,
     /// The hub's answer to the last [`Service::publish_map_edits`], by serial: the map,
     /// the checksum and the new revision, or why it was refused.
     pub map_edits_published: Option<(u64, MapEditsPublished)>,
@@ -616,6 +620,7 @@ impl Snapshot {
             packs_revision: 0,
             assets_note: None,
             map_edits_revision: 0,
+            map_edits_note: None,
             map_edits_published: None,
             mystery_boxes: None,
             mystery_boxes_revision: 0,
@@ -739,6 +744,8 @@ enum Command {
     AssetsDir(PathBuf),
     /// The folder map edits are kept in ([`crate::map_edits`]).
     MapEditsDir(PathBuf),
+    /// Look at the hub's map edits now.
+    RefreshMapEdits,
     /// Open mystery box `id` on `server`.
     OpenMysteryBox {
         id: i64,
@@ -748,12 +755,16 @@ enum Command {
     PlaceMysteryBox(crate::mystery_box::MysteryBox),
     /// SJK's creator: remove mystery box `id`.
     RemoveMysteryBox(i64),
-    /// Read the box hunt on `server`.
-    BoxHunt(String),
+    /// Read the box hunt on `server`, the player away or not.
+    BoxHunt {
+        server: String,
+        away: bool,
+    },
     /// The player, the box hunt's mark on `server`, was killed by slot `by`.
     BoxHuntKilled {
         server: String,
         by: u8,
+        away: bool,
     },
     /// Staff: publish a map's edits.
     PublishMapEdits {
@@ -1631,6 +1642,7 @@ impl Worker {
                     self.due_map_edits = now;
                 }
             }
+            Command::RefreshMapEdits => self.due_map_edits = now,
             Command::PublishMapEdits {
                 map,
                 checksum,
@@ -1644,8 +1656,10 @@ impl Worker {
                 hub.place_mystery_box(identity, &placed)
                     .map(|id| (BoxDone::Placed(id), None))
             }),
-            Command::BoxHunt(server) => self.box_hunt(&server, None),
-            Command::BoxHuntKilled { server, by } => self.box_hunt(&server, Some(by)),
+            Command::BoxHunt { server, away } => self.box_hunt(&server, None, away),
+            Command::BoxHuntKilled { server, by, away } => {
+                self.box_hunt(&server, Some(by), away);
+            }
             Command::RemoveMysteryBox(id) => self.mystery_box(now, |hub, identity| {
                 hub.remove_mystery_box(identity, id)
                     .map(|_| (BoxDone::Removed(id), None))
@@ -2408,7 +2422,7 @@ impl Worker {
         if self.assets_dir.is_some() {
             wait = wait.min(self.due_assets.saturating_duration_since(now));
         }
-        if self.map_edits_dir.is_some() {
+        if self.map_edits_dir.is_some() && self.registered {
             wait = wait.min(self.due_map_edits.saturating_duration_since(now));
         }
         if self.registered {
@@ -2779,10 +2793,15 @@ impl Worker {
         });
     }
 
-    /// Bring the map edits' folder up to the hub's list if a folder was given and it is
-    /// time: next time [`MAP_EDITS_EVERY`] later. Cosmetic: the status stays.
+    /// Bring the map edits' folder up to the hub's list once registered, if a folder was
+    /// given and it is time: next time [`MAP_EDITS_EVERY`] later. Cosmetic: the status
+    /// stays; what it did goes in [`Snapshot::map_edits_note`].
     fn keep_map_edits(&mut self, now: Instant) {
-        let (Some(dir), Some(hub)) = (self.map_edits_dir.as_ref(), self.hub.as_mut()) else {
+        let (Some(dir), Some(hub), true) = (
+            self.map_edits_dir.as_ref(),
+            self.hub.as_mut(),
+            self.registered,
+        ) else {
             return;
         };
         if now < self.due_map_edits {
@@ -2790,9 +2809,14 @@ impl Worker {
         }
         self.due_map_edits = now + MAP_EDITS_EVERY;
         let refresh = crate::map_edits::refresh(hub.as_mut(), &self.identity, dir);
-        if refresh.changed > 0 {
-            self.update(|snapshot| snapshot.map_edits_revision += refresh.changed as u64);
-        }
+        let note = match &refresh.problem {
+            Some(problem) => Err(problem.clone()),
+            None => Ok(refresh.summary()),
+        };
+        self.update(|snapshot| {
+            snapshot.map_edits_revision += refresh.changed as u64;
+            snapshot.map_edits_note = Some(note);
+        });
     }
 
     /// Read the hub's mystery boxes once registered, if it is time: next time
@@ -2855,16 +2879,19 @@ impl Worker {
     }
 
     /// Read the box hunt on `server` into [`Snapshot::box_hunt`], first saying the
-    /// player (the mark) was killed by slot `killed_by` when given. A failed read leaves
-    /// the last one.
-    fn box_hunt(&mut self, server: &str, killed_by: Option<u8>) {
+    /// player (the mark) was killed by slot `killed_by` when given (tried twice: a kill
+    /// lost is a hunter's free roll lost), and whether the player is `away`. A failed
+    /// read leaves the last one.
+    fn box_hunt(&mut self, server: &str, killed_by: Option<u8>, away: bool) {
         let (Some(hub), true) = (self.hub.as_mut(), self.registered) else {
             return;
         };
-        if let Some(by) = killed_by {
+        if let Some(by) = killed_by
+            && hub.box_hunt_killed(&self.identity, server, by).is_err()
+        {
             let _ = hub.box_hunt_killed(&self.identity, server, by);
         }
-        let Ok(state) = hub.box_hunt(&self.identity, server) else {
+        let Ok(state) = hub.box_hunt(&self.identity, server, away) else {
             return;
         };
         self.box_hunt_serial += 1;
@@ -2878,11 +2905,11 @@ impl Worker {
         self.map_edits_serial += 1;
         let serial = self.map_edits_serial;
         let outcome = match self.hub.as_mut() {
-            None => Err("not connected to the hub".to_owned()),
+            None => Err("Not connected to the SJK hub.".to_owned()),
             Some(hub) => hub
                 .publish_map_edits(&self.identity, map, checksum, edits)
                 .map(|revision| (map.to_owned(), checksum, revision))
-                .map_err(|error| error.to_string()),
+                .map_err(|error| crate::map_edits::refusal(&error)),
         };
         if outcome.is_ok() {
             self.due_map_edits = now;
@@ -3714,6 +3741,12 @@ impl Service {
         let _ = self.commands.send(Command::MapEditsDir(directory));
     }
 
+    /// Look at the hub's map edits now rather than at the next 10 minutes (the editor
+    /// turned on), once registered.
+    pub fn refresh_map_edits(&self) {
+        let _ = self.commands.send(Command::RefreshMapEdits);
+    }
+
     /// Open mystery box `id`, which the player stands at on `server`: what came of it
     /// arrives in [`Snapshot::mystery_box`], the credits after in the profile.
     pub fn open_mystery_box(&self, id: i64, server: String) {
@@ -3731,15 +3764,19 @@ impl Service {
         let _ = self.commands.send(Command::RemoveMysteryBox(id));
     }
 
-    /// Read the box hunt on `server`: it arrives in [`Snapshot::box_hunt`].
-    pub fn read_box_hunt(&self, server: String) {
-        let _ = self.commands.send(Command::BoxHunt(server));
+    /// Read the box hunt on `server`, saying whether the player is `away` (in the chat,
+    /// a menu, idle: the hub picks no mark among them): it arrives in
+    /// [`Snapshot::box_hunt`].
+    pub fn read_box_hunt(&self, server: String, away: bool) {
+        let _ = self.commands.send(Command::BoxHunt { server, away });
     }
 
     /// The player, the box hunt's mark on `server`, was killed by the player on slot
-    /// `by`; the hunt is read again after.
-    pub fn box_hunt_killed(&self, server: String, by: u8) {
-        let _ = self.commands.send(Command::BoxHuntKilled { server, by });
+    /// `by`; the hunt is read again after, the player `away` or not.
+    pub fn box_hunt_killed(&self, server: String, by: u8, away: bool) {
+        let _ = self
+            .commands
+            .send(Command::BoxHuntKilled { server, by, away });
     }
 
     /// Staff: publish `edits` for `map` and `checksum`; the answer lands in

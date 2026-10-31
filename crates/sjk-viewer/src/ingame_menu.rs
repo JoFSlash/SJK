@@ -1120,7 +1120,7 @@ mod sjk_tests {
         main.staff = true;
         menu.build_sjk(main, [1_920.0, 1_080.0]);
         assert_eq!(menu.focus, sjk_focus::Focus::Row(sjk_focus::Icon::Staff));
-        assert_eq!(menu.sjk_icons().len(), 6);
+        assert_eq!(menu.sjk_icons().len(), 7, "Map editor and Staff tools");
         let mut main = view(Page::Main, 0, false, 0);
         main.staff = false;
         menu.build_sjk(main, [1_920.0, 1_080.0]);

@@ -1406,13 +1406,15 @@ entry of its own under Profile, making seven.
   Camera control (the settings `camera` icon; F8 opens it too), What's new (the
   wheel's `whats_new`), Credits (`credits`), Report a bug (`other_controls`, the
   tools), SJK chat (`text`, the quill) and, only for a staff key (the hub's `staff`
-  flag, `profile_card::Summary::staff`), Staff tools (`identity`), dimmer than the
-  others. Each is drawn at 78 % (Staff at 50 %) and, hovered or focused, whole with
+  flag, `profile_card::Summary::staff`), Map editor (`maps_own`, the globe) and Staff
+  tools (`identity`), dimmer than the others. Each is drawn at 78 % (those two at 50 %)
+  and, hovered or focused, whole with
   a gold ring (bright gold when focused); the one hovered or focused is named over
   the row in gold (Rajdhani 24) with its key cap (F8 for Camera control) and what it
   opens. Only on the main page. What's new, Credits, SJK chat and Staff tools open
   their console pages over the menu, which shows again when they close; Report a
-  bug opens the report card; Camera control its panel.
+  bug opens the report card; Camera control its panel; Map editor turns the editor on
+  and opens its panel ([Map editor](#map-editor)).
 - **SJK chat:** the main page's docked chat ([Main page](#main-page),
   [hub-chat.md](hub-chat.md#in-the-menus)), on the main page only and while
   `cl_sjkChat` is on: in the match card's column under its last control (x 1360, the
@@ -2014,7 +2016,8 @@ panel was removed on 10/10/2026).
 
 [panel_view.rs](../crates/sjk-viewer/src/map_edits/panel_view.rs): the staff map editor's
 panel ([map-edits.md](map-edits.md#the-panel) has what it does), opened by the world-note
-key while `mapedit` is on, in every menu style (19/10/2026, Sol's request). It is Camera
+key while `mapedit` is on, or the in-game menu's Map editor icon, in every menu style
+(19/10/2026, Sol's request; made easier 28/10/2026, Sol's request). It is Camera
 control's column: the 1080-line frame on the window's right edge, the column at x 1440,
 416 wide, over the same navy fade, the scene left of x 1400 undimmed, where a click
 selects (the selection's green outline is the screen's one memorable thing).
@@ -2023,20 +2026,25 @@ selects (the selection's green outline is the screen's one memorable thing).
   published, or published with the hub's revision), then the pages as tabs: Selected,
   Place, Edits (Camera control's tabs).
 - **Selected:** what it is (Rajdhani 26), its model or shader and its detail (Exo 2 16,
-  muted, two lines), a row of two kit buttons, then Draw another shader: a kit field and
-  Remap and Remove remap. With nothing selected, how to select.
-- **Place:** the kit's search pill, a list of seven rows (34 each, the chosen one gold with
+  muted, two lines), a row of two kit buttons, then Draw another shader: the kit's search
+  pill (with its count), a list of five rows as Place's (names without `textures/` or
+  `models/`, the selection's own shader in quiet print unless chosen), and Remap and
+  Remove remap. With nothing selected, how to select.
+- **Place:** the kit's search pill, a list of six rows (34 each, the chosen one gold with
   a gold tick at its left, paths without `models/`), Place where you aimed across the
-  column, then Placed model: its line and two rows of four buttons.
-- **Edits:** a list of twelve rows, an edit for another server in quiet print; Delete and
-  Undo newest.
+  column, then Placed model: its line and three rows of four buttons (turn and lift,
+  the nudges, scale with Grab and Remove).
+- **Edits:** a list of twelve rows, an edit for another server in quiet print; Delete,
+  Undo and Redo (each dimmed with nothing to do).
 - **Foot:** New edits for and the kit's segments (All servers, This server) at y 800, the
-  last answer (ember when refused) at 840, Publish (gold), Aim and Editor off at 898, and
-  two lines of keys from 964 as Camera control's. A page's controls end above it (a test
-  checks every page at four window shapes).
+  last answer (ember when refused, or a failed look at the hub) at 840, Publish (gold),
+  Aim and Editor off at 898, and two lines of keys from 964 as Camera control's (Enter,
+  Ctrl+Z, Ctrl+Y; then Click, Esc, with Shift's fine steps on Place). A page's controls
+  end above it (a test checks every page at four window shapes).
 - **Strip:** while the editor is on and the panel hidden, a navy card 600 wide at the top
   centre of the 16:9 frame: "Map editor" in gold, what to aim at (or that the grabbed model
-  follows the aim), and the world-note key's cap with "edit" (or "put it down").
+  follows the aim), and the world-note key's cap with "edit" (or "put it down", with the
+  Wheel's "turn" under it).
 
 It is a page of the in-game menu (`Page::MapEdit`), drawn by `InGameMenu::append_own_page`
 from the panel's state, which lives with the map's edits; its keys come before the game
