@@ -946,8 +946,13 @@ fn duel6_sjk_collection_history() {
                 unlock: "saber_sun".into(),
                 ..OpenedLine::default()
             }),
-            HistoryLine::Credits(ledger(now - 60, -400, "holocron_buy", "")),
-            came(now - 60, "legendary", "bought"),
+            {
+                let HistoryLine::Came(mut bought) = came(now - 60, "rare", "bought") else {
+                    unreachable!()
+                };
+                bought.price = 400;
+                HistoryLine::Came(bought)
+            },
         ];
         lines.extend((0..5).map(|index| {
             opened(

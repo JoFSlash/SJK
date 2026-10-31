@@ -125,6 +125,10 @@ pub struct Came {
     /// The team's note (a gift's, a reward's), often empty.
     #[serde(default, deserialize_with = "text")]
     pub note: String,
+    /// The credits a bought one cost (0 otherwise; the hub's credits line for it is
+    /// this one's).
+    #[serde(default)]
+    pub price: i64,
     /// It arrived through a trade.
     #[serde(default)]
     pub traded: bool,
@@ -379,6 +383,7 @@ mod tests {
                 tier: "rare".into(),
                 source: "play".into(),
                 note: String::new(),
+                price: 0,
                 traded: false,
             })
         );

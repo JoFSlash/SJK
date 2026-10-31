@@ -92,6 +92,7 @@ impl Filter {
             | (Self::Trades, HistoryLine::Trade(_))
             | (Self::Boxes, HistoryLine::Box(_)) => true,
             (Self::Credits, HistoryLine::Opened(line)) => line.credits != 0,
+            (Self::Credits, HistoryLine::Came(line)) => line.price != 0,
             (Self::Credits, HistoryLine::Box(line)) => line.won != line.price,
             (Self::Shards, HistoryLine::Opened(line)) => line.shards != 0,
             (Self::Shards, HistoryLine::Box(line)) => line.shards != 0,
@@ -470,7 +471,12 @@ pub(super) fn row(line: &HistoryLine) -> Row {
         inner: false,
     };
     match line {
-        HistoryLine::Came(came) => base("Drop", tier_colour(&came.tier), came_text(came), vec![]),
+        HistoryLine::Came(came) => base(
+            "Drop",
+            tier_colour(&came.tier),
+            came_text(came),
+            Amount::of(-came.price, "credits").into_iter().collect(),
+        ),
         HistoryLine::Opened(opened) => base(
             "Opened",
             tier_colour(&opened.tier),
@@ -593,10 +599,10 @@ pub(super) fn shards_text(ledger: &Ledger) -> String {
 fn outcome_words(outcome: &str) -> String {
     use sjk_identity::mystery_box as wire;
     match outcome {
-        "empty" => "empty".to_owned(),
+        "empty" => "nothing inside".to_owned(),
         "refund" => "your credits back".to_owned(),
-        "double" => "double".to_owned(),
-        "jackpot" => "jackpot".to_owned(),
+        "double" => "double your credits".to_owned(),
+        "jackpot" => "the jackpot".to_owned(),
         wire::EXPLODE => "it blew up".to_owned(),
         wire::HOLOCRON => crate::terms::say("a holocron").into_owned(),
         wire::SHARD_PILE => "kyber shards".to_owned(),
@@ -606,7 +612,7 @@ fn outcome_words(outcome: &str) -> String {
     }
 }
 
-/// A mystery box in a sentence: "Mystery box: double, paid 100, won 200".
+/// A mystery box in a sentence: "Mystery box: double your credits, paid 100, won 200".
 pub(super) fn box_text(opened: &BoxLine) -> String {
     let mut text = format!("Mystery box: {}", outcome_words(&opened.outcome));
     if opened.price > 0 {
@@ -735,7 +741,14 @@ pub(super) fn group_row(run: &[&HistoryLine]) -> Row {
                     _ => format!("Received {noun}{breakdown}"),
                 }
             };
-            (text, Vec::new())
+            let price: i64 = run
+                .iter()
+                .map(|line| match line {
+                    HistoryLine::Came(came) => came.price,
+                    _ => 0,
+                })
+                .sum();
+            (text, Amount::of(-price, "credits").into_iter().collect())
         }
         _ => {
             let (mut credits, mut shards, mut cards, mut unlocks) = (0, 0, 0, 0);
@@ -924,6 +937,7 @@ pub(crate) mod tests {
             tier: tier.into(),
             source: source.into(),
             note: String::new(),
+            price: 0,
             traded: false,
         })
     }
@@ -935,6 +949,20 @@ pub(crate) mod tests {
             reason: reason.into(),
             note: note.into(),
         }
+    }
+
+    #[test]
+    fn a_bought_holocron_shows_its_price() {
+        let HistoryLine::Came(mut bought) = came(0, "rare", "bought") else {
+            unreachable!()
+        };
+        bought.price = 400;
+        let line = HistoryLine::Came(bought);
+        let shown = row(&line);
+        assert_eq!(shown.text, "Bought a Rare Holocron");
+        assert_eq!(shown.amounts[0].text, "-400 credits");
+        assert!(!shown.amounts[0].gain);
+        assert!(Filter::Credits.passes(&line));
     }
 
     #[test]
@@ -1043,7 +1071,7 @@ pub(crate) mod tests {
                 won: 200,
                 ..BoxLine::default()
             }),
-            "Mystery box: double, paid 100, won 200"
+            "Mystery box: double your credits, paid 100, won 200"
         );
         assert_eq!(
             box_text(&BoxLine {

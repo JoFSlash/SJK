@@ -808,9 +808,9 @@ and `kind`:
 
 | Kind | What it is | Its fields |
 | --- | --- | --- |
-| `came` | a holocron or kyber crystal came (not through a trade: the trade's line says it) | `holocron`, `tier`, `source` (`play`, `staff`, `achievement`, `bought`, `box`, `reward`), `note`, `traded` |
+| `came` | a holocron or kyber crystal came (not through a trade: the trade's line says it; one found then traded away stays) | `holocron`, `tier`, `source` (`play`, `staff`, `achievement`, `bought`, `box`, `reward`), `note`, `price` (what a bought one cost, its row's amount), `traded` |
 | `opened` | the player opened one | `holocron`, `tier`, `credits`, `shards`, `card` (`card`, null while sealed; `rarity`, `finish`; or null), `unlock` ("" for none) |
-| `credits` | a credits ledger line no other kind covers | `delta` (signed), `reason` (`holocron_buy`, `staff`, `reward`, `mystery_box` with `note` `explode_gift`), `note` |
+| `credits` | a credits ledger line no other kind covers | `delta` (signed), `reason` (`staff`, `reward`, `mystery_box` with `note` `explode_gift`), `note` |
 | `shards` | a kyber shard ledger line no other kind covers | `delta`, `reason` (`shatter`, `craft`, `shop` with the shader's id as `note`, `staff`, `reward`), `note` |
 | `box` | a mystery box opened | `outcome` ([mystery-boxes.md](mystery-boxes.md)), `price` (0 a free roll), `won`, `shards` |
 | `trade` | a finished trade | `trade`, `with` (`name` with colour codes, `verified`), `gave` and `got` (the trade items of `GET /v1/trades`, `value` included) |
