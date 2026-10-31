@@ -62,7 +62,7 @@ Add each release's notes here when it is tagged (docs/sjk.md "Releases").
 - Mystery boxes: when the opener takes what came out, everyone else sees it go and the lid close at once, instead of it floating on for 10 seconds _(Sol)_
 - Tags: two new ones, Gonk (Uncommon) and Geyon (Rare), and the EZ tag has its real picture, all three drawn by Blep and picked from the Discord's #tag-proposals _(Sol, art by Blep)_
 - A prompt by the crosshair shows what Use does at a mystery box, with the key you bound to Use: Open mystery box and its price, Take it, or why you cannot yet (your turn in a few seconds, not enough credits), instead of a message in the middle of the screen _(Sol)_
-- Fonts from your PC: Settings > Chat font (`cg_chatFont`) and Console font (`con_font`) list the font families installed on this PC; pick one to draw the chat or the console in it. Characters it lacks, Cyrillic, Chinese, Japanese, Korean and emoji still come from SJK's fonts, and SJK default keeps SJK's own _(Sol, after Saturn's idea)_
+- Fonts from your PC: Settings > Chat font (`cg_chatFont`) and Console font (`con_font`) list the font families installed on this PC; pick one to draw the chat or the console in it. Characters it lacks, Cyrillic, Chinese, Japanese, Korean and emoji still come from SJK's fonts, and SJK default keeps SJK's own _(Slash, PR #303, after Saturn's idea)_
 
 ## 2026.1030.2 (Alpha) | 30/10/2026
 

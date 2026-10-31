@@ -4457,7 +4457,9 @@ and a font that fails to load leaves its surfaces on Inter.
 `cg_chatFont` and `con_font` (Settings: Chat font, Console font; empty is SJK's own) name a
 font family installed on the PC for the chat box and the console
 ([system_font.rs](../crates/sjk-viewer/src/text/system_font.rs)): the system font folders
-(Windows `Fonts` and the per-user one, macOS and Linux system and user folders) are listed
+(Windows `Fonts` and the per-user one, macOS system and user folders, and on Linux the
+user's `fonts` folders and each `XDG_DATA_DIRS` folder's `fonts`, as on NixOS and Flatpak,
+following symlinked folders and visiting each real folder once) are listed
 once on a worker from each file's `name` table, and a chosen family's 256 code-page slots
 are rasterized once on a worker into its own coverage atlas (chat proportional with the
 family's bold face; the console in its 8 by 16 cell, each glyph centred and the em sized so

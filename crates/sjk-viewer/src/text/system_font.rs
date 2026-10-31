@@ -289,11 +289,28 @@ pub(crate) fn font_directories() -> Vec<PathBuf> {
     } else {
         let data =
             env("XDG_DATA_HOME").or_else(|| env("HOME").map(|home| home.join(".local/share")));
-        directories.extend(["/usr/share/fonts", "/usr/local/share/fonts"].map(PathBuf::from));
         directories.extend(data.map(|data| data.join("fonts")));
         directories.extend(env("HOME").map(|home| home.join(".fonts")));
+        directories.extend(
+            xdg_data_dirs(std::env::var_os("XDG_DATA_DIRS"))
+                .into_iter()
+                .map(|data| data.join("fonts")),
+        );
     }
+    let mut seen = std::collections::HashSet::new();
+    directories.retain(|directory| seen.insert(directory.clone()));
     directories
+}
+
+/// The system data folders of `XDG_DATA_DIRS` (NixOS and Flatpak keep their
+/// fonts there), or the spec's default when it is unset or empty.
+fn xdg_data_dirs(value: Option<std::ffi::OsString>) -> Vec<PathBuf> {
+    let value = value
+        .filter(|value| !value.is_empty())
+        .unwrap_or_else(|| "/usr/local/share:/usr/share".into());
+    std::env::split_paths(&value)
+        .filter(|path| path.is_absolute())
+        .collect()
 }
 
 fn is_font_file(path: &Path) -> bool {
@@ -306,18 +323,36 @@ fn is_font_file(path: &Path) -> bool {
         })
 }
 
-fn collect_files(directory: &Path, depth: usize, files: &mut Vec<PathBuf>) {
+/// The font files under `directory`, at most [`MAX_DEPTH`] folders down.
+/// Symlinked folders are followed (Linux distributions link font packages
+/// into `/usr/share/fonts`); `visited` keeps each real folder to one visit, so
+/// a link loop or two links to one folder add nothing twice.
+fn collect_files(
+    directory: &Path,
+    depth: usize,
+    visited: &mut std::collections::HashSet<PathBuf>,
+    files: &mut Vec<PathBuf>,
+) {
+    let real = std::fs::canonicalize(directory).unwrap_or_else(|_| directory.to_path_buf());
+    if !visited.insert(real) {
+        return;
+    }
     let Ok(entries) = std::fs::read_dir(directory) else {
         return;
     };
     for entry in entries.flatten() {
         let path = entry.path();
-        match entry.file_type() {
-            Ok(kind) if kind.is_dir() && depth < MAX_DEPTH => {
-                collect_files(&path, depth + 1, files)
+        let is_dir = match entry.file_type() {
+            Ok(kind) if kind.is_symlink() => path.is_dir(),
+            Ok(kind) => kind.is_dir(),
+            Err(_) => false,
+        };
+        if is_dir {
+            if depth < MAX_DEPTH {
+                collect_files(&path, depth + 1, visited, files);
             }
-            Ok(_) if is_font_file(&path) => files.push(path),
-            _ => {}
+        } else if is_font_file(&path) {
+            files.push(path);
         }
     }
 }
@@ -325,8 +360,9 @@ fn collect_files(directory: &Path, depth: usize, files: &mut Vec<PathBuf>) {
 /// Every family in `directories`.
 pub(crate) fn scan(directories: &[PathBuf]) -> Vec<InstalledFamily> {
     let mut files = Vec::new();
+    let mut visited = std::collections::HashSet::new();
     for directory in directories {
-        collect_files(directory, 0, &mut files);
+        collect_files(directory, 0, &mut visited, &mut files);
     }
     let faces = files.into_iter().flat_map(|path| {
         let faces = std::fs::File::open(&path)
@@ -995,5 +1031,57 @@ mod tests {
         // Every glyph of a sane font passes the size check.
         assert!(rasterize(&inter, 100.0, 'W').is_some());
         assert!(rasterize(&inter, 100.0, ' ').is_some());
+    }
+
+    /// Font folders are searched below, each real folder once, and only font
+    /// files are kept.
+    #[test]
+    fn font_folders_are_searched_once_each() {
+        let root = std::env::temp_dir().join(format!("sjk-font-scan-{}", std::process::id()));
+        let nested = root.join("truetype").join("dejavu");
+        std::fs::create_dir_all(&nested).unwrap();
+        std::fs::write(nested.join("DejaVuSans.ttf"), b"").unwrap();
+        std::fs::write(nested.join("README"), b"").unwrap();
+        let mut files = Vec::new();
+        let mut visited = std::collections::HashSet::new();
+        collect_files(&root, 0, &mut visited, &mut files);
+        collect_files(&root.join("truetype"), 0, &mut visited, &mut files);
+        assert_eq!(files, vec![nested.join("DejaVuSans.ttf")]);
+        // A symlinked folder (as distributions link font packages) is
+        // followed, and a link back to its parent adds nothing twice.
+        #[cfg(unix)]
+        {
+            let linked = std::env::temp_dir().join(format!("sjk-font-link-{}", std::process::id()));
+            std::fs::create_dir_all(&linked).unwrap();
+            std::os::unix::fs::symlink(&root, linked.join("packages")).unwrap();
+            std::os::unix::fs::symlink(&linked, linked.join("loop")).unwrap();
+            let mut files = Vec::new();
+            collect_files(&linked, 0, &mut Default::default(), &mut files);
+            assert_eq!(files.len(), 1);
+            let _ = std::fs::remove_dir_all(&linked);
+        }
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// `XDG_DATA_DIRS` names the system data folders; unset or empty, the
+    /// spec's default holds.
+    #[cfg(unix)]
+    #[test]
+    fn xdg_data_dirs_follow_the_spec() {
+        let default = vec![
+            PathBuf::from("/usr/local/share"),
+            PathBuf::from("/usr/share"),
+        ];
+        assert_eq!(xdg_data_dirs(None), default);
+        assert_eq!(xdg_data_dirs(Some("".into())), default);
+        assert_eq!(
+            xdg_data_dirs(Some(
+                "/run/current-system/sw/share:relative:/app/share".into()
+            )),
+            vec![
+                PathBuf::from("/run/current-system/sw/share"),
+                PathBuf::from("/app/share")
+            ]
+        );
     }
 }
