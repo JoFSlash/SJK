@@ -144,6 +144,7 @@ impl GpuState {
         self.offer_holocrons();
         self.follow_official();
         let _ = player_identity::with_snapshot(|snapshot| {
+            log_look_outcome(snapshot.look_outcome.as_ref());
             crate::loot_odds::follow(&snapshot.loot);
             crate::economy::follow(snapshot.economy.as_ref());
             crate::kyber::follow(snapshot.kyber.as_ref());
@@ -204,4 +205,16 @@ impl GpuState {
             .filter(|folder| !models.retail.contains(folder));
         player_identity::set_own_model(own);
     }
+}
+
+/// Log each look the hub was sent (it carries the toys others see), once: how long it
+/// waited after the change and whether the hub took it, for slow toy sync reports.
+fn log_look_outcome(outcome: Option<&sjk_identity::ReportOutcome>) {
+    static LOGGED: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+    let Some(outcome) = outcome else { return };
+    if LOGGED.swap(outcome.serial, std::sync::atomic::Ordering::AcqRel) == outcome.serial {
+        return;
+    }
+    let verdict = if outcome.sent { "sent" } else { "refused" };
+    crate::log::progress(format_args!("SJK look {verdict}: {}", outcome.message));
 }

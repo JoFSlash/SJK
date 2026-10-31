@@ -625,9 +625,9 @@ profile is read every ten minutes, and sooner (at most once every 30 seconds) af
 last one sent, with another blade skin (staff took it back; `Service::take_looks`
 hands it to the worker), so a relocked skin leaves the player's own blade within
 seconds; too many
-(429: `look_quota`, or the per-address `rate_limited` the chat and emotes share), a
-refused signature (401) and failures wait 10 seconds and go again; `not_on_server`
-waits for the next accepted claim;
+(429 `look_quota`) waits 1 second; the per-address `rate_limited` the chat and emotes
+share, a refused signature (401) and failures wait 10 seconds and go again;
+`not_on_server` asks for the claim again at once and the look goes with it;
 another refusal (an older hub) is not repeated until the look or the claim changes.
 Leaving the server sends nothing (the release drops the look).
 `Snapshot::look_outcome` holds what became of the last one. Unit tests against a fake
