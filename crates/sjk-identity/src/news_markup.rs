@@ -389,7 +389,7 @@ mod tests {
         );
         let seven = vec![format!("[[image:{ID}]]"); 7].join("\n");
         assert_eq!(check(&seven, known), Err(MarkupError::TooManyImages));
-        let ten = vec!["[[switch:cg_a]]"; 10].join("\n");
+        let ten = ["[[switch:cg_a]]"; 10].join("\n");
         assert_eq!(check(&ten, known), Err(MarkupError::TooManySwitches));
         assert_eq!(images(&format!("a\n[[image:{ID}]]")), [ID]);
     }

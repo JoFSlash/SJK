@@ -576,6 +576,15 @@ fn lay_out(entry: &Entry, measures: &Measures<'_>) -> Laid {
             Block::Gap => laid.items.push(Item::Gap(BLOCK_GAP)),
         }
     }
+    if laid.items.is_empty() {
+        // A release without a recap or an introduction ("Unreleased" before it is cut).
+        laid.items.extend(rows_of(
+            "Its changes are listed in the full changelog.",
+            0.0,
+            Tone::Muted,
+            measures,
+        ));
+    }
     if !entry.credit.is_empty() {
         laid.items.push(Item::Gap(6.0));
         laid.items

@@ -50,6 +50,9 @@ struct Slot {
     freed_in: Option<u64>,
 }
 
+/// What the worker answers: the picture's id and its pixels, or none.
+type Answer = (String, Option<LevelshotImage>);
+
 struct Request {
     id: String,
     hub_url: String,
@@ -64,7 +67,7 @@ struct Cache {
     slots: [Slot; NEWS_IMAGE_SLOTS],
     frame: u64,
     renderer: Option<u64>,
-    worker: Option<(Sender<Request>, Receiver<(String, Option<LevelshotImage>)>)>,
+    worker: Option<(Sender<Request>, Receiver<Answer>)>,
 }
 
 static CACHE: Mutex<Option<Cache>> = Mutex::new(None);
@@ -251,7 +254,7 @@ fn blank() -> LevelshotImage {
     }
 }
 
-fn spawn() -> (Sender<Request>, Receiver<(String, Option<LevelshotImage>)>) {
+fn spawn() -> (Sender<Request>, Receiver<Answer>) {
     let (requests, inbox) = channel::<Request>();
     let (outbox, answers) = channel();
     let spawned = std::thread::Builder::new()

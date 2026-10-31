@@ -3781,7 +3781,7 @@ seeing any of them means sharing your own, through the hub (Sol's rule, 15/10/20
   Every profile had saved nameplates on (the old default), so the release asks players
   to choose it again (`= cg_nameplate reset: ...` in the changelog): the what's-new card
   puts it back off and opens on it with its switch, and the player turns it on again
-  knowing that it shares ([sjk-ui.md](sjk-ui.md#whats-new-card)).
+  knowing that it shares ([sjk-ui.md](sjk-ui.md#news-panel)).
 - **Duels** (Milamber's rule, 18/10/2026): nobody sees a duel opponent's health,
   shield and Force, and a duellist sends nobody theirs, whatever either side's
   settings (`hud::nameplate::Duel`). In a private duel (`duelInProgress`) the opponent
@@ -4038,7 +4038,7 @@ the in-game pop-up box and title band, a retail list box of releases, a detail
 box with the release and its credits in gold, a Close button and the
 description line, in the menus' retail font. How the file is kept is in
 [SJK conventions](sjk.md#changelog). A release's `> Heading: sentence` recap lines are
-not drawn here: they feed the [what's-new card](sjk-ui.md#whats-new-card), the pop-up
+not drawn here: they feed the [News panel](sjk-ui.md#news-panel), the pop-up
 shown once after an update (`cl_whatsNewSeen` remembers the version; `whatsnew` previews
 the newest recap).
 

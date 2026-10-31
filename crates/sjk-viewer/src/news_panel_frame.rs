@@ -235,6 +235,7 @@ impl crate::GpuState {
         if let Some(highest) = self.news.highest_listed() {
             self.official.mark_news_read(highest);
         }
+        self.news.put_away();
         self.news.set_open(false);
         if let Some(console) = self.console.as_mut() {
             if !version.is_empty() {

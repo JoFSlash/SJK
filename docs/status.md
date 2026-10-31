@@ -3727,7 +3727,7 @@ profiles from before, with no migration cvar of its own. A nameplate's Force bar
 the value the player shares: the Force estimate (`force_estimate.rs`) and
 `cg_nameplateForce` are removed. In a duel (private, Duel, Power Duel) the opponent's
 plate shows no bars and the duellist sends no values. See
-[client](client.md#sharing-and-estimates), [sjk-ui](sjk-ui.md#whats-new-card) and
+[client](client.md#sharing-and-estimates), [sjk-ui](sjk-ui.md#news-panel) and
 [sjk](sjk.md#changelog).
 
 Workspace `cargo fmt --check`, build, test and clippy (no new warnings) passed on

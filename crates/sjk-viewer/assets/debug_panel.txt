@@ -8027,3 +8027,15 @@ title: What's new: Settings to review switches flip
 change: A setting held in a number cvar (r_dynamicGlowNoSabers) showed Off and never flipped.
 test: whatsnew: on Settings to review, click each switch: it flips On and Off and stays.
 test: Settings: the same setting shows the value the card set.
+
+[news-panel]
+area: Menus & settings
+title: News panel: what's new and announcements in one
+change: One panel lists the releases' recaps and the SJK team's announcements, newest first.
+change: Announcements can hold links to a setting or a page, pictures and switches.
+change: Staff can announce; announce: Ctrl+L link, Ctrl+K switch, Ctrl+I picture.
+test: news, then whatsnew: the panel opens; Up/Down change entry, wheel scrolls the text.
+test: debug_announce long: click the Collection link, the setting link, the chip, the switch.
+test: debug_announce picture: a framed Picture loading... where the picture goes.
+test: announce, type cg_nameplate then Ctrl+L / Ctrl+K; Ctrl+L alone opens the picker.
+note: Pictures and staff announcing need the hub's news-panel branch deployed.

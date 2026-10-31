@@ -99,6 +99,9 @@ pub(crate) fn older_than(installed: &str, version: &str) -> bool {
     }
 }
 
+/// A picture chosen for an announcement: its bytes and type, or why there are none.
+type Picked = Result<(Vec<u8>, &'static str), String>;
+
 /// The client's side of announcements and rewards.
 #[derive(Default)]
 pub(crate) struct Official {
@@ -119,7 +122,7 @@ pub(crate) struct Official {
     image_serial: u64,
     /// The picture the composer's Ctrl+I is choosing: the file dialog's thread answers
     /// with its bytes and type, or why there are none.
-    picking: Option<std::sync::mpsc::Receiver<Result<(Vec<u8>, &'static str), String>>>,
+    picking: Option<std::sync::mpsc::Receiver<Picked>>,
     /// The rewards' revision the round list last read.
     rewards_revision: u64,
     /// Rehearsals: announcements, rewards waiting and rounds, made up offline.
@@ -294,7 +297,7 @@ pub(crate) fn rehearsal_announcement(kind: &str, id: u64, at: i64) -> Result<Ann
 
 /// The picture at `path` for an upload: its bytes and type, refused when it is too big
 /// for the hub or not a PNG or a JPEG.
-fn read_news_image(path: &Path) -> Result<(Vec<u8>, &'static str), String> {
+fn read_news_image(path: &Path) -> Picked {
     let bytes = std::fs::read(path).map_err(|error| format!("Cannot read the picture: {error}"))?;
     if bytes.len() > sjk_identity::news::NEWS_UPLOAD_MAX {
         return Err("The picture is over 3 MB: make it smaller first.".to_owned());
