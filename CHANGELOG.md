@@ -30,9 +30,15 @@ The site (site/assets/site.js, parseChangelog) reads the release headings,
 introductions and recap lines too.
 Add each release's notes here when it is tagged (docs/sjk.md "Releases").
 -->
-## Unreleased
+## 2026.1031.2 (Alpha) | 31/10/2026
 
-- Map editor (SJK team): a Map editor icon in the game menu; the World note key opens its panel and puts a grabbed model down, as its strip said; undo and redo for every change (`mapedit_undo`, `mapedit_redo`, Ctrl+Z, Ctrl+Y); a shader search to remap with; Left, Right, Away and Closer nudges, Shift for fine steps and the wheel turning a grabbed model; Publish says what the hub answered, and the log says when the hub cannot keep map edits _(Sol)_
+One News panel, cloud content that updates itself, faster blades and a fairer box hunt.
+
+> News: Release notes and announcements share one News panel.
+> Content: JoF content and the Sith cloud can update themselves.
+> Sabers: Legendary and Mythical blades draw faster.
+> Box hunt: Marks only among players in play, with an arrow.
+
 - What's new and the SJK team's announcements are now one News panel (`news`): the releases' recaps and the announcements in one list, with their settings to review, links that take you straight to a setting or a page, pictures and switches you can flip on the spot. It opens after an update and when there is news you have not read, never in the middle of play _(Sol)_
 - The switches on the what's-new card's Settings to review work for every setting: some (the dynamic glow's saber setting) did nothing and always showed Off _(Sol)_
 - JoF content and the Sith cloud can update themselves: turn on Update automatically on their card (or Settings > JoF content auto-update, Sith cloud auto-update) and tick Auto on the groups you want; SJK checks at start and every hour, also during a match, downloads what changed and says so in a small card, the new files loading from the next map. Off by default (`jof.contentAuto`, `sith.cloudAuto`) _(Sol)_
