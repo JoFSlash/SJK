@@ -45,6 +45,18 @@ test: On a JA+ server with 255: strafe jumps, swings and dual jump attacks feel 
 test: Respawn holding attack and jump with 4 set: you jump at once (the server may correct it).
 test: Back to Current: cg_predictLegacy 0, and the miss log (cg_showMiss 1) stays quiet.
 
+[history-tab]
+area: Menus & settings
+title: Collection > History: drops, openings, credits, shards, boxes and trades
+change: A tenth Collection tab lists GET /v1/history newest first, a row a line, dates local.
+change: An Open all is one row (+ opens it); chips filter; Load older reads the next page.
+test: Collection > History: the newest lines show with chips, amounts in green/red, dates.
+test: Open all some holocrons, reopen History: one "Opened N ..." row; Enter shows its lines.
+test: Left/Right filter: Credits keeps buys, boxes and openings that paid credits.
+test: Scroll to the end with more than 100 lines: Load older adds older lines once.
+test: On a hub without the endpoint: "History unavailable", "keeps no history yet".
+note: Needs the hub's history branch deployed.
+
 [pr-batch-1031]
 area: Gameplay
 title: PRs 31/10: chat colour, GIF hiding, Change name, melee kick, duel noclip, vehicle clips

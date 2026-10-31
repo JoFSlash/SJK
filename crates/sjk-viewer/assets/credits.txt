@@ -78,6 +78,7 @@ did: The Mythical holocron's engram: gold plates breathing round a glowing core
 did: Blade cards craft their saber shader for less, and lead to it from the Cards tab
 did: Perk marks on cards: a badge for each thing a card brings
 did: The Forge: shop, crafting and breaking any saber shader down, in one tab
+did: The History tab: every drop, opening, credit and shard spent, box and trade
 did: Blade cost ranking: every Legendary and Mythical blade timed on the GPU
 did: Top-tier saber shaders made faster with the same look
 did: The four holocrons: the Jedi cube, the Great Holocron, the Sith pyramid, the kyber prism

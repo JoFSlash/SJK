@@ -36,6 +36,7 @@ pub struct TradeEvent {
 #[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq)]
 pub struct TradeItem {
     /// `holocron` or `shader`.
+    #[serde(default)]
     pub kind: String,
     /// The holocron's id, for a holocron.
     #[serde(default)]

@@ -9,6 +9,30 @@
 #                               made it when that is not the piece's owner.
 
 = Sol
++ 31/10/2026 | - | Collection > History: the player's inventory history from GET /v1/history
+- 21e5def |  | Collection > History: the player's inventory history from GET /v1/history
++ 31/10/2026 | - | History: bought holocrons show their price on their own line; plainer mystery box words
+- 84022d2 |  | History: bought holocrons show their price on their own line; plainer mystery box words
++ 31/10/2026 | - | Blade signatures: Reactor, Between Worlds, Felucia Spores, Starforge skip pieces a ray passes far from
+- f8346b3 |  | Blade signatures: Reactor, Between Worlds, Felucia Spores, Starforge skip pieces a ray passes far from
++ 31/10/2026 | - | Blade signatures: Exogorth's saliva strands and Nebula Song's ribbons skip far rays
+- fe2a43b |  | Blade signatures: Exogorth's saliva strands and Nebula Song's ribbons skip far rays
++ 31/10/2026 | - | Blade perf round 2: docs, changelog, credits, debug panel
+- bebd74c |  | Blade perf round 2: docs, changelog, credits, debug panel
++ 31/10/2026 | - | Changelog: the blade perf line under Unreleased (2026.1031.1 was tagged meanwhile)
+- 9523d55 |  | Changelog: the blade perf line under Unreleased (2026.1031.1 was tagged meanwhile)
++ 31/10/2026 | - | Blade signatures: behindBlade works out the ray's part once per ray
+- 54cdcb4 |  | Blade signatures: behindBlade works out the ray's part once per ray
++ 31/10/2026 | - | blade_cost.py: resolve --out, the test runs from the crate's folder
+- 83f59ad |  | blade_cost.py: resolve --out, the test runs from the crate's folder
++ 31/10/2026 | - | Blade signatures: ray cache filled once per pixel, bolt3 and Exogorth skip what draws nothing
+- 0dcd79a |  | Blade signatures: ray cache filled once per pixel, bolt3 and Exogorth skip what draws nothing
++ 31/10/2026 | - | Blade signatures: World Shift draws its hiding whole again (@raycache off by rename)
+- 3923312 |  | Blade signatures: World Shift draws its hiding whole again (@raycache off by rename)
++ 31/10/2026 | - | Blade perf: docs, changelog, credits, debug panel
+- 28c3437 |  | Blade perf: docs, changelog, credits, debug panel
++ 31/10/2026 | - | Release 2026.1031.1
+- 6adedf1 |  | Release 2026.1031.1
 + 31/10/2026 | - | Cards: ranks in place of rarities (rank + rank_colour, for the JoF collection)
 - c406c9b |  | Cards: ranks in place of rarities (rank + rank_colour, for the JoF collection)
 + 31/10/2026 | - | Nameplate styles: holo, capsule or classic (cg_nameplateStyle)

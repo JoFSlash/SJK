@@ -314,6 +314,10 @@ pub struct Snapshot {
     /// The player's trades with other players, as the hub last listed them
     /// ([`Service::trade_with`], 22/10/2026); `None` before the first read.
     pub trades: Option<TradesState>,
+    /// The player's inventory history as read so far ([`Service::read_history`],
+    /// 31/10/2026), shared so a copy of the snapshot costs nothing more; `None` before
+    /// the first read.
+    pub history: Option<Arc<crate::history::HistoryState>>,
     /// The SJK team's announcements as the hub last listed them and the feed relayed
     /// since, newest first (`GET /v1/announcements`, 25/10/2026): read at the
     /// registration and every 30 minutes. Empty before, or from a hub without them.
@@ -631,6 +635,7 @@ impl Snapshot {
             marks_revision: 0,
             mark_refusal: None,
             trades: None,
+            history: None,
             announcements: Vec::new(),
             announcements_revision: 0,
             rewards: None,
@@ -784,6 +789,8 @@ enum Command {
     BuyHolocron(String),
     /// Read the player's trades again (the feed told of a change, or the viewer asks).
     ReadTrades,
+    /// Read the player's history: the newest page, or the one before this time.
+    ReadHistory(Option<i64>),
     /// Ask the player with this hub id to trade.
     TradeAsk(String),
     /// Take a step in this trade.
@@ -1658,6 +1665,7 @@ impl Worker {
             Command::Buy(id) => self.trade(Trade::Buy, &id),
             Command::BuyHolocron(tier) => self.trade(Trade::Holocron, &tier),
             Command::ReadTrades => self.due_trades = now,
+            Command::ReadHistory(before) => self.read_history(before),
             Command::TradeAsk(to) => self.trade_with(None, Some(&to), now),
             Command::TradeStep(id, step) => self.trade_with(Some((id, step)), None, now),
             Command::News(crate::feed::FeedNews::Announcements(list)) => {
@@ -1700,6 +1708,14 @@ impl Worker {
             }
             if snapshot.rewards.take().is_some() {
                 snapshot.rewards_revision += 1;
+            }
+            // Another key's or hub's history; its count goes on, for the readers waiting.
+            if let Some(history) = snapshot.history.as_mut() {
+                let serial = history.serial;
+                *history = Arc::new(crate::history::HistoryState {
+                    serial,
+                    ..Default::default()
+                });
             }
         });
         if settings.enabled && !settings.hub_url.trim().is_empty() {
@@ -2011,6 +2027,19 @@ impl Worker {
                 self.holocrons_soon(now);
             }
         }
+    }
+
+    /// Read a page of the history (the newest, or the one before `before`) into
+    /// [`Snapshot::history`], or why it could not be read.
+    fn read_history(&mut self, before: Option<i64>) {
+        let answer = match (self.hub.as_mut(), self.registered) {
+            (Some(hub), true) => hub.history(&self.identity, before),
+            _ => Err(self.not_connected()),
+        };
+        self.update(|snapshot| {
+            Arc::make_mut(snapshot.history.get_or_insert_with(Default::default))
+                .take(before, answer);
+        });
     }
 
     /// Read the shop's day: it goes in [`Snapshot::shop`], or why not.
@@ -3794,6 +3823,13 @@ impl Service {
         crate::feed::post_announcements(&self.chat, announcements)
     }
 
+    /// Read a page of the player's history into [`Snapshot::history`]: the newest
+    /// (`None`, which starts the list again), or the one before `before`
+    /// ([`crate::HistoryState::before`], added to the list).
+    pub fn read_history(&self, before: Option<i64>) {
+        let _ = self.commands.send(Command::ReadHistory(before));
+    }
+
     /// Read the shop's offers of the day into [`Snapshot::shop`].
     pub fn read_shop(&self) {
         let _ = self.commands.send(Command::ReadShop);
@@ -4501,6 +4537,31 @@ mod tests {
             Ok(crate::trades::TradeAnswer {
                 trade: crate::trades::PlayerTrade::default(),
                 profile,
+            })
+        }
+        fn history(
+            &mut self,
+            _: &Identity,
+            before: Option<i64>,
+        ) -> Result<crate::history::HistoryPage, HubError> {
+            self.record(format!("history {before:?}"))?;
+            let line = |at| {
+                crate::history::HistoryLine::Credits(crate::history::Ledger {
+                    at,
+                    ..Default::default()
+                })
+            };
+            Ok(match before {
+                None => crate::history::HistoryPage {
+                    lines: vec![line(30), line(20)],
+                    more: true,
+                    before: 20,
+                },
+                Some(_) => crate::history::HistoryPage {
+                    lines: vec![line(10)],
+                    more: false,
+                    before: 10,
+                },
             })
         }
         fn shop(&mut self, _: &Identity) -> Result<crate::wire::ShopDay, HubError> {
@@ -5744,6 +5805,39 @@ mod tests {
         assert!(holocron_reads(&fake) > reads, "read again");
         let marks = lock(&snapshot).marks.clone().unwrap();
         assert!(!marks.locked("saber_void") && marks.locked("saber_frost"));
+    }
+
+    /// The history (31/10/2026) waits for the registration, its pages follow on, and a
+    /// read of the newest starts the list again.
+    #[test]
+    fn the_history_is_read_page_by_page() {
+        let fake = Fake::default();
+        let t0 = Instant::now();
+        let (mut worker, snapshot) = worker(&fake, t0);
+        worker.handle(Command::ReadHistory(None), t0);
+        let first = lock(&snapshot).history.clone().unwrap();
+        assert_eq!(first.serial, 1);
+        assert!(first.message.contains("cl_identity 1"));
+        assert!(
+            fake.log().is_empty(),
+            "nothing goes before the registration"
+        );
+        worker.handle(Command::Configure(on("https://hub")), t0);
+        worker.tick(t0);
+        worker.handle(Command::ReadHistory(None), t0);
+        worker.handle(Command::ReadHistory(Some(20)), t0);
+        let read = lock(&snapshot).history.clone().unwrap();
+        assert_eq!((read.serial, read.lines.len(), read.more), (3, 3, false));
+        assert!(read.message.is_empty());
+        worker.handle(Command::ReadHistory(None), t0);
+        let again = lock(&snapshot).history.clone().unwrap();
+        assert_eq!((again.serial, again.lines.len(), again.more), (4, 2, true));
+        assert!(
+            fake.log()
+                .iter()
+                .filter(|line| line.starts_with("history"))
+                .eq(["history None", "history Some(20)", "history None"].iter())
+        );
     }
 
     #[test]

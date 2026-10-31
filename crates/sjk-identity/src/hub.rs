@@ -584,6 +584,18 @@ pub trait Hub: Send {
         ))
     }
 
+    /// A page of the player's history (`GET /v1/history`, 31/10/2026): the newest, or
+    /// the one before `before` (unix seconds, [`crate::HistoryPage::before`]).
+    fn history(
+        &mut self,
+        _identity: &Identity,
+        _before: Option<i64>,
+    ) -> Result<crate::history::HistoryPage, HubError> {
+        Err(HubError::Protocol(
+            "status 404: this hub client does not read the history".to_owned(),
+        ))
+    }
+
     /// The player's trades, what they traded today and the rules (`GET /v1/trades`,
     /// 22/10/2026).
     fn trades(&mut self, _identity: &Identity) -> Result<crate::trades::TradesAnswer, HubError> {
@@ -1786,6 +1798,15 @@ impl Hub for HttpHub {
 
     fn trades(&mut self, identity: &Identity) -> Result<crate::trades::TradesAnswer, HubError> {
         parse(self.send(Some(identity), "GET", "/v1/trades", None)?)
+    }
+
+    fn history(
+        &mut self,
+        identity: &Identity,
+        before: Option<i64>,
+    ) -> Result<crate::history::HistoryPage, HubError> {
+        let path = crate::history::path(before);
+        parse(self.send(Some(identity), "GET", &path, None)?)
     }
 
     fn trade_ask(
