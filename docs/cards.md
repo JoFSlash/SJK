@@ -438,6 +438,24 @@ not know is kept but named nowhere; `Face::blade` in
 - **Each card has one rarity** (Bishop is Mythical, the Toxiee card Legendary): the
   first set needs cards of every rarity before every copy can be revealed.
 
+### Ranks
+
+Since 31/10/2026 (Sol's decision, for the JoF collection) a card may show a rank in
+place of its rarity: its file carries `rank` (the name players read, 1 to 24
+characters, "Leader") and `rank_colour` (`#RRGGBB`), always together. Its `rarity`
+stays and only sets its odds (JoF's Leaders are Mythical, its Council Legendary): a
+ranked card never shows a rarity's name, mark or colour. Its rank's name stands at its
+foot and on its tile, "Rank card" in its hover (no mark), its rank's colour edges its
+plate, tile and badges, its drawn scene's backdrop, the opening's title and flourish and
+the grand find's chat line ("a Leader card"; the hub's `finds` carry the card's id).
+A rarity chip leaves ranked cards out of the binder, and their hover gives the card's
+own odds ("about 1 in N holocrons found holds this card": the rarity's share, split
+among the sets that have cards of it, then the set's cards of it). A sealed copy is not a
+card yet and still shows its rolled rarity, as does the crate's spin. Ranks are data on
+the card, so a new rank needs no client release (`cards::Tone`, `cards::faces::Rank`).
+A rank without its colour, or a bad one, is left out (logged) and the card shows its
+rarity. Older clients read past the two keys and show the rarity.
+
 ### Scenes
 
 Since 30/10/2026 (Sol's idea) a card's file may name a `scene`: the client then draws

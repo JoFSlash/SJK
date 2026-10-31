@@ -2117,6 +2117,17 @@ test: First they show the old placeholder, then the drawing; a restart shows the
 test: Look closer at Luke: green blade lit; JKA Arsenal: the Disruptor drawn whole, not in bits.
 note: The drawings are kept in card_scenes beside identity.key; deleting the folder draws them again.
 
+[ranked-cards]
+area: Menus & settings
+title: Ranked cards (JoF): a rank and its colour in place of the rarity
+change: A card with a rank (Leader, Council) shows it and its colour, never Mythical/Legendary.
+change: Its foot, tile, close-up, hover, opening words and chat find line name the rank.
+test: Once the hub has the JoF cards: Collection > Cards, JoF: Leader in cyan, Council in green.
+test: Hover a JoF card: "Leader card." and its own odds; no rarity name or mark anywhere.
+test: Rarity chip (T) on Mythical: JoF cards leave the grid; Any brings them back.
+test: Open holocrons until a JoF card comes: its title and words name the rank, not a rarity.
+note: A sealed copy and the crate spin still show the rolled rarity (the odds).
+
 [card-faces-lazy]
 area: Menus & settings
 title: Card pictures load only when shown (1.8 GB less video memory; 3 GB cards crashed)

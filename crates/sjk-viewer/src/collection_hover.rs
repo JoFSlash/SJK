@@ -482,7 +482,10 @@ pub(super) fn mark_card(
 fn tile_card(tile: &crate::cards::binder::Tile) -> Card {
     use crate::cards::binder::Slot;
     let faces = crate::cards::faces::current();
-    let odds = cards::rarity_odds(tile.rarity, &faces);
+    let odds = match tile.face(&faces) {
+        Some(face) if face.rank.is_some() => cards::card_odds(face, &faces),
+        _ => cards::rarity_odds(tile.rarity, &faces),
+    };
     let mut lines = Vec::with_capacity(4);
     match (&tile.slot, tile.face(&faces)) {
         (_, Some(face)) => {
@@ -494,7 +497,7 @@ fn tile_card(tile: &crate::cards::binder::Tile) -> Card {
             // No number, whatever the kind (Sol, 20/10/2026): it stays the card's id.
             lines.push(Line::status(format!(
                 "{} card. {}, {}.",
-                tile.rarity.name,
+                face.tone().name,
                 face.kind.name(),
                 face.set_name
             )));
@@ -522,7 +525,7 @@ fn tile_card(tile: &crate::cards::binder::Tile) -> Card {
     Card {
         title: tile.name(&faces),
         colour: if tile.owned() {
-            tile.rarity.colour
+            tile.tone(&faces).colour
         } else {
             color::MUTED
         },

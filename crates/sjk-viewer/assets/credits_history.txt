@@ -9,6 +9,20 @@
 #                               made it when that is not the piece's owner.
 
 = Sol
++ 31/10/2026 | - | Cards: ranks in place of rarities (rank + rank_colour, for the JoF collection)
+- c406c9b |  | Cards: ranks in place of rarities (rank + rank_colour, for the JoF collection)
++ 31/10/2026 | - | Nameplate styles: holo, capsule or classic (cg_nameplateStyle)
+- bd94cdd |  | Nameplate styles: holo, capsule or classic (cg_nameplateStyle)
++ 31/10/2026 | - | Blade cost ranking: time every Legendary/Mythical blade (scripts/blade_cost.py)
+- 8bab688 |  | Blade cost ranking: time every Legendary/Mythical blade (scripts/blade_cost.py)
++ 31/10/2026 | - | AGENTS.md: time every blade change with blade_cost.py, keep blades cheap (Sol's rule)
+- ee0ac8f |  | AGENTS.md: time every blade change with blade_cost.py, keep blades cheap (Sol's rule)
++ 31/10/2026 | - | Credits: blade cost ranking
+- b6a0b0d |  | Credits: blade cost ranking
++ 31/10/2026 | - | Looks (toys) reach the hub sooner: picked up between hub calls, 1 s quota retry
+- 60995f2 |  | Looks (toys) reach the hub sooner: picked up between hub calls, 1 s quota retry
++ 31/10/2026 | - | Prediction as in 2026.1028.1: cg_predictLegacy, one bit per change (Kushina's request)
+- e243873 |  | Prediction as in 2026.1028.1: cg_predictLegacy, one bit per change (Kushina's request)
 + 30/10/2026 | - | Defaults are the stock base JKA experience (Sol's rule)
 - 7bd082a |  | Defaults are the stock base JKA experience (Sol's rule)
 + 30/10/2026 | - | Achievements: the toys' own, and a Fun page for them

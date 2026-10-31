@@ -64,7 +64,12 @@ fn prize(find: &sjk_identity::FindMark) -> String {
             name
         };
     }
-    let rarity = crate::cards::Rarity::from_id(&find.rarity).map_or("rare", |rarity| rarity.name);
+    // A ranked card says its rank, never its rarity.
+    let faces = crate::cards::faces::current();
+    let card = Some(find.card.as_str()).filter(|card| !card.is_empty());
+    let rarity = crate::cards::Rarity::from_id(&find.rarity).map_or("rare", |rarity| {
+        crate::cards::tone_in(&faces, rarity, card).name
+    });
     let article = if rarity.starts_with(['A', 'E', 'I', 'O', 'U']) {
         "an"
     } else {
@@ -128,6 +133,7 @@ mod tests {
             name: name.to_owned(),
             rarity: "mythical".to_owned(),
             finish: String::new(),
+            card: String::new(),
         }
     }
 
@@ -137,6 +143,7 @@ mod tests {
             name: String::new(),
             rarity: rarity.to_owned(),
             finish: finish.to_owned(),
+            card: String::new(),
         }
     }
 

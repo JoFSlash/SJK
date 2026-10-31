@@ -1298,6 +1298,9 @@ pub struct FindMark {
     pub rarity: String,
     /// The card's finish as a wire id (empty for a shader).
     pub finish: String,
+    /// The card's id (empty for a shader or a sealed card): its face may name a rank
+    /// in place of its rarity.
+    pub card: String,
 }
 
 /// A grand find (`PROTOCOL.md`, "The feed", `finds`; since 17/10/2026): a holocron someone

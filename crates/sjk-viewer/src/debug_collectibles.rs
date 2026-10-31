@@ -172,6 +172,7 @@ mod tests {
             grants: None,
             blade: None,
             scene: None,
+            rank: None,
         };
         dress(&mut me, std::slice::from_ref(&face), 5);
         let finishes: Vec<_> = me.cards.iter().map(|stack| stack.finish.as_str()).collect();
