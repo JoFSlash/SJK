@@ -36,6 +36,7 @@ Add each release's notes here when it is tagged (docs/sjk.md "Releases").
 = r_dynamicGlowNoSabers: New: the dynamic glow leaves saber blades and trails out, so each saber's details show while the rest still glows; off, sabers glow as before.
 = r_dayClock: New: day and night follow your PC's clock in every preset: with Sun and sky the sun moves, without it the sky turns to night and the world darkens.
 
+- Legendary and Mythical saber shaders draw faster, looking the same: about a fifth less GPU time over the 48 of them, and half on Bleeding Kyber, Abyssal Eye and Sith Holocron _(Sol)_
 - Nameplate styles: choose how nameplates look, Holo (today's), Capsule (your picture in a pill, the bars on a tray under it) or Classic (the name over a framed plate of bars, grey bars on players who do not share). Settings > Nameplate style or Collection > Nameplates, which shows yours (`cg_nameplateStyle`) _(Sol)_
 - Cards: a card can show a rank and its colour in place of a rarity, for the JoF collection (Leaders in cyan, the Council in green): its foot, tile, close-up, hover, the opening and the chat's grand finds name the rank, its hover gives the card's own odds, and the rarity chip leaves ranked cards out _(Sol)_
 - Profile > SJK Profile has a Change name button: it opens the Character tab with its Name field ready to type, the name the hub and other SJK players see being the one you wear in game _(Slash, PR #299, after hub report #202, Nib)_

@@ -3071,6 +3071,37 @@ their own pass). Left out: the glow pass (one shared pipeline for every skin), t
 afterimages and lights. GPU timestamps on a non-exclusive GPU: compare blades within one
 run.
 
+First optimizations from it (31/10/2026), each leaving every signature sheet (still, orbit and
+tip, 132 blades) within 1/255 of `main`'s:
+
+- `behindBlade` (how far the blade's body hides a piece) ran inside every `rayPt` and `raySeg`,
+  a few hundred times a pixel on the heaviest blades, though most of it depends on the ray
+  alone. `saber.wgsl` now calls `labRayPrepare(ray.o, ray.d)` before a signature's volume and
+  solid parts; the lab keeps the ray's part in `var<private>` variables (the translator writes
+  a non-`const` module variable as one) and `behindBlade` reads it for that ray, returning at
+  once where the ray never passes behind the body; another ray (a shifted one) goes through
+  `behindBladeFull`, the old body. The cached path keeps the old multiplication order: `hideD`
+  divides by `1 - h`, which magnifies the last digit a thousandfold where a piece is nearly
+  hidden (a reordered product moved Big Bang's clash ring contour by 31/255).
+- World Shift drew at a third of its speed with the cache on an RTX 5080 (Vulkan), and still
+  did with the cache switched off by a constant or reached through a wrapper, though the same
+  arithmetic in one function did not. Its header says `@raycache off`: `module_source` renames
+  `behindBladeFull` to `behindBlade` in its module, so its pieces call the old body and the kept
+  one goes uncalled (`Signature::ray_cache`, test `world_shift_alone_goes_without_the_ray_cache`).
+- `bolt3` takes `px` and skips its ten segments when the whole bolt (within half its length and
+  0.71 of its zigzag of its middle) is more than six units and three pixels off the ray: every
+  caller turns its distance into Gaussian glows at most 1.5 wide, under a ten-thousandth there.
+- Exogorth: the grit's throat flash is worked out only in the last tenth of its way in, where
+  it shows, and a fang the ray passes further from than its thickness and half a pixel is
+  skipped.
+
+Timed with `scripts/blade_cost.py`, `main` and the branch in one sitting (RTX 5080, Vulkan,
+1920x1080): the 48 Legendary and Mythical blades' total went from 75.1 to 58.2 ms in the
+`game` scene, 40.8 to 32.0 in `close` and 32.6 to 25.6 in `along` (each blade worn by all 33
+blades of the scene). Bleeding Kyber 3.57 to 1.49 ms, Abyssal Eye 3.03 to 1.37, Sith Holocron
+2.52 to 1.32, Exogorth 4.06 to 2.92, Between Worlds 3.86 to 3.05; World Shift and the five
+blades without a signature unchanged. Not timed on another GPU or backend.
+
 ### Falling blossoms
 
 Built 21/10/2026 for the Varykino Blossom (blade 166, Kushina's idea: "the afterimage like

@@ -7979,6 +7979,15 @@ test: The city part keeps its still Coruscant sky (that shader has no stages).
 test: A retail map with a plain sky (mp/ffa3, mp/duel6) looks the same as before.
 test: With r_dayNight 1 the clouds take the hour's tint like the box.
 
+[blade-perf]
+area: Rendering & effects
+title: Top-tier saber shaders draw faster, same look
+change: Signature blades work out the blade's hiding once per pixel; lightning skips far bolts.
+change: About a fifth less GPU time over the 48 Legendary/Mythical blades, up to half on some.
+test: debug_collectibles 1, wear Bleeding Kyber, Abyssal Eye, Exogorth: they look as before.
+test: World Shift and Sith Holocron: lightning and climates as before, no flicker or cut bolts.
+test: cg_drawFPS 1 with several top-tier blades in view: FPS a little higher than before.
+
 [tcgen-vector]
 area: Rendering & effects
 title: tcGen vector stages projected in world space
