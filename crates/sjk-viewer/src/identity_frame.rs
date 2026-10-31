@@ -17,7 +17,8 @@
 //! (`installed_models.rs`), tells the hub's service when the game menu opens, so its
 //! pages read the hub again, puts the pictures that finished loading into the UI's atlas and
 //! gives the UI the frames of the SJK chat's GIFs on screen (`chat_gifs.rs`), and
-//! carries the encrypted whispers (`e2e_whispers.rs`).
+//! carries the encrypted whispers (`e2e_whispers.rs`) and runs the content
+//! collections' automatic updates when due (`console_jof_content.rs`).
 
 use super::*;
 use sjk_identity::Settings;
@@ -100,6 +101,8 @@ impl GpuState {
         self.update_mystery_boxes(&toy_events, &relay_events);
         self.update_e2e_whispers();
         self.update_player_trades();
+        #[cfg(feature = "mod-jof")]
+        self.update_content_auto();
         if !due {
             return;
         }

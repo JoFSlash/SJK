@@ -265,7 +265,9 @@ includes:
   JoF's repository into SJK's own folder and checked by MD5, opt in, after JoF's
   launcher; the Sith cloud (`sith.cloud`), the S community's own maps, skins and
   extras on the same card, and the SJK hub naming both collections' servers so they
-  can move or be switched off without a release;
+  can move or be switched off without a release; and their automatic updates
+  (`jof.contentAuto`, `sith.cloudAuto`, 31/10/2026), opt in, at start and every hour
+  for the groups the player marks Auto;
 - Mythical shader parts: the Sun's prominences, rising sparks, glints circling its
   blade below the tip and heat haze, the Void's orbiting black holes, warped space,
   gravity pulse and afterimages, the Spectral's wisps, souls, smoky edge, cold rim and swaying echo, each a part

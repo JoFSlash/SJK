@@ -24,6 +24,19 @@
 
 # ---- Console & chat ----
 
+[cloud-auto-update]
+area: Menus & settings
+title: JoF content and Sith cloud update automatically (opt in, per group)
+change: The card has Update automatically (jof.contentAuto, sith.cloudAuto) and an Auto tick per group.
+change: At start (+30 s) and every hour, a run downloads what changed in the Auto groups only.
+change: It removes only files SJK fetched for an Auto group that the server dropped; a card says so.
+test: jof.downloads: Update automatically on; the foot says Next automatic check HH:MM (soon).
+test: Auto ticks dim while it is off; A or a click marks a group; jof.contentAutoGroups follows.
+test: Delete a file of an Auto group and one of another: the next check brings back only the first.
+test: In a match, the run goes on quietly; "JoF content updated: N files" shows, maps load next map.
+test: Settings > General: the JoF content / Sith cloud auto-update rows switch the same cvars.
+note: Not verified in game. Nothing runs with jof.content off or no Auto group (log: "automatic").
+
 [look-sync]
 area: Gameplay
 title: Toys (the box) reach other players faster

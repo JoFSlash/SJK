@@ -815,7 +815,8 @@ that mode for the visit and leaves the player's choice as it was.
     aura, away emote and JA+ away emote, since 20/10/2026), HUD (under HUD: HUD look and scale; Crosshair: crosshair, its size,
     damage hitmarker; Over the game: nameplates, FPS readout, speedometer, kill
     feed, chat and its text size) and General (Menus: menu style and text size;
-    From another client: import; JoF content: its card, since 16/10/2026; SJK
+    From another client: import; JoF content: its card, since 16/10/2026, and its
+    auto-update switch, and the same for the Sith cloud, since 31/10/2026; SJK
     online: check for updates, SJK chat, crash reports, settings usage, SJK
     identity key). They are `settings::Group::Simple`.
   - Advanced: First setup, Display, Graphics, Sound, Controls (Mouse until
@@ -973,8 +974,9 @@ input while it is open, and closing it restores the previous console state. See
 
 Mods' JoF content row ("Choose and download"; `jof.downloads` in the console,
 `jof_content_card.rs`) opens the JoF content card the same way, an SJK UI card in
-every menu style: the opt-in switch, JoF's groups with a tick each and what is here
-of them, the download's progress, Check again and Download
+every menu style: the opt-in switch, the automatic updates' switch (since
+31/10/2026), JoF's groups with a tick and an Auto tick each and what is here of them,
+the download's progress, Check again and Download
 ([jof-content.md](jof-content.md#the-card)).
 
 ### First setup

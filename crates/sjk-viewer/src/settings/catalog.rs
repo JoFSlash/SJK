@@ -1547,6 +1547,12 @@ pub(super) const GAME: &[Setting] = &[
     },
     #[cfg(feature = "mod-jof")]
     Setting {
+        label: "JoF content auto-update",
+        cvar: crate::jof_content::AUTO,
+        kind: ValueKind::Bool,
+    },
+    #[cfg(feature = "mod-jof")]
+    Setting {
         label: "JoF content host",
         cvar: crate::jof_content::SOURCE,
         kind: ValueKind::Choice(&crate::jof_content::SOURCES),
@@ -1557,6 +1563,12 @@ pub(super) const GAME: &[Setting] = &[
         label: "Sith cloud",
         cvar: crate::sith_cloud::COMMAND,
         kind: ValueKind::ContentCard,
+    },
+    #[cfg(feature = "mod-jof")]
+    Setting {
+        label: "Sith cloud auto-update",
+        cvar: crate::sith_cloud::AUTO,
+        kind: ValueKind::Bool,
     },
     Setting {
         label: "Invisible brushes",
