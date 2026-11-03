@@ -472,7 +472,7 @@ const HELP: &[(&str, &str)] = &[
     ),
     (
         crate::actor_world_submission::force_powers::policy::EMPOWER_CVAR,
-        "Empower glow: -1 follows the server; 0 full body, 1 arms, 2 hands. Ordinary Push stays full body.",
+        "Empower glow: -1 follows the server; 0 full body, 1 arms, 2 hands, 3 off. Ordinary Push stays full body.",
     ),
     (
         "cg_tauntAntiSpam",
@@ -578,6 +578,10 @@ const HELP: &[(&str, &str)] = &[
     (
         crate::text::system_font::CONSOLE_CVAR,
         "A font from this PC for the console, kept to its even grid. What it lacks comes from SJK's fonts.",
+    ),
+    (
+        crate::toy_sounds::Toy::Fishing.cvar(),
+        "Off: your casts, bites and catches are silent. The toy still works.",
     ),
     (
         crate::away_emote::SJK_CVAR,

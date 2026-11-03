@@ -645,6 +645,12 @@ pub(super) fn register_daily_cvars(cvars: &mut CvarRegistry) -> Result<(), sjk_s
             "Play the sounds of the Toy Master's hidden toys (SJK)",
         ),
         CvarDefinition::new(
+            crate::toy_sounds::Toy::Fishing.cvar(),
+            true,
+            archive,
+            "Play the Fishing toy's sounds (SJK)",
+        ),
+        CvarDefinition::new(
             crate::held_view::LOOK_CVAR,
             crate::held_view::DEFAULT_LOOK,
             archive,
@@ -1162,7 +1168,7 @@ pub(super) fn register_daily_cvars(cvars: &mut CvarRegistry) -> Result<(), sjk_s
             crate::actor_world_submission::force_powers::policy::EMPOWER_CVAR,
             -1_i64,
             archive,
-            "Empower glow: -1 server, 0 full body, 1 arms, 2 hands; ordinary Push stays full body",
+            "Empower glow: -1 server, 0 full body, 1 arms, 2 hands, 3 off; ordinary Push stays full body",
         ),
         CvarDefinition::new(
             "cg_spProtAbsColor",
