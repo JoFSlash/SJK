@@ -5955,7 +5955,7 @@ once beside the sabers' hum loops, and three swings for `EV_SABER_ATTACK` and th
 animation `saberhup` cues, over a hilt's own `swingSound`s
 ([saber_sound_overrides.rs](../crates/sjk-client/src/saber_sound_overrides.rs)).
 The viewer registers the skins' sounds with the gamestate's sound tables and passes
-the per-client table every frame. With no skin worn every path is the stock one. A
+the per-client table every frame. When the skins are registered again mid-session (a skin's pack came in), the wearers keep their sets and get the new hums at once: the per-frame table is skipped while it does not change, which left a wearer whose pack came late without a skin hum, so with Only skin the stock hum played (hub report #233). A dual wielder is one player: with Only skin neither saber's own hum, ignition, toggle or swing plays. With no skin worn every path is the stock one. A
 thrown saber hums its owner's skin too: over the flying saber entity's `loopSound` (the
 stock hum or the hilt's `soundLoop`), while the owner it names
 (`genericenemyindex`) wears one. A skin's sounds are the game paths its file names, read from its pack below all game

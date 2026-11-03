@@ -28,6 +28,9 @@ fn vfs() -> VirtualFileSystem {
         "sound/weapons/saber/saberhum1.wav",
         "sound/weapons/explosion.wav",
         "sound/custom/ignite.wav",
+        "sound/other/on.wav",
+        "sound/other/off.wav",
+        "sound/other/hum.wav",
         SET.on,
         SET.off,
         SET.hum,
@@ -47,6 +50,10 @@ fn vfs() -> VirtualFileSystem {
     files.push((
         "ext_data/sabers/custom.sab".to_owned(),
         b"custom\n{\n\tname \"Custom\"\n\tsoundOn \"sound/custom/ignite.wav\"\n\tsoundOff \"sound/null.wav\"\n}\n".to_vec(),
+    ));
+    files.push((
+        "ext_data/sabers/other.sab".to_owned(),
+        b"other\n{\n\tname \"Other\"\n\tsoundOn \"sound/other/on.wav\"\n\tsoundOff \"sound/other/off.wav\"\n\tsoundLoop \"sound/other/hum.wav\"\n}\n".to_vec(),
     ));
     vfs.mount_memory("test", files).unwrap();
     vfs
@@ -599,4 +606,184 @@ fn a_set_whose_files_are_not_in_the_game_data_leaves_the_stock_sounds_even_alone
         })
         .collect();
     assert_eq!(hums, ["sound/weapons/saber/saberhum1.wav"]);
+}
+
+/// Every saber hum decision of `snapshot`'s players: kind, source and path.
+fn saber_hums(
+    adapter: &mut LegacySoundAdapter,
+    snapshot: &Snapshot,
+) -> Vec<(LegacyLoopKind, u16, String)> {
+    adapter.observe_loops(snapshot, 1_000, [0.0; 3], |state| state.trajectory_base());
+    adapter
+        .loop_decisions()
+        .iter()
+        .filter(|decision| {
+            matches!(
+                decision.kind,
+                LegacyLoopKind::SaberHumPrimary
+                    | LegacyLoopKind::SaberHumSecondary
+                    | LegacyLoopKind::SaberHumSkin
+            )
+        })
+        .map(|decision| {
+            (
+                decision.kind,
+                decision.request.source.0 as u16,
+                adapter
+                    .loop_sound(decision.sound.unwrap())
+                    .unwrap()
+                    .path
+                    .to_string(),
+            )
+        })
+        .collect()
+}
+
+#[test]
+fn with_skin_sounds_only_a_dual_wielder_hears_no_stock_sound_of_either_saber() {
+    // Two sabers, each with its own .sab sounds (hub report #233).
+    let mut game = game_state();
+    game.replace_config_string(
+        CS_PLAYERS + usize::from(SKINNED),
+        b"n\\Player\\model\\kyle/default\\st\\custom\\st2\\other".to_vec(),
+    )
+    .unwrap();
+    game.replace_config_string(CS_SOUNDS + 5, b"sound/other/on.wav".to_vec())
+        .unwrap();
+    game.replace_config_string(CS_SOUNDS + 6, b"sound/other/off.wav".to_vec())
+        .unwrap();
+    let vfs = vfs();
+    let mut next = 0;
+    let mut register = |_: &str, _: &[u8]| {
+        next += 1;
+        Some(SoundHandle(next))
+    };
+    let mut adapter = LegacySoundAdapter::new(&game, &vfs, &mut register);
+    adapter.register_saber_sound_sets(&[SET], &vfs, &mut register);
+    // Without a skin both sabers hum and ignite with their own sounds (a .sab naming no
+    // soundLoop hums with `WP_SaberSetDefaults`' saberhum3).
+    let player = snapshot(vec![player_entity(SKINNED, AT_SKINNED)]);
+    assert_eq!(
+        saber_hums(&mut adapter, &player),
+        [
+            (
+                LegacyLoopKind::SaberHumPrimary,
+                SKINNED,
+                "sound/weapons/saber/saberhum3.wav".to_owned()
+            ),
+            (
+                LegacyLoopKind::SaberHumSecondary,
+                SKINNED,
+                "sound/other/hum.wav".to_owned()
+            ),
+        ]
+    );
+    let sounds = played(
+        &mut adapter,
+        vec![with_event(player_entity(SKINNED, AT_SKINNED), 33, 0)],
+    );
+    assert_eq!(
+        sounds,
+        [
+            (SKINNED, "sound/custom/ignite.wav".to_owned()),
+            (SKINNED, "sound/other/on.wav".to_owned()),
+        ]
+    );
+    wear(&mut adapter, SKINNED);
+    adapter.set_saber_skin_sounds_only(true);
+    // Hum: the skin's once, for both sabers.
+    assert_eq!(
+        saber_hums(&mut adapter, &player),
+        [(LegacyLoopKind::SaberHumSkin, SKINNED, SET.hum.to_owned())]
+    );
+    // Ignition: the skin's alone, neither hand's own. (The sequence bits tell this event
+    // from the last; the toggle cap is paid by the time.)
+    let mut ignition = snapshot(vec![with_event(
+        player_entity(SKINNED, AT_SKINNED),
+        33 | 1 << 8,
+        0,
+    )]);
+    ignition.server_time += 10_000;
+    adapter.observe_snapshot(&ignition);
+    let sounds: Vec<(u16, String)> = adapter
+        .decisions()
+        .iter()
+        .map(|decision| {
+            let path = decision
+                .sound
+                .and_then(|sound| adapter.sound(sound))
+                .map_or_else(String::new, |sound| sound.path.to_string());
+            (decision.request.source.0 as u16, path)
+        })
+        .collect();
+    assert_eq!(sounds, [(SKINNED, SET.on.to_owned())]);
+    // Swings: the skin's in place of the stock swing.
+    for round in 0..8_u16 {
+        let event = 29 | (round % 4) << 8;
+        let sounds = played(
+            &mut adapter,
+            vec![with_event(
+                player_entity(SKINNED, AT_SKINNED),
+                event,
+                round as u8,
+            )],
+        );
+        assert_eq!(sounds.len(), 1, "{sounds:?}");
+        assert!(SET.swings.contains(&sounds[0].1.as_str()), "{sounds:?}");
+    }
+    // The server's toggles, one per saber, stock and the second hilt's own: the skin's
+    // once for the pair.
+    for (stock, own, skin) in [(1, 5, SET.on), (2, 6, SET.off)] {
+        let mut later = snapshot(vec![
+            player_entity(SKINNED, AT_SKINNED),
+            // Fresh temporary entities each time, as `G_Sound` makes them.
+            general_sound(100 + u16::from(stock) * 2, stock, AT_SKINNED),
+            general_sound(101 + u16::from(stock) * 2, own, AT_SKINNED),
+        ]);
+        later.server_time += 10_000 + i32::from(stock) * 1_000;
+        adapter.observe_snapshot(&later);
+        let paths: Vec<String> = adapter
+            .decisions()
+            .iter()
+            .filter_map(|decision| decision.sound.and_then(|sound| adapter.sound(sound)))
+            .map(|sound| sound.path.to_string())
+            .collect();
+        assert_eq!(paths, [skin], "toggle {stock}");
+    }
+}
+
+#[test]
+fn a_pack_registered_mid_session_gives_its_hum_to_who_already_wears_its_set() {
+    // The skin is worn before its pack is in: its set has no files yet.
+    let mut adapter = adapter();
+    let empty = VirtualFileSystem::new();
+    let mut next = 1_000;
+    let mut register = |_: &str, _: &[u8]| {
+        next += 1;
+        Some(SoundHandle(next))
+    };
+    adapter.register_saber_sound_sets(&[SET], &empty, &mut register);
+    wear(&mut adapter, SKINNED);
+    adapter.set_saber_skin_sounds_only(true);
+    let player = snapshot(vec![player_entity(SKINNED, AT_SKINNED)]);
+    assert_eq!(
+        saber_hums(&mut adapter, &player),
+        [(
+            LegacyLoopKind::SaberHumPrimary,
+            SKINNED,
+            "sound/weapons/saber/saberhum1.wav".to_owned()
+        )]
+    );
+    // The pack arrives; the viewer registers the sets again and gives the same clients.
+    adapter.register_saber_sound_sets(&[SET], &vfs(), &mut register);
+    wear(&mut adapter, SKINNED);
+    assert_eq!(
+        saber_hums(&mut adapter, &player),
+        [(LegacyLoopKind::SaberHumSkin, SKINNED, SET.hum.to_owned())]
+    );
+    let sounds = played(
+        &mut adapter,
+        vec![with_event(player_entity(SKINNED, AT_SKINNED), 33, 0)],
+    );
+    assert_eq!(sounds, [(SKINNED, SET.on.to_owned())]);
 }

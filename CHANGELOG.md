@@ -30,6 +30,10 @@ The site (site/assets/site.js, parseChangelog) reads the release headings,
 introductions and recap lines too.
 Add each release's notes here when it is tagged (docs/sjk.md "Releases").
 -->
+## Unreleased
+
+- Blade skin sounds on Only skin (`s_saberSkinSounds 2`): a skin whose sounds arrive while you play (its pack downloaded mid-game) now hums with its own hum alone, instead of the normal saber hum, for players who already wore it (hub report #233) _(Sol)_
+
 ## 2026.1103.1 (Alpha) | 03/11/2026
 
 3D sound and a sound sonar, a HUD you move with the mouse, quieter and fuller chat, profile banners, one life per box hunter and a cat that dances to its song.

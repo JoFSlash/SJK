@@ -311,6 +311,14 @@ impl LegacySoundAdapter {
             .register(sets, &mut self.sounds, vfs, &mut register);
         let hums: Vec<&str> = sets.iter().map(|set| set.hum).collect();
         self.loops.register_saber_hums(&hums, vfs, &mut register);
+        // Registered again mid-session (a skin's pack came in), the sets keep their
+        // wearers, who get the new hums now: `set_saber_sound_overrides` is skipped
+        // while the wearers stay the same, and would leave the old hums (none, before
+        // the pack), so the stock hum played even with `s_saberSkinSounds 2`.
+        let clients = self.saber_overrides.clients;
+        self.saber_overrides.set_clients(&clients);
+        self.loops
+            .set_saber_hum_overrides(&self.saber_overrides.clients);
     }
 
     /// Which registered set each client slot wears (`None`: the stock sounds). Cheap
