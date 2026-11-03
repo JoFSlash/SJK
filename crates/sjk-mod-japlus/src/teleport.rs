@@ -54,23 +54,68 @@ pub(crate) fn gun_tele(
         return Ok(tele(point, yaw));
     };
     let offset = args.get(1).map_or(0.0, |text| number(text));
-    let position = level_destination(me.origin, yaw, number(distance), trace)
+    let position = level_destination(me.origin, yaw, number(distance), Walls::Stop, trace)
         .or_else(on_crosshair)
         .unwrap_or(me.origin);
     Ok(tele(position, yaw + offset))
+}
+
+/// `japlus.guntelewall <distance> [yaw offset]`: `distance` straight ahead,
+/// level as [`gun_tele`], but through walls as EternalJK's `teleGun` goes (hub
+/// report #232). When the player's box would end inside something solid
+/// (`trace`, [`Host::trace_player`]) it lands on the nearest free spot back along
+/// the way, or else where `japlus.guntele` would, [`WALL_GAP`] short of the first
+/// wall. From inside a wall (noclip) it goes to the crosshair's point, or stays.
+pub(crate) fn gun_tele_wall(
+    args: &[String],
+    me: Me,
+    crosshair: Option<[f32; 3]>,
+    trace: impl Fn([f32; 3], [f32; 3]) -> Option<Trace>,
+) -> Result<String, String> {
+    let distance = args
+        .first()
+        .ok_or("usage: japlus.guntelewall <distance> [yaw offset]")?;
+    let yaw = me.view_angles[1];
+    let offset = args.get(1).map_or(0.0, |text| number(text));
+    let position = level_destination(me.origin, yaw, number(distance), Walls::Through, trace)
+        .or_else(|| {
+            crosshair
+                .filter(|point| *point != [0.0; 3])
+                .map(|point| [point[0], point[1], point[2] + LIFT])
+        })
+        .unwrap_or(me.origin);
+    Ok(tele(position, yaw + offset))
+}
+
+/// What a distance teleport does about a wall in the way.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum Walls {
+    /// Stop [`WALL_GAP`] short of it (`japlus.guntele`).
+    Stop,
+    /// Go through it, landing out of solid (`japlus.guntelewall`).
+    Through,
 }
 
 /// How far short of a wall a distance teleport stops: the server keeps whole
 /// units (`atoi`), which can move the player up to one unit towards it.
 pub(crate) const WALL_GAP: f32 = 2.0;
 
-/// `distance` level along `yaw` from `origin`, stopped [`WALL_GAP`] short of what
-/// the player's box meets on the way (`trace`; nothing in the way without a map);
+/// How far back along the way each try for a free spot moves when a teleport
+/// through walls would end inside something solid.
+pub(crate) const FREE_STEP: f32 = 4.0;
+
+/// `distance` level along `yaw` from `origin` (nothing in the way without a map).
+/// [`Walls::Stop`] stops [`WALL_GAP`] short of what the player's box meets on the
+/// way (`trace`). [`Walls::Through`] goes the whole way, and when the box would
+/// end inside something solid (`trace` from the point to itself starts solid)
+/// takes the free spot nearest the end going back in [`FREE_STEP`]s, down to where
+/// the box first meets a wall; with none, it stops as [`Walls::Stop`] does.
 /// `None` when the box starts inside something solid.
 fn level_destination(
     origin: [f32; 3],
     yaw: f32,
     distance: f32,
+    walls: Walls,
     trace: impl Fn([f32; 3], [f32; 3]) -> Option<Trace>,
 ) -> Option<[f32; 3]> {
     let direction = forward([0.0, yaw, 0.0]);
@@ -84,8 +129,20 @@ fn level_destination(
     if hit.fraction >= 1.0 {
         return Some(wanted);
     }
-    let travelled = (distance.abs() * hit.fraction - WALL_GAP).max(0.0);
-    Some(add(origin, direction, travelled.copysign(distance)))
+    let along = |travelled: f32| add(origin, direction, travelled.copysign(distance));
+    let first_wall = distance.abs() * hit.fraction;
+    if walls == Walls::Through {
+        let free = |point: [f32; 3]| trace(point, point).is_some_and(|stay| !stay.start_solid);
+        let mut travelled = distance.abs();
+        while travelled > first_wall {
+            let point = along(travelled);
+            if free(point) {
+                return Some(point);
+            }
+            travelled -= FREE_STEP;
+        }
+    }
+    Some(along((first_wall - WALL_GAP).max(0.0)))
 }
 
 /// The player `get`/`goto` act on: the crosshair's without a name or with `gun`.
@@ -315,6 +372,108 @@ mod tests {
         // A wall right in front: it stays where it is.
         assert_eq!(
             gun_tele(&args("300"), me(), None, wall(0.0, false)).unwrap(),
+            "amtele 100.000000 200.000000 24.000000 90.000000"
+        );
+    }
+
+    /// A map of walls across the way north (+y), each solid from one y to
+    /// another, swept with the standing box (15 units each side).
+    fn walls(solid: &'static [(f32, f32)]) -> impl Fn([f32; 3], [f32; 3]) -> Option<Trace> {
+        move |from, to| {
+            let inside = |y: f32| {
+                solid
+                    .iter()
+                    .any(|&(low, high)| y + 15.0 > low && y - 15.0 < high)
+            };
+            if inside(from[1]) {
+                return Some(Trace {
+                    fraction: 0.0,
+                    end: from,
+                    start_solid: true,
+                });
+            }
+            let length = to[1] - from[1];
+            let fraction = solid
+                .iter()
+                .filter_map(|&(low, high)| {
+                    let contact = if length > 0.0 {
+                        low - 15.0
+                    } else {
+                        high + 15.0
+                    };
+                    let fraction = (contact - from[1]) / length;
+                    (0.0..1.0).contains(&fraction).then_some(fraction)
+                })
+                .fold(1.0, f32::min);
+            Some(Trace {
+                fraction,
+                end: std::array::from_fn(|axis| from[axis] + (to[axis] - from[axis]) * fraction),
+                start_solid: false,
+            })
+        }
+    }
+
+    /// Hub report #232: `japlus.guntelewall` goes the whole distance through a
+    /// wall in the way, as EternalJK's `teleGun` does, level and turned by the
+    /// offset, backwards too; it needs a distance.
+    #[test]
+    fn gun_tele_wall_goes_through_a_wall_in_the_way() {
+        assert_eq!(
+            gun_tele_wall(&args("300 45"), me(), None, walls(&[(300.0, 340.0)])).unwrap(),
+            "amtele 99.999985 500.000000 24.000000 135.000000"
+        );
+        assert_eq!(
+            gun_tele_wall(&args("-300"), me(), None, walls(&[(60.0, 100.0)])).unwrap(),
+            "amtele 100.000015 -100.000000 24.000000 90.000000"
+        );
+        // A wall right in front makes no difference.
+        assert_eq!(
+            gun_tele_wall(&args("300"), me(), None, walls(&[(216.0, 260.0)])).unwrap(),
+            "amtele 99.999985 500.000000 24.000000 90.000000"
+        );
+        // No map: straight there.
+        assert_eq!(
+            gun_tele_wall(&args("300"), me(), None, open).unwrap(),
+            "amtele 99.999985 500.000000 24.000000 90.000000"
+        );
+        assert!(gun_tele_wall(&[], me(), Some([1.0, 2.0, 3.0]), open).is_err());
+        // japlus.guntele still stops 2 units short of the same wall.
+        assert_eq!(
+            gun_tele(&args("300"), me(), None, walls(&[(300.0, 340.0)])).unwrap(),
+            "amtele 100.000000 283.000000 24.000000 90.000000"
+        );
+    }
+
+    /// Hub report #232: a `japlus.guntelewall` that would end inside a wall lands
+    /// back out of it, on the free spot nearest the end, and short of the first
+    /// wall only when nothing past it is free.
+    #[test]
+    fn gun_tele_wall_lands_back_out_of_a_wall_at_the_end() {
+        // Through a wall 300 to 340 north, into one 450 to 600: the box at 500
+        // is inside it, and the nearest free spot back is 432 (box edge at 447).
+        assert_eq!(
+            gun_tele_wall(
+                &args("300"),
+                me(),
+                None,
+                walls(&[(300.0, 340.0), (450.0, 600.0)])
+            )
+            .unwrap(),
+            "amtele 99.999992 432.000000 24.000000 90.000000"
+        );
+        // Into a wall with nothing free past the one before it: 2 units short of
+        // it, where japlus.guntele stops (the box meets it at 435).
+        assert_eq!(
+            gun_tele_wall(&args("300"), me(), None, walls(&[(450.0, 600.0)])).unwrap(),
+            "amtele 99.999992 433.000000 24.000000 90.000000"
+        );
+        // From inside a wall: the crosshair's point, else where you are.
+        assert_eq!(
+            gun_tele_wall(&args("300"), me(), Some([1.0, 2.0, 3.0]), wall(0.0, true)).unwrap(),
+            "amtele 1.000000 2.000000 27.000000 90.000000"
+        );
+        assert_eq!(
+            gun_tele_wall(&args("300"), me(), None, wall(0.0, true)).unwrap(),
             "amtele 100.000000 200.000000 24.000000 90.000000"
         );
     }

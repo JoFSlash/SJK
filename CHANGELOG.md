@@ -30,6 +30,10 @@ The site (site/assets/site.js, parseChangelog) reads the release headings,
 introductions and recap lines too.
 Add each release's notes here when it is tagged (docs/sjk.md "Releases").
 -->
+## Unreleased
+
+- JA+ tools: `japlus.guntelewall <distance>` teleports you that far straight ahead through walls, as JoF EJK's teleGun does, still level so you never end under the floor, and lands on the nearest free spot back along the way when the end is inside a wall; `japlus.guntele` still stops before walls _(Slash, after hub report #232, Nib)_
+
 ## 2026.1103.1 (Alpha) | 03/11/2026
 
 3D sound and a sound sonar, a HUD you move with the mouse, quieter and fuller chat, profile banners, one life per box hunter and a cat that dances to its song.
