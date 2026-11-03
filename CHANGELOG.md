@@ -36,6 +36,7 @@ Add each release's notes here when it is tagged (docs/sjk.md "Releases").
 - Maps lit by switchable or flickering lights, such as the JoF Shuttle trial mission ship, the JoF missions and Memorial Grounds, show that light instead of drawing it dark, and follow the server as a light is switched off or on (SJK and Vanilla graphics presets) _(Slash, PR #339, after Kushina's report)_
 - NPCs whose skin names only a head and a torso, such as the alien younglings of the JoF Shuttle trial mission, wear their skin instead of drawing grey (Kushina's report) _(Slash, PR #336)_
 - Fishing toy: `toy_fishing` (the quick wheel's Toys page, Collection > Toys) gets a rod out. Stand still and press Use when the float dips to land fish and junk for your fish log; each of the 12 fish looks different, and your last catch waits in the bucket; where there is no water, a small pond appears. An Echo dropped to you while you fish comes up on the line. Five new achievements: First Bite, Angler, Every Fish in the Pond, Echo Angler and a hidden one _(Slash, PR #278, after Sanji's idea)_
+- The sound follows your system's default output: plug headphones in or switch to another device and the game's sound moves there within two seconds, and `snd_restart` opens it on the current default _(Slash, after Metan's report, hub report #210)_
 
 ## 2026.1103.1 (Alpha) | 03/11/2026
 

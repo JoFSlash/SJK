@@ -234,6 +234,16 @@ impl GameAudio {
         self.generation
     }
 
+    /// The default device's name when the output was opened, if it had one.
+    pub(crate) fn output_device(&self) -> Option<&str> {
+        self.output.device.as_deref()
+    }
+
+    /// The output's device stopped taking sound (`audio_feed.rs`).
+    pub(crate) fn output_stalled(&self) -> bool {
+        self.output.stalled()
+    }
+
     /// Create the one process-lifetime output stream and its decode worker.
     pub(crate) fn start() -> Option<Self> {
         let output = AudioOutput::start(MixerConfig {

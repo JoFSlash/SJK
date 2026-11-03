@@ -16,6 +16,7 @@ mod anti_emote;
 mod app_launch;
 mod assets;
 mod audio;
+mod audio_device_watch;
 mod audio_mute;
 mod audio_output;
 mod auto_switch;

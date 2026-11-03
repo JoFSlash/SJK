@@ -23,6 +23,8 @@ pub(super) struct ViewerApplication {
 
     pub(super) completed_map_changes: u32,
     pub(super) game_audio: Option<GameAudio>,
+    /// Reopens `game_audio` when the system's default output changes (`audio_device_watch.rs`).
+    pub(super) audio_watch: crate::audio_device_watch::Watch,
     pub(super) initial_connect: Option<String>,
     pub(super) gpu: Option<GpuState>,
     pub(super) menu_world: menu_world::Parked,
@@ -283,6 +285,7 @@ impl ApplicationHandler for ViewerApplication {
 
     fn about_to_wait(&mut self, event_loop: &ActiveEventLoop) {
         if let Some(gpu) = &mut self.gpu {
+            follow_default_audio_device(&mut self.audio_watch, &mut self.game_audio, gpu);
             let now = Instant::now();
             let maximum_fps = gpu.maximum_fps();
             if maximum_fps == 0 || now >= gpu.frame_pacer.deadline() {
@@ -300,4 +303,29 @@ impl ApplicationHandler for ViewerApplication {
             }
         }
     }
+}
+
+/// Move the sound to the system's default output once it changed (headphones plugged
+/// in) or the open device stopped taking sound; not with `s_initsound 0`.
+fn follow_default_audio_device(
+    watch: &mut crate::audio_device_watch::Watch,
+    audio: &mut Option<GameAudio>,
+    gpu: &mut GpuState,
+) {
+    if gpu
+        .console
+        .as_ref()
+        .and_then(|c| c.bool_cvar("s_initsound"))
+        == Some(false)
+    {
+        return;
+    }
+    let Some(reason) = watch.poll(audio.as_ref(), Instant::now()) else {
+        return;
+    };
+    log::progress(format_args!(
+        "audio output reopened on the default device ({reason:?})"
+    ));
+    let line = gpu.reopen_audio(audio);
+    log::progress(format_args!("{line}"));
 }

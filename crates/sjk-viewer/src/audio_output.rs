@@ -281,6 +281,9 @@ enum DecodedAction {
 pub(super) struct AudioOutput {
     _stream: Option<OutputStream>,
     pub(super) description: String,
+    /// The default device's name when this output was opened (`audio_device_watch.rs`
+    /// reopens the output when the default becomes another device).
+    pub(super) device: Option<String>,
     commands: HeapProd<AudioCommand>,
     /// Whether the callback still drains `commands`; a stopped stream is not waited on.
     feed: feed::Feed,
@@ -332,9 +335,11 @@ impl AudioOutput {
                 return None;
             }
         };
+        let device = crate::audio_device_watch::default_output_name();
         let description = describe_default_device();
         crate::log::progress(format_args!("audio output: {description}"));
         let (mut audio, source) = Self::assemble(config, description)?;
+        audio.device = device;
         if let Err(error) = output.play_raw(source) {
             crate::log::progress(format_args!("audio mixer could not start: {error}"));
             return None;
@@ -381,6 +386,7 @@ impl AudioOutput {
         let audio = Self {
             _stream: None,
             description,
+            device: None,
             commands: command_producer,
             feed: feed::Feed::default(),
             decode_jobs: Some(decode_sender),
@@ -441,6 +447,11 @@ impl AudioOutput {
                  dropped until it resumes or snd_restart opens the output again"
             ));
         }
+    }
+
+    /// The callback stopped draining the command queue (its device went away?).
+    pub(super) fn stalled(&self) -> bool {
+        self.feed.stalled()
     }
 
     /// Cached decoded duration, or zero while unavailable/invalid. No file access or lock.

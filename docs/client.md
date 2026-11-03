@@ -6457,6 +6457,26 @@ the device that is then the default. The decode worker keeps sounds in order and
 waits for room as before, but stops when the output is dropped, so `snd_restart` and
 quitting do not wait on it. See [audio_feed.rs](../crates/sjk-viewer/src/audio_feed.rs).
 
+The sound follows the system's default output (since 03/11/2026, hub report #210,
+Metan's): plugging headphones in, switching a headset on or choosing another device in
+the system's sound settings moves the game's sound there within about two seconds.
+cpal, under rodio, opens the default device of the moment and stays on it, and its
+0.15 version has no notice of a default change, so a small thread
+(`sjk-audio-device`) asks for the default device's name every 1.5 s. The event loop
+looks at each new answer once (one atomic load a frame otherwise, no allocation) and
+reopens the output as `snd_restart` does when the default is another device than the
+one the output was opened on, when a device appears while there was none, or when the
+open output stopped taking sound on an unchanged default (at most every 10 s, so a
+failing device is not reopened at every poll). The log says `audio output reopened
+on the default device`. With `s_initsound 0` nothing is opened. Two devices of the
+same name are not told apart (cpal 0.15 gives no device id). `snd_restart` itself
+opens the output on the current default and sets it up as a map load does: the sounds
+are registered again, and the music starts again where the level's clock says it is
+(with music sync) or from the start. Unit tests in
+[audio_device_watch.rs](../crates/sjk-viewer/src/audio_device_watch.rs): a new default
+reopens, an unchanged one does not, no default opens nothing, a stalled output is
+reopened at most every 10 s, and a failed open is not retried on the same default.
+
 The Video tab's Display mode row offers Windowed, Borderless fullscreen and,
 where the windowing system supports it, Exclusive fullscreen (Wayland does not,
 and macOS is kept to borderless: winit's exclusive mode there captures the display,

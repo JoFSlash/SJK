@@ -137,6 +137,7 @@ pub(super) fn run() -> Result<(), Box<dyn Error>> {
 
         completed_map_changes: 0,
         game_audio: None,
+        audio_watch: crate::audio_device_watch::Watch::start(),
         initial_connect: connect_address,
         gpu: None,
         menu_world: crate::menu_world::Parked::new(),

@@ -115,36 +115,7 @@ impl crate::GpuState {
                 }
                 Ok(lines)
             }
-            "snd_restart" => {
-                drop(audio.take());
-                if self
-                    .console
-                    .as_ref()
-                    .and_then(|c| c.bool_cvar("s_initsound"))
-                    == Some(false)
-                {
-                    return Ok(vec!["Audio disabled by s_initsound".into()]);
-                }
-                *audio = crate::GameAudio::start();
-                let Some(restarted) = audio else {
-                    return Ok(vec!["Audio stopped; no output device available.".into()]);
-                };
-                restarted.sync_gains(self.console.as_ref());
-                if let (Some(session), Some(vfs)) = (&self.live_session, &self.vfs) {
-                    restarted.install_gamestate(
-                        session.game_state(),
-                        std::sync::Arc::clone(vfs),
-                        &self.bsp,
-                    );
-                } else if let (Some(session), Some(vfs)) = (&self.demo_session, &self.vfs) {
-                    restarted.install_gamestate(
-                        session.game_state(),
-                        std::sync::Arc::clone(vfs),
-                        &self.bsp,
-                    );
-                }
-                Ok(vec!["Audio output recreated; sample cache cleared.".into()])
-            }
+            "snd_restart" => Ok(vec![self.reopen_audio(audio).into()]),
             "in_restart" => {
                 self.gameplay_input.clear();
                 self.release_pointer();
@@ -153,5 +124,27 @@ impl crate::GpuState {
             }
             _ => Err("Unknown restart command".into()),
         }
+    }
+
+    /// Open the sound output again on the system's current default device
+    /// (`snd_restart`, and [`crate::audio_device_watch`] when the default changes): the
+    /// level's sounds are registered again and its music restarts where the level's
+    /// clock says it is, as after a map load.
+    pub(crate) fn reopen_audio(&mut self, audio: &mut Option<crate::GameAudio>) -> &'static str {
+        drop(audio.take());
+        if self
+            .console
+            .as_ref()
+            .and_then(|c| c.bool_cvar("s_initsound"))
+            == Some(false)
+        {
+            return "Audio disabled by s_initsound";
+        }
+        *audio = crate::GameAudio::start();
+        if audio.is_none() {
+            return "Audio stopped; no output device available.";
+        }
+        self.configure_audio(audio);
+        "Audio output recreated on the default device; sample cache cleared."
     }
 }

@@ -74,7 +74,6 @@ impl Feed {
     }
 
     /// The callback has not drained this queue since it was last found full.
-    #[cfg(test)]
     pub(super) fn stalled(&self) -> bool {
         self.stalled
     }
