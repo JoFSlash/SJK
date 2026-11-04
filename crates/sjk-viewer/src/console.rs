@@ -272,6 +272,8 @@ pub(crate) struct ViewerConsole {
     fishing_on: bool,
     /// The Toys tab asked to get the rod out (`true`) or put it away, not yet taken.
     pending_fishing: Option<bool>,
+    /// The shader trial asked for and followed (`shader_try.rs`).
+    pub(crate) shader_try: crate::shader_try::State,
     /// The Monitor toy is on, mirrored as [`Self::order66_on`] is.
     monitor_on: bool,
     /// The Toys tab asked to turn the Monitor on (`true`) or off, not yet taken.

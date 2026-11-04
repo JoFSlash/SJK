@@ -1,3 +1,15 @@
+## Trying a shader (Blep's idea, 04/11/2026)
+
+`feat/shader-try`, with the hub's `feat/shader-try` (`GET`/`POST /v1/shaders/try`, 10
+minutes, a day's cooldown per shader, one trial at a time, behind the operator's switch,
+off by default; the hub takes the skin off the live look at the end). The shader card's
+Try button, the look wearing the trial's skin (`player_identity::wears_unlock`), the saber
+put back at the end through `cg_saberSkinBeforeTry`
+([unlockables.md](unlockables.md#trying-a-shader)). Verified: fmt, release build, the
+`shader_try` tests on both sides (the hub's API test runs a trial to its end, the look
+taken off and the cooldown), clippy without new warnings. Not verified: against a hub
+that has the routes, the button's place on the card in a screenshot.
+
 ## Holocron catch-up, play signals, tag copies (client side)
 
 03/11/2026, `personal/economy-ideas` from `main` `69a3d6a0`, built with the hub's

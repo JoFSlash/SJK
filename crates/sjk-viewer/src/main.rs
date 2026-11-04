@@ -64,6 +64,7 @@ mod propgun_frame;
 mod saber_colour_command;
 mod shader_image;
 mod shader_marks;
+mod shader_try;
 mod shared_textures;
 
 mod body_fade;

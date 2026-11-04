@@ -80,6 +80,8 @@ impl ViewerConsole {
         self.collection_panel.open(tab, owns_console, hub, back);
         let store = super::collection_panel::loadouts::Store::load(self.config_directory());
         self.collection_panel.set_loadouts(&store, Some(""));
+        // Whether shaders may be tried, for the shader cards' Try button.
+        crate::player_identity::read_shader_try();
     }
 
     fn close_collection_panel(&mut self) {
@@ -119,6 +121,7 @@ impl ViewerConsole {
             PanelAction::ShatterAll => {
                 let _ = crate::economy::shatter_all();
             }
+            PanelAction::TryShader(id) => crate::shader_try::ask(self, id),
             PanelAction::Craft(id) => {
                 let _ = crate::economy::craft(id);
             }

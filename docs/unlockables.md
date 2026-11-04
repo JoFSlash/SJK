@@ -1579,6 +1579,27 @@ refuses to break down or trade a locked one. `shader_marks::Marks` is what a pag
 (worn, favourite, locked, New), `sjk_identity::Service::set_mark` asks the hub, and the
 New marks are kept on the PC (`shader-seen.txt`).
 
+## Trying a shader
+
+Since 04/11/2026 (Blep's idea in #ideas; the hub's `PROTOCOL.md` "Trying a shader",
+`sjk_identity::shader_try`, [shader_try.rs](../crates/sjk-viewer/src/shader_try.rs)). The
+card of a shader the player does not hold offers **Try for 10 min** when the hub lets them
+(the operator's switch, `off` until Sol turns it on; `staff` lets only staff try). The hub
+starts the trial and decides when it ends: while it runs, `/v1/look` takes the skin as if
+held, so every SJK player on the server sees and hears it, and the look here wears it too
+(`player_identity::wears_unlock`, which only the look reads: the Collection, the Forge,
+trades and banners still go by the profile). Once the hub says it started, `cg_saberSkin`
+is set to it and what the saber wore before is kept in `cg_saberSkinBeforeTry` (`stock`
+for the stock blade); when the trial ends (on this PC's clock from the hub's times, or as
+the hub says after a restart) the saber wears that again, unless the player chose another
+of their own meanwhile. The hub takes the skin off the live look itself at the end
+whatever the client does, and then that shader cannot be tried again by that player for a
+day; one trial runs at a time. The card then says "Trying, 9:05 left", "Try again in 23 h"
+or "Another trial runs". Unique shaders and shaders held are never offered. The client
+reads the hub's answer (`GET /v1/shaders/try`) when the Collection opens, every 10 minutes
+and at a trial's end; a hub without the route shows no button. Numbers are the hub's and
+provisional.
+
 ## Planned, not built
 
 Achievements granting unlockables (with harder goals), holocron drops beyond shaders

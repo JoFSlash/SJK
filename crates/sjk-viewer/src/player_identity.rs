@@ -1581,6 +1581,46 @@ pub(crate) fn owns_unlock(id: &str) -> bool {
     })
 }
 
+/// Whether the player may wear blade skin `id` now: their profile lists it
+/// ([`owns_unlock`]), or a shader trial of it runs (`crate::shader_try`). Only the look
+/// counts a trial; the Collection, the Forge and trades go by [`owns_unlock`].
+pub(crate) fn wears_unlock(id: &str) -> bool {
+    owns_unlock(id)
+        || with_snapshot(|snapshot| {
+            snapshot
+                .shader_try
+                .as_ref()
+                .is_some_and(|trials| trials.wears(id, std::time::Instant::now()))
+        })
+        .unwrap_or(false)
+}
+
+/// Shader trials as the hub last said, `None` with the identity off or a hub without
+/// them.
+pub(crate) fn shader_trials() -> Option<sjk_identity::shader_try::Trials> {
+    with_snapshot(|snapshot| snapshot.shader_try.clone()).flatten()
+}
+
+/// The answer to the last shader trial asked for, by serial.
+pub(crate) fn shader_try_started()
+-> Option<(u64, Result<sjk_identity::shader_try::Started, String>)> {
+    with_snapshot(|snapshot| snapshot.shader_try_started.clone()).flatten()
+}
+
+/// Ask the hub about shader trials now.
+pub(crate) fn read_shader_try() {
+    if let Some(service) = lock().service.as_ref() {
+        service.read_shader_try();
+    }
+}
+
+/// Start a trial of blade skin `blade` (`crate::shader_try`).
+pub(crate) fn start_shader_try(blade: &str) {
+    if let Some(service) = lock().service.as_ref() {
+        service.start_shader_try(blade);
+    }
+}
+
 /// What the player's own hub profile holds of tag or card `id`, by finish
 /// ([`crate::tags::Held::of`]), by the same rule as [`owns_unlock`]: only the free tags
 /// with the identity off, no hub or before the hub answered.

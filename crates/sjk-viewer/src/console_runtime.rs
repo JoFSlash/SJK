@@ -91,6 +91,10 @@ impl GpuState {
         {
             self.toggle_boombox();
         }
+        // A shader trial: wear its skin once it started, put the old one back at its end.
+        if let Some(console) = self.console.as_mut() {
+            crate::shader_try::follow(console);
+        }
         // `toy_illuminate` may have flipped it: tell the Toys tab. Order 66, the Hax, the
         // Drone, the Monitor, Box hunt and the Banana peel stay as last switched, across
         // maps, servers and restarts (`toy_saved`).

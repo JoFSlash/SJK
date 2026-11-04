@@ -30,6 +30,10 @@ The site (site/assets/site.js, parseChangelog) reads the release headings,
 introductions and recap lines too.
 Add each release's notes here when it is tagged (docs/sjk.md "Releases").
 -->
+## Unreleased
+
+- Shaders: try a shader you do not own for 10 minutes from its card in Collection > Shaders, seen by every SJK player on your server; your old blade comes back when it ends, and that shader can be tried again a day later; once the hub turns it on _(Slash, after Blep's idea)_
+
 ## 2026.1103.2 (Alpha) | 03/11/2026
 
 Clan chats for JoF and S, holocrons earned by playing, tag copies to break down or craft, loadouts, fishing and many fixes.

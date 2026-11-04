@@ -1183,6 +1183,12 @@ pub(super) fn register_daily_cvars(cvars: &mut CvarRegistry) -> Result<(), sjk_s
             "The blade skin your sabers wear, by unlock id (saber_sun: the Sun blade), shown once your SJK profile holds it; empty for the stock blade",
         ),
         CvarDefinition::new(
+            crate::shader_try::BEFORE_CVAR,
+            "",
+            archive,
+            "Kept by SJK while a shader trial runs: the blade skin your sabers wore before it, put back when it ends (stock for the stock blade); empty when no trial runs",
+        ),
+        CvarDefinition::new(
             crate::looks::SECOND_CVAR,
             "",
             archive,

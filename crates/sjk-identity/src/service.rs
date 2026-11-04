@@ -102,6 +102,8 @@ const MAP_EDITS_EVERY: Duration = Duration::from_secs(600);
 const MYSTERY_BOXES_EVERY: Duration = Duration::from_secs(600);
 /// How often the Toy Master's toys are read while registered.
 const SECRETS_EVERY: Duration = Duration::from_secs(600);
+/// How often shader trials are read while registered (and at a trial's end).
+const SHADER_TRY_EVERY: Duration = Duration::from_secs(600);
 
 /// What a request about the Toy Master's toys did ([`Snapshot::secret`]).
 #[derive(Clone, Debug, PartialEq)]
@@ -302,6 +304,12 @@ pub struct Snapshot {
     /// The answer to the last mystery box request, by serial, or why it was refused
     /// (in the player's words).
     pub mystery_box: Option<(u64, Result<BoxDone, String>)>,
+    /// Shader trials as the hub last said ([`Service::read_shader_try`]): `None` until
+    /// read, and when the hub has none or could not be asked (no Try button then).
+    pub shader_try: Option<crate::shader_try::Trials>,
+    /// The answer to the last trial asked for ([`Service::start_shader_try`]), by serial,
+    /// or why it was refused (in the player's words).
+    pub shader_try_started: Option<(u64, Result<crate::shader_try::Started, String>)>,
     /// The box hunt as last read, by serial, for the server named
     /// ([`Service::read_box_hunt`]).
     pub box_hunt: Option<(u64, String, crate::mystery_box::HuntState)>,
@@ -730,6 +738,8 @@ impl Snapshot {
             mystery_boxes: None,
             mystery_boxes_revision: 0,
             mystery_box: None,
+            shader_try: None,
+            shader_try_started: None,
             box_hunt: None,
             secrets: None,
             secrets_revision: 0,
@@ -885,6 +895,10 @@ enum Command {
     PlaceMysteryBox(crate::mystery_box::MysteryBox),
     /// SJK's creator: remove mystery box `id`.
     RemoveMysteryBox(i64),
+    /// Ask the hub about shader trials.
+    ReadShaderTry,
+    /// Start a trial of this blade skin.
+    StartShaderTry(String),
     /// Read the box hunt on `server`, the player away or not.
     BoxHunt {
         server: String,
@@ -1103,6 +1117,9 @@ struct Worker {
     /// When the hub's mystery boxes are next read, and the last request's serial.
     due_mystery_boxes: Instant,
     mystery_box_serial: u64,
+    /// When shader trials are next read, and the last trial's serial.
+    due_shader_try: Instant,
+    shader_try_serial: u64,
     box_hunt_serial: u64,
     /// When the Toy Master's toys are next read, and the last request's serial.
     due_secrets: Instant,
@@ -1435,6 +1452,8 @@ impl Worker {
             map_edits_serial: 0,
             due_mystery_boxes: now,
             mystery_box_serial: 0,
+            due_shader_try: now,
+            shader_try_serial: 0,
             box_hunt_serial: 0,
             due_secrets: now,
             secret_serial: 0,
@@ -1898,6 +1917,11 @@ impl Worker {
                 hub.remove_mystery_box(identity, id)
                     .map(|_| (BoxDone::Removed(id), None))
             }),
+            Command::ReadShaderTry => {
+                self.due_shader_try = now;
+                self.keep_shader_try(now);
+            }
+            Command::StartShaderTry(blade) => self.start_shader_try(now, &blade),
             Command::UseSecret {
                 id,
                 server,
@@ -2738,6 +2762,7 @@ impl Worker {
         self.keep_mystery_boxes(now);
         self.look_between(now);
         self.keep_secrets(now);
+        self.keep_shader_try(now);
         self.send_crashes(now);
         self.look_between(now);
         let mut wait = IDLE_MAX;
@@ -3247,6 +3272,58 @@ impl Worker {
                 }
             });
         }
+    }
+
+    /// Read shader trials once registered, if it is time: next time [`SHADER_TRY_EVERY`]
+    /// later, or just after the running trial ends. A failure keeps the last answer; an
+    /// older hub's 404 clears it (no Try button).
+    fn keep_shader_try(&mut self, now: Instant) {
+        if !self.registered || now < self.due_shader_try {
+            return;
+        }
+        let Some(hub) = self.hub.as_mut() else {
+            return;
+        };
+        self.due_shader_try = now + SHADER_TRY_EVERY;
+        match hub.shader_try(&self.identity) {
+            Ok(status) => {
+                let trials = crate::shader_try::Trials { status, read: now };
+                if let Some((_, left)) = trials.running(now) {
+                    self.due_shader_try =
+                        self.due_shader_try.min(now + left + Duration::from_secs(2));
+                }
+                self.update(|snapshot| snapshot.shader_try = Some(trials));
+            }
+            Err(error) if crate::shader_try::unsupported(&error) => {
+                self.update(|snapshot| snapshot.shader_try = None);
+            }
+            Err(_) => {}
+        }
+    }
+
+    /// Start a trial of `blade`: the answer goes in [`Snapshot::shader_try_started`] and
+    /// the trial in [`Snapshot::shader_try`]; the trials are read again after.
+    fn start_shader_try(&mut self, now: Instant, blade: &str) {
+        self.shader_try_serial += 1;
+        let serial = self.shader_try_serial;
+        let outcome = match (self.hub.as_mut(), self.registered) {
+            (Some(hub), true) => hub.start_shader_try(&self.identity, blade),
+            _ => Err(self.not_connected()),
+        };
+        self.update(|snapshot| {
+            let outcome = match outcome {
+                Ok(started) => {
+                    if let Some(trials) = snapshot.shader_try.as_mut() {
+                        trials.started(&started, now);
+                    }
+                    Ok(started)
+                }
+                Err(error) => Err(crate::shader_try::refusal(&error)),
+            };
+            snapshot.shader_try_started = Some((serial, outcome));
+        });
+        self.due_shader_try = now;
+        self.keep_shader_try(now);
     }
 
     /// Send a request about the Toy Master's toys: its outcome goes in
@@ -4206,6 +4283,20 @@ impl Service {
     /// SJK's creator: remove mystery box `id`.
     pub fn remove_mystery_box(&self, id: i64) {
         let _ = self.commands.send(Command::RemoveMysteryBox(id));
+    }
+
+    /// Ask the hub about shader trials now: the answer arrives in
+    /// [`Snapshot::shader_try`].
+    pub fn read_shader_try(&self) {
+        let _ = self.commands.send(Command::ReadShaderTry);
+    }
+
+    /// Start a trial of blade skin `blade`: the answer arrives in
+    /// [`Snapshot::shader_try_started`], the trial in [`Snapshot::shader_try`].
+    pub fn start_shader_try(&self, blade: &str) {
+        let _ = self
+            .commands
+            .send(Command::StartShaderTry(blade.to_owned()));
     }
 
     /// The player pressed Use `presses` times on the Toy Master's toy `id` on `server` in

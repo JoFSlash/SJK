@@ -30,6 +30,7 @@ pub mod reactions;
 pub mod relay;
 pub mod report;
 pub mod service;
+pub mod shader_try;
 pub mod staff;
 pub mod toy_master;
 pub mod trades;

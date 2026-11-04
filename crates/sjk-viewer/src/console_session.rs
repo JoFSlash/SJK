@@ -644,6 +644,7 @@ impl ViewerConsole {
             pending_boombox: None,
             fishing_on: false,
             pending_fishing: None,
+            shader_try: Default::default(),
             monitor_on: false,
             pending_monitor: None,
             box_hunt_on: false,

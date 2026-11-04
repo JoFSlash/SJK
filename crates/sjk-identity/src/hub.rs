@@ -602,6 +602,28 @@ pub trait Hub: Send {
         ))
     }
 
+    /// Whether this key may try shaders, the trial running and the skins cooling down
+    /// (`GET /v1/shaders/try`, 04/11/2026).
+    fn shader_try(
+        &mut self,
+        _identity: &Identity,
+    ) -> Result<crate::shader_try::TryStatus, HubError> {
+        Err(HubError::Protocol(
+            "this hub client does not read shader trials".to_owned(),
+        ))
+    }
+
+    /// Start a trial of blade skin `blade` (`POST /v1/shaders/try`, 04/11/2026).
+    fn start_shader_try(
+        &mut self,
+        _identity: &Identity,
+        _blade: &str,
+    ) -> Result<crate::shader_try::Started, HubError> {
+        Err(HubError::Protocol(
+            "this hub client does not try shaders".to_owned(),
+        ))
+    }
+
     /// Every placed mystery box, the price and the odds (`GET /v1/mystery-boxes`,
     /// 27/10/2026).
     fn mystery_boxes(
@@ -1991,6 +2013,22 @@ impl Hub for HttpHub {
         identity: &Identity,
     ) -> Result<crate::mystery_box::Boxes, HubError> {
         parse(self.send(Some(identity), "GET", "/v1/mystery-boxes", None)?)
+    }
+
+    fn shader_try(
+        &mut self,
+        identity: &Identity,
+    ) -> Result<crate::shader_try::TryStatus, HubError> {
+        parse(self.send(Some(identity), "GET", "/v1/shaders/try", None)?)
+    }
+
+    fn start_shader_try(
+        &mut self,
+        identity: &Identity,
+        blade: &str,
+    ) -> Result<crate::shader_try::Started, HubError> {
+        let body = crate::shader_try::start_body(blade);
+        parse(self.send(Some(identity), "POST", "/v1/shaders/try", Some(body))?)
     }
 
     fn open_mystery_box(

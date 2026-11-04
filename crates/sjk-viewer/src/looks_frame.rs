@@ -78,7 +78,8 @@ impl GpuState {
             let shot = self.looks.shot_owns_unlocks;
             #[cfg(not(test))]
             let shot = false;
-            let owned = |id: &str| shot || player_identity::owns_unlock(id);
+            // A shader trial lets the look wear a skin not held (`shader_try.rs`).
+            let owned = |id: &str| shot || player_identity::wears_unlock(id);
             // The extras of a skin whose card the player does not hold in its finish stay
             // off (`blade_extras.rs`): the hub would not relay them either.
             let held_options = crate::blade_extras::gated(&options, |gate| {

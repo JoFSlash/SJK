@@ -1338,6 +1338,8 @@ Found the fog bug, ask me about it!"
             mystery_boxes: None,
             mystery_boxes_revision: 0,
             mystery_box: None,
+            shader_try: None,
+            shader_try_started: None,
             box_hunt: None,
             secrets: None,
             secrets_revision: 0,

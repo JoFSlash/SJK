@@ -2172,6 +2172,33 @@ impl Panel {
             );
             right = toggles_x - 12.0;
         }
+        // A shader not held may be tried for a while, when the hub lets the player
+        // (`crate::shader_try`): Try, or how long its trial or cooldown still runs.
+        self.try_link = None;
+        let trials = inputs
+            .snapshot
+            .and_then(|snapshot| snapshot.shader_try.as_ref());
+        if let Some((skin, offer)) = row.skin.and_then(|skin| {
+            crate::shader_try::offer(trials, skin, row.owned, Instant::now())
+                .map(|offer| (skin, offer))
+        }) {
+            let (label, enabled) = offer.button();
+            let button_width = (crate::text::display_width(&label, 18.0) + 56.0).max(180.0);
+            kit::button(
+                &mut self.ui,
+                frame,
+                [left, button_y, button_width, 44.0],
+                &label,
+                true,
+                enabled,
+                false,
+                TRY_TOKEN,
+            );
+            if enabled {
+                self.try_link = Some(skin.id);
+            }
+            left += button_width + 12.0;
+        }
         self.trade_buttons(frame, row, inputs, [left, button_y], right);
     }
 

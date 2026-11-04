@@ -134,6 +134,8 @@ const SABER_TOKEN: u16 = 1_316;
 /// The shader card's way to the Forge: Craft in the Forge (one not held) or Break down
 /// in the Forge (a copy of the player's own).
 const FORGE_LINK_TOKEN: u16 = 1_317;
+/// The shader card's Try button: wear one not held for a while (`crate::shader_try`).
+const TRY_TOKEN: u16 = 1_329;
 /// The Nameplates tab's See and share nameplates switch.
 const SHARE_TOKEN: u16 = 1_319;
 /// The Nameplates tab's style choices, one per [`crate::hud::nameplate::Style`].
@@ -440,6 +442,8 @@ pub(crate) enum PanelAction {
     ShatterAll,
     /// Craft this shader with kyber shards.
     Craft(&'static str),
+    /// Ask the hub for a trial of this shader, not held (`crate::shader_try`).
+    TryShader(&'static str),
     /// Ask the hub to sell the player this offer of the day.
     Buy(String),
     /// Ask the hub to sell the player a holocron of this tier for credits.
@@ -812,6 +816,8 @@ pub(crate) struct Panel {
     forge: forge::Forge,
     /// Where the chosen shader's way to the Forge leads, as the last frame drew it.
     forge_link: Option<(forge::Section, &'static str)>,
+    /// The shader the card's Try button asks for, as the last frame drew it.
+    try_link: Option<&'static str>,
     /// Whether the hub's economy is known (the Shaders tab's way to the Forge shows then).
     trade_known: bool,
     /// What the Shaders tab and the Forge show on each shader (worn, favourite, locked,
@@ -955,6 +961,7 @@ impl Panel {
             scale: 1.0,
             forge: forge::Forge::default(),
             forge_link: None,
+            try_link: None,
             trade_known: false,
             marks: Default::default(),
             marks_from: None,
@@ -2279,6 +2286,7 @@ impl Panel {
             TARGET_SECOND_TOKEN => self.set_target(true),
             BOTH_TOKEN => self.toggle_both(),
             FORGE_LINK_TOKEN => self.open_forge_link(),
+            TRY_TOKEN => self.try_shader(),
             FAVOURITE_TOKEN => self.toggle_mark(sjk_identity::Mark::Favourite),
             LOCK_TOKEN => self.toggle_mark(sjk_identity::Mark::Locked),
             SEEN_ALL_TOKEN => self.see_all(),
@@ -2316,6 +2324,17 @@ impl Panel {
         self.shader_filter = ShaderFilter::default();
         self.shader_focus = Some(skin.id);
         PanelAction::None
+    }
+
+    /// The shader card's Try button, when the last frame offered it.
+    fn try_shader(&mut self) -> PanelAction {
+        match self.try_link.take() {
+            Some(id) => {
+                ui_cues_click();
+                PanelAction::TryShader(id)
+            }
+            None => PanelAction::None,
+        }
     }
 
     /// The Shaders tab's way to the Forge: Craft for a shader of the trade not held, Break
