@@ -1,3 +1,19 @@
+## Map changes no longer join the server again (hub #262)
+
+07/11/2026, `fix/map-change-rejoin`, based on `main` `b1ed113d`. Players (vini's hub #262,
+Nib, Sanji) lost their admin login on every map change and saw the map load two to four
+times, with "server is full" at times. A session log from 2026.1107.1 showed the cause: at
+the map change, "password changed while joining: joining again" twice, each a new
+`connect`. `rejoin_on_new_password` (the 03/11 password fix) ran whenever the menu was in
+its connect phase without a `live_session`, and a map change is just that: the session
+waits in `resident` while the next map loads. Each new connect made the server take the
+player for a new client, so its session data (the admin login) went. It now never joins
+again once the server has taken the join (`live_session`, `resident.session`, or a
+resumed download's `JoinTask::in_session`); a password typed while a join waits or on its
+failure screen still joins again. Why the `password` cvar read differently from the one
+the join sent was not found (nothing in the log changes it); it no longer matters at a map
+change. Verified: unit tests for the rule, fmt, clippy. Not verified: a map change in a game.
+
 ## Rig chains feel the player's movement, and can keep out of the arms
 
 06/11/2026, `feat/rig-dynamics-motion` from `feat/rig-dynamics-cloth`. Chains answered only

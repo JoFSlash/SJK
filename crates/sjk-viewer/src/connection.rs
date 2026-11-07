@@ -201,6 +201,12 @@ impl crate::GpuState {
     /// `connect` with the new userinfo (`CL_CheckForResend`). Retyping the password a
     /// join already sent changes nothing. (headshotsmcgee117's report, 03/11/2026:
     /// only `connect <ip>;password <pw>` worked.)
+    ///
+    /// Never once the server has taken the join: a map change keeps the menu in its
+    /// connect phase with the session waiting in `resident` (or resuming a download),
+    /// and joining again there made a new client of the player on every map change,
+    /// with two or three loads of the map and the admin login lost, even on servers
+    /// without a password (hub report #262, 07/11/2026).
     fn rejoin_on_new_password(&mut self) {
         let (Some(console), Some(menu), Some(address)) = (
             self.console.as_ref(),
@@ -214,8 +220,11 @@ impl crate::GpuState {
             crate::client_state::ClientPhase::Connecting(_)
                 | crate::client_state::ClientPhase::ConnectionError
         );
+        let in_session = self.live_session.is_some()
+            || self.resident.session.is_some()
+            || self.join_task.as_ref().is_some_and(JoinTask::in_session);
         let password = console.text_value("password").unwrap_or_default().trim();
-        if !waiting || self.live_session.is_some() || password == self.join_password {
+        if !joins_again_for_password(waiting, in_session, password, &self.join_password) {
             return;
         }
         log::progress(format_args!(
@@ -560,4 +569,43 @@ fn base_jka_pure_command(game_state: &GameState, assets: &Pk3Fingerprint) -> Opt
         game_state.checksum_feed,
     ));
     Some(command)
+}
+
+/// Whether a changed `password` joins the server again: only while a join waits for
+/// the server's answer or has failed (`waiting`), never once the server has taken it
+/// (`in_session`: playing, a map change loading, its download), and only for a
+/// password other than the one the join sent.
+fn joins_again_for_password(waiting: bool, in_session: bool, password: &str, sent: &str) -> bool {
+    waiting && !in_session && password != sent
+}
+
+#[cfg(test)]
+mod password_rejoin_tests {
+    use super::joins_again_for_password;
+
+    #[test]
+    fn a_new_password_joins_again_while_the_join_waits_or_failed() {
+        assert!(joins_again_for_password(true, false, "temple", ""));
+        assert!(joins_again_for_password(true, false, "temple", "old"));
+    }
+
+    #[test]
+    fn the_password_the_join_sent_changes_nothing() {
+        assert!(!joins_again_for_password(true, false, "temple", "temple"));
+        assert!(!joins_again_for_password(true, false, "", ""));
+    }
+
+    #[test]
+    fn a_map_change_never_joins_again() {
+        // Hub report #262: the menu is in its connect phase while the map loads,
+        // but the server already holds the player's session.
+        assert!(!joins_again_for_password(true, true, "temple", ""));
+        assert!(!joins_again_for_password(true, true, "", "temple"));
+    }
+
+    #[test]
+    fn nothing_joins_again_in_game() {
+        assert!(!joins_again_for_password(false, true, "temple", ""));
+        assert!(!joins_again_for_password(false, false, "temple", ""));
+    }
 }

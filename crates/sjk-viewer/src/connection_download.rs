@@ -34,6 +34,7 @@ impl JoinTask {
             prepared,
             phase,
             cancelled,
+            in_session: true,
         }
     }
 }

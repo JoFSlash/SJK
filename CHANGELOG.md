@@ -32,6 +32,7 @@ Add each release's notes here when it is tagged (docs/sjk.md "Releases").
 -->
 ## Unreleased
 
+- Map changes: SJK no longer joins the server again two or three times while the next map loads, which loaded the map that many times and logged you out of admin (amlogin), even on servers without a password (hub report #262) _(Slash, after Nib, Sanji and vini)_
 - Rig models' hair and capes can trail behind a running player and keep out of the arms (`drag`, `arms`) _(Kushina, PR #377)_
 - Rig models' chains can take `limit`, `clearance` and `layer` lines, and a bone's middle now collides with the body _(Kushina, PR #374)_
 

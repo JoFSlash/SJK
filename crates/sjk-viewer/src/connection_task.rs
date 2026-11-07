@@ -35,6 +35,8 @@ pub(crate) struct JoinTask {
     prepared: Receiver<GameState>,
     phase: Receiver<TimelinePhase>,
     cancelled: Arc<AtomicBool>,
+    /// The server took this join already: a map change's download resumes its session.
+    in_session: bool,
 }
 
 impl JoinTask {
@@ -90,7 +92,13 @@ impl JoinTask {
             prepared,
             phase,
             cancelled,
+            in_session: false,
         }
+    }
+
+    /// Whether the server took this join already ([`Self::resume`]'s download).
+    pub(crate) fn in_session(&self) -> bool {
+        self.in_session
     }
 
     /// Poll without blocking the rendering thread.
