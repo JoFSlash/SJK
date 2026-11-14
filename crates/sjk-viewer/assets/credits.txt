@@ -602,8 +602,9 @@ link: Kushina's pull requests | https://github.com/Sol-Vulpes/SJK/pulls?q=is%3Ap
 
 [Hormorn]
 github: Hormorn
-role: Contributor: 1 merged pull request
+role: Contributor: 2 merged pull requests
 did: #401 A Nameplate height slider: move every nameplate up or down, clear of team logos
+did: #421 Status balloon modes: stock, SJK, and JoF and {{S}} clan pictures, static or animated
 link: Hormorn's pull requests | https://github.com/Sol-Vulpes/SJK/pulls?q=is%3Apr+author%3AHormorn
 
 == Art
