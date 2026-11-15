@@ -208,6 +208,8 @@ JA+ servers grow (emotes, the grappling hook, admins by SJK key), lights in map 
 > Toys: Collection > Toys stands in three sections, and every toy is signed by who made it.
 > Status bubbles: The chat bubble over SJK players now shows why it is up by default: dots while typing, a pause sign in a menu, a moon while away.
 
+= cg_statusBalloons reset: Status bubbles are now on by default: the chat bubble over SJK players shows dots while typing, a pause sign in a menu, a moon while alt-tabbed.
+
 - Status bubbles are now on by default: the chat bubble over an SJK player shows the dots while they type, a pause sign in a menu or the console and a moon while alt-tabbed; switch them off in Settings > Chat > Status bubbles (`cg_statusBalloons`) _(Sol)_
 - Collection > Toys stands in three sections (Around you, With others, Earn and win) with a By column naming who made each toy, and each toy's card says "Made by ..." under its name, with whose idea it was _(Sol)_
 - SJK's server in JA+ mode (`g_mod japlus`) has JA+'s emotes and player commands: the 27 emotes (`amsit`, `sleep`, `amkneel`...) held until a button, `amhug`, `amflip`, `amknockmedown`, `amdropsaber`, `jetpack`, `amcolor`, `sabercolor`, `saber`, `ammove`, `amDMGs`, `duelWhois` and `refuseTele`, with `jp_emotDisallow`, `jp_fixEmot` and the `jp_allow*` settings; SJK players now predict JA+'s held emotes on every JA+ server _(Sol, after VisionJK by Blackwolf)_

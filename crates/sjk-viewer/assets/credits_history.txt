@@ -3299,6 +3299,12 @@
 - 0874042 |  | Decode print and cp text as legacy bytes
 
 = Hormorn
++ 15/11/2026 | - | Update CHANGELOG.md
+- f141a5d |  | Update CHANGELOG.md
++ 15/11/2026 | - | Cargo fmt --all (fix)
+- 2262415 |  | cargo fmt --all (fix)
++ 15/11/2026 | - | Fix changelog review check for choice settings
+- df6af5d |  | Fix changelog review check for choice settings
 + 15/11/2026 | SJK #421 | Expand cg_statusBalloons into four display modes.
 - c749c5d |  | Expand cg_statusBalloons into four display modes: stock game behavior, original SJK animations, static clan artwork, and animated clan artwork.
 - 98d75ae |  | Fix status balloon CI checks
