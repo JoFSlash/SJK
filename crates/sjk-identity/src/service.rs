@@ -318,6 +318,12 @@ pub struct Snapshot {
     /// The answer to the last junk sale ([`Service::sell_junk`]), by serial, or why it
     /// was refused (in the player's words).
     pub junk_sale: Option<(u64, Result<crate::junk::JunkSold, String>)>,
+    /// The last kyber find a claim's answer brought (`crate::catch`, since 15/11/2026),
+    /// by a count that rises with each: the toys show it once.
+    pub kyber_find: Option<(u64, crate::catch::KyberFind)>,
+    /// The day's catch quests as the last claim's answer said them (`None` from a hub
+    /// without them, or before the player fished or mined that day).
+    pub catch_quests: Option<crate::catch::CatchQuests>,
     /// The WHEEL OF DOOM's price, cooldown and segments as the hub last said
     /// ([`Service::read_wheel_of_doom`]): `None` until read, or with a hub that has none.
     pub wheel_of_doom: Option<crate::wheel_of_doom::Wheel>,
@@ -791,6 +797,8 @@ impl Snapshot {
             mystery_box: None,
             junk: None,
             junk_sale: None,
+            kyber_find: None,
+            catch_quests: None,
             wheel_of_doom: None,
             wheel_of_doom_revision: 0,
             wheel_of_doom_spin: None,
@@ -1511,6 +1519,23 @@ fn outcome_of(serial: u64, outcome: Result<String, HubError>) -> ReportOutcome {
             sent: false,
             message: error.to_string(),
         },
+    }
+}
+
+/// Keep what a claim's answer brought beside its `ttl` (`crate::catch`): a kyber find
+/// for the toys to show once, with the shards it left; the day's catch quests.
+fn note_claim_extras(snapshot: &Mutex<Snapshot>, extras: crate::catch::ClaimExtras) {
+    let mut snapshot = lock(snapshot);
+    if let Some(find) = extras.kyber_find {
+        if let Some(me) = snapshot.me.as_mut() {
+            me.shards = u64::try_from(find.balance).unwrap_or(me.shards);
+            snapshot.me_revision += 1;
+        }
+        let count = snapshot.kyber_find.as_ref().map_or(0, |(count, _)| *count) + 1;
+        snapshot.kyber_find = Some((count, find));
+    }
+    if extras.catch_quests.is_some() {
+        snapshot.catch_quests = extras.catch_quests;
     }
 }
 
@@ -4390,7 +4415,8 @@ impl Worker {
                     self.active,
                     Some(&self.play),
                 ) {
-                    Ok(()) => {
+                    Ok(extras) => {
+                        note_claim_extras(&self.snapshot, extras);
                         // What was sent is counted: the next claim starts afresh. An
                         // inactive claim sent nothing, so what it held waits.
                         if self.active {

@@ -555,7 +555,9 @@ pub trait Hub: Send {
     ) -> Result<(), HubError>;
     /// [`Hub::claim`] with what the player did since the last accepted claim (`play`,
     /// 03/11/2026: the hub counts the time by real play), sent only with `active`. A hub
-    /// client that does not send signals claims without them.
+    /// client that does not send signals claims without them. Answers what the claim's
+    /// answer brought beside its `ttl` (since 15/11/2026: a kyber find, the day's catch
+    /// quests; [`crate::catch`]).
     fn claim_with(
         &mut self,
         identity: &Identity,
@@ -564,8 +566,9 @@ pub trait Hub: Send {
         name: &str,
         active: bool,
         _play: Option<&crate::wire::PlaySignals>,
-    ) -> Result<(), HubError> {
+    ) -> Result<crate::catch::ClaimExtras, HubError> {
         self.claim(identity, server, slot, name, active)
+            .map(|()| crate::catch::ClaimExtras::default())
     }
     /// How far the identity's key is from its next holocron (`GET /v1/holocrons`).
     fn holocrons(&mut self, _identity: &Identity) -> Result<HolocronState, HubError> {
@@ -2103,6 +2106,7 @@ impl Hub for HttpHub {
         active: bool,
     ) -> Result<(), HubError> {
         self.claim_with(identity, server, slot, name, active, None)
+            .map(|_| ())
     }
 
     fn claim_with(
@@ -2113,10 +2117,10 @@ impl Hub for HttpHub {
         name: &str,
         active: bool,
         play: Option<&crate::wire::PlaySignals>,
-    ) -> Result<(), HubError> {
+    ) -> Result<crate::catch::ClaimExtras, HubError> {
         let body = claim_body_with(server, slot, name, active, play);
         self.send(Some(identity), "POST", "/v1/claim", Some(body))
-            .map(|_| ())
+            .map(|answer| crate::catch::ClaimExtras::of(&answer))
     }
 
     fn holocrons(&mut self, identity: &Identity) -> Result<HolocronState, HubError> {
@@ -3669,7 +3673,7 @@ mod tests {
             claim_body_with("1.2.3.4:29070", 3, "Sol", true, Some(&play)),
             json!({"server": "1.2.3.4:29070", "slot": 3, "name": "Sol", "active": true,
                 "play": {"moved": 900, "attacks": 3, "hits": 2, "hurt": 0, "kills": 0,
-                    "deaths": 0, "bites": 0}})
+                    "deaths": 0, "bites": 0, "rocks": 0}})
         );
         assert_eq!(
             claim_body_with("1.2.3.4:29070", 3, "Sol", false, Some(&play)),

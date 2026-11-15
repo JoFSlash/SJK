@@ -39,6 +39,14 @@ pub(super) fn register(shell: &mut sjk_shell::Shell) -> Result<(), sjk_shell::Co
             "Toy: sell your fished junk to the SJK hub for a few credits (a small sum a day)",
         ),
         (
+            crate::fishing_sell::FISH_COMMAND,
+            "Toy: sell your fish at the SJK hub's catch market (the same small sum a day as junk), once the hub opens it",
+        ),
+        (
+            crate::mining_sell::ORE_COMMAND,
+            "Toy: sell your ore at the SJK hub's catch market (the same small sum a day as junk), once the hub opens it",
+        ),
+        (
             crate::fishing_sell::LOG_COMMAND,
             "Toy: print your fish log in full: every fish and junk caught, held and sold",
         ),

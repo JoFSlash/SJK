@@ -579,6 +579,17 @@ impl Log {
             .collect()
     }
 
+    /// The fish the player holds unsold, by id (only kinds with some): what the catch
+    /// market buys (15/11/2026).
+    pub(crate) fn fish_held(&self) -> std::collections::BTreeMap<String, u32> {
+        CATCHES
+            .iter()
+            .filter(|c| c.kind == Kind::Fish)
+            .map(|c| (c.id.to_owned(), self.held(c.id)))
+            .filter(|(_, held)| *held > 0)
+            .collect()
+    }
+
     /// Count `sold` (pieces by id, as the hub took them) as sold, never more than was
     /// caught; returns how many pieces that was.
     pub(crate) fn sell(&mut self, sold: &std::collections::BTreeMap<String, u32>) -> u32 {

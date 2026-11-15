@@ -12,8 +12,9 @@ use crate::hub::HubError;
 use serde::Deserialize;
 use std::collections::BTreeMap;
 
-/// Most kinds of junk one sale names (the hub refuses more).
-pub const KINDS_MAX: usize = 6;
+/// Most kinds one sale names (the hub refuses more): its junk and rubble, and since
+/// 15/11/2026 the catch market's fish and ore beside them (10 + 21).
+pub const KINDS_MAX: usize = 31;
 /// Most pieces of one kind one sale names.
 pub const COUNT_MAX: u32 = 1_000;
 
@@ -35,6 +36,27 @@ pub struct JunkStatus {
     /// The player's credits.
     #[serde(default)]
     pub balance: i64,
+    /// The catch market (since 15/11/2026, off unless the hub's operator opens it): fish
+    /// and ore sell too, under the same cap. `None` while it is closed to this player.
+    #[serde(default)]
+    pub market: Option<Market>,
+}
+
+/// The catch market as `GET /v1/fishing/junk` says it.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Deserialize)]
+pub struct Market {
+    /// Credits a fish or an ore, by id, the wanted one's already raised.
+    #[serde(default)]
+    pub prices: BTreeMap<String, u32>,
+    /// The fish or ore wanted today, which pays [`Market::wanted_times`] its price.
+    #[serde(default)]
+    pub wanted: String,
+    /// How many times its price the wanted one pays.
+    #[serde(default)]
+    pub wanted_times: u32,
+    /// When the day (and the wanted one) ends, unix seconds.
+    #[serde(default)]
+    pub until: i64,
 }
 
 /// `POST /v1/fishing/junk/sell`'s answer.
@@ -52,12 +74,21 @@ pub struct JunkSold {
 }
 
 impl JunkStatus {
+    /// What one piece of `id` pays now: junk's price, else the market's while open.
+    pub fn price(&self, id: &str) -> Option<u32> {
+        self.prices.get(id).copied().or_else(|| {
+            self.market
+                .as_ref()
+                .and_then(|market| market.prices.get(id).copied())
+        })
+    }
+
     /// What selling `held` (pieces by junk id) would pay now, as the hub picks: the most
     /// valuable first while each fits in [`Self::left`].
     pub fn payable(&self, held: &BTreeMap<String, u32>) -> u32 {
         let mut pieces: Vec<(u32, u32)> = held
             .iter()
-            .filter_map(|(id, count)| self.prices.get(id).map(|price| (*price, *count)))
+            .filter_map(|(id, count)| self.price(id).map(|price| (price, *count)))
             .filter(|(price, count)| *price > 0 && *count > 0)
             .collect();
         pieces.sort_by_key(|(price, _)| std::cmp::Reverse(*price));
@@ -120,6 +151,30 @@ mod tests {
     }
 
     #[test]
+    fn the_market_prices_fish_and_ore_beside_junk() {
+        let status: JunkStatus = serde_json::from_str(
+            r#"{"open":true,"prices":{"boot":1,"hilt":5},"daily":15,"left":15,"balance":0,
+                "market":{"prices":{"sun_carp":3,"moon_eel":6},"wanted":"moon_eel","wanted_times":2,"until":1800000000}}"#,
+        )
+        .unwrap();
+        let market = status.market.as_ref().unwrap();
+        assert_eq!(
+            (market.wanted.as_str(), market.wanted_times),
+            ("moon_eel", 2)
+        );
+        assert_eq!(status.price("moon_eel"), Some(6));
+        assert_eq!(status.price("boot"), Some(1));
+        assert_eq!(status.price("old_whiskers"), None);
+        assert_eq!(status.payable(&held(&[("moon_eel", 2), ("boot", 5)])), 15);
+        // Without the market, fish pay nothing.
+        let closed = JunkStatus {
+            market: None,
+            ..status
+        };
+        assert_eq!(closed.payable(&held(&[("moon_eel", 2)])), 0);
+    }
+
+    #[test]
     fn answers_read_as_the_protocol_writes_them() {
         let status: JunkStatus = serde_json::from_str(
             r#"{"open":true,"prices":{"boot":1,"weed":1,"blaster":2,"holopad":3,"droid_head":4,"hilt":5},"daily":15,"left":7,"balance":158}"#,
@@ -146,6 +201,7 @@ mod tests {
             daily: 15,
             left: 12,
             balance: 0,
+            market: None,
         };
         // Two hilts (10), one blaster (2), then nothing left for the boots.
         assert_eq!(

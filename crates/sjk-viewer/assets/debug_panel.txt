@@ -9977,6 +9977,17 @@ test: toy_fishing online: bites come often, Use about a second late still hooks 
 test: Press Use with no bite: the next bite comes 5 to 10 s later than usual.
 test: debug_holocron is no Echo; wait for a real drop: the golden bite holds 3 s.
 
+[catch-rewards]
+area: Gameplay
+title: Kyber finds, daily catch goals, catch market (Slash, after adwe's idea)
+change: Hub rolls a few kyber shards on claims with bites or broken boulders (3 a day).
+change: Daily goals: 25 bites, 40 boulders win an Echo each. Market buys fish and ore.
+test: Local hub with --kyber-finds, --catch-market, --junk-selling, --quests staff.
+test: Fish or mine a while: "A kyber glint ... +N kyber shards", shards rise in Profile.
+test: Collection > Toys > Fishing: goal line counts bites; at 25 the Echo comes once.
+test: Sell fish: Wanted today line, the wanted one pays double, the 15 a day cap holds.
+note: Needs the hub's feat/catch-rewards deployed; without it nothing new shows.
+
 [forge-shatter-many]
 area: Menus & settings
 title: The Forge breaks several shaders down at once (Slash, #367)

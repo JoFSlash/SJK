@@ -32,6 +32,7 @@ Add each release's notes here when it is tagged (docs/sjk.md "Releases").
 -->
 ## Unreleased
 
+- Fishing and Mining: now and then a kyber glint brings a few kyber shards, a daily goal (25 bites hooked, 40 boulders broken) wins an Echo, and the catch market buys fish and ore with one wanted each day at double price (`fishing_sellfish`, `mining_sellore`); each once the hub turns it on _(Slash, after adwe's idea)_
 - Status balloons: `cg_statusBalloons` offers stock, SJK animations, static clan pictures or clan animations; name tags select clan art, with static pictures for non-SJK players _(Hormorn, PR #421)_
 
 ## 2026.1113.1 (Alpha) | 13/11/2026

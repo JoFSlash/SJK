@@ -512,12 +512,24 @@ impl Log {
             .collect()
     }
 
-    /// Count `sold` (pieces by id, as the hub took them) as sold, rubble only and never
-    /// more than was dug; returns how many pieces that was.
+    /// The ore the player holds unsold, by id (only kinds with some): what the catch
+    /// market buys (15/11/2026).
+    pub(crate) fn ore_held(&self) -> std::collections::BTreeMap<String, u32> {
+        FINDS
+            .iter()
+            .filter(|f| f.kind == Kind::Ore)
+            .map(|f| (f.id.to_owned(), self.held(f.id)))
+            .filter(|(_, held)| *held > 0)
+            .collect()
+    }
+
+    /// Count `sold` (pieces by id, as the hub took them) as sold, rubble and (since the
+    /// catch market, 15/11/2026) ore, never more than was dug; returns how many pieces
+    /// that was.
     pub(crate) fn sell(&mut self, sold: &std::collections::BTreeMap<String, u32>) -> u32 {
         let mut pieces = 0;
         for (id, count) in sold {
-            if !FINDS.iter().any(|f| f.kind == Kind::Rubble && f.id == id) {
+            if !FINDS.iter().any(|f| f.id == id) {
                 continue;
             }
             let taken = (*count).min(self.held(id));
@@ -961,6 +973,9 @@ impl Mining {
         let second = self.dice.next();
         let find = roll_find(roll, pick, second, rock.clean, heart_wait);
         let count = self.log.get_or_insert_with(Log::default).found(find);
+        // A play signal (15/11/2026): the hub counts broken boulders for its kyber finds
+        // and the daily catch quests.
+        crate::holocrons::signals::rock();
         self.broken.push((find, rock.clean));
         self.said.push(Say::Sound(BREAK));
         if find.id == HEART {
@@ -1901,7 +1916,8 @@ mod tests {
     }
 
     /// What was sold is kept apart from what was dug: the counts stay, held is the
-    /// difference, only rubble sells, and the lines read back.
+    /// difference, rubble and (the catch market's) ore sell, nothing else, and the lines
+    /// read back.
     #[test]
     fn sold_rubble_is_kept_apart_from_what_was_dug() {
         let mut log = Log::parse("rubble 4\nfossil 1\niron_ore 2\nsold rubble 1\n");
@@ -1914,9 +1930,10 @@ mod tests {
         sold.insert("rubble".to_owned(), 5);
         sold.insert("iron_ore".to_owned(), 1);
         sold.insert("boot".to_owned(), 1);
-        assert_eq!(log.sell(&sold), 3);
+        assert_eq!(log.sell(&sold), 4);
         assert_eq!((log.count("rubble"), log.held("rubble")), (4, 0));
-        assert_eq!(log.held("iron_ore"), 2);
+        assert_eq!((log.count("iron_ore"), log.held("iron_ore")), (2, 1));
+        assert_eq!(log.ore_held().get("iron_ore"), Some(&1));
         let text = log.text();
         assert!(text.contains("sold rubble 4\n"));
         assert_eq!(Log::parse(&text), log);
