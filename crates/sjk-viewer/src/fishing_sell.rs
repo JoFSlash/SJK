@@ -14,6 +14,9 @@ use std::time::{Duration, Instant};
 pub(crate) const COMMAND: &str = "fishing_sell";
 /// The console command that prints the fish log in full.
 pub(crate) const LOG_COMMAND: &str = "fishing_log";
+/// The console command that shares the last rare catch in the SJK chat
+/// ([`crate::catch_book`]).
+pub(crate) const BRAG_COMMAND: &str = "fishing_brag";
 /// How often the card asks the hub what it still pays, while it is on show.
 pub(crate) const READ_EVERY: Duration = Duration::from_secs(30);
 /// How long a sale waits for the hub's answer before another may be asked.
@@ -67,6 +70,14 @@ pub(crate) struct Card {
     pub(crate) selling: bool,
     /// The last sale's result, or why the button does nothing.
     pub(crate) line: Option<String>,
+    /// The log book ([`crate::catch_book`]): the fish (or ores) in the table's order,
+    /// then the junk (or rubble).
+    pub(crate) book: Vec<crate::catch_book::Entry>,
+    /// The kinds of the book's first part (fish, ores): the rest is junk or rubble.
+    pub(crate) book_kinds: usize,
+    /// What the log book's Share button would say in the SJK chat (`None`: nothing worth
+    /// sharing yet).
+    pub(crate) brag: Option<String>,
 }
 
 /// A catch's name for the card: without its article, and before any comma ("Old
@@ -121,6 +132,21 @@ pub(crate) fn card(
         }
         None => format!("Junk: {pieces} {piece}"),
     };
+    let entry = |c: &Catch| {
+        crate::catch_book::Entry::of(
+            c.name,
+            log.count(c.id),
+            log.first(c.id),
+            crate::fishing::is_rare(c),
+        )
+    };
+    let mut book: Vec<_> = CATCHES
+        .iter()
+        .filter(|c| c.kind == Kind::Fish)
+        .map(entry)
+        .collect();
+    let book_kinds = book.len();
+    book.extend(CATCHES.iter().filter(|c| c.kind == Kind::Junk).map(entry));
     Card {
         title: "Fish log",
         goods: "junk",
@@ -132,7 +158,22 @@ pub(crate) fn card(
         sell: payable.map(|(pays, _)| pays),
         selling,
         line,
+        book,
+        book_kinds,
+        brag: brag_line(log, None),
     }
+}
+
+/// What `fishing_brag` says for `log`: the session's last rare catch (`last_rare`, with
+/// the count the log then held), else the log's rarest fish; `None` with no fish.
+pub(crate) fn brag_line(log: &Log, last_rare: Option<(&'static Catch, u32)>) -> Option<String> {
+    let (catch, count) = last_rare.or_else(|| log.rarest())?;
+    Some(crate::catch_book::brag_line(
+        "Caught",
+        catch.name,
+        count,
+        log.species(),
+    ))
 }
 
 /// The result line of a sale that took `pieces` for `credits`.
@@ -171,6 +212,36 @@ impl GpuState {
             for line in lines {
                 console.push_log(line);
             }
+        }
+    }
+
+    /// `fishing_brag`, or the log book's Share button: say the session's last rare catch
+    /// (else the rarest fish of the log) in the SJK chat as the player's own message,
+    /// once in [`crate::catch_book::BRAG_EVERY`].
+    pub(crate) fn brag_fishing(&mut self) {
+        let Some(directory) = self
+            .console
+            .as_ref()
+            .map(|c| c.config_directory().to_owned())
+        else {
+            return;
+        };
+        let last_rare = self.fishing.last_rare;
+        let line = brag_line(self.fishing.log_in(&directory), last_rare);
+        let said = match line {
+            None => Some("Nothing to share yet: catch a fish first."),
+            Some(_) if !self.fishing.brag.take(Instant::now()) => {
+                Some("You shared a catch a moment ago.")
+            }
+            Some(line) => crate::catch_book::share(line),
+        };
+        if let Some(said) = said {
+            self.chat.receive(
+                sjk_client::ServerEventKind::CenterPrint,
+                said.to_owned(),
+                None,
+                Instant::now(),
+            );
         }
     }
 
@@ -259,6 +330,7 @@ impl GpuState {
         };
         let selling = self.fishing.sale.waiting(now);
         let line = self.fishing.sale.line.clone();
+        let last_rare = self.fishing.last_rare;
         let log = self.fishing.log_in(&directory);
         let held = log.junk_held();
         let payable = crate::player_identity::with_snapshot(|snapshot| {
@@ -269,7 +341,8 @@ impl GpuState {
                 .map(|junk| (junk.payable(&held), junk.left))
         })
         .flatten();
-        let card = card(log, payable, selling, line);
+        let mut card = card(log, payable, selling, line);
+        card.brag = brag_line(log, last_rare);
         if let Some(console) = self.console.as_mut() {
             console.set_fishing_card(card);
         }
@@ -342,6 +415,22 @@ mod tests {
         let empty = card(&Log::default(), None, false, None);
         assert_eq!(empty.summary, "No fish caught yet.");
         assert!(empty.fish.is_empty() && empty.junk.is_empty());
+        assert!(empty.brag.is_none(), "nothing to share");
+        // The log book holds every kind, fish first, the ones never caught hidden.
+        assert_eq!(shown.book.len(), CATCHES.len());
+        assert_eq!(shown.book_kinds, crate::fishing::FISH_KINDS);
+        assert_eq!(shown.book[0].name, "Silver darter");
+        assert_eq!(shown.book[1].name, "???");
+        let whiskers = &shown.book[crate::fishing::FISH_KINDS - 1];
+        assert_eq!(
+            (whiskers.name.as_str(), whiskers.rare),
+            ("Old Whiskers", true)
+        );
+        // With no rare catch this session, the share names the rarest in the log.
+        assert_eq!(
+            shown.brag.as_deref(),
+            Some("Caught Old Whiskers, the great catfish (my first!) - 2 of 12 kinds in my log")
+        );
         // Selling everything leaves no junk listed.
         let all = log.junk_held();
         assert_eq!(log.sell(&all), 2);

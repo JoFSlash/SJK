@@ -318,6 +318,8 @@ pub(crate) struct ViewerConsole {
     mining_card: crate::fishing_sell::Card,
     /// The Mining card's Sell rubble button was pressed.
     pending_mining_sell: bool,
+    /// The log book's Share button was pressed: Mining's (`true`) or Fishing's.
+    pending_brag: Option<bool>,
     /// The Monitor toy is on, mirrored as [`Self::order66_on`] is.
     monitor_on: bool,
     /// The Toys tab asked to turn the Monitor on (`true`) or off, not yet taken.

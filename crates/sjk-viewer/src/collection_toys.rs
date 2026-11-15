@@ -115,6 +115,12 @@ const SIGHT_ROW: f32 = 48.0;
 const LOG_HEAD: f32 = 30.0;
 const LOG_LINE: f32 = 22.0;
 const SELL_ROW: f32 = 42.0;
+/// The log book ([`crate::catch_book`]), in place of the toy's words: its head, a row
+/// of two cells, the head over the junk (or rubble), and the Share row.
+const BOOK_HEAD: f32 = 28.0;
+const BOOK_ROW: f32 = 24.0;
+const BOOK_SUBHEAD: f32 = 22.0;
+const SHARE_ROW: f32 = 44.0;
 
 /// Every command a toy is run by, in the order the page is told their keys
 /// ([`Inputs::toy_keys`]): each toy's switch, Order 66's order after its own, the
@@ -777,6 +783,21 @@ impl Panel {
     fn toy_card_height(&self, toy: &Toy) -> f32 {
         let k = text_scale();
         let line = |size: f32| size * 1.42 * k;
+        if self.toy_book
+            && let Some(book) = book_height(toy.token)
+        {
+            return CARD_PAD
+                + 24.0
+                + 50.0 * k.max(1.0)
+                + SIGNATURE_ROW * k.max(1.0)
+                + 10.0
+                + book
+                + 8.0
+                + 18.0
+                + 48.0
+                + fish_log_height()
+                + CARD_PAD;
+        }
         let about = crate::menu::sjk::wrap(toy.what, (ABOUT_CHARS / k).max(12.0) as usize).count();
         let more = toy.more.map_or(0, |more| {
             crate::menu::sjk::wrap(more, (NOTE_CHARS / k).max(12.0) as usize).count()
@@ -881,130 +902,144 @@ impl Panel {
             TextAlign::Start,
         );
         y += SIGNATURE_ROW * k.max(1.0) + 10.0;
-        y = words(
-            &mut self.ui,
-            frame,
-            toy.what,
-            [x, y, width],
-            ABOUT_CHARS,
-            17.0,
-            color::TEXT,
-        );
-        y += 18.0;
-        for (slot, (command, label)) in toy.commands.iter().enumerate() {
-            let waiting = self.bind_wait == Some(slot);
-            let key = keys_of(inputs, command);
-            let token = if slot == 0 {
-                BIND_TOKEN
-            } else {
-                BIND_SECOND_TOKEN
-            };
+        // The Fishing and Mining cards' log book stands in place of the toy's words.
+        let book = if self.toy_book {
+            match toy.token {
+                FISHING_TOKEN => inputs.fishing_card,
+                MINING_TOKEN => inputs.mining_card,
+                _ => None,
+            }
+        } else {
+            None
+        };
+        if let Some(card) = book {
+            y = self.log_book(frame, card, [x, y, width]);
+        } else {
+            y = words(
+                &mut self.ui,
+                frame,
+                toy.what,
+                [x, y, width],
+                ABOUT_CHARS,
+                17.0,
+                color::TEXT,
+            );
+            y += 18.0;
+            for (slot, (command, label)) in toy.commands.iter().enumerate() {
+                let waiting = self.bind_wait == Some(slot);
+                let key = keys_of(inputs, command);
+                let token = if slot == 0 {
+                    BIND_TOKEN
+                } else {
+                    BIND_SECOND_TOKEN
+                };
+                text(
+                    &mut self.ui,
+                    TextFamily::Display,
+                    format_args!("{label}"),
+                    frame.rect(x, y + 8.0, 100.0, 22.0),
+                    15.0 * s,
+                    color::HOLO,
+                    FontWeight::Semibold,
+                    TextAlign::Start,
+                );
+                let shown = if waiting {
+                    "Press a key..."
+                } else if key.is_empty() {
+                    "Bind a key"
+                } else {
+                    key
+                };
+                let button_width = (crate::text::display_width(shown, 17.0) * k + 32.0).max(110.0);
+                let button_x = x + 104.0;
+                let rect = frame.rect(button_x, y, button_width, 36.0);
+                let hovered = self.ui.token_hovered(token);
+                let _ = self.ui.draw_list_mut().push(DrawCommand::RoundedRect {
+                    rect,
+                    radius: 8.0 * s,
+                    color: if waiting {
+                        color::alpha(color::GOLD, 0.16)
+                    } else {
+                        color::alpha(color::HOLO, if hovered { 0.14 } else { 0.05 })
+                    },
+                });
+                let _ = self.ui.draw_list_mut().push(DrawCommand::Border {
+                    rect,
+                    radius: 8.0 * s,
+                    width: 1.2 * s,
+                    color: if waiting {
+                        color::GOLD
+                    } else if key.is_empty() {
+                        color::alpha(color::HOLO, 0.45)
+                    } else {
+                        color::alpha(color::TEXT, 0.55)
+                    },
+                });
+                text(
+                    &mut self.ui,
+                    TextFamily::Display,
+                    format_args!("{shown}"),
+                    frame.rect(button_x, y + 6.0, button_width, 24.0),
+                    17.0 * s,
+                    if waiting {
+                        color::GOLD_BRIGHT
+                    } else {
+                        color::TEXT
+                    },
+                    FontWeight::Semibold,
+                    TextAlign::Center,
+                );
+                self.ui.hit_region(token, rect);
+                let note_x = button_x + button_width + 12.0;
+                let note = if waiting {
+                    "Esc cancels, Backspace clears"
+                } else {
+                    command
+                };
+                text(
+                    &mut self.ui,
+                    TextFamily::Body,
+                    format_args!("{note}"),
+                    frame.rect(note_x, y + 9.0, (x + width - note_x).max(0.0), 20.0),
+                    13.0 * s,
+                    color::QUIET,
+                    FontWeight::Regular,
+                    TextAlign::Start,
+                );
+                y += 44.0;
+            }
             text(
                 &mut self.ui,
                 TextFamily::Display,
-                format_args!("{label}"),
-                frame.rect(x, y + 8.0, 100.0, 22.0),
+                format_args!("Quick wheel"),
+                frame.rect(x, y + 4.0, 100.0, 22.0),
                 15.0 * s,
                 color::HOLO,
                 FontWeight::Semibold,
                 TextAlign::Start,
             );
-            let shown = if waiting {
-                "Press a key..."
-            } else if key.is_empty() {
-                "Bind a key"
-            } else {
-                key
-            };
-            let button_width = (crate::text::display_width(shown, 17.0) * k + 32.0).max(110.0);
-            let button_x = x + 104.0;
-            let rect = frame.rect(button_x, y, button_width, 36.0);
-            let hovered = self.ui.token_hovered(token);
-            let _ = self.ui.draw_list_mut().push(DrawCommand::RoundedRect {
-                rect,
-                radius: 8.0 * s,
-                color: if waiting {
-                    color::alpha(color::GOLD, 0.16)
-                } else {
-                    color::alpha(color::HOLO, if hovered { 0.14 } else { 0.05 })
-                },
-            });
-            let _ = self.ui.draw_list_mut().push(DrawCommand::Border {
-                rect,
-                radius: 8.0 * s,
-                width: 1.2 * s,
-                color: if waiting {
-                    color::GOLD
-                } else if key.is_empty() {
-                    color::alpha(color::HOLO, 0.45)
-                } else {
-                    color::alpha(color::TEXT, 0.55)
-                },
-            });
-            text(
-                &mut self.ui,
-                TextFamily::Display,
-                format_args!("{shown}"),
-                frame.rect(button_x, y + 6.0, button_width, 24.0),
-                17.0 * s,
-                if waiting {
-                    color::GOLD_BRIGHT
-                } else {
-                    color::TEXT
-                },
-                FontWeight::Semibold,
-                TextAlign::Center,
-            );
-            self.ui.hit_region(token, rect);
-            let note_x = button_x + button_width + 12.0;
-            let note = if waiting {
-                "Esc cancels, Backspace clears"
-            } else {
-                command
-            };
             text(
                 &mut self.ui,
                 TextFamily::Body,
-                format_args!("{note}"),
-                frame.rect(note_x, y + 9.0, (x + width - note_x).max(0.0), 20.0),
-                13.0 * s,
-                color::QUIET,
+                format_args!("On its Toys page"),
+                frame.rect(x + 104.0, y + 4.0, width - 104.0, 22.0),
+                15.0 * s,
+                color::TEXT,
                 FontWeight::Regular,
                 TextAlign::Start,
             );
-            y += 44.0;
-        }
-        text(
-            &mut self.ui,
-            TextFamily::Display,
-            format_args!("Quick wheel"),
-            frame.rect(x, y + 4.0, 100.0, 22.0),
-            15.0 * s,
-            color::HOLO,
-            FontWeight::Semibold,
-            TextAlign::Start,
-        );
-        text(
-            &mut self.ui,
-            TextFamily::Body,
-            format_args!("On its Toys page"),
-            frame.rect(x + 104.0, y + 4.0, width - 104.0, 22.0),
-            15.0 * s,
-            color::TEXT,
-            FontWeight::Regular,
-            TextAlign::Start,
-        );
-        y += 34.0;
-        if let Some(more) = toy.more {
-            y = words(
-                &mut self.ui,
-                frame,
-                more,
-                [x, y, width],
-                NOTE_CHARS,
-                15.0,
-                color::MUTED,
-            );
+            y += 34.0;
+            if let Some(more) = toy.more {
+                y = words(
+                    &mut self.ui,
+                    frame,
+                    more,
+                    [x, y, width],
+                    NOTE_CHARS,
+                    15.0,
+                    color::MUTED,
+                );
+            }
         }
         y += 8.0;
         let _ = self.ui.draw_list_mut().push(DrawCommand::SolidRect {
@@ -1083,6 +1118,174 @@ impl Panel {
         }
     }
 
+    /// The toy's log book from (`x`, `y`) ([`crate::catch_book`]): every kind of `card`'s
+    /// log two to a row, the ones never caught as "???", the others with their count and
+    /// first day, the rare ones in gold; then the Share button. Returns where the next
+    /// line stands.
+    fn log_book(
+        &mut self,
+        frame: &Frame,
+        card: &crate::fishing_sell::Card,
+        [x, mut y, width]: [f32; 3],
+    ) -> f32 {
+        let s = frame.s;
+        let k = text_scale();
+        let found = card.book.iter().filter(|entry| entry.count > 0).count();
+        text(
+            &mut self.ui,
+            TextFamily::Display,
+            format_args!("Log book"),
+            frame.rect(x, y, width * 0.5, 22.0),
+            16.0 * s,
+            color::HOLO,
+            FontWeight::Semibold,
+            TextAlign::Start,
+        );
+        text(
+            &mut self.ui,
+            TextFamily::Body,
+            format_args!("{found} of {} found", card.book.len()),
+            frame.rect(x + width * 0.5, y + 2.0, width * 0.5, 20.0),
+            14.0 * s,
+            color::MUTED,
+            FontWeight::Regular,
+            TextAlign::End,
+        );
+        y += BOOK_HEAD;
+        let column = (width - 16.0) * 0.5;
+        let split = card.book_kinds.min(card.book.len());
+        for (part, entries) in [&card.book[..split], &card.book[split..]]
+            .into_iter()
+            .enumerate()
+        {
+            if entries.is_empty() {
+                continue;
+            }
+            if part == 1 {
+                let mut head = card.goods.to_owned();
+                if let Some(first) = head.get_mut(..1) {
+                    first.make_ascii_uppercase();
+                }
+                text(
+                    &mut self.ui,
+                    TextFamily::Display,
+                    format_args!("{head}"),
+                    frame.rect(x, y + 2.0, width, 18.0),
+                    13.0 * s,
+                    color::QUIET,
+                    FontWeight::Semibold,
+                    TextAlign::Start,
+                );
+                y += BOOK_SUBHEAD;
+            }
+            for (index, entry) in entries.iter().enumerate() {
+                let cell_x = x + (index % 2) as f32 * (column + 16.0);
+                let cell_y = y + (index / 2) as f32 * BOOK_ROW;
+                let caught = entry.count > 0;
+                let colour = match (caught, entry.rare) {
+                    (false, _) => color::QUIET,
+                    (true, true) => color::GOLD_BRIGHT,
+                    (true, false) => color::TEXT,
+                };
+                let note = entry.note();
+                let note_width = crate::text::display_width(&note, 12.0) * k;
+                text(
+                    &mut self.ui,
+                    TextFamily::Body,
+                    format_args!("{}", entry.name),
+                    frame.rect(
+                        cell_x,
+                        cell_y + 2.0,
+                        (column - note_width - 6.0).max(0.0),
+                        20.0,
+                    ),
+                    14.0 * s,
+                    colour,
+                    if entry.rare && caught {
+                        FontWeight::Semibold
+                    } else {
+                        FontWeight::Regular
+                    },
+                    TextAlign::Start,
+                );
+                text(
+                    &mut self.ui,
+                    TextFamily::Body,
+                    format_args!("{note}"),
+                    frame.rect(cell_x, cell_y + 4.0, column, 18.0),
+                    12.0 * s,
+                    color::MUTED,
+                    FontWeight::Regular,
+                    TextAlign::End,
+                );
+            }
+            y += entries.len().div_ceil(2) as f32 * BOOK_ROW;
+        }
+        // Share: the player's own line in the SJK chat, only when pressed.
+        y += 6.0;
+        let live = card.brag.is_some();
+        let shown = "Share in SJK chat";
+        let button_width = crate::text::display_width(shown, 15.0) * k + 28.0;
+        let rect = frame.rect(x, y, button_width, 32.0);
+        let hovered = live && self.ui.token_hovered(BRAG_TOKEN);
+        let _ = self.ui.draw_list_mut().push(DrawCommand::RoundedRect {
+            rect,
+            radius: 8.0 * s,
+            color: color::alpha(
+                color::GOLD,
+                match (live, hovered) {
+                    (true, true) => 0.22,
+                    (true, false) => 0.12,
+                    (false, _) => 0.04,
+                },
+            ),
+        });
+        let _ = self.ui.draw_list_mut().push(DrawCommand::Border {
+            rect,
+            radius: 8.0 * s,
+            width: 1.2 * s,
+            color: if live {
+                color::GOLD
+            } else {
+                color::alpha(color::TEXT, 0.3)
+            },
+        });
+        text(
+            &mut self.ui,
+            TextFamily::Display,
+            format_args!("{shown}"),
+            frame.rect(x, y + 6.0, button_width, 22.0),
+            15.0 * s,
+            if live {
+                color::GOLD_BRIGHT
+            } else {
+                color::QUIET
+            },
+            FontWeight::Semibold,
+            TextAlign::Center,
+        );
+        if live {
+            self.ui.hit_region(BRAG_TOKEN, rect);
+        }
+        let note_x = x + button_width + 12.0;
+        let note = if live {
+            "Your last rare catch, else your rarest"
+        } else {
+            "Nothing to share yet"
+        };
+        text(
+            &mut self.ui,
+            TextFamily::Body,
+            format_args!("{note}"),
+            frame.rect(note_x, y + 8.0, (x + width - note_x).max(0.0), 20.0),
+            13.0 * s,
+            color::QUIET,
+            FontWeight::Regular,
+            TextAlign::Start,
+        );
+        y + SHARE_ROW - 6.0
+    }
+
     /// A toy's log from (`x`, `y`), the Fishing card's fish log or the Mining card's
     /// mining log: what was caught or dug, what sells held (junk, rubble), and the Sell
     /// button with what it pays now (when the hub buys it from the player) and the last
@@ -1120,6 +1323,33 @@ impl Panel {
             FontWeight::Regular,
             TextAlign::Start,
         );
+        // The log book's button, or the way back to the toy's words.
+        let shown = if self.toy_book { "Back" } else { "Log book" };
+        let button_width = crate::text::display_width(shown, 14.0) * k + 22.0;
+        let rect = frame.rect(x + width - button_width, y - 3.0, button_width, 26.0);
+        let hovered = self.ui.token_hovered(LOG_BOOK_TOKEN);
+        let _ = self.ui.draw_list_mut().push(DrawCommand::RoundedRect {
+            rect,
+            radius: 7.0 * s,
+            color: color::alpha(color::HOLO, if hovered { 0.18 } else { 0.07 }),
+        });
+        let _ = self.ui.draw_list_mut().push(DrawCommand::Border {
+            rect,
+            radius: 7.0 * s,
+            width: 1.0 * s,
+            color: color::alpha(color::HOLO, 0.5),
+        });
+        text(
+            &mut self.ui,
+            TextFamily::Display,
+            format_args!("{shown}"),
+            frame.rect(x + width - button_width, y + 1.0, button_width, 20.0),
+            14.0 * s,
+            color::HOLO,
+            FontWeight::Semibold,
+            TextAlign::Center,
+        );
+        self.ui.hit_region(LOG_BOOK_TOKEN, rect);
         y += LOG_HEAD - 8.0;
         text(
             &mut self.ui,
@@ -1214,6 +1444,29 @@ impl Panel {
 /// switch.
 fn fish_log_height() -> f32 {
     30.0 + LOG_HEAD + LOG_LINE + 4.0 + SELL_ROW
+}
+
+/// How tall the log book of the toy `token` stands: its kinds (fish and junk, ores and
+/// rubble) two to a row. `None` for a toy with no log book.
+fn book_height(token: u16) -> Option<f32> {
+    let (first, all) = match token {
+        FISHING_TOKEN => (crate::fishing::FISH_KINDS, crate::fishing::CATCHES.len()),
+        MINING_TOKEN => (crate::mining::ORE_KINDS, crate::mining::FINDS.len()),
+        _ => return None,
+    };
+    Some(book_rows_height(first, all - first))
+}
+
+/// How tall a log book of `first` kinds then `rest` stands.
+fn book_rows_height(first: usize, rest: usize) -> f32 {
+    BOOK_HEAD
+        + first.div_ceil(2) as f32 * BOOK_ROW
+        + if rest > 0 {
+            BOOK_SUBHEAD + rest.div_ceil(2) as f32 * BOOK_ROW
+        } else {
+            0.0
+        }
+        + SHARE_ROW
 }
 
 /// `body` from (`x`, `y`) in a column `width` wide, wrapped at `chars` to a line at the
@@ -1343,10 +1596,21 @@ mod tests {
         assert_eq!(signature(&TOYS[0]), "Made by Sol");
     }
 
-    /// Every toy's card holds its words in full below its highest top.
+    /// Every toy's card holds its words in full below its highest top, and the Fishing
+    /// and Mining cards their log book.
     #[test]
     fn every_toy_card_holds_its_words() {
-        let panel = Panel::new();
+        let mut panel = Panel::new();
+        panel.toy_book = true;
+        for toy in TOYS.iter().filter(|toy| book_height(toy.token).is_some()) {
+            assert!(
+                panel.toy_card_height(toy) <= CARD_BOTTOM - CARD_TOP_MIN,
+                "{} {}",
+                toy.name,
+                panel.toy_card_height(toy)
+            );
+        }
+        panel.toy_book = false;
         for toy in &TOYS {
             assert!(
                 panel.toy_card_height(toy) <= CARD_BOTTOM - CARD_TOP_MIN,

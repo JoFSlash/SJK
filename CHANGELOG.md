@@ -32,6 +32,7 @@ Add each release's notes here when it is tagged (docs/sjk.md "Releases").
 -->
 ## Unreleased
 
+- Fishing and Mining: a Log book on their Collection card lists every fish, junk, ore and rubble, ??? until you catch it, with how many and the day of your first; a rare catch brings its own card, and `fishing_brag` or `mining_brag` (or the book's Share button) says it in the SJK chat _(Slash, after adwe's idea)_
 - Status balloons: `cg_statusBalloons` offers stock, SJK animations, static clan pictures or clan animations; name tags select clan art, with static pictures for non-SJK players _(Hormorn, PR #421)_
 
 ## 2026.1113.1 (Alpha) | 13/11/2026

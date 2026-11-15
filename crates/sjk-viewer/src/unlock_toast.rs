@@ -233,6 +233,13 @@ pub(crate) enum Unlock {
     Wished {
         skin: &'static crate::unlockables::Unlockable,
     },
+    /// A rare fish landed or a rare ore dug (`mining`) by the player's toy
+    /// ([`crate::catch_book`]): the catch's `name` and how many the log now holds.
+    RareCatch {
+        name: &'static str,
+        count: u32,
+        mining: bool,
+    },
 }
 
 impl Unlock {
@@ -291,15 +298,21 @@ impl Unlock {
             Self::Reward { .. } => "CONTRIBUTOR REWARD",
             Self::Content { .. } => "CONTENT UPDATED",
             Self::Wished { .. } => "ON YOUR WISHLIST",
+            Self::RareCatch { mining: false, .. } => "RARE CATCH",
+            Self::RareCatch { mining: true, .. } => "RARE FIND",
         }
     }
 
     /// Whether the card plays the chime: everything but an update or a content
-    /// update, which are news, not rewards.
+    /// update, which are news, not rewards, and a rare catch, whose toy plays it among
+    /// its own sounds (at the toys' volume).
     pub(crate) const fn chimes(self) -> bool {
         !matches!(
             self,
-            Self::Update { .. } | Self::Content { .. } | Self::Wished { .. }
+            Self::Update { .. }
+                | Self::Content { .. }
+                | Self::Wished { .. }
+                | Self::RareCatch { .. }
         )
     }
 
@@ -320,6 +333,8 @@ impl Unlock {
             Self::Reward { .. } => "From the SJK team",
             Self::Content { .. } => "Automatic update",
             Self::Wished { .. } => "Collection, Forge, Shop",
+            Self::RareCatch { mining: false, .. } => "fishing_brag shares it",
+            Self::RareCatch { mining: true, .. } => "mining_brag shares it",
         }
     }
 
@@ -327,7 +342,7 @@ impl Unlock {
     fn hue(self) -> Color {
         match self {
             Self::Achievement { kind, .. } => tint(kind.category),
-            Self::Medal { .. } | Self::Reward { .. } => color::GOLD,
+            Self::Medal { .. } | Self::Reward { .. } | Self::RareCatch { .. } => color::GOLD,
             Self::Holocron { tier, .. } => tier.colour,
             Self::Wished { skin } => skin.tier.colour(),
             Self::Update { .. } | Self::Content { .. } => color::HOLO,
@@ -385,6 +400,9 @@ impl fmt::Display for Name {
             Unlock::Reward { .. } => formatter.write_str("Contributor reward waiting"),
             Unlock::Content { title, .. } => write!(formatter, "{title} updated"),
             Unlock::Wished { skin } => formatter.write_str(skin.name),
+            Unlock::RareCatch { name, .. } => {
+                formatter.write_str(crate::catch_book::bare_name(name))
+            }
         }
     }
 }
@@ -428,6 +446,14 @@ impl fmt::Display for Description {
             Unlock::Wished { .. } => {
                 formatter.write_str("A shader on your wishlist is in the shop today")
             }
+            Unlock::RareCatch { count: 0 | 1, .. } => {
+                formatter.write_str("Your first! New in your log book")
+            }
+            Unlock::RareCatch { count, .. } => write!(
+                formatter,
+                "Your {} in the log book",
+                crate::catch_book::ordinal(count)
+            ),
             Unlock::Content {
                 files,
                 bytes,
@@ -1015,6 +1041,13 @@ fn emblem(canvas: &mut MenuCanvas, unlock: Unlock, centre: [f32; 2], radius: f32
         | Unlock::Reward { .. }
         | Unlock::Content { .. }
         | Unlock::Wished { .. } => (Some((crate::ui_renderer::LOGO_TEXTURE, 0.86)), None),
+        Unlock::RareCatch { mining, .. } => {
+            let toy = if mining { "mining" } else { "fishing" };
+            let picture = crate::quick_wheel::catalog::icon_index(toy)
+                .map(crate::ui_renderer::wheel_icon)
+                .unwrap_or(crate::ui_renderer::LOGO_TEXTURE);
+            (Some((picture, 0.9)), None)
+        }
     };
     // The medallion's line widths at this size.
     let k = radius / MEDAL_RADIUS;

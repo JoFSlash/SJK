@@ -70,6 +70,7 @@ impl GpuState {
         let sell_junk = console.take_fishing_sell_request();
         let wheel_of_doom = console.take_wheel_of_doom_request();
         let sell_rubble = console.take_mining_sell_request();
+        let brag = console.take_brag_request();
         let mut actions = [None; MAX_ACTIONS_PER_FRAME];
         console.advance_command_frame();
         console.pump_console_socket();
@@ -115,6 +116,11 @@ impl GpuState {
         }
         if sell_rubble {
             self.sell_mining_rubble();
+        }
+        match brag {
+            Some(true) => self.brag_mining(),
+            Some(false) => self.brag_fishing(),
+            None => {}
         }
         // `toy_illuminate` may have flipped it: tell the Toys tab. Order 66, the Hax, the
         // Drone, the Monitor, Box hunt and the Banana peel stay as last switched, across

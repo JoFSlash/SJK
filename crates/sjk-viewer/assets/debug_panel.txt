@@ -5126,6 +5126,18 @@ test: s_language english, snd_restart: they are English again.
 
 # ---- Gameplay ----
 
+[catch-log-book]
+area: Gameplay
+title: Fishing/Mining: log book, rare catch card, share in SJK chat (Slash, after adwe)
+change: Toys > Fishing/Mining: Log book button lists every kind, ??? until caught, with x and day.
+change: A rare fish (Kyber minnow or rarer) or ore (star quartz or rarer) brings a RARE card.
+change: fishing_brag / mining_brag (and the book's Share) say it in SJK chat, once a minute.
+test: Collection > Toys > Fishing > Log book: ??? cells, caught ones with count; Back returns.
+test: Land a new fish: its cell shows today's date; fishing_log.txt has a first <id> line.
+test: debug: give a Kyber minnow (or play): RARE CATCH card at the top, secret area sound.
+test: fishing_brag: one line in SJK chat as you, not in the game's chat; again: a moment ago.
+note: Nothing goes to the hub but the chat line; an old client keeps the log, drops first lines.
+
 [mining-rarer-of-two]
 area: Gameplay
 title: Mining: a clean strike gives the rarer of two ores (Slash, PR #414, hub #286)
