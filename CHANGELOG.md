@@ -30,10 +30,6 @@ The site (site/assets/site.js, parseChangelog) reads the release headings,
 introductions and recap lines too.
 Add each release's notes here when it is tagged (docs/sjk.md "Releases").
 -->
-## Unreleased
-
-- The Staff page has a Toys tab: how many players had each look toy out today, in 7 and 30 days, for how long and how often, the longest out first, and a toy's 10 players who had it out longest. It needs the newer SJK hub _(Slash)_
-
 ## 2026.1112.1 (Alpha) | 12/11/2026
 
 Mystery boxes reworked, the Ray Gun, Wheels of Doom on the maps, and easier fishing.
