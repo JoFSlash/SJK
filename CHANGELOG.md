@@ -32,13 +32,14 @@ Add each release's notes here when it is tagged (docs/sjk.md "Releases").
 -->
 ## Unreleased
 
-- Fishing and Mining: now and then a kyber glint brings a few kyber shards, a daily goal (25 bites hooked, 40 boulders broken) wins an Echo, and the catch market buys fish and ore with one wanted each day at double price (`fishing_sellfish`, `mining_sellore`); each once the hub turns it on _(Slash, after adwe's idea)_
 - Status balloons: `cg_statusBalloons` offers stock, SJK animations, static clan pictures or clan animations; name tags select clan art, with static pictures for non-SJK players _(Hormorn, PR #421)_
 - JoF maps: `devmap` and Create game start the maps in the JoF content folder too, instead of the local server stopping at once _(Slash, PR #423)_
 - Vote panel: F1 votes YES and F2 votes NO while a vote waits for you (then they are push and pull again), and once you have voted the card folds to one row, the question over the YES / NO bar with its counts, so it covers less of the game _(Slash, PR #426)_
 - Server: JA+ admins' `ampoll <question>` works: everyone votes YES or NO on the question for 30 seconds, and nothing runs when it passes; on a devmap anyone may use it, to try it, and `testpoll <question>` shows one only to you _(Slash, PR #426)_
 - Devmap bar: in a game with cheats on, hold Ctrl (`+devbar`) for a bar of cheat buttons (noclip, god, jetpack, give, spawn list, NPCs, third person, respawn) to click; `cg_devBar` keeps it on screen at the bottom or the top _(Slash, PR #427)_
-- Chat translation in the console too: click another player's chat line in the console (game or SJK chat) to put it into English; the translation shows right under that line, however fast the chat goes _(Slash)_
+- Chat translation in the console too: click another player's chat line in the console (game or SJK chat) to put it into English; the translation shows right under that line, however fast the chat goes _(Slash, PR #422)_
+- Fishing and Mining: now and then a kyber glint brings a few kyber shards, a daily goal (25 bites hooked, 40 boulders broken) wins an Echo, and the catch market buys fish and ore with one wanted each day at double price (`fishing_sellfish`, `mining_sellore`); each once the hub turns it on _(Slash, PR #424, after adwe's idea)_
+- Fishing and Mining: a Log book on their Collection card lists every fish, junk, ore and rubble, ??? until you catch it, with how many and the day of your first; a rare catch brings its own card, and `fishing_brag` or `mining_brag` (or the book's Share button) says it in the SJK chat _(Slash, PR #425, after adwe's idea)_
 
 ## 2026.1113.1 (Alpha) | 13/11/2026
 

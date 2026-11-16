@@ -62,7 +62,7 @@ const CLEAN: &str = "sound/weapons/flechette/ricochet1.wav";
 const GLINT_SOUND: &str = "sound/ambience/spark1.wav";
 /// A boulder breaking.
 const BREAK: &str = "sound/effects/stone_break1.mp3";
-/// The rarest find.
+/// A rare find ([`is_rare`]).
 const RARE: &str = "sound/interface/secret_area.mp3";
 const SOUNDS: [&str; 7] = [SWING, HIT[0], HIT[1], CLEAN, GLINT_SOUND, BREAK, RARE];
 /// The mining log, in the profile's folder: `<find id> <count>` a line.
@@ -253,6 +253,15 @@ pub(crate) const ORE_KINDS: usize = {
 
 /// The rarest ore's id: bad luck protection raises its weight ([`HEART_PITY`]).
 pub(crate) const HEART: &str = "heart_of_the_mountain";
+/// An ore this light in [`FINDS`] (star quartz, void crystal, the Heart: about one ore
+/// in seventeen) is a rare find: it brings its card ([`crate::catch_book`]), as
+/// Fishing's rare catches do.
+pub(crate) const RARE_WEIGHT: u32 = 11;
+
+/// Whether `find` is a rare find.
+pub(crate) fn is_rare(find: &Find) -> bool {
+    find.kind == Kind::Ore && find.weight <= RARE_WEIGHT
+}
 
 /// Everything a boulder can give: SJK's own names.
 pub(crate) const FINDS: [Find; 13] = [
@@ -452,19 +461,25 @@ pub(crate) struct Log {
     counts: Vec<(String, u32)>,
     /// The rubble sold to the hub ([`crate::mining_sell`]): the counts stay what was dug.
     sold: Vec<(String, u32)>,
+    /// The day each find first came up, for the log book ([`crate::catch_book`]).
+    firsts: crate::catch_book::Firsts,
 }
 
 /// The mining log's lines of what was sold: `sold <id> <count>`, as the fish log's.
 const SOLD: &str = "sold";
 
 impl Log {
-    /// Read `text` (`<id> <count>` a line, `sold <id> <count>`; anything else is
-    /// skipped).
+    /// Read `text` (`<id> <count>` a line, `sold <id> <count>`, `first <id>
+    /// <yyyymmdd>`; anything else is skipped).
     pub(crate) fn parse(text: &str) -> Self {
         let mut log = Self::default();
         for line in text.lines() {
             let words: Vec<&str> = line.split_whitespace().collect();
             let (list, id, value) = match words.as_slice() {
+                [crate::catch_book::FIRST, id, day] => {
+                    log.firsts.read(id, day);
+                    continue;
+                }
                 [SOLD, id, value] => (&mut log.sold, *id, *value),
                 [id, value] => (&mut log.counts, *id, *value),
                 _ => continue,
@@ -486,7 +501,27 @@ impl Log {
         for (id, count) in &self.sold {
             text.push_str(&format!("{SOLD} {id} {count}\n"));
         }
+        self.firsts.push_text(&mut text);
         text
+    }
+
+    /// Note `day` (`yyyymmdd`) as the day `id` first came up, unless one is known.
+    pub(crate) fn mark_first(&mut self, id: &str, day: u32) {
+        self.firsts.mark(id, day);
+    }
+
+    /// The day `id` first came up, when the log knows it.
+    pub(crate) fn first(&self, id: &str) -> Option<u32> {
+        self.firsts.of(id)
+    }
+
+    /// The rarest ore dug (the lowest weight), with its count.
+    pub(crate) fn rarest(&self) -> Option<(&'static Find, u32)> {
+        FINDS
+            .iter()
+            .filter(|f| f.kind == Kind::Ore && self.count(f.id) > 0)
+            .min_by_key(|f| f.weight)
+            .map(|f| (f, self.count(f.id)))
     }
 
     /// How many of `id` were sold.
@@ -642,6 +677,10 @@ pub(crate) struct Mining {
     broken: Vec<(&'static Find, u32)>,
     /// Selling the rubble to the hub ([`crate::mining_sell`]).
     pub(crate) sale: crate::fishing_sell::Sale,
+    /// The last rare find of the session and how many the log then held, for
+    /// `mining_brag` ([`crate::catch_book`]), and when a find was last shared.
+    pub(crate) last_rare: Option<(&'static Find, u32)>,
+    pub(crate) brag: crate::catch_book::Brag,
     /// Each holder's pickaxe, for the actors to draw ([`pick_in_hand`]).
     pub(crate) picks: Picks,
     sounds_registered: Option<u64>,
@@ -674,6 +713,8 @@ impl Default for Mining {
             said: Vec::with_capacity(4),
             broken: Vec::new(),
             sale: crate::fishing_sell::Sale::default(),
+            last_rare: None,
+            brag: Default::default(),
             picks: Picks::default(),
             sounds_registered: None,
             empty_hands_until: None,
@@ -972,13 +1013,17 @@ impl Mining {
         let pick = self.dice.next();
         let second = self.dice.next();
         let find = roll_find(roll, pick, second, rock.clean, heart_wait);
-        let count = self.log.get_or_insert_with(Log::default).found(find);
+        let log = self.log.get_or_insert_with(Log::default);
+        let count = log.found(find);
+        if count == 1 {
+            log.mark_first(find.id, crate::catch_book::today());
+        }
         // A play signal (15/11/2026): the hub counts broken boulders for its kyber finds
         // and the daily catch quests.
         crate::holocrons::signals::rock();
         self.broken.push((find, rock.clean));
         self.said.push(Say::Sound(BREAK));
-        if find.id == HEART {
+        if is_rare(find) {
             self.said.push(Say::Sound(RARE));
         }
         self.said.push(Say::Found(find, count));
@@ -1011,6 +1056,7 @@ impl Mining {
         let text = std::fs::read_to_string(directory.join(LOG_FILE)).unwrap_or_default();
         let mut log = Log::parse(&text);
         if let Some(pending) = self.log.take() {
+            log.firsts.merge(&pending.firsts);
             for (id, count) in pending.counts {
                 for _ in 0..count {
                     log.add(&id);
@@ -1444,6 +1490,15 @@ impl GpuState {
                 Say::Centre(text) => text.to_owned(),
                 Say::Found(find, count) => {
                     let (kinds, all) = self.mining.log.as_ref().map_or((0, 0), Log::kinds);
+                    if is_rare(find) {
+                        self.mining.last_rare = Some((find, count));
+                        self.unlock_toast
+                            .push(crate::unlock_toast::Unlock::RareCatch {
+                                name: find.name,
+                                count,
+                                mining: true,
+                            });
+                    }
                     match find.kind {
                         Kind::Ore if count == 1 => format!(
                             "You dug out {}! New in your log ({kinds} of {all} ores).",

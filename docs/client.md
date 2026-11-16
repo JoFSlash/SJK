@@ -6778,6 +6778,19 @@ brings up are the ones the hub drops anyway.
     hub's `sold` names is counted sold; the catch counts never change.
   - Mining sends a new play signal, `rocks` (boulders broken,
     `holocrons::signals::rock`), which sets no pace.
+- **Log book, rare catches and sharing** (15/11/2026, Slash, after adwè's #ideas post;
+  `catch_book.rs`, the same for [Mining](#mining)): the card's "Log book" button shows,
+  in place of the toy's words, every fish and junk two to a row, the ones never caught as
+  "???", the others with their count and the day the first came up ("Back" returns). The
+  day is a `first <id> <yyyymmdd>` line of the log, which older clients skip (and drop
+  when they write the log); catches from before have none. A rare fish (weight 3 or less:
+  the Kyber minnow, Ghost ray, Temple koi and Old Whiskers) also brings the unlock
+  pop-up's "RARE CATCH" card and the single-player game's secret-area sound among the
+  toy's sounds. `fishing_brag` (and the book's "Share in SJK chat") says the session's
+  last rare catch, else the log's rarest fish, as the player's own SJK chat message
+  ("Caught Old Whiskers, the great catfish (my first!) - 9 of 12 kinds in my log"),
+  never in the game server's chat, at most once a minute and only when asked. The hub
+  neither reads nor pays for any of it.
 - **Bite cue** (03/11/2026, for players with the sound off): Settings > Sound > Toys,
   "Fishing bite cue" (`cg_fishingBiteCue`: 0 off, 1 when the sound is off, the default,
   2 always). While shown, a bite puts a pulsing "!" over the float (gold for an Echo's
@@ -6820,6 +6833,12 @@ ore, the Heart among them) and the hidden Heart of the Mountain.
   lines in `mining_log.txt`, the counts of what was dug unchanged (`mining_sell.rs`; the
   card and the sale state are `fishing_sell`'s). Ore never sells: it stays in the log for
   the achievements.
+- **Log book, rare finds and sharing** (15/11/2026, as Fishing's,
+  [Fishing](#fishing)): the Mining card's "Log book" lists every ore and rubble with its
+  count and first day, "???" until dug; a rare ore (weight 11 or less: star quartz, void
+  crystal and the Heart of the Mountain, about one ore in seventeen) brings the "RARE
+  FIND" card and the secret-area sound (the Heart's alone before); `mining_brag` and the
+  book's Share button say the last rare find, else the rarest ore, in the SJK chat.
 
 - **`toy_mining`** (a bind, the quick wheel's Toys catalogue, Collection > Toys, "Pickaxe
   out") takes the pickaxe in hand or puts it away. The player may walk with it;

@@ -56,7 +56,9 @@ const BITE: &str = "sound/player/bodyfall_water1.mp3";
 const ECHO_BITE: &str = "sound/player/holocron.wav";
 /// The catch out of the water.
 const CATCH: &str = "sound/player/watr_out.wav";
-const SOUNDS: [&str; 5] = [CAST, LAND, BITE, ECHO_BITE, CATCH];
+/// A rare catch ([`is_rare`]): the single-player game's secret-area sound.
+const RARE: &str = "sound/interface/secret_area.mp3";
+const SOUNDS: [&str; 6] = [CAST, LAND, BITE, ECHO_BITE, CATCH, RARE];
 /// The fish log, in the profile's folder: `<catch id> <count>` a line.
 pub(crate) const LOG_FILE: &str = "fishing_log.txt";
 /// When a bite is shown as well as heard (`cg_fishingBiteCue`, for players with the
@@ -268,6 +270,14 @@ const fn fish(id: &'static str, name: &'static str, weight: u32) -> Catch {
 
 /// The great catfish's id: its own achievement (Old Whiskers).
 pub(crate) const GREAT_CATFISH: &str = "old_whiskers";
+/// A fish this light in [`CATCHES`] (one in about 35 fish or rarer) is a rare catch: it
+/// brings its card ([`crate::catch_book`]).
+pub(crate) const RARE_WEIGHT: u32 = 3;
+
+/// Whether `catch` is a rare catch.
+pub(crate) fn is_rare(catch: &Catch) -> bool {
+    catch.kind == Kind::Fish && catch.weight <= RARE_WEIGHT
+}
 /// How many kinds of fish [`CATCHES`] holds.
 pub(crate) const FISH_KINDS: usize = {
     let mut count = 0;
@@ -461,6 +471,8 @@ pub(crate) struct Log {
     counts: Vec<(String, u32)>,
     sold: Vec<(String, u32)>,
     last: Option<&'static Catch>,
+    /// The day each catch first came up, for the log book ([`crate::catch_book`]).
+    firsts: crate::catch_book::Firsts,
 }
 
 /// The fish log's line naming the last fish caught: `last <id>`.
@@ -470,13 +482,14 @@ const LAST: &str = "last";
 const SOLD: &str = "sold";
 
 impl Log {
-    /// Read `text` (`<id> <count>` a line, `sold <id> <count>` and `last <id>`; anything
-    /// else is skipped).
+    /// Read `text` (`<id> <count>` a line, `sold <id> <count>`, `first <id> <yyyymmdd>`
+    /// and `last <id>`; anything else is skipped).
     pub(crate) fn parse(text: &str) -> Self {
         let mut log = Self::default();
         for line in text.lines() {
             let words: Vec<&str> = line.split_whitespace().collect();
             match words.as_slice() {
+                [crate::catch_book::FIRST, id, day] => log.firsts.read(id, day),
                 [SOLD, id, value] => {
                     if let Ok(count) = value.parse::<u32>() {
                         log.sold.retain(|(known, _)| known != id);
@@ -509,10 +522,31 @@ impl Log {
         for (id, count) in &self.sold {
             text.push_str(&format!("{SOLD} {id} {count}\n"));
         }
+        self.firsts.push_text(&mut text);
         if let Some(last) = self.last {
             text.push_str(&format!("{LAST} {}\n", last.id));
         }
         text
+    }
+
+    /// Note `day` (`yyyymmdd`) as the day `id` first came up, unless one is known.
+    pub(crate) fn mark_first(&mut self, id: &str, day: u32) {
+        self.firsts.mark(id, day);
+    }
+
+    /// The day `id` first came up, when the log knows it.
+    pub(crate) fn first(&self, id: &str) -> Option<u32> {
+        self.firsts.of(id)
+    }
+
+    /// The rarest fish caught (the lowest weight; the first of the table among equals),
+    /// with its count.
+    pub(crate) fn rarest(&self) -> Option<(&'static Catch, u32)> {
+        CATCHES
+            .iter()
+            .filter(|c| c.kind == Kind::Fish && self.count(c.id) > 0)
+            .min_by_key(|c| c.weight)
+            .map(|c| (c, self.count(c.id)))
     }
 
     /// The fish landed since the last Old Whiskers (all of them before the first).
@@ -664,6 +698,10 @@ pub(crate) struct Fishing {
     sounds_registered: Option<u64>,
     /// Selling the junk to the hub ([`crate::fishing_sell`]).
     pub(crate) sale: crate::fishing_sell::Sale,
+    /// The last rare catch of the session and how many the log then held, for
+    /// `fishing_brag` ([`crate::catch_book`]), and when a catch was last shared.
+    pub(crate) last_rare: Option<(&'static Catch, u32)>,
+    pub(crate) brag: crate::catch_book::Brag,
     /// The bite cue's "!" this frame ([`GpuState::append_fishing_cue`]).
     cue: sjk_ui::DrawList,
     /// Rods to draw without a session, for the world shots: where the player stands,
@@ -698,6 +736,8 @@ impl Default for Fishing {
             tips: [None; SLOTS],
             sounds_registered: None,
             sale: Default::default(),
+            last_rare: None,
+            brag: Default::default(),
             cue: sjk_ui::DrawList::new(2),
             #[cfg(test)]
             shot_rods: Vec::new(),
@@ -968,7 +1008,14 @@ impl Fishing {
                         let catch = roll_catch(roll, pick, whiskers_wait);
                         match catch {
                             Some(catch) => {
-                                let count = self.log.get_or_insert_with(Log::default).caught(catch);
+                                let log = self.log.get_or_insert_with(Log::default);
+                                let count = log.caught(catch);
+                                if count == 1 {
+                                    log.mark_first(catch.id, crate::catch_book::today());
+                                }
+                                if is_rare(catch) {
+                                    self.said.push(Say::Sound(RARE));
+                                }
                                 self.said.push(Say::Caught(catch, count));
                             }
                             None => self.said.push(Say::Centre("The hook came up empty.")),
@@ -1035,6 +1082,7 @@ impl Fishing {
                 }
             }
             log.last = pending.last.or(log.last);
+            log.firsts.merge(&pending.firsts);
         }
         self.log = Some(log);
     }
@@ -1548,6 +1596,15 @@ impl GpuState {
                 Say::Cue(_) => continue,
                 Say::Caught(catch, count) => {
                     let (species, all) = self.fishing.log.as_ref().map_or((0, 0), Log::species);
+                    if is_rare(catch) {
+                        self.fishing.last_rare = Some((catch, count));
+                        self.unlock_toast
+                            .push(crate::unlock_toast::Unlock::RareCatch {
+                                name: catch.name,
+                                count,
+                                mining: false,
+                            });
+                    }
                     match catch.kind {
                         Kind::Fish if count == 1 => {
                             format!(

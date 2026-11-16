@@ -21,6 +21,9 @@ pub(crate) const COMMAND: &str = "mining_sell";
 pub(crate) const ORE_COMMAND: &str = "mining_sellore";
 /// The console command that prints the mining log in full.
 pub(crate) const LOG_COMMAND: &str = "mining_log";
+/// The console command that shares the last rare find in the SJK chat
+/// ([`crate::catch_book`]).
+pub(crate) const BRAG_COMMAND: &str = "mining_brag";
 
 /// A find's name for the card: without its article ("a chunk of iron ore" is chunk of
 /// iron ore, "the Heart of the Mountain" Heart of the Mountain).
@@ -80,6 +83,21 @@ pub(crate) fn card(
         }
         None => format!("Rubble: {pieces} {piece}"),
     };
+    let entry = |f: &Find| {
+        crate::catch_book::Entry::of(
+            f.name,
+            log.count(f.id),
+            log.first(f.id),
+            crate::mining::is_rare(f),
+        )
+    };
+    let mut book: Vec<_> = FINDS
+        .iter()
+        .filter(|f| f.kind == Kind::Ore)
+        .map(entry)
+        .collect();
+    let book_kinds = book.len();
+    book.extend(FINDS.iter().filter(|f| f.kind == Kind::Rubble).map(entry));
     Card {
         title: "Mining log",
         goods: "rubble",
@@ -92,6 +110,9 @@ pub(crate) fn card(
         sell: payable.map(|(pays, _)| pays),
         selling,
         line,
+        book,
+        book_kinds,
+        brag: brag_line(log, None),
         ..Card::default()
     }
 }
@@ -102,6 +123,18 @@ pub(crate) fn ore_name(id: &str) -> Option<&'static str> {
         .iter()
         .find(|f| f.kind == Kind::Ore && f.id == id)
         .map(short_name)
+}
+
+/// What `mining_brag` says for `log`: the session's last rare find (`last_rare`, with
+/// the count the log then held), else the log's rarest ore; `None` with no ore.
+pub(crate) fn brag_line(log: &Log, last_rare: Option<(&'static Find, u32)>) -> Option<String> {
+    let (find, count) = last_rare.or_else(|| log.rarest())?;
+    Some(crate::catch_book::brag_line(
+        "Dug out",
+        find.name,
+        count,
+        log.kinds(),
+    ))
 }
 
 /// The result line of a sale that took `pieces` for `credits`.
@@ -115,6 +148,32 @@ impl GpuState {
         self.console
             .as_ref()
             .map(|c| c.config_directory().to_owned())
+    }
+
+    /// `mining_brag`, or the log book's Share button: say the session's last rare find
+    /// (else the rarest ore of the log) in the SJK chat as the player's own message, once
+    /// in [`crate::catch_book::BRAG_EVERY`].
+    pub(crate) fn brag_mining(&mut self) {
+        let Some(directory) = self.config_directory() else {
+            return;
+        };
+        let last_rare = self.mining.last_rare;
+        let line = brag_line(self.mining.log_in(&directory), last_rare);
+        let said = match line {
+            None => Some("Nothing to share yet: dig out some ore first."),
+            Some(_) if !self.mining.brag.take(Instant::now()) => {
+                Some("You shared a find a moment ago.")
+            }
+            Some(line) => crate::catch_book::share(line),
+        };
+        if let Some(said) = said {
+            self.chat.receive(
+                sjk_client::ServerEventKind::CenterPrint,
+                said.to_owned(),
+                None,
+                Instant::now(),
+            );
+        }
     }
 
     /// `mining_log`: print the mining log in full to the console, every kind with its
@@ -244,6 +303,7 @@ impl GpuState {
         };
         let selling = self.mining.sale.waiting(now);
         let line = self.mining.sale.line.clone();
+        let last_rare = self.mining.last_rare;
         let log = self.mining.log_in(&directory);
         let held = log.rubble_held();
         let payable = crate::player_identity::with_snapshot(|snapshot| {
@@ -266,6 +326,7 @@ impl GpuState {
                 ore_name,
             );
         });
+        card.brag = brag_line(log, last_rare);
         if let Some(console) = self.console.as_mut() {
             console.set_mining_card(card);
         }

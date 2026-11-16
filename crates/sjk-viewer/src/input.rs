@@ -115,6 +115,10 @@ pub(crate) enum InputAction {
     MiningSell,
     /// `mining_log`: print the mining log in full to the console.
     MiningLog,
+    /// `fishing_brag`: share the last rare catch in the SJK chat ([`crate::catch_book`]).
+    FishingBrag,
+    /// `mining_brag`: share the last rare find in the SJK chat.
+    MiningBrag,
     /// `toy_order66`: turn the Order 66 toy on or off ([`crate::order66`]).
     Order66,
     /// `order66`: execute Order 66 for every player who has the toy on.
@@ -388,6 +392,8 @@ impl GameplayInput {
                     | crate::mining_sell::ORE_COMMAND
                     | crate::mining_sell::COMMAND
                     | crate::mining_sell::LOG_COMMAND
+                    | crate::fishing_sell::BRAG_COMMAND
+                    | crate::mining_sell::BRAG_COMMAND
                     | crate::order66::COMMAND
                     | crate::order66::EXECUTE_COMMAND
                     | crate::hax::COMMAND
@@ -580,6 +586,8 @@ impl GameplayInput {
             crate::mining_sell::ORE_COMMAND => Some(InputAction::MiningSellOre),
             crate::mining_sell::COMMAND => Some(InputAction::MiningSell),
             crate::mining_sell::LOG_COMMAND => Some(InputAction::MiningLog),
+            crate::fishing_sell::BRAG_COMMAND => Some(InputAction::FishingBrag),
+            crate::mining_sell::BRAG_COMMAND => Some(InputAction::MiningBrag),
             crate::order66::COMMAND => Some(InputAction::Order66),
             crate::order66::EXECUTE_COMMAND => Some(InputAction::ExecuteOrder66),
             crate::hax::COMMAND => Some(InputAction::Hax),
@@ -788,6 +796,8 @@ impl super::GpuState {
             Some(InputAction::MiningSellOre) => self.sell_mining_ore(),
             Some(InputAction::MiningSell) => self.sell_mining_rubble(),
             Some(InputAction::MiningLog) => self.print_mining_log(),
+            Some(InputAction::FishingBrag) => self.brag_fishing(),
+            Some(InputAction::MiningBrag) => self.brag_mining(),
             Some(InputAction::Order66) => self.toggle_order66(),
             Some(InputAction::ExecuteOrder66) => self.execute_order66(),
             Some(InputAction::Hax) => self.toggle_hax(),

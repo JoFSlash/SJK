@@ -405,7 +405,7 @@ link: Lukas's pull requests | https://github.com/Sol-Vulpes/SJK/pulls?q=is%3Apr+
 
 [Slash]
 github: JoFSlash
-role: Contributor: 155 merged pull requests
+role: Contributor: 159 merged pull requests
 did: #114 Tab completes cfg file names after exec and writeconfig
 did: #113 CTF team saber colours, an option
 did: #153 The SJK scoreboard tells who won the Siege round or team match
@@ -562,6 +562,9 @@ did: #419 Easier fishing: quicker bites, more time to hook, fewer empty catches
 did: #423 devmap and Create game start maps from the JoF content folder
 did: #426 F1/F2 vote, the voted card folds to one row, ampoll and testpoll
 did: #427 Devmap bar: cheat buttons over play, hold Ctrl to click
+did: #422 Click a chat line in the console to translate it, right under it
+did: #424 Fishing and Mining: kyber finds, daily goals, the catch market (adwe's idea)
+did: #425 Fishing and Mining: log book, rare catch card, share in SJK chat
 link: Slash's pull requests | https://github.com/Sol-Vulpes/SJK/pulls?q=is%3Apr+author%3AJoFSlash
 
 [Milamber]

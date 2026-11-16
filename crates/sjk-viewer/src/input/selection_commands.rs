@@ -59,6 +59,14 @@ pub(super) fn register(shell: &mut sjk_shell::Shell) -> Result<(), sjk_shell::Co
             "Toy: print your mining log in full: every ore and rubble dug, held and sold",
         ),
         (
+            crate::fishing_sell::BRAG_COMMAND,
+            "Toy: share your last rare catch (else your rarest fish) in the SJK chat",
+        ),
+        (
+            crate::mining_sell::BRAG_COMMAND,
+            "Toy: share your last rare find (else your rarest ore) in the SJK chat",
+        ),
+        (
             crate::mining::COMMAND,
             "Toy: take a pickaxe in hand, or put it away (boulders come up round you; attack strikes the one before you)",
         ),

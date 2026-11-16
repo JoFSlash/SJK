@@ -5126,6 +5126,18 @@ test: s_language english, snd_restart: they are English again.
 
 # ---- Gameplay ----
 
+[catch-log-book]
+area: Gameplay
+title: Fishing/Mining: log book, rare catch card, share in SJK chat (Slash, after adwe)
+change: Toys > Fishing/Mining: Log book button lists every kind, ??? until caught, with x and day.
+change: A rare fish (Kyber minnow or rarer) or ore (star quartz or rarer) brings a RARE card.
+change: fishing_brag / mining_brag (and the book's Share) say it in SJK chat, once a minute.
+test: Collection > Toys > Fishing > Log book: ??? cells, caught ones with count; Back returns.
+test: Land a new fish: its cell shows today's date; fishing_log.txt has a first <id> line.
+test: debug: give a Kyber minnow (or play): RARE CATCH card at the top, secret area sound.
+test: fishing_brag: one line in SJK chat as you, not in the game's chat; again: a moment ago.
+note: Nothing goes to the hub but the chat line; an old client keeps the log, drops first lines.
+
 [mining-rarer-of-two]
 area: Gameplay
 title: Mining: a clean strike gives the rarer of two ores (Slash, PR #414, hub #286)
@@ -10004,6 +10016,23 @@ test: devmap mp/ffa3, hold Ctrl: the bar and a pointer; click Noclip, God, Give 
 test: Let go of Ctrl or press Escape: the view turns again; mouse buttons never attack meanwhile.
 test: On a server without cheats nothing shows, whatever cg_devBar says.
 
+[console-translate]
+area: Console & chat
+title: Console: click a chat line to translate it, right under it (Slash, #422)
+change: In the console a click on another player's chat line (game or SJK chat) translates it.
+change: The translation shows right under that line, however fast the chat goes.
+test: Console open, someone writes in another language: click the line, English shows under it.
+test: Click your own line or a non-chat line: nothing is translated.
+note: Uses the hub's /v1/translate (hub shared #22, live).
+
+[staff-toys-tab]
+area: Menus & settings
+title: Staff page Toys tab: which toys players use (Slash, PR #420, needs hub #25)
+change: Staff page > Toys: per look toy, players today, in 7 and 30 days, time out and uses.
+change: Click a toy: its 10 players who had it out longest.
+test: As staff, Staff page > Toys: the list fills, longest out first; a toy opens its top 10.
+note: Needs hub shared #25 deployed; until then the tab says "Toy counts need a newer SJK hub."
+
 [catch-rewards]
 area: Gameplay
 title: Kyber finds, daily catch goals, catch market (Slash, after adwe's idea)
@@ -10013,7 +10042,7 @@ test: Local hub with --kyber-finds, --catch-market, --junk-selling, --catch-ques
 test: Fish or mine a while: "A kyber glint ... +N kyber shards", shards rise in Profile.
 test: Collection > Toys > Fishing: goal line counts bites; at 25 the Echo comes once.
 test: Sell fish: Wanted today line, the wanted one pays double, the 15 a day cap holds.
-note: Needs the hub's feat/catch-rewards deployed; without it nothing new shows.
+note: Needs hub shared #26 deployed and its switches on; without it nothing new shows.
 
 [forge-shatter-many]
 area: Menus & settings

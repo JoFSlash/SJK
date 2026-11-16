@@ -230,6 +230,7 @@ impl ViewerConsole {
             PanelAction::SellRubble => self.pending_mining_sell = true,
             PanelAction::SellFish => self.pending_catch_sell = Some(true),
             PanelAction::SellOre => self.pending_catch_sell = Some(false),
+            PanelAction::Brag { mining } => self.pending_brag = Some(mining),
             PanelAction::Monitor(on) => {
                 self.pending_monitor = Some(on);
                 self.monitor_on = on;
@@ -424,6 +425,11 @@ impl ViewerConsole {
     /// (`Some(false)`) button was pressed, once.
     pub(crate) fn take_catch_sell_request(&mut self) -> Option<bool> {
         self.pending_catch_sell.take()
+    }
+
+    /// The log book's Share button was pressed, once: Mining's (`true`) or Fishing's.
+    pub(crate) fn take_brag_request(&mut self) -> Option<bool> {
+        self.pending_brag.take()
     }
 
     /// The Fishing card's Sell junk button was pressed, once.

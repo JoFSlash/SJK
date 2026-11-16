@@ -825,7 +825,7 @@ merged into SJK
 - #306 long game-chat messages sent whole, as up to four messages split at a word; at the
   merge a draft refused past four pieces stays in the composer.
 
-Slash ([JoFSlash](https://github.com/JoFSlash)), contributor, has 155 pull requests merged
+Slash ([JoFSlash](https://github.com/JoFSlash)), contributor, has 159 pull requests merged
 into SJK ([all of them](https://github.com/Sol-Vulpes/SJK/pulls?q=is%3Apr+author%3AJoFSlash)):
 
 - #114 Tab completes the cfg file argument of `exec`, `execq`, `writeconfig` and `write`
@@ -1098,6 +1098,13 @@ medal pictures carry their own labels in `vram` and crash reports.
   JA+ admins' `ampoll` (anyone on a devmap) and `testpoll`.
 - #427 the devmap bar: cheat buttons over play in a game with cheats, held on Ctrl
   (`+devbar`), `cg_devBar` 0 by default.
+- #422 a click on another player's chat line in the console translates it, the
+  translation shown right under that line.
+- #424 Fishing and Mining (after adwe's idea): kyber finds, daily catch goals that win
+  an Echo and the catch market, all rolled and capped by the hub behind its switches
+  (hub-shared #26).
+- #425 Fishing and Mining: a log book of every catch with the day of the first, a
+  RARE CATCH card and sharing a rare catch in the SJK chat.
 
 Milamber ([Milamber0](https://github.com/Milamber0)), contributor, has 4 pull requests merged
 into SJK ([all of them](https://github.com/Sol-Vulpes/SJK/pulls?q=is%3Apr+author%3AMilamber0)):

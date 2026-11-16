@@ -38,6 +38,7 @@ mod card_outline;
 mod card_scenes;
 mod cardboard_box;
 mod cards;
+mod catch_book;
 mod cgame_options;
 mod chat;
 mod chat_ban;
