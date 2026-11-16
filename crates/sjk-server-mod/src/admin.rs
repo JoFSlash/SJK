@@ -100,6 +100,8 @@ pub enum AdminCommand {
     Say,
     LockTeam,
     KillVote,
+    /// `ampoll <question>`: a vote on the question that runs nothing.
+    Poll,
     // The server console only.
     /// `admGrant <player> <rank|no>`.
     Grant,

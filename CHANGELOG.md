@@ -32,6 +32,8 @@ Add each release's notes here when it is tagged (docs/sjk.md "Releases").
 -->
 ## Unreleased
 
+- Vote panel: F1 votes YES and F2 votes NO while a vote waits for you (then they are push and pull again), and once you have voted the card folds to one row, the question over the YES / NO bar with its counts, so it covers less of the game _(Slash)_
+- Server: JA+ admins' `ampoll <question>` works: everyone votes YES or NO on the question for 30 seconds, and nothing runs when it passes; on a devmap anyone may use it, to try it, and `testpoll <question>` shows one only to you _(Slash)_
 - Status balloons: `cg_statusBalloons` offers stock, SJK animations, static clan pictures or clan animations; name tags select clan art, with static pictures for non-SJK players _(Hormorn, PR #421)_
 
 ## 2026.1113.1 (Alpha) | 13/11/2026

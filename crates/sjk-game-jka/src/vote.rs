@@ -277,6 +277,9 @@ pub struct Vote {
     ballots: Vec<(usize, Ballot)>,
     /// The red and the blue side's team votes (`level.teamVote*`).
     pub team: [crate::team_vote::TeamVote; 2],
+    /// The running vote is a JA+ `ampoll` question ([`start_poll`]): it runs nothing,
+    /// and starts with nobody's vote.
+    pub poll: bool,
 }
 
 impl Vote {
@@ -513,6 +516,7 @@ pub fn call_vote(
         b")\n\"",
     ])));
     // The vote starts, and its caller has voted yes.
+    vote.poll = false;
     vote.time = now;
     vote.yes = 1;
     vote.no = 0;
@@ -532,6 +536,45 @@ pub fn call_vote(
         vote.no.to_string().into_bytes(),
     ));
     said
+}
+
+/// What a poll's question is shown as (`CS_VOTE_STRING`).
+pub const POLL_PREFIX: &[u8] = b"Poll: ";
+
+/// JA+'s `ampoll <question>`: a vote on the question that runs nothing when it passes.
+/// Nobody has voted at its start (its caller may vote as anyone does), so it is not
+/// failed for want of votes before its 30 seconds are over. `None` while a vote runs.
+pub fn start_poll(vote: &mut Vote, question: &[u8], now: i32) -> Option<Vec<Said>> {
+    if vote.time != 0 {
+        return None;
+    }
+    // Quotes and line breaks would end the configstring and the prints early.
+    let mut question: Vec<u8> = question
+        .iter()
+        .copied()
+        .filter(|byte| !matches!(byte, b'"' | b'\n' | b'\r' | b';'))
+        .collect();
+    question.truncate(MAX_ARGUMENT);
+    let question = question.trim_ascii();
+    if question.is_empty() {
+        return None;
+    }
+    vote.poll = true;
+    vote.string.clear();
+    vote.gametype_to = None;
+    vote.execute_delay = 0;
+    vote.display = cat(&[POLL_PREFIX, question]);
+    vote.clean = vote.display.clone();
+    vote.time = now;
+    vote.yes = 0;
+    vote.no = 0;
+    vote.ballots.clear();
+    Some(vec![
+        Said::ConfigString(CS_VOTE_TIME, vote.time.to_string().into_bytes()),
+        Said::ConfigString(CS_VOTE_STRING, vote.display.clone()),
+        Said::ConfigString(CS_VOTE_YES, b"0".to_vec()),
+        Said::ConfigString(CS_VOTE_NO, b"0".to_vec()),
+    ])
 }
 
 /// The row a caller's name picks among the allowed ones, and whether it picked it by an
@@ -848,7 +891,8 @@ pub fn check_vote(
     if vote.time == 0 {
         return said;
     }
-    if now - vote.time >= VOTE_TIME || vote.yes + vote.no == 0 {
+    // A poll starts with no votes, so it waits for its time.
+    if now - vote.time >= VOTE_TIME || (vote.yes + vote.no == 0 && !vote.poll) {
         said.push(Said::Everyone(cat(&[
             b"print \"@@@VOTEFAILED (",
             &vote.clean,
@@ -860,7 +904,10 @@ pub fn check_vote(
             &vote.clean,
             b")\n\"",
         ])));
-        vote.execute_time = now + vote.execute_delay;
+        // A poll's question passed: there is nothing to run.
+        if !vote.poll {
+            vote.execute_time = now + vote.execute_delay;
+        }
     } else if vote.no >= (voting_clients + 1) / 2 {
         // The same as running out of time.
         said.push(Said::Everyone(cat(&[

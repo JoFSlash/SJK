@@ -329,6 +329,10 @@ pub(super) const COMMANDS: &[(&str, &str)] = &[
         crate::hud::VOTE_PREVIEW_COMMAND,
         crate::hud::VOTE_PREVIEW_HELP,
     ),
+    (
+        crate::hud::POLL_PREVIEW_COMMAND,
+        crate::hud::POLL_PREVIEW_HELP,
+    ),
     (crate::map_edits::SYNC_COMMAND, crate::map_edits::SYNC_HELP),
     (crate::emote_help::COMMAND, crate::emote_help::HELP),
     (crate::emote_picker::COMMAND, crate::emote_picker::HELP),
@@ -1415,6 +1419,9 @@ impl crate::GpuState {
             crate::hud_edit::COMMAND => return self.hud_edit_command(args),
             crate::hud::VOTE_PREVIEW_COMMAND => {
                 return self.hud.preview_vote_command(args).map(|line| vec![line]);
+            }
+            crate::hud::POLL_PREVIEW_COMMAND => {
+                return self.hud.preview_poll_command(args).map(|line| vec![line]);
             }
             crate::map_edits::SYNC_COMMAND => return self.map_edits_sync_command(),
             crate::emote_help::COMMAND => return self.emote_help_command(),

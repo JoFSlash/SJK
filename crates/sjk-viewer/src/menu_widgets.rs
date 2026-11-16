@@ -3,7 +3,7 @@
 mod input;
 mod text;
 mod vote;
-pub(crate) use vote::VoteLayout;
+pub(crate) use vote::{VoteLayout, VoteRow};
 mod controls;
 pub(crate) mod numeric;
 mod targets;

@@ -179,6 +179,7 @@ impl NativeGame {
             AdminCommand::LockTeam => self.amlockteam(caller, entry, words, system),
             AdminCommand::ForceTeam => self.amforceteam(caller, entry, words, system),
             AdminCommand::KillVote => self.amkillvote(caller, entry, system),
+            AdminCommand::Poll => self.ampoll(caller, entry, words),
             AdminCommand::Motd => {
                 if let Caller::Player(client) = caller {
                     self.admin_set_motd(client, system);
@@ -1116,6 +1117,56 @@ impl NativeGame {
         self.admin_log_command(caller, entry.name, b"");
     }
 
+    /// `ampoll <question>`: everyone votes YES or NO on the question for 30 seconds, as
+    /// on a vote ([`sjk_game_jka::vote::start_poll`]); nothing is carried out.
+    fn ampoll(&mut self, caller: Caller, entry: &AdminEntry, words: &[&[u8]]) {
+        if !self.admin_allowed(caller, entry, true) {
+            return;
+        }
+        let question = concat(words, 1, SAY_BYTES);
+        if self.start_poll(caller, &question) {
+            self.admin_log_command(caller, entry.name, &question);
+        }
+    }
+
+    /// `ampoll` on a base game server with `sv_cheats` (a devmap), which has no admin
+    /// system: any player may ask, to try polls where nobody can log in.
+    pub(super) fn development_poll(&mut self, client: usize, words: &[&[u8]]) {
+        let question = concat(words, 0, SAY_BYTES);
+        self.start_poll(Caller::Player(client), &question);
+    }
+
+    /// Start the poll on `question`, telling everyone; `false` (the caller told why)
+    /// without a question or while a vote runs.
+    fn start_poll(&mut self, caller: Caller, question: &[u8]) -> bool {
+        if question.trim_ascii().is_empty() {
+            self.admin_reply(caller, b"Usage: ampoll <question>\n");
+            return false;
+        }
+        let now = self.last_frame_time;
+        let Some(said) = sjk_game_jka::vote::start_poll(&mut self.vote, question, now) else {
+            self.admin_reply(caller, b"@@@VOTEINPROGRESS\n");
+            return false;
+        };
+        let name = match caller {
+            Caller::Player(client) => self.admin_name(client),
+            Caller::Console => b"Server".to_vec(),
+        };
+        let display = self.vote.display.clone();
+        self.told.push(Told::Everyone(
+            [
+                &b"print \""[..],
+                &name,
+                b"^7 started a poll (",
+                &display,
+                b")\n\"",
+            ]
+            .concat(),
+        ));
+        self.tell_vote(said, None);
+        true
+    }
+
     /// `JP_SetMotd`: the message of the day shown to `client` for `jp_motdtime` seconds.
     fn admin_set_motd(&mut self, client: usize, system: &AdminSystem) {
         let text = [
@@ -1615,6 +1666,41 @@ mod tests {
         command(&mut game, 0, "amdenyvote 2");
         let said = command(&mut game, 2, "callvote map mp/ffa5");
         assert!(said.contains("not allowed to callVote"), "{said}");
+    }
+
+    #[test]
+    fn a_poll_asks_everyone_and_runs_nothing() {
+        let mut game = ruled();
+        let said = command(&mut game, 0, "ampoll all vs all?");
+        assert!(
+            said.contains("started a poll (Poll: all vs all?)"),
+            "{said}"
+        );
+        assert!(game.vote.poll && game.vote.string.is_empty());
+        assert_eq!(game.vote.display, b"Poll: all vs all?");
+        assert_eq!((game.vote.yes, game.vote.no), (0, 0));
+        // No votes yet: it waits instead of failing at once.
+        game.run_votes(game.last_frame_time + 50);
+        assert_ne!(game.vote.time, 0);
+        let said = command(&mut game, 0, "ampoll another?");
+        assert!(said.contains("VOTEINPROGRESS"), "{said}");
+        run(&mut game, 2, "vote yes");
+        assert_eq!(game.vote.yes, 1);
+        assert!(command(&mut game, 0, "ampoll").contains("Usage: ampoll"));
+    }
+
+    #[test]
+    fn a_devmap_polls_without_admins() {
+        let mut base = super::super::bridge_admin::tests::game("base");
+        let said = command(&mut base, 1, "ampoll do you like apple pie?");
+        assert!(said.contains("Unknown command ampoll"), "{said}");
+        base.settings.cheats = true;
+        let said = command(&mut base, 1, "ampoll do you like apple pie?");
+        assert!(
+            said.contains("started a poll (Poll: do you like apple pie?)"),
+            "{said}"
+        );
+        assert!(base.vote.poll);
     }
 
     #[test]

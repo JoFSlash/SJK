@@ -46,7 +46,10 @@ pub(crate) mod vehicle;
 pub(crate) mod vehicle_feed;
 mod vitals_estimate;
 mod vote;
-pub(crate) use vote::{PREVIEW_COMMAND as VOTE_PREVIEW_COMMAND, PREVIEW_HELP as VOTE_PREVIEW_HELP};
+pub(crate) use vote::{
+    POLL_PREVIEW_COMMAND, POLL_PREVIEW_HELP, PREVIEW_COMMAND as VOTE_PREVIEW_COMMAND,
+    PREVIEW_HELP as VOTE_PREVIEW_HELP, VoteKey,
+};
 mod widgets;
 
 use super::{TextVertex, UiFont};
@@ -255,6 +258,11 @@ pub(crate) struct HudOverlay {
     vote_preview: vote::Preview,
     yes_keys: String,
     no_keys: String,
+    /// The number of the last sent command the vote cards read
+    /// ([`sjk_client::sent_commands::SentCommands`]).
+    sent_votes_seen: u64,
+    /// The `testvote` / `testpoll` card's question.
+    preview_question: String,
     /// The kill feed at the top right.
     pub(crate) kill_feed: kill_feed::Feed,
     crosshair_name: String,
@@ -492,6 +500,8 @@ impl HudOverlay {
             vote_preview: Default::default(),
             yes_keys: String::with_capacity(48),
             no_keys: String::with_capacity(48),
+            sent_votes_seen: 0,
+            preview_question: String::new(),
             kill_feed: kill_feed::Feed::default(),
             crosshair_name: String::with_capacity(64),
             speed: options::Speed::default(),
