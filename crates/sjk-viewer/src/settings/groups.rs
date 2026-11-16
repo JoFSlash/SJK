@@ -546,6 +546,7 @@ impl Group {
                 crate::quick_wheel::pages::FILE,
                 crate::quick_wheel::SOUNDS_CVAR,
                 crate::player_trades::SIZE_CVAR,
+                crate::devmap_bar::CVAR,
             ],
             Self::Hud => &[
                 "cg_drawHud",

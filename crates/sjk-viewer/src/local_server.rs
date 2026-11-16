@@ -306,6 +306,8 @@ pub(crate) struct LocalServer {
     ready: bool,
     console: Vec<String>,
     log_path: PathBuf,
+    /// Started with `--cheats` (`devmap`, or Create game with cheats on).
+    cheats: bool,
 }
 
 impl LocalServer {
@@ -348,7 +350,20 @@ impl LocalServer {
             ready: false,
             console,
             log_path: log_path.to_owned(),
+            cheats: false,
         })
+    }
+
+    /// Note that the server was started with cheats on. SJK's server does not put
+    /// `sv_cheats` in its system info, so the client tells its own game this way
+    /// (the devmap bar, [`crate::devmap_bar`]).
+    pub(crate) fn set_cheats(&mut self, cheats: bool) {
+        self.cheats = cheats;
+    }
+
+    /// Whether the server was started with cheats on.
+    pub(crate) fn cheats(&self) -> bool {
+        self.cheats
     }
 
     /// Where the server's output is written.

@@ -770,6 +770,14 @@ overlay routes their text to the UI's families (`console_sjk_pages.rs`).
   gold, and the gold Spawn (Run) button; two quiet lines at the bottom say it needs
   cheats. The last line run bottom left; keys Enter, Tab, Up Down, Esc bottom right.
   World shot: `world_shot::tests::duel6_spawn_panel` (`ui_menuStyle sjk` and `classic`).
+- **Devmap bar** ([devmap_bar.rs](../crates/sjk-viewer/src/devmap_bar.rs), 16/11/2026):
+  the cheat buttons' strip ([client.md](client.md#devmap-bar)) over play in every menu
+  style: a dark glass pill 50 high, 14 from the bottom (or top) edge, centred, a gold
+  "DEVMAP" at its left; pill buttons 32 high in Body SemiBold 14, outlined in their
+  kind's colour (gold toggles, holo `give`, ember NPCs, muted player), a thin holo line
+  between kinds; the hovered one filled, a clicked one lit solid a moment. A quiet line
+  on the bar's inner side says "Hold <key> to click the bar", or what the hovered button
+  does and its command. While held a white dot ringed dark is the pointer.
 - **Credits** ([credits_sjk.rs](../crates/sjk-viewer/src/credits_sjk.rs), since
   08/10/2026, Sol's request: restyle Credits but keep its sun): on the left SJK's
   emblem (220 across, centred at (300, 330)) is the page's sun, the one memorable

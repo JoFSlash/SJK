@@ -52,6 +52,21 @@ impl crate::GpuState {
                 "^3Tip: ^7{} lists NPCs, vehicles and cheats to run with a click",
                 crate::console::spawn_panel::COMMAND
             ));
+            let mut keys = String::new();
+            console.write_keys_for_command(crate::devmap_bar::HOLD_COMMAND, &mut keys);
+            let line = if keys == "unbound" {
+                format!(
+                    "^3Tip: ^7bind a key to {} (bind MOUSE4 {}) and hold it for the devmap bar of cheat buttons",
+                    crate::devmap_bar::HOLD_COMMAND,
+                    crate::devmap_bar::HOLD_COMMAND
+                )
+            } else {
+                format!(
+                    "^3Tip: ^7hold {keys} for the devmap bar of cheat buttons; {} 1 keeps it on screen",
+                    crate::devmap_bar::CVAR
+                )
+            };
+            console.push_log(line);
         }
     }
 }

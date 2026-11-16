@@ -1361,6 +1361,12 @@ pub(super) fn register_daily_cvars(cvars: &mut CvarRegistry) -> Result<(), sjk_s
             "Quick wheel sounds: changing page, moving to another choice and running one (0 silent)",
         ),
         CvarDefinition::new(
+            crate::devmap_bar::CVAR,
+            0_i64,
+            archive,
+            "The devmap bar of cheat buttons in a game with cheats on: 0 only while +devbar is held (bottom), 1 always at the bottom, 2 always at the top",
+        ),
+        CvarDefinition::new(
             "cg_shieldSphere",
             0_i64,
             archive,
@@ -1903,6 +1909,12 @@ pub(super) fn register_daily_cvars(cvars: &mut CvarRegistry) -> Result<(), sjk_s
             0_i64,
             archive,
             "Internal migration marker for the auto scoreboard style default",
+        ),
+        CvarDefinition::new(
+            crate::devmap_bar::BIND_VERSION_CVAR,
+            0_i64,
+            archive,
+            "Internal migration marker for the devmap bar's Ctrl bind in saved profiles",
         ),
         CvarDefinition::new(
             "cl_wheelBindVersion",

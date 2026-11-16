@@ -297,6 +297,13 @@ const FIXED: &[BindableAction] = &[
     // on the page used last; `+wheel <page>` on that page.
     action(Other, "Quick wheel (hold)", "+wheel", "q"),
     action(Other, "Quick wheel, Weather (hold)", "+wheel weather", "r"),
+    // SJK: lends the mouse to the devmap bar's cheat buttons (cheats on only).
+    action(
+        Other,
+        "Devmap bar (hold)",
+        crate::devmap_bar::HOLD_COMMAND,
+        crate::devmap_bar::DEFAULT_KEY,
+    ),
     action(Other, "Taunt", "taunt", "g"),
     action(Other, "Bow", "bow", "b"),
     action(Other, "Meditate", "meditate", ""),

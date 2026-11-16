@@ -142,6 +142,14 @@ impl GpuState {
             }
             return;
         }
+        // The devmap bar, while its key is held, takes the left and right buttons: the
+        // left one runs the button under its pointer, and neither attacks.
+        if self.devmap_bar.is_held() && matches!(button, MouseButton::Left | MouseButton::Right) {
+            if button == MouseButton::Left && state == ElementState::Pressed {
+                self.click_devmap_bar();
+            }
+            return;
+        }
         // An open quick wheel takes the left and right buttons: they change its
         // page, and neither attacks.
         let side = match button {
@@ -303,6 +311,11 @@ impl GpuState {
         // An open quick wheel takes the mouse: it moves the wheel's pointer, not the view.
         if self.quick_wheel.is_open() {
             self.quick_wheel.moved([delta.0 as f32, delta.1 as f32]);
+            return;
+        }
+        // So does the devmap bar while its key is held.
+        if self.devmap_bar.is_held() {
+            self.devmap_bar.moved([delta.0 as f32, delta.1 as f32]);
             return;
         }
         // Accumulate raw counts; filtering and acceleration run once per command frame.
