@@ -1,0 +1,614 @@
+//! The client's own game server: an `sjk-server` child process started by
+//! the Create game screen, watched until it answers queries, fed its bots
+//! through its console, and stopped when the player leaves.
+//!
+//! Safety of the owner's machine comes first: the server binds `127.0.0.1`
+//! unless the player explicitly allows LAN players, runs as a LAN server
+//! (`dedicated 1`, which never sends a master heartbeat) with every master
+//! address cleared, and is started with `--quit-on-eof`, so it quits when
+//! the client's end of its console pipe closes — however the client ends.
+
+use std::ffi::OsString;
+use std::fs::{File, OpenOptions};
+use std::io::{BufRead, BufReader, Write};
+use std::net::{IpAddr, Ipv4Addr, SocketAddr, UdpSocket};
+use std::path::{Path, PathBuf};
+use std::process::{Child, ChildStdin, Stdio};
+use std::sync::mpsc::{self, Receiver, Sender, TryRecvError};
+use std::time::{Duration, Instant};
+
+/// File name of the server binary next to the client.
+const SERVER_BINARY: &str = "sjk-server";
+/// Environment variable naming the server binary explicitly.
+pub(crate) const SERVER_BINARY_ENV: &str = "JKA_DEDICATED";
+/// Environment variable naming the server log file explicitly.
+pub(crate) const SERVER_LOG_ENV: &str = "SJK_SERVER_LOG";
+/// The milliseconds a point of Force takes to come back in games this client hosts:
+/// `g_forceRegenTime`, then EternalJK's paces in a private duel and in a full-force
+/// duel.
+pub(crate) const FORCE_REGEN_CVARS: [&str; 3] = [
+    "g_forceRegenTime",
+    "g_saberDuelForceRegenTime",
+    "g_forceDuelForceRegenTime",
+];
+/// File name of the server log beside the client's own log.
+const SERVER_LOG: &str = "last-server.log";
+/// Ports a LAN-visible server tries first: the stock game port and the nine
+/// after it, which LAN browsers probe.
+pub(crate) const LAN_PORTS: std::ops::RangeInclusive<u16> = 29_070..=29_079;
+/// How long the server may take from `listening on` to answering `getinfo`.
+const ANSWER_DEADLINE: Duration = Duration::from_secs(20);
+/// How long a stopped server gets to quit on its own before it is killed.
+const QUIT_GRACE: Duration = Duration::from_millis(1_500);
+/// Master-server variables cleared on the command line.
+const MASTER_CVARS: [&str; 5] = [
+    "sv_master1",
+    "sv_master2",
+    "sv_master3",
+    "sv_master4",
+    "sv_master5",
+];
+
+/// The setting that names the server's mod (`sjk-dedicated`'s `server_mods::MOD_CVAR`).
+pub(crate) const SERVER_MOD_CVAR: &str = "g_mod";
+/// Its value for the base game (`server_mods::BASE`).
+pub(crate) const BASE_SERVER_MOD: &str = "base";
+
+/// One server mod a hosted game can run: `g_mod`'s value and its name on screen.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) struct ServerModChoice {
+    /// `g_mod`'s value, the server mod's id (`japlus`).
+    pub(crate) id: &'static str,
+    /// What Create game calls it.
+    pub(crate) name: &'static str,
+}
+
+/// The server mods Create game offers, the base game first (the default): the base
+/// game and `sjk-dedicated`'s `server_mods::SERVER_MODS`, by the same ids and names
+/// (a test compares them). Offering another is an entry here.
+pub(crate) const SERVER_MODS: [ServerModChoice; 2] = [
+    ServerModChoice {
+        id: BASE_SERVER_MOD,
+        name: "Base game",
+    },
+    // JA+ 2.4 Build 7 (`sjk_server_mod_japlus::JaPlus`, docs/server.md "JA+ mode").
+    ServerModChoice {
+        id: "japlus",
+        name: "JA+",
+    },
+];
+
+/// The entry of [`SERVER_MODS`] with `id`, any letter case.
+pub(crate) fn server_mod_index(id: &str) -> Option<usize> {
+    SERVER_MODS
+        .iter()
+        .position(|choice| choice.id.eq_ignore_ascii_case(id))
+}
+
+/// What the player chose on the Create game screen, independent of where
+/// the server binary and the game data are.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) struct HostSettings {
+    /// Map without `maps/` and `.bsp` (`mp/ffa3`).
+    pub(crate) map: String,
+    /// `sjk-server --gametype` name (`ffa`, `ctf`, ...).
+    pub(crate) gametype: &'static str,
+    /// `sv_hostname`.
+    pub(crate) hostname: String,
+    /// Bot definitions added with `addbot`, one per bot.
+    pub(crate) bots: Vec<String>,
+    /// `addbot` skill, 1 to 5.
+    pub(crate) bot_skill: u8,
+    /// `fraglimit`, 0 for none.
+    pub(crate) fraglimit: u32,
+    /// `timelimit` in minutes, 0 for none.
+    pub(crate) timelimit: u32,
+    /// `capturelimit`, 0 for none.
+    pub(crate) capturelimit: u32,
+    /// Bind every interface instead of loopback only.
+    pub(crate) allow_lan: bool,
+    /// Enable server-authorized development commands for a devmap launch.
+    pub(crate) cheats: bool,
+    /// `g_mod`: an id of [`SERVER_MODS`], [`BASE_SERVER_MOD`] for the base game.
+    pub(crate) server_mod: &'static str,
+}
+
+impl HostSettings {
+    /// Address the server binds: loopback only unless LAN players are
+    /// allowed; port 0 lets the system choose a free one.
+    pub(crate) fn bind_address(&self, port: u16) -> SocketAddr {
+        let ip = if self.allow_lan {
+            Ipv4Addr::UNSPECIFIED
+        } else {
+            Ipv4Addr::LOCALHOST
+        };
+        SocketAddr::new(IpAddr::V4(ip), port)
+    }
+
+    /// The server's command line for `game_data` bound on `port`.
+    pub(crate) fn arguments(&self, game_data: &Path, port: u16) -> Vec<OsString> {
+        let mut arguments: Vec<OsString> = Vec::with_capacity(40);
+        let mut pair = |flag: &str, value: String| {
+            arguments.push(flag.into());
+            arguments.push(value.into());
+        };
+        pair("--bind", self.bind_address(port).to_string());
+        pair("--map", self.map.clone());
+        pair("--gametype", self.gametype.to_owned());
+        pair("--hostname", self.hostname.clone());
+        pair("--fraglimit", self.fraglimit.to_string());
+        pair("--timelimit", self.timelimit.to_string());
+        pair("--capturelimit", self.capturelimit.to_string());
+        arguments.push("--game-data".into());
+        arguments.push(game_data.as_os_str().to_owned());
+        // A LAN server: `dedicated 2` is the only value that heartbeats. `g_mod` is
+        // always given, so a value the server archived earlier never picks the mod.
+        for (name, value) in [("dedicated", "1"), (SERVER_MOD_CVAR, self.server_mod)]
+            .into_iter()
+            .chain(MASTER_CVARS.map(|name| (name, "")))
+        {
+            arguments.extend(["--set".into(), name.into(), value.into()]);
+        }
+        if self.cheats {
+            arguments.push("--cheats".into());
+            arguments.push("--team-auto-join".into());
+        }
+        arguments.push("--quit-on-eof".into());
+        arguments
+    }
+
+    /// `--extra-base` for each of `folders`: the client's content folders standing in
+    /// for `base` (SJK's JoF content), so the server finds the maps the client lists.
+    pub(crate) fn extra_base_arguments(folders: &[PathBuf]) -> Vec<OsString> {
+        folders
+            .iter()
+            .flat_map(|folder| ["--extra-base".into(), folder.as_os_str().to_owned()])
+            .collect()
+    }
+
+    /// Console lines typed into the server once it answers: one `addbot`
+    /// per bot, at the chosen skill.
+    pub(crate) fn console_lines(&self) -> Vec<String> {
+        let skill = self.bot_skill.clamp(1, 5);
+        self.bots
+            .iter()
+            .map(|name| format!("addbot \"{name}\" {skill}"))
+            .collect()
+    }
+}
+
+/// The first port `is_free` accepts in `candidates`, else 0 (the system's
+/// choice).
+pub(crate) fn pick_port(
+    candidates: impl IntoIterator<Item = u16>,
+    mut is_free: impl FnMut(u16) -> bool,
+) -> u16 {
+    candidates
+        .into_iter()
+        .find(|&port| is_free(port))
+        .unwrap_or(0)
+}
+
+/// Whether UDP `port` can be bound on every interface right now.
+pub(crate) fn udp_port_free(port: u16) -> bool {
+    UdpSocket::bind((Ipv4Addr::UNSPECIFIED, port)).is_ok()
+}
+
+/// The port the server should bind for `settings`: a LAN server prefers the
+/// stock ports; a loopback one lets the system choose.
+pub(crate) fn choose_port(settings: &HostSettings) -> u16 {
+    if settings.allow_lan {
+        pick_port(LAN_PORTS, udp_port_free)
+    } else {
+        0
+    }
+}
+
+/// Where the server binary is: `override_path` if given; else beside the
+/// client (`sjk-server-<suffix>` for a client named `sjk-<suffix>`, then plain
+/// `sjk-server`); else the first `sjk-server` on `search_path`.
+pub(crate) fn find_server_binary(
+    client: &Path,
+    override_path: Option<PathBuf>,
+    search_path: Option<OsString>,
+    exists: impl Fn(&Path) -> bool,
+) -> Option<PathBuf> {
+    if let Some(path) = override_path {
+        return Some(path);
+    }
+    let file = |name: &str| format!("{name}{}", std::env::consts::EXE_SUFFIX);
+    let mut candidates = Vec::with_capacity(4);
+    if let Some(directory) = crate::platform::install_folder(client) {
+        let stem = client
+            .file_stem()
+            .and_then(|stem| stem.to_str())
+            .unwrap_or_default();
+        if let Some(suffix) = stem
+            .strip_prefix("sjk-")
+            .filter(|suffix| !suffix.starts_with("server"))
+        {
+            candidates.push(directory.join(file(&format!("{SERVER_BINARY}-{suffix}"))));
+        }
+        candidates.push(directory.join(file(SERVER_BINARY)));
+    }
+    if let Some(search_path) = search_path {
+        candidates
+            .extend(std::env::split_paths(&search_path).map(|dir| dir.join(file(SERVER_BINARY))));
+    }
+    candidates.into_iter().find(|path| exists(path))
+}
+
+/// [`find_server_binary`] for this process.
+pub(crate) fn locate_server_binary() -> Option<PathBuf> {
+    let client = std::env::current_exe().ok()?;
+    let override_path = std::env::var_os(SERVER_BINARY_ENV)
+        .filter(|path| !path.is_empty())
+        .map(PathBuf::from);
+    find_server_binary(
+        &client,
+        override_path,
+        std::env::var_os("PATH"),
+        Path::is_file,
+    )
+}
+
+/// Where the server log goes: `override_path` if given; else beside the
+/// client's own log when standard error is a file (`~/sjk-test/last-run.log`
+/// gives `~/sjk-test/last-server.log`); else in `config_directory`.
+pub(crate) fn server_log_path(
+    override_path: Option<PathBuf>,
+    client_log: Option<PathBuf>,
+    config_directory: &Path,
+) -> PathBuf {
+    if let Some(path) = override_path {
+        return path;
+    }
+    client_log.as_deref().and_then(Path::parent).map_or_else(
+        || config_directory.join(SERVER_LOG),
+        |directory| directory.join(SERVER_LOG),
+    )
+}
+
+/// The file this process's standard error is written to, if it is one.
+pub(crate) fn client_log_file() -> Option<PathBuf> {
+    let target = std::fs::read_link("/proc/self/fd/2").ok()?;
+    target.is_file().then_some(target)
+}
+
+/// The address the server printed in its `listening on ADDRESS` line, made
+/// connectable: a server bound on every interface is joined over loopback.
+pub(crate) fn listening_address(line: &str) -> Option<SocketAddr> {
+    let mut address: SocketAddr = line.trim().strip_prefix("listening on ")?.parse().ok()?;
+    if address.ip().is_unspecified() {
+        address.set_ip(IpAddr::V4(Ipv4Addr::LOCALHOST));
+    }
+    Some(address)
+}
+
+/// What the watcher threads report about a starting server.
+enum Event {
+    /// It printed where it listens.
+    Listening(SocketAddr),
+    /// It answered a `getinfo` at that address.
+    Answering(SocketAddr),
+    /// It did not answer in time.
+    Silent,
+}
+
+/// Progress of a started server, polled each frame.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) enum ServerPoll {
+    /// Loading the map or not yet answering.
+    Starting,
+    /// Answering queries at this address; its bots have been sent.
+    Ready(SocketAddr),
+    /// Gone or never answered; the reason names the log.
+    Failed(String),
+}
+
+/// A running `sjk-server` child owned by the client.
+pub(crate) struct LocalServer {
+    child: Option<Child>,
+    stdin: Option<ChildStdin>,
+    events: Receiver<Event>,
+    address: Option<SocketAddr>,
+    ready: bool,
+    console: Vec<String>,
+    log_path: PathBuf,
+    /// Started with `--cheats` (`devmap`, or Create game with cheats on).
+    cheats: bool,
+}
+
+impl LocalServer {
+    /// Start `program` with `arguments`; its output goes to `log_path`
+    /// (rewritten), and `console` lines are typed once it answers.
+    pub(crate) fn start(
+        program: &Path,
+        arguments: &[OsString],
+        console: Vec<String>,
+        log_path: &Path,
+    ) -> std::io::Result<Self> {
+        if let Some(directory) = log_path.parent() {
+            std::fs::create_dir_all(directory)?;
+        }
+        let log = OpenOptions::new()
+            .create(true)
+            .write(true)
+            .truncate(true)
+            .open(log_path)?;
+        let mut child = crate::platform::hidden_command(program)
+            .args(arguments)
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::from(log.try_clone()?))
+            .spawn()?;
+        let stdin = child.stdin.take();
+        let stdout = child
+            .stdout
+            .take()
+            .ok_or_else(|| std::io::Error::other("no server output"))?;
+        let (sender, events) = mpsc::channel();
+        std::thread::Builder::new()
+            .name("local-server-log".into())
+            .spawn(move || copy_output(stdout, log, sender))?;
+        Ok(Self {
+            child: Some(child),
+            stdin,
+            events,
+            address: None,
+            ready: false,
+            console,
+            log_path: log_path.to_owned(),
+            cheats: false,
+        })
+    }
+
+    /// Note that the server was started with cheats on. SJK's server does not put
+    /// `sv_cheats` in its system info, so the client tells its own game this way
+    /// (the devmap bar, [`crate::devmap_bar`]).
+    pub(crate) fn set_cheats(&mut self, cheats: bool) {
+        self.cheats = cheats;
+    }
+
+    /// Whether the server was started with cheats on.
+    pub(crate) fn cheats(&self) -> bool {
+        self.cheats
+    }
+
+    /// Where the server's output is written.
+    pub(crate) fn log_path(&self) -> &Path {
+        &self.log_path
+    }
+
+    /// The address clients join, once the server has printed it.
+    pub(crate) fn address(&self) -> Option<SocketAddr> {
+        self.address
+    }
+
+    /// Advance the start-up without blocking: note what the watchers saw,
+    /// and type the bot lines the moment the server answers.
+    pub(crate) fn poll(&mut self) -> ServerPoll {
+        if let Some(status) = self
+            .child
+            .as_mut()
+            .and_then(|child| child.try_wait().ok().flatten())
+        {
+            return ServerPoll::Failed(format!(
+                "the server exited ({status}); see {}",
+                self.log_path.display()
+            ));
+        }
+        if self.child.is_none() {
+            return ServerPoll::Failed("the server was stopped".to_owned());
+        }
+        loop {
+            match self.events.try_recv() {
+                Ok(Event::Listening(address)) => self.address = Some(address),
+                Ok(Event::Answering(address)) => {
+                    self.address = Some(address);
+                    self.ready = true;
+                    self.type_console();
+                }
+                Ok(Event::Silent) => {
+                    return ServerPoll::Failed(format!(
+                        "the server did not answer; see {}",
+                        self.log_path.display()
+                    ));
+                }
+                Err(TryRecvError::Empty) => break,
+                Err(TryRecvError::Disconnected) if !self.ready => {
+                    return ServerPoll::Failed(format!(
+                        "the server closed its output; see {}",
+                        self.log_path.display()
+                    ));
+                }
+                Err(TryRecvError::Disconnected) => break,
+            }
+        }
+        match self.address {
+            Some(address) if self.ready => ServerPoll::Ready(address),
+            _ => ServerPoll::Starting,
+        }
+    }
+
+    /// Type the queued console lines into the server.
+    fn type_console(&mut self) {
+        let Some(stdin) = &mut self.stdin else { return };
+        for line in self.console.drain(..) {
+            crate::log::progress(format_args!("local server: {line}"));
+            if writeln!(stdin, "{line}").is_err() {
+                break;
+            }
+        }
+        let _ = stdin.flush();
+    }
+
+    /// Stop the server without blocking the caller: it is asked to `quit`
+    /// and, on a helper thread, killed if it has not within the grace time.
+    pub(crate) fn stop(mut self) {
+        let (Some(child), stdin) = (self.child.take(), self.stdin.take()) else {
+            return;
+        };
+        let spawned = std::thread::Builder::new()
+            .name("local-server-stop".into())
+            .spawn(move || shut_down(child, stdin));
+        if let Err(error) = spawned {
+            crate::log::progress(format_args!("local server: no stop thread ({error})"));
+        }
+    }
+}
+
+impl Drop for LocalServer {
+    /// The client is going: stop the server before returning.
+    fn drop(&mut self) {
+        if let Some(child) = self.child.take() {
+            shut_down(child, self.stdin.take());
+        }
+    }
+}
+
+/// `quit` on the server's console, its pipe closed, then a bounded wait and
+/// a kill if it is still there; the child is always reaped.
+fn shut_down(mut child: Child, stdin: Option<ChildStdin>) {
+    if let Some(mut stdin) = stdin {
+        let _ = writeln!(stdin, "quit");
+        let _ = stdin.flush();
+    }
+    let deadline = Instant::now() + QUIT_GRACE;
+    while Instant::now() < deadline {
+        match child.try_wait() {
+            Ok(Some(status)) => {
+                crate::log::progress(format_args!("local server stopped ({status})"));
+                return;
+            }
+            Ok(None) => std::thread::sleep(Duration::from_millis(20)),
+            Err(_) => break,
+        }
+    }
+    let _ = child.kill();
+    let _ = child.wait();
+    crate::log::progress(format_args!(
+        "local server killed after {} ms",
+        QUIT_GRACE.as_millis()
+    ));
+}
+
+/// Copy the server's standard output into the log, reporting its
+/// `listening on` line and then whether it answers there.
+fn copy_output(stdout: std::process::ChildStdout, mut log: File, events: Sender<Event>) {
+    let mut announced = false;
+    for line in BufReader::new(stdout).lines().map_while(Result::ok) {
+        let _ = writeln!(log, "{line}");
+        if announced {
+            continue;
+        }
+        if let Some(address) = listening_address(&line) {
+            announced = true;
+            let _ = events.send(Event::Listening(address));
+            // Probed on its own thread: this one must keep draining the pipe,
+            // or a chatty server would block on a full one.
+            let events = events.clone();
+            let _ = std::thread::Builder::new()
+                .name("local-server-probe".into())
+                .spawn(move || probe(address, &events));
+        }
+    }
+}
+
+/// Ask `address` for its info until it answers or the deadline passes.
+fn probe(address: SocketAddr, events: &Sender<Event>) {
+    let deadline = Instant::now() + ANSWER_DEADLINE;
+    while Instant::now() < deadline {
+        if sjk_network::query_server_info(address, Duration::from_millis(300)).is_ok() {
+            let _ = events.send(Event::Answering(address));
+            return;
+        }
+        // A refused query fails at once; do not spin.
+        std::thread::sleep(Duration::from_millis(100));
+    }
+    let _ = events.send(Event::Silent);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn settings(server_mod: &'static str) -> HostSettings {
+        HostSettings {
+            map: "mp/ffa3".into(),
+            gametype: "ffa",
+            hostname: "SJK local game".into(),
+            bots: Vec::new(),
+            bot_skill: 3,
+            fraglimit: 20,
+            timelimit: 0,
+            capturelimit: 0,
+            allow_lan: false,
+            cheats: false,
+            server_mod,
+        }
+    }
+
+    /// The value after each `--set g_mod` on the command line.
+    fn server_mods_set(arguments: &[OsString]) -> Vec<&str> {
+        arguments
+            .windows(3)
+            .filter(|window| window[0] == "--set" && window[1] == SERVER_MOD_CVAR)
+            .filter_map(|window| window[2].to_str())
+            .collect()
+    }
+
+    #[test]
+    fn the_server_mod_reaches_the_command_line_once() {
+        let game_data = Path::new("GameData");
+        let japlus = settings("japlus").arguments(game_data, 0);
+        assert_eq!(server_mods_set(&japlus), ["japlus"]);
+        let base = settings(BASE_SERVER_MOD).arguments(game_data, 0);
+        assert_eq!(server_mods_set(&base), ["base"]);
+        // Nothing else moves: the two lines differ by the mod's value only.
+        let differing = japlus
+            .iter()
+            .zip(&base)
+            .filter(|(left, right)| left != right)
+            .count();
+        assert_eq!((japlus.len(), differing), (base.len(), 1));
+    }
+
+    #[test]
+    fn content_folders_reach_the_command_line_as_extra_bases() {
+        let folders = [PathBuf::from("SJK/jof/base"), PathBuf::from("other/base")];
+        let arguments = HostSettings::extra_base_arguments(&folders);
+        let expected: Vec<OsString> =
+            ["--extra-base", "SJK/jof/base", "--extra-base", "other/base"]
+                .map(OsString::from)
+                .into();
+        assert_eq!(arguments, expected);
+        assert!(HostSettings::extra_base_arguments(&[]).is_empty());
+    }
+
+    #[test]
+    fn server_mod_choices_are_the_servers() {
+        assert_eq!(SERVER_MODS[0].id, BASE_SERVER_MOD, "the base game first");
+        assert_eq!(server_mod_index("JAPLUS"), Some(1));
+        assert_eq!(server_mod_index("base"), Some(0));
+        assert_eq!(server_mod_index("lugormod"), None);
+        for (index, choice) in SERVER_MODS.iter().enumerate() {
+            assert_eq!(
+                server_mod_index(choice.id),
+                Some(index),
+                "{} is unique",
+                choice.id
+            );
+        }
+        // The server's own names and table: the base game, then its mods by id and name.
+        use sjk_dedicated::server_mods;
+        assert_eq!(SERVER_MOD_CVAR.as_bytes(), server_mods::MOD_CVAR);
+        assert_eq!(BASE_SERVER_MOD, server_mods::BASE);
+        let ours: Vec<_> = SERVER_MODS[1..].iter().map(|c| (c.id, c.name)).collect();
+        let theirs: Vec<_> = server_mods::SERVER_MODS
+            .iter()
+            .map(|server_mod| (server_mod.id(), server_mod.name()))
+            .collect();
+        assert_eq!(ours, theirs);
+    }
+}

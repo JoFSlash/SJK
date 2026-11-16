@@ -1,0 +1,427 @@
+//! Lazy, mount-scoped compatibility catalogue for player-profile assets.
+//!
+//! Construction enumerates and reads the mounted VFS and is therefore kept on
+//! an explicit worker. A loader instance belongs to one immutable VFS mount
+//! set, so a completed result is reused until the caller replaces the loader.
+
+use crate::character_catalog::{
+    LegacyCharacter, LegacySpecies, legacy_character_catalog_with_policy,
+};
+use crate::player_profile::SaberColor;
+use crate::saber_definitions::{
+    LegacySaberDefinition, legacy_saber_definitions, legacy_saber_load_order,
+};
+use crate::string_table;
+use sjk_vfs::VirtualFileSystem;
+use std::sync::Arc;
+use std::sync::mpsc::{self, Receiver};
+
+/// The six stable BaseJKA `saber_colors_t` values (`q_shared.h:349-358`).
+pub const LEGACY_SABER_COLORS: [SaberColor; 6] = [
+    SaberColor::Red,
+    SaberColor::Orange,
+    SaberColor::Yellow,
+    SaberColor::Green,
+    SaberColor::Blue,
+    SaberColor::Purple,
+];
+
+/// Fully parsed compatibility catalogue used by player-profile screens.
+#[derive(Clone, Debug, PartialEq)]
+pub struct LegacyAssetCatalog {
+    /// Icon-backed ordinary player model/skin choices, the retail game's first
+    /// ([`Self::retail_characters`] of them), then the community's, each in
+    /// alphabetical order.
+    pub characters: Vec<LegacyCharacter>,
+    /// How many of `characters`, from the first, are the retail game's own.
+    pub retail_characters: usize,
+    /// Multipart customisable species choices, the retail game's first.
+    pub species: Vec<LegacySpecies>,
+    /// How many of `species`, from the first, are the retail game's own.
+    pub retail_species: usize,
+    /// Saber definitions accepted by `UI_SaberValidForPlayerInMP`, in the game's
+    /// load order with the retail game's first.
+    pub saber_hilts: Vec<LegacySaberDefinition>,
+    /// How many of `saber_hilts`, from the first, are the retail game's own.
+    pub retail_saber_hilts: usize,
+    /// Definitions excluded because their raw `notInMP` value is non-zero.
+    pub excluded_saber_hilts: usize,
+    /// The six numeric saber-colour choices sent in `color1` and `color2`.
+    pub saber_colors: [SaberColor; 6],
+}
+
+/// Builds a catalogue synchronously.
+///
+/// UI callers should normally use [`LegacyAssetCatalogLoader`] so VFS reads do
+/// not block the event thread. This entry point exists for workers and tools.
+pub fn legacy_asset_catalog(
+    vfs: &VirtualFileSystem,
+) -> Result<LegacyAssetCatalog, Box<dyn std::error::Error + Send + Sync>> {
+    legacy_asset_catalog_with_model_policy(vfs, "", true)
+}
+
+/// Build a player catalogue with local model restrictions; retail ordering remains intact.
+pub fn legacy_asset_catalog_with_model_policy(
+    vfs: &VirtualFileSystem,
+    blacklist: &str,
+    respect_metadata: bool,
+) -> Result<LegacyAssetCatalog, Box<dyn std::error::Error + Send + Sync>> {
+    let characters = legacy_character_catalog_with_policy(vfs, blacklist, respect_metadata)?;
+    let mut all_sabers =
+        legacy_saber_definitions(vfs).map_err(|error| std::io::Error::other(error.to_string()))?;
+    // `.sab` names are menu string-table references (`@MENUS_SINGLE_HILT1`).
+    let strings = string_table::load_referenced(vfs, &["strings/english/menus.str"]);
+    for definition in all_sabers.values_mut() {
+        let name = string_table::resolve(&strings, &definition.display_name).to_owned();
+        definition.display_name = name;
+    }
+    let excluded_saber_hilts = all_sabers
+        .values()
+        .filter(|definition| definition.not_in_mp)
+        .count();
+    let mut saber_hilts: Vec<LegacySaberDefinition> = all_sabers
+        .into_values()
+        .filter(|definition| !definition.not_in_mp)
+        .collect();
+    // In the order the game loads them, as EternalJK's menus list them; one
+    // the load never met (none should) keeps its alphabetical place after.
+    let order =
+        legacy_saber_load_order(vfs).map_err(|error| std::io::Error::other(error.to_string()))?;
+    let place: std::collections::HashMap<&str, usize> = order
+        .iter()
+        .enumerate()
+        .map(|(index, id)| (id.as_str(), index))
+        .collect();
+    saber_hilts.sort_by_key(|hilt| {
+        place
+            .get(hilt.name.to_ascii_lowercase().as_str())
+            .copied()
+            .unwrap_or(usize::MAX)
+    });
+    // The retail game's own items go first ([`crate::retail_assets`]): what the
+    // retail archives alone catalogue, even where a community archive changes it.
+    let mut characters = characters;
+    let (retail_characters, retail_species, retail_saber_hilts) =
+        match crate::retail_assets::retail_view(vfs) {
+            Some(retail) => {
+                let own = legacy_character_catalog_with_policy(&retail, "", false)?;
+                let own_hilts = legacy_saber_definitions(&retail)
+                    .map_err(|error| std::io::Error::other(error.to_string()))?;
+                let own_characters: std::collections::HashSet<&str> = own
+                    .characters
+                    .iter()
+                    .map(|each| each.cvar_value.as_str())
+                    .collect();
+                let own_species: std::collections::HashSet<&str> =
+                    own.species.iter().map(|each| each.model.as_str()).collect();
+                let characters_first =
+                    crate::retail_assets::retail_first(&mut characters.characters, |character| {
+                        own_characters.contains(character.cvar_value.as_str())
+                    });
+                let species_first =
+                    crate::retail_assets::retail_first(&mut characters.species, |species| {
+                        own_species.contains(species.model.as_str())
+                    });
+                let hilts_first = crate::retail_assets::retail_first(&mut saber_hilts, |hilt| {
+                    own_hilts.contains_key(&hilt.name.to_ascii_lowercase())
+                });
+                (characters_first, species_first, hilts_first)
+            }
+            None => (0, 0, 0),
+        };
+    Ok(LegacyAssetCatalog {
+        characters: characters.characters,
+        retail_characters,
+        species: characters.species,
+        retail_species,
+        saber_hilts,
+        retail_saber_hilts,
+        excluded_saber_hilts,
+        saber_colors: LEGACY_SABER_COLORS,
+    })
+}
+
+/// State of a mount-scoped asynchronous catalogue request.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum LegacyCatalogStatus {
+    /// No request has been made; no worker exists and no VFS read has occurred.
+    Idle,
+    /// The worker is enumerating and parsing the mounted assets.
+    Loading,
+    /// The parsed catalogue is cached and available through `catalog`.
+    Ready,
+    /// The worker failed; the stable diagnostic is available through `error`.
+    Failed,
+}
+
+/// One lazy catalogue cache bound to a single VFS mount set.
+pub struct LegacyAssetCatalogLoader {
+    vfs: Arc<VirtualFileSystem>,
+    receiver: Option<Receiver<Result<LegacyAssetCatalog, String>>>,
+    catalog: Option<Arc<LegacyAssetCatalog>>,
+    error: Option<String>,
+    status: LegacyCatalogStatus,
+    model_blacklist: String,
+    respect_model_metadata: bool,
+    building_model_policy: Option<(String, bool)>,
+}
+
+impl LegacyAssetCatalogLoader {
+    /// Creates an idle loader without enumerating or reading the VFS.
+    pub fn new(vfs: Arc<VirtualFileSystem>) -> Self {
+        Self {
+            vfs,
+            receiver: None,
+            catalog: None,
+            error: None,
+            status: LegacyCatalogStatus::Idle,
+            model_blacklist: String::new(),
+            respect_model_metadata: true,
+            building_model_policy: None,
+        }
+    }
+
+    /// Replace player model options and invalidate a result from the previous options.
+    /// Returns whether callers must rematch their selection against the new catalogue.
+    pub fn set_model_policy(&mut self, blacklist: &str, respect_metadata: bool) -> bool {
+        if self.model_blacklist == blacklist && self.respect_model_metadata == respect_metadata {
+            return false;
+        }
+        self.model_blacklist.clear();
+        self.model_blacklist.push_str(blacklist);
+        self.respect_model_metadata = respect_metadata;
+        self.catalog = None;
+        self.error = None;
+        // Keep one worker in flight. Poll discards an obsolete result and starts
+        // the latest options, rather than spawning one worker per edited key.
+        if self.status != LegacyCatalogStatus::Loading {
+            self.status = LegacyCatalogStatus::Idle;
+        }
+        true
+    }
+
+    /// Starts exactly one background build; ready and loading requests are no-ops.
+    pub fn request(&mut self) {
+        if self.status != LegacyCatalogStatus::Idle {
+            return;
+        }
+        let (sender, receiver) = mpsc::sync_channel(1);
+        let vfs = Arc::clone(&self.vfs);
+        let blacklist = self.model_blacklist.clone();
+        let respect_metadata = self.respect_model_metadata;
+        self.building_model_policy = Some((blacklist.clone(), respect_metadata));
+        std::thread::spawn(move || {
+            let result = legacy_asset_catalog_with_model_policy(&vfs, &blacklist, respect_metadata)
+                .map_err(|error| error.to_string());
+            let _ = sender.send(result);
+        });
+        self.receiver = Some(receiver);
+        self.status = LegacyCatalogStatus::Loading;
+    }
+
+    /// Polls the worker without blocking and caches a completed result.
+    pub fn poll(&mut self) -> LegacyCatalogStatus {
+        if self.status != LegacyCatalogStatus::Loading {
+            return self.status;
+        }
+        let Some(receiver) = self.receiver.as_ref() else {
+            return self.status;
+        };
+        let result = receiver.try_recv();
+        if !matches!(result, Err(mpsc::TryRecvError::Empty))
+            && self
+                .building_model_policy
+                .as_ref()
+                .is_some_and(|(blacklist, respect)| {
+                    *blacklist != self.model_blacklist || *respect != self.respect_model_metadata
+                })
+        {
+            self.receiver = None;
+            self.building_model_policy = None;
+            self.status = LegacyCatalogStatus::Idle;
+            self.request();
+            return self.status;
+        }
+        match result {
+            Ok(Ok(catalog)) => {
+                self.catalog = Some(Arc::new(catalog));
+                self.receiver = None;
+                self.status = LegacyCatalogStatus::Ready;
+            }
+            Ok(Err(error)) => {
+                self.error = Some(error);
+                self.receiver = None;
+                self.status = LegacyCatalogStatus::Failed;
+            }
+            Err(mpsc::TryRecvError::Disconnected) => {
+                self.error = Some("catalogue worker disconnected".to_owned());
+                self.receiver = None;
+                self.status = LegacyCatalogStatus::Failed;
+            }
+            Err(mpsc::TryRecvError::Empty) => {}
+        }
+        self.status
+    }
+
+    /// Returns the current state without polling or allocating.
+    pub fn status(&self) -> LegacyCatalogStatus {
+        self.status
+    }
+
+    /// Returns the cached catalogue after the loader reaches `Ready`.
+    pub fn catalog(&self) -> Option<&Arc<LegacyAssetCatalog>> {
+        self.catalog.as_ref()
+    }
+
+    /// Returns the stable worker diagnostic after the loader reaches `Failed`.
+    pub fn error(&self) -> Option<&str> {
+        self.error.as_deref()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn model_restrictions_cover_rigs_species_and_retail_order_with_overrides() {
+        fn ordinary(name: &str) -> Vec<(String, Vec<u8>)> {
+            ["model.glm", "model_default.skin", "icon_default.jpg"]
+                .map(|file| (format!("models/players/{name}/{file}"), Vec::new()))
+                .to_vec()
+        }
+        let mut vfs = VirtualFileSystem::new();
+        let mut retail = ordinary("zretail");
+        retail.push((
+            "models/players/zretail/settings.txt".into(),
+            b"notInMP 1".to_vec(),
+        ));
+        vfs.mount_memory("fixture/base/assets1.pk3", retail)
+            .unwrap();
+        let mut community = ordinary("community");
+        community.extend([
+            ("models/players/rig/sjk_rig.cfg".into(), Vec::new()),
+            ("models/players/rig/icon_default.png".into(), Vec::new()),
+            ("ext_data/modelblacklist/rig.txt".into(), b"rig".to_vec()),
+            ("models/players/species/model.glm".into(), Vec::new()),
+            ("models/players/species/playerchoice.txt".into(), Vec::new()),
+            (
+                "models/players/species/settings.txt".into(),
+                b"notInMP +1suffix".to_vec(),
+            ),
+        ]);
+        for part in ["head", "torso", "lower"] {
+            for file in [format!("{part}_one.skin"), format!("icon_{part}_one.jpg")] {
+                community.push((format!("models/players/species/{file}"), Vec::new()));
+            }
+        }
+        vfs.mount_memory("community", community).unwrap();
+        let default = legacy_asset_catalog(&vfs).unwrap();
+        assert_eq!(
+            default
+                .characters
+                .iter()
+                .map(|c| c.model.as_str())
+                .collect::<Vec<_>>(),
+            ["community"]
+        );
+        assert!(default.species.is_empty());
+        let overridden = legacy_asset_catalog_with_model_policy(&vfs, "", false).unwrap();
+        assert_eq!(overridden.retail_characters, 1);
+        assert_eq!(
+            overridden
+                .characters
+                .iter()
+                .map(|c| c.model.as_str())
+                .collect::<Vec<_>>(),
+            ["zretail", "community", "rig"]
+        );
+        assert!(overridden.characters[2].rig);
+        assert_eq!(overridden.species[0].model, "species");
+        let local =
+            legacy_asset_catalog_with_model_policy(&vfs, "rig/default,species", false).unwrap();
+        assert_eq!(local.retail_characters, 1);
+        assert_eq!(local.characters.len(), 2);
+        assert!(local.species.is_empty());
+        // A ready result must not survive a changed local restriction policy.
+        let mut loader = LegacyAssetCatalogLoader::new(Arc::new(vfs));
+        loader.catalog = Some(Arc::new(default));
+        loader.status = LegacyCatalogStatus::Ready;
+        assert!(loader.set_model_policy("rig", false));
+        assert_eq!(loader.status(), LegacyCatalogStatus::Idle);
+        assert!(loader.catalog().is_none());
+        assert!(!loader.set_model_policy("rig", false));
+        let (sender, receiver) = mpsc::sync_channel(1);
+        loader.receiver = Some(receiver);
+        loader.status = LegacyCatalogStatus::Loading;
+        loader.building_model_policy = Some(("rig".into(), false));
+        assert!(loader.set_model_policy("community", true));
+        assert!(loader.set_model_policy("species", false));
+        assert_eq!(loader.status(), LegacyCatalogStatus::Loading);
+        // Editing must retain the outstanding receiver and its single worker.
+        sender.send(Ok(overridden)).unwrap();
+        assert_eq!(loader.poll(), LegacyCatalogStatus::Loading);
+        assert!(
+            loader.catalog().is_none(),
+            "the obsolete catalogue must never become visible"
+        );
+        assert_eq!(
+            loader.building_model_policy,
+            Some(("species".into(), false))
+        );
+    }
+
+    /// Against the installed game (`JKA_GAME_DATA`): the retail items come first,
+    /// then the community's, and a hilt of each kind sits on its side of the line.
+    #[test]
+    #[ignore = "reads the installed game data named by JKA_GAME_DATA"]
+    fn retail_items_lead_the_catalogue() {
+        let Ok(data) = std::env::var("JKA_GAME_DATA") else {
+            return;
+        };
+        let mut vfs = VirtualFileSystem::new();
+        vfs.mount_pk3_directory(std::path::Path::new(&data).join("base"))
+            .unwrap();
+        let catalog = legacy_asset_catalog(&vfs).unwrap();
+        println!(
+            "characters {} (retail {}), species {} (retail {}), hilts {} (retail {})",
+            catalog.characters.len(),
+            catalog.retail_characters,
+            catalog.species.len(),
+            catalog.retail_species,
+            catalog.saber_hilts.len(),
+            catalog.retail_saber_hilts
+        );
+        let names = |count: usize| {
+            catalog.characters[..count.min(6)]
+                .iter()
+                .map(|each| each.cvar_value.clone())
+                .collect::<Vec<_>>()
+        };
+        println!("first {:?}", names(catalog.retail_characters));
+        println!(
+            "first community {:?}",
+            catalog.characters[catalog.retail_characters..]
+                .iter()
+                .take(4)
+                .map(|each| each.cvar_value.clone())
+                .collect::<Vec<_>>()
+        );
+        println!(
+            "hilts {:?} / {:?}",
+            catalog
+                .saber_hilts
+                .iter()
+                .take(4)
+                .map(|hilt| hilt.name.clone())
+                .collect::<Vec<_>>(),
+            catalog.saber_hilts[catalog.retail_saber_hilts..]
+                .iter()
+                .take(4)
+                .map(|hilt| hilt.name.clone())
+                .collect::<Vec<_>>()
+        );
+        assert!(catalog.retail_characters > 0);
+        assert!(catalog.retail_characters < catalog.characters.len());
+    }
+}

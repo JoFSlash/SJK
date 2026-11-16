@@ -1,0 +1,40 @@
+Particle
+{
+	name				Confetti
+
+	count				110 140
+
+	life				2200 3200
+
+	origin				0 -8 -8 30 8 8
+
+	rotation			0 360
+
+	rotationDelta		-30 30
+
+	velocity			200 -260 -260 520 260 260
+
+	gravity				-420 -520
+
+	alpha
+	{
+		end				0
+		parm			70
+		flags			nonlinear
+	}
+
+	size
+	{
+		start			1.1 1.7
+	}
+
+	shaders
+	[
+		gfx/sjk/order66/confetti_red
+		gfx/sjk/order66/confetti_yellow
+		gfx/sjk/order66/confetti_green
+		gfx/sjk/order66/confetti_cyan
+		gfx/sjk/order66/confetti_blue
+		gfx/sjk/order66/confetti_pink
+	]
+}

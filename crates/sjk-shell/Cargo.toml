@@ -1,0 +1,19 @@
+[package]
+name = "sjk-shell"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+# Local wall-clock time for console timestamps and clocks: the OS time zone rules
+# (Windows API on Windows, the tz database on Unix), with daylight saving.
+chrono = { version = "0.4.45", default-features = false, features = ["clock"] }
+
+[dev-dependencies]
+# Counts allocator calls in `assert_no_alloc` blocks: cvar reads made every frame
+# allocate nothing (`cvar.rs`).
+assert_no_alloc = { version = "1.1.2", features = ["warn_debug"] }

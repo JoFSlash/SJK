@@ -1,0 +1,43 @@
+// Hyperlane: a hyperspace lane folded into a blade. Rings of light rush down round it in a deep
+// blue tunnel, starlines stream along it, lane beacons blink down both sides of it in a chase and
+// bands race down the blade (round 15: the beacons replaced lanes it shared with the Aurodium). A
+// swing brightens the tunnel; a clash a white ring.
+// @part Tunnel rings
+// @part Starlines
+// @part Lane beacons
+// @room 8
+// @palette {"corona.rim_cool":[0.1,0.2,0.6],"corona.rim_hot":[0.45,0.65,1.0],"corona.inner":[0.85,0.92,1.0],"core.white":[1,1,1],"core.fringe_cool":[0.35,0.55,1.0],"core.fringe_hot":[0.8,0.9,1.0],"light.color":[0.4,0.6,1.0],"trail":[0.4,0.6,1.0]}
+
+vec3 sig_glow(vec3 g, vec2 b, float r, float px){
+  return g*(0.85 + 0.35*bands(b.y, 0.1, -2.0));
+}
+vec3 sig_core(vec3 c, vec2 b, float px){ return c; }
+// the effects round the blade, in three dimensions
+vec3 sig_vol(vec3 ro, vec3 rd, float px){
+  float L = uLength, t = uTime, sw = clamp(uSwing, 0.0, 1.0), cl = clamp(uClash, 0.0, 1.0);
+  float y0 = L*0.2, y1 = L*0.97;
+  vec3 fx = vec3(0.0);
+  vec3 blue = vec3(0.45, 0.65, 1.0);
+  for (int i = 0; i < 5; i++){
+    float q = fract(-t*0.35 + float(i)/5.0);
+    float d = ringD(ro, rd, mix(y0, y1, q), 1.2 + 1.5*q);
+    fx += (vec3(1.0)*halo(d, max(0.04, px))*0.8 + blue*halo(d, 0.3)*0.4)*sin(3.1416*q)*(0.8 + 0.4*sw)*part(0.0);
+  }
+  fx += fxFall(ro, rd, px, y0, y1, 2.0, 12.0, -20.0, 1.5, 0.0, 4.4, vec3(0.8, 0.9, 1.0))*part(1.0);
+  // lane beacons: two columns of lights marking the lane, a chase running down them
+  float ta;
+  if (fxNear(ro, rd, y0, y1) < 4.5){
+    for (int i = 0; i < 20; i++){
+      float fi = float(i);
+      float row = floor(fi/2.0);
+      float side = mod(fi, 2.0) < 0.5 ? -1.0 : 1.0;
+      float y = mix(y1, y0, row/9.0);
+      float chase = pow(0.5 + 0.5*cos(6.2832*(row/10.0 - t*0.9)), 12.0);
+      // round 19: the lane's lights wind round the blade, in three dimensions
+      vec3 p = turnY(vec3(side*2.3, y, 0.0), row*0.045);
+      float d = rayPt(ro, rd, p, ta);
+      fx += (vec3(1.0)*halo(d, max(0.08, px))*(0.5 + 2.4*chase) + blue*halo(d, 0.45)*(0.3 + 1.3*chase))*part(2.0);
+    }
+  }
+  return fx*uFx;
+}

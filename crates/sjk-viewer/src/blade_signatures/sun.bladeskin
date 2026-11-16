@@ -1,0 +1,249 @@
+{
+  "version": 1,
+  "glow_profile": {
+    "width": 0.46,
+    "peak": 0.48,
+    "tail_width": 0.8,
+    "tail_peak": 0.1
+  },
+  "core_profile": {
+    "width": 0.36,
+    "fringe_width": 0.75
+  },
+  "core": {
+    "white": [
+      1.0,
+      0.97,
+      0.86
+    ],
+    "white_flare": 0.4,
+    "fringe_cool": [
+      1.0,
+      0.42,
+      0.05
+    ],
+    "fringe_hot": [
+      1.0,
+      0.72,
+      0.24
+    ],
+    "fringe_heat": {
+      "base": 0.35,
+      "grain": 0.65
+    },
+    "fringe_brightness": {
+      "base": 0.7,
+      "grain": 0.6,
+      "flare": 1.0
+    },
+    "breathe": {
+      "amount": 0.06,
+      "rate": 11.0,
+      "along": 0.9,
+      "seed": 6.283
+    }
+  },
+  "corona": {
+    "rim_cool": [
+      1.0,
+      0.2,
+      0.02
+    ],
+    "rim_hot": [
+      1.0,
+      0.42,
+      0.05
+    ],
+    "inner": [
+      1.0,
+      0.72,
+      0.24
+    ],
+    "inner_width": 0.8,
+    "rim_heat": {
+      "grain": 1.2,
+      "flare": 0.6
+    },
+    "inner_mix": {
+      "base": 0.55,
+      "grain": 0.45,
+      "flare": 0.25
+    },
+    "brightness": {
+      "base": 0.5,
+      "grain": 0.7,
+      "flare": 1.6
+    },
+    "reach": 1.6,
+    "swell": {
+      "grain": 0.14,
+      "flare": 0.4
+    }
+  },
+  "granulation": {
+    "octaves": [
+      {
+        "scale": 0.32,
+        "speed": 2.1,
+        "evolve": 0.45,
+        "offset": 61.0,
+        "weight": 0.62
+      },
+      {
+        "scale": 0.85,
+        "speed": 3.6,
+        "evolve": 0.9,
+        "offset": 113.0,
+        "weight": 0.38
+      }
+    ],
+    "low": 0.15,
+    "high": 0.85
+  },
+  "flares": {
+    "count": 4,
+    "rate": 0.38,
+    "rate_step": 0.11,
+    "rate_seed": 0.08,
+    "phase_seed": 7.3,
+    "phase_step": 0.37,
+    "threshold": 0.42,
+    "overshoot": 5.0,
+    "size": 3.0,
+    "size_jitter": 1.4
+  },
+  "shimmer": [
+    {
+      "amount": 0.045,
+      "rate": 9.0,
+      "along": 0.7,
+      "seed": 6.283
+    },
+    {
+      "amount": 0.03,
+      "rate": 15.7,
+      "along": -1.3,
+      "seed": 0.0
+    }
+  ],
+  "tongues": {
+    "along": 0.45,
+    "offset": 17.0,
+    "out": 2.6,
+    "speed": 3.8,
+    "edge_low": 0.25,
+    "edge_high": 0.9,
+    "low": 0.3,
+    "range": 1.8
+  },
+  "arcs": {
+    "count": 4,
+    "color": [
+      1.0,
+      0.5,
+      0.1
+    ],
+    "brightness": 1.5,
+    "width": 0.32,
+    "halo": 1.3,
+    "reach": 1.25,
+    "jag": 0.05,
+    "kinks": 0.12,
+    "span": {
+      "low": 0.12,
+      "high": 0.28
+    },
+    "rate": 0.55,
+    "jitter": 0.0,
+    "threshold": 0.15,
+    "tip": 0.15,
+    "crawl": 1.5,
+    "decay": 0.7
+  },
+  "motes": {
+    "color": [
+      1.0,
+      0.82,
+      0.42
+    ],
+    "brightness": 1.5,
+    "density": 0.12,
+    "cells": 0.5,
+    "rings": 2.0,
+    "size": 0.1,
+    "stretch": 2.5,
+    "drift": {
+      "along": 3.0,
+      "out": 0.8
+    },
+    "twinkle": 3.0,
+    "inner": 0.7,
+    "outer": 1.5,
+    "focus": 0.0
+  },
+  "trail": [
+    1.0,
+    0.6,
+    0.12
+  ],
+  "light": {
+    "color": [
+      1.5,
+      0.85,
+      0.3
+    ],
+    "flicker": {
+      "amount": 0.14,
+      "waves": [
+        {
+          "rate": 1.25,
+          "weight": 0.75,
+          "phase": 1.0
+        },
+        {
+          "rate": 7.3,
+          "weight": 0.25,
+          "phase": 2.3
+        }
+      ]
+    }
+  },
+  "sounds": {
+    "on": "sound/sjk/sabers/sun/on.wav",
+    "off": "sound/sjk/sabers/sun/off.wav",
+    "hum": "sound/sjk/sabers/sun/hum.wav",
+    "swings": [
+      "sound/sjk/sabers/sun/swing1.wav",
+      "sound/sjk/sabers/sun/swing2.wav",
+      "sound/sjk/sabers/sun/swing3.wav"
+    ]
+  },
+  "star": {
+    "color": [
+      1.0,
+      0.9,
+      0.66
+    ],
+    "brightness": 1.6,
+    "rays": 4,
+    "length": 6.5,
+    "width": 0.06,
+    "spin": 0.05,
+    "twinkle": 1.3,
+    "depth": 0.35,
+    "halo": 0.8
+  },
+  "orbit": {
+    "at": 9.0,
+    "count": 2,
+    "radius": 4.5,
+    "rate": 0.45,
+    "tilt": 0.35
+  },
+  "haze": {
+    "strength": 0.3,
+    "scale": 0.45,
+    "speed": 9.0,
+    "reach": 3.0
+  }
+}

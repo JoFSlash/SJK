@@ -1,0 +1,127 @@
+[package]
+name = "sjk-viewer"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[[bin]]
+name = "sjk"
+path = "src/main.rs"
+
+[dependencies]
+# Jedi Academy in Steam libraries and GOG, for a client kept outside GameData; shared
+# with the SJK Launcher.
+sjk-game-stores.workspace = true
+# The graphics card's video memory, for the small-card settings (`video_memory.rs`);
+# read on Windows only (the crate answers None elsewhere).
+sjk-gpu-memory.workspace = true
+sjk-pipeline-cache.workspace = true
+bytemuck = { version = "1.25.0", features = ["derive"] }
+glam = "0.33.0"
+image = { version = "0.25.9", default-features = false, features = ["gif", "jpeg", "png", "tga", "webp"] }
+half = "2.7.1"
+# Block compression of map and model textures (`r_textureCompression`,
+# `texture_compression.rs`): its CPU encoders only, pure Rust (Intel's ISPC kernels ported).
+block_compression = { version = "0.10.1", default-features = false, features = ["bc15", "bc7"] }
+fontdue = "0.9.3"
+# Glyphs beyond the code-page atlases, outlined on demand (`text/wide.rs`).
+ab_glyph = { version = "0.2.32", default-features = false, features = ["std"] }
+getrandom = { version = "0.3.4", features = ["std"] }
+sjk-acoustics.workspace = true
+sjk-bsp.workspace = true
+sjk-audio.workspace = true
+sjk-client.workspace = true
+sjk-game-jka.workspace = true
+sjk-entity.workspace = true
+sjk-effect.workspace = true
+sjk-identity.workspace = true
+sjk-model.workspace = true
+sjk-mod.workspace = true
+# The client mods (docs/mods.md): built in by default, each can be left out.
+sjk-mod-japlus = { workspace = true, optional = true }
+sjk-mod-japro = { workspace = true, optional = true }
+sjk-mod-jof = { workspace = true, optional = true }
+sjk-jof-content = { workspace = true, optional = true }
+sjk-model-sync = { workspace = true, optional = true, features = ["client"] }
+sjk-network.workspace = true
+sjk-protocol.workspace = true
+sjk-runtime.workspace = true
+sjk-scene.workspace = true
+sjk-shader.workspace = true
+sjk-shell.workspace = true
+sjk-ui.workspace = true
+sjk-vfs.workspace = true
+md-5.workspace = true
+md4.workspace = true
+pollster = "1.0.0"
+rodio = { version = "0.20.1", default-features = false, features = ["minimp3", "wav"] }
+ringbuf = "0.4.8"
+# The picture panel's Browse...: the system's file dialog. On Linux the desktop portal,
+# reached through libdbus loaded at run time, so the build needs no GTK.
+rfd = { version = "=0.17.2", default-features = false, features = ["xdg-portal"] }
+serde.workspace = true
+serde_json.workspace = true
+tempfile = "3.27.0"
+zip.workspace = true
+wgpu = { version = "30.0.1", default-features = false, features = ["dx12", "gles", "metal", "std", "vulkan", "wgsl"] }
+winit = { version = "0.30.13", default-features = false, features = ["rwh_06", "wayland", "wayland-dlopen", "x11"] }
+ureq = { version = "3", default-features = false, features = ["rustls", "gzip"] }
+sha2 = "0.11.0"
+# Trusted chat media: exact URL hosts, lock-free policy snapshots and bounded HTML
+# discovery. Silent MP4 clips use the system's Media Foundation on Windows (below).
+url = "2"
+arc-swap = "1"
+scraper = { version = "0.24", default-features = false }
+# Guessing the language of a chat line, offline, before it is offered for translation
+# (`chat/translate.rs`). MIT.
+whatlang = { version = "0.18.0", default-features = false }
+
+[dev-dependencies]
+# Counts allocator calls in `assert_no_alloc` blocks: per-frame bookkeeping allocates
+# nothing (`blade_pictures.rs`, `graphics_quality.rs`).
+assert_no_alloc = { version = "1.1.2", features = ["warn_debug"] }
+# Create game's server mods are checked against the server's own table
+# (`local_server.rs`).
+sjk-dedicated = { path = "../sjk-dedicated" }
+
+[features]
+default = ["mod-japlus", "mod-japro", "mod-jof"]
+mod-japlus = ["dep:sjk-mod-japlus"]
+mod-japro = ["dep:sjk-mod-japro"]
+mod-jof = ["dep:sjk-mod-jof", "dep:sjk-jof-content", "dep:sjk-model-sync"]
+
+[target.'cfg(unix)'.dependencies]
+# Raise the process file-descriptor headroom before mounting PK3 archives. This safe
+# wrapper also respects macOS's hidden kern.maxfilesperproc ceiling.
+rlimit = "0.11.0"
+
+[target.'cfg(windows)'.dependencies]
+# Ctrl+V and copies read and set the clipboard directly: starting PowerShell for them
+# took about a quarter of a second, a hitch in the middle of play.
+clipboard-win = "5.4.0"
+# Chat MP4 clips (`chat_gifs/video.rs`): Windows Media Foundation, its DLLs loaded at
+# run time so Windows N editions still start.
+sjk-mediafoundation.workspace = true
+
+[target.'cfg(windows)'.dev-dependencies]
+sjk-mediafoundation = { workspace = true, features = ["test-encoder"] }
+
+[target.'cfg(target_os = "linux")'.dependencies]
+# Ctrl+V and copies talk to the X11 or Wayland clipboard in process: they used to need
+# xclip or wl-clipboard installed, and without them pasting did nothing on Linux.
+arboard = { version = "3.6.1", default-features = false, features = ["wayland-data-control"] }
+
+[target.'cfg(target_os = "macos")'.dev-dependencies]
+# Shader tests translate to SPIR-V and HLSL through `wgpu::naga`; the Vulkan and DX12
+# backends turn those writers on elsewhere, Metal does not.
+naga = { version = "30.0.1", features = ["spv-out", "hlsl-out"] }
+
+[build-dependencies]
+# Windows icon and version resource; the build script uses it only for Windows targets.
+winresource = { version = "0.1.31", default-features = false }
+# The fast-card hints for laptops with two graphics cards (`src/gpu_hints.c`), Windows only.
+cc = "1.4.4"
+
+[lints]
+workspace = true

@@ -1,0 +1,1106 @@
+// Weather: rain streaks, sprite clouds (snow, dust, mist) and splashes, drawn into the
+// display-space effect layer after the effects, as rd-vanilla draws its world effects
+// last. Every particle is derived from its instance index and the flow the CPU
+// integrates: no vertex or instance buffer exists.
+//
+// Instance numbers: bits 16.. are the cloud slot (0-4) or 7 for splashes, bit 15 is the
+// far rain layer, bits 0-14 the particle.
+struct Camera {
+    view_projection: mat4x4<f32>,
+    position: vec3<f32>,
+    shader_time: f32,
+    forward: vec3<f32>,
+    view_flags: f32,
+};
+
+struct Cloud {
+    // rgb display colour, a the reference's alpha target.
+    color: vec4<f32>,
+    // x half width, y streak length or sprite half height, z image layer, w spin.
+    shape: vec4<f32>,
+    // xyz box corner relative to the camera, w near-layer count.
+    box_min: vec4<f32>,
+    // xyz box size, w far-layer count.
+    box_size: vec4<f32>,
+    // x far layer's horizontal scale, y far layer's opacity, zw unused.
+    layers: vec4<f32>,
+    // Per mass bucket: xyz velocity.
+    velocity: array<vec4<f32>, 8>,
+    // Per mass bucket: xyz flow offset, wrapped to the far box (x, y) and the box (z).
+    offset: array<vec4<f32>, 8>,
+};
+
+struct Weather {
+    // First cell x, y of the cover window, and one past its last.
+    window: vec4<f32>,
+    // x cell size, y cover texture size, z cover in use, w weather time (seconds).
+    cover: vec4<f32>,
+    // xy viewport pixels, z global fog's 1 / depthForOpaque (0 none), w splash count.
+    view: vec4<f32>,
+    // rgb light tint, w the cloud whose rain splashes.
+    light: vec4<f32>,
+    // The main view's clip-to-world transform, for the fog pass.
+    inverse_view_projection: mat4x4<f32>,
+    // x rain haze per unit, y ground fog per unit at the floor, z the height it thins
+    // over, w samples along each ray (0: no fog pass).
+    haze: vec4<f32>,
+    // rgb fog colour (display), w 1 once the noise volume is made.
+    fog_color: vec4<f32>,
+    // xyz the fog's drift with the wind, w the longest ray marched.
+    fog_flow: vec4<f32>,
+    // xy the far cover's first corner, z its column width, w 1 once it is surveyed.
+    far: vec4<f32>,
+    // x how wet the rain makes what it falls on (0 dry), y what it does there
+    // (`r_weatherQuality`'s: 1 wet, 2 running water, 3 puddles), z running water's scroll
+    // down the walls (wrapped to STREAK_LENGTH), w its pattern's change (wrapped to 1).
+    wet: vec4<f32>,
+    // rgb the overcast sky a wet surface mirrors, in the scene's light units.
+    wet_sky: vec4<f32>,
+    // xyz the direction the rain falls (unit), w a lightning flash (0..1).
+    rain: vec4<f32>,
+    // xyz towards the sun (unit), w how much the fog and the rain glow towards it (0 none).
+    sun: vec4<f32>,
+    // x what wet surfaces mirror (0 the sky's colour, 1 the world in puddles, 2 in every wet
+    // surface), y the puddles' amount (1 as designed), z settled snow (0..1), w the rain
+    // streaks' opacity (1 as designed).
+    looks: vec4<f32>,
+    // x the spray over the ground a downpour beats on (per unit at the floor), y how
+    // strongly the rain comes in waves, zw the two waves' phases.
+    tune: vec4<f32>,
+    // rgb the light settled snow gives back, in the scene's light units.
+    snow: vec4<f32>,
+    clouds: array<Cloud, 5>,
+};
+
+@group(0) @binding(0) var<uniform> camera: Camera;
+@group(1) @binding(0) var<uniform> weather: Weather;
+@group(1) @binding(1) var cover_map: texture_2d<f32>;
+@group(1) @binding(2) var images: texture_2d_array<f32>;
+@group(1) @binding(3) var image_sampler: sampler;
+@group(1) @binding(4) var noise: texture_3d<f32>;
+@group(1) @binding(5) var noise_sampler: sampler;
+@group(1) @binding(6) var far_cover: texture_2d<f32>;
+@group(2) @binding(0) var scene_depth: texture_depth_2d;
+// A pass's own image (group 3): for the puddles' mirror (`weather_mirror.rs`, ultra) the
+// scene in its copy pass and that copy at half size in the wet pass (one black texel
+// while there is none); for the fog's blend its half-size march (`fragment_volume_half`).
+@group(3) @binding(0) var pass_image: texture_2d<f32>;
+@group(3) @binding(1) var pass_sampler: sampler;
+
+// Additive (GL_ONE GL_ONE) or alpha-blended sprites.
+override additive: bool = true;
+
+const SPLASH: u32 = 1u;
+const LIQUID: u32 = 2u;
+const VOID: u32 = 4u;
+const HIDDEN: vec4<f32> = vec4(2.0, 2.0, 2.0, 1.0);
+const TAU: f32 = 6.2831853;
+
+// PCG hash (Jarzynski and Olano, 2020).
+fn pcg(value: u32) -> u32 {
+    let state = value * 747796405u + 2891336453u;
+    let word = ((state >> ((state >> 28u) + 4u)) ^ state) * 277803737u;
+    return (word >> 22u) ^ word;
+}
+
+fn hash3(value: u32) -> vec3<f32> {
+    let a = pcg(value);
+    let b = pcg(a);
+    let c = pcg(b);
+    return vec3(f32(a), f32(b), f32(c)) * (1.0 / 4294967296.0);
+}
+
+// Two triangles: corners (-,-) (+,-) (+,+) and (-,-) (+,+) (-,+).
+fn corner(vertex: u32) -> vec2<f32> {
+    let x = f32((0x16u >> vertex) & 1u);
+    let y = f32((0x34u >> vertex) & 1u);
+    return vec2(x, y) * 2.0 - 1.0;
+}
+
+// The weather span of the column under `p`: x bottom, y top, z flags. Columns outside
+// the surveyed window hold no weather and read as void; without a cover everything is
+// open.
+fn cover_at(p: vec2<f32>) -> vec3<f32> {
+    if weather.cover.z == 0.0 { return vec3(-3.0e38, 3.0e38, 0.0); }
+    let cell = floor(p / weather.cover.x);
+    if any(cell < weather.window.xy) || any(cell >= weather.window.zw) {
+        return vec3(3.0e38, -3.0e38, f32(VOID));
+    }
+    let size = i32(weather.cover.y);
+    let texel = ((vec2<i32>(cell) % size) + size) % size;
+    return textureLoad(cover_map, texel, 0).xyz;
+}
+
+fn open_at(p: vec3<f32>) -> bool {
+    let span = cover_at(p.xy);
+    return p.z >= span.x && p.z <= span.y;
+}
+
+// The global fog between the eye and `p`, as the world's GL_EXP2 fog: 1 clear, 0 lost.
+fn fog_clear(p: vec3<f32>) -> f32 {
+    let ratio = dot(p - camera.position, normalize(camera.forward)) * weather.view.z;
+    return exp(-5.541263545 * ratio * ratio);
+}
+
+fn wrap(value: vec3<f32>, size: vec3<f32>) -> vec3<f32> {
+    return value - size * floor(value / size);
+}
+
+fn wrap2(value: vec2<f32>, size: vec2<f32>) -> vec2<f32> {
+    return value - size * floor(value / size);
+}
+
+struct Particle {
+    position: vec3<f32>,
+    velocity: vec3<f32>,
+    seed: vec3<f32>,
+    // Distance and box-edge fades, not yet the cover.
+    fade: f32,
+};
+
+// Where particle `index` of `cloud` is now: anchored in the world, carried by its mass
+// bucket's flow, wrapped into the box around the camera.
+fn particle(cloud: Cloud, slot: u32, index: u32, far: bool) -> Particle {
+    var result: Particle;
+    let salt = slot * 0x85EBCA77u + select(0u, 0xC2B2AE3Du, far);
+    result.seed = hash3(index * 0x9E3779B1u + salt);
+    let bucket = pcg(index ^ salt ^ 0x27D4EB2Fu) & 7u;
+    let scale = select(vec3(1.0), vec3(cloud.layers.x, cloud.layers.x, 1.0), far);
+    let size = cloud.box_size.xyz * scale;
+    let low = cloud.box_min.xyz * scale;
+    let anchor = result.seed * size + cloud.offset[bucket].xyz;
+    let local = low + wrap(anchor - (camera.position + low), size);
+    result.position = camera.position + local;
+    result.velocity = cloud.velocity[bucket].xyz;
+    let edge = abs(local - (low + 0.5 * size)) / (0.5 * size);
+    let distance = length(local);
+    var fade = 1.0 - smoothstep(0.8, 1.0, max(max(edge.x, edge.y), edge.z));
+    fade *= smoothstep(16.0, 64.0, distance);
+    if far {
+        // The far layer starts where the near one thins out.
+        let near = 0.5 * min(cloud.box_size.x, cloud.box_size.y);
+        fade *= smoothstep(0.6 * near, near, length(local.xy)) * cloud.layers.y;
+    }
+    result.fade = fade * fog_clear(result.position);
+    return result;
+}
+
+// Rain comes in waves with the wind: two trains of denser and thinner rain cross the
+// ground (1100 and 430 units long, along axes a quarter turn apart), each carried by the
+// phase the CPU advances with the wind, so the pattern travels with it. 1 on average.
+fn rain_waves(p: vec2<f32>) -> f32 {
+    let long = sin(dot(p, vec2(0.8, 0.6)) * (TAU / 1100.0) - weather.tune.z);
+    let short = sin(dot(p, vec2(-0.6, 0.8)) * (TAU / 430.0) - weather.tune.w);
+    return max(1.0 + weather.tune.y * (0.6 * long + 0.4 * short), 0.0);
+}
+
+struct StreakOutput {
+    @builtin(position) position: vec4<f32>,
+    @location(0) world: vec3<f32>,
+    // x across the streak (-1..1), y along it (0 head, 1 tail).
+    @location(1) uv: vec2<f32>,
+    @location(2) color: vec3<f32>,
+    @location(3) opacity: f32,
+};
+
+@vertex fn vertex_streak(@builtin(vertex_index) vertex: u32,
+    @builtin(instance_index) instance: u32) -> StreakOutput {
+    var output: StreakOutput;
+    output.position = HIDDEN;
+    let slot = instance >> 16u;
+    let far = ((instance >> 15u) & 1u) != 0u;
+    let cloud = weather.clouds[slot];
+    let p = particle(cloud, slot, instance & 0x7FFFu, far);
+    if p.fade <= 0.002 { return output; }
+    let speed = length(p.velocity);
+    let direction = select(vec3(0.0, 0.0, -1.0), p.velocity / max(speed, 0.001), speed > 1.0);
+    let length_ = cloud.shape.y * (0.8 + 0.4 * p.seed.z);
+    let head = p.position;
+    let tail = head - direction * length_;
+    // Wholly under a roof or the ground, or above the sky: skip the quad.
+    let head_span = cover_at(head.xy);
+    let tail_span = cover_at(tail.xy);
+    if (head.z < head_span.x && tail.z < tail_span.x) || (head.z > head_span.y && tail.z > tail_span.y) {
+        return output;
+    }
+    let c = corner(vertex);
+    let along = c.y * 0.5 + 0.5;
+    let centre = mix(head, tail, along);
+    var side = cross(direction, camera.position - centre);
+    if dot(side, side) < 1e-6 { side = cross(direction, vec3(0.0, 0.0, 1.0)); }
+    side = normalize(side);
+    // Keep a streak at least about a pixel wide; a thinner one gets fainter instead
+    // of flickering in and out.
+    let a = camera.view_projection * vec4(centre, 1.0);
+    let b = camera.view_projection * vec4(centre + side, 1.0);
+    if a.w <= 1.0 || b.w <= 1.0 { return output; }
+    let pixels = length((b.xy / b.w - a.xy / a.w) * weather.view.xy * 0.5);
+    let half_width = max(cloud.shape.x, 0.6 / max(pixels, 0.0001));
+    let world = centre + side * c.x * half_width;
+    output.position = camera.view_projection * vec4(world, 1.0);
+    output.world = world;
+    output.uv = vec2(c.x, along);
+    // Drops vary: some catch more light than others. x is the streak's opacity, so a
+    // thinner or farther streak is fainter rather than whiter; yzw the cloud's colour.
+    let catch_light = 0.55 + 0.45 * fract(p.seed.x * 7.31 + p.seed.y * 3.17);
+    // Drops between the eye and the sun light up: it shines through them.
+    let towards = max(dot(normalize(centre - camera.position), weather.sun.xyz), 0.0);
+    let backlit = 1.0 + 1.6 * weather.sun.w * pow(towards, 8.0);
+    output.opacity = catch_light * cloud.color.a * p.fade * (cloud.shape.x / half_width) * backlit
+        * rain_waves(p.position.xy) * weather.looks.w;
+    output.color = cloud.color.rgb;
+    return output;
+}
+
+// A falling drop shows a blurred, tinted image of the bright sky around it more than a
+// white line: rain is drawn over the scene as a faint streak of the light where the camera
+// is, cooled toward the overcast blue-grey, brightest along its core.
+const RAIN_TINT: vec3<f32> = vec3(0.80, 0.85, 0.92);
+const RAIN_OPACITY: f32 = 0.42;
+
+@fragment fn fragment_streak(input: StreakOutput) -> @location(0) vec4<f32> {
+    if !open_at(input.world) { discard; }
+    // Soft across, brightest just behind the head, fading along the tail.
+    let across = 1.0 - input.uv.x * input.uv.x;
+    let along = smoothstep(0.0, 0.08, input.uv.y) * pow(max(1.0 - input.uv.y, 0.0), 1.2);
+    let alpha = clamp(input.opacity * across * along * RAIN_OPACITY, 0.0, 1.0);
+    // The reference's grey rain (0.5) is neutral; acid rain keeps its green.
+    let hue = input.color / max(max(input.color.r, max(input.color.g, input.color.b)), 0.001);
+    let core = 1.0 + 0.25 * across * across;
+    return vec4(min(weather.light.rgb * RAIN_TINT * hue * core, vec3(1.0)), alpha);
+}
+
+struct SpriteOutput {
+    @builtin(position) position: vec4<f32>,
+    @location(0) uv: vec2<f32>,
+    @location(1) color: vec4<f32>,
+    @location(2) @interpolate(flat) layer: i32,
+};
+
+@vertex fn vertex_sprite(@builtin(vertex_index) vertex: u32,
+    @builtin(instance_index) instance: u32) -> SpriteOutput {
+    var output: SpriteOutput;
+    output.position = HIDDEN;
+    let slot = instance >> 16u;
+    let cloud = weather.clouds[slot];
+    let p = particle(cloud, slot, instance & 0x7FFFu, false);
+    if p.fade <= 0.002 || !open_at(p.position) { return output; }
+    let forward = normalize(camera.forward);
+    var right = cross(forward, vec3(0.0, 0.0, 1.0));
+    if dot(right, right) < 1e-4 { right = vec3(0.0, 1.0, 0.0); }
+    right = normalize(right);
+    let up = cross(right, forward);
+    // `mRotation`: turning quads, ±0.7 radians a second.
+    let angle = p.seed.x * TAU + weather.cover.w * (p.seed.y - 0.5) * 1.4 * cloud.shape.w;
+    let turn = vec2(cos(angle), sin(angle));
+    let c = corner(vertex);
+    let r = vec2(c.x * turn.x - c.y * turn.y, c.x * turn.y + c.y * turn.x);
+    let world = p.position + right * r.x * cloud.shape.x + up * r.y * cloud.shape.y;
+    output.position = camera.view_projection * vec4(world, 1.0);
+    output.uv = c * 0.5 + 0.5;
+    output.layer = i32(cloud.shape.z);
+    output.color = vec4(cloud.color.rgb * weather.light.rgb, cloud.color.a * p.fade);
+    return output;
+}
+
+// The scene's depth gap along the view, in world units (soft_particles.wgsl's).
+fn depth_gap(fragment: vec4<f32>) -> f32 {
+    let scene = textureLoad(scene_depth, vec2<i32>(fragment.xy), 0);
+    if scene >= 1.0 { return 1.0e6; }
+    let w = 1.0 / fragment.w;
+    let origin = camera.view_projection * vec4(camera.position, 1.0);
+    if abs(w - origin.w) < 0.000001 { return 1.0e6; }
+    let slope = (fragment.z * w - origin.z) / (w - origin.w);
+    let denominator = scene - slope;
+    if abs(denominator) < 0.00000001 { return 1.0e6; }
+    let behind = (origin.z - slope * origin.w) / denominator;
+    let row = vec3(camera.view_projection[0].w, camera.view_projection[1].w,
+        camera.view_projection[2].w);
+    return (behind - w) / max(length(row), 0.000001);
+}
+
+@fragment fn fragment_sprite(input: SpriteOutput) -> @location(0) vec4<f32> {
+    let texel = textureSample(images, image_sampler, input.uv, input.layer);
+    let soft = clamp(depth_gap(input.position) / 24.0, 0.0, 1.0);
+    let alpha = input.color.a * soft;
+    if additive {
+        return vec4(input.color.rgb * alpha * texel.rgb, 0.0);
+    }
+    return vec4(input.color.rgb * texel.rgb, alpha * texel.a);
+}
+
+// A splash is real geometry, not a sprite: a ring flush with the ground, a crown of
+// water as a curved wall of segments that flares out, rises and collapses, and drops
+// thrown out on arcs, each part placed in the world so the splash keeps its shape and
+// parallax from any angle. On water the ring becomes two ripples under a lower crown.
+const SPLASH_PARTS: u32 = 15u;
+const CROWN_SEGMENTS: u32 = 8u;
+const DROPLETS: u32 = 6u;
+const PI: f32 = 3.14159265;
+
+struct SplashOutput {
+    @builtin(position) position: vec4<f32>,
+    // Ring: the ground plane (-1..1). Crown: across the segment and up (0..1). Drop:
+    // across (-1..1) and along, head 0 to tail 1.
+    @location(0) uv: vec2<f32>,
+    @location(1) opacity: f32,
+    // 0 ring on the ground, 1 ripples on water, 2 crown, 3 drop.
+    @location(2) @interpolate(flat) kind: u32,
+    // x age (0..1), y how edge-on a crown segment is seen, z a random phase.
+    @location(3) @interpolate(flat) detail: vec3<f32>,
+};
+
+@vertex fn vertex_splash(@builtin(vertex_index) vertex: u32,
+    @builtin(instance_index) instance: u32) -> SplashOutput {
+    var output: SplashOutput;
+    output.position = HIDDEN;
+    let rain = weather.clouds[u32(weather.light.w)];
+    let index = instance & 0x7FFFu;
+    let timing = hash3(index * 0x632BE5ABu + 0x1234567u);
+    let life = 0.28 + 0.2 * timing.x;
+    let clock = weather.cover.w / life + timing.y;
+    let age = fract(clock);
+    let cycle = u32(i32(floor(clock)));
+    let seed = hash3(index * 0x9E3779B1u ^ (cycle * 0x85EBCA77u));
+    let radius = 0.5 * min(rain.box_size.x, rain.box_size.y);
+    // Anchored in the world as the streaks are: the spot repeats every box width, and
+    // the copy inside the box around the camera is the one drawn, so a splash stays
+    // where it struck while the camera moves and only wraps at the box's edge.
+    let low = camera.position.xy - radius;
+    let ground = low + wrap2(seed.xy * (2.0 * radius) - low, vec2(2.0 * radius));
+    let span = cover_at(ground);
+    let flags = u32(span.z);
+    if (flags & SPLASH) == 0u || span.x > span.y || abs(span.x - camera.position.z) > 1200.0 {
+        return output;
+    }
+    let base = vec3(ground, span.x);
+    let distance = length(base - camera.position);
+    let fade = (1.0 - smoothstep(0.7 * radius, radius, length(ground - camera.position.xy)))
+        * smoothstep(24.0, 64.0, distance) * fog_clear(base);
+    if fade <= 0.002 { return output; }
+    let part = vertex / 6u;
+    // Far away a crown is a few pixels and its drops less: only the ring and three drops
+    // past 400 units, only the ring past 700.
+    if (distance > 700.0 && part != 0u) || (distance > 400.0 && part > CROWN_SEGMENTS + 3u) {
+        return output;
+    }
+    let c = corner(vertex % 6u);
+    let water = (flags & LIQUID) != 0u;
+    let shape = hash3(index * 0x27D4EB2Fu ^ (cycle * 0x165667B1u));
+    let scale = 0.75 + 0.5 * seed.z;
+    let spin = shape.x * TAU;
+    output.detail = vec3(age, 0.0, shape.y);
+    output.opacity = rain.color.a * fade;
+    var world: vec3<f32>;
+    if part == 0u {
+        // Lifted a little more with distance, where depth is coarser.
+        let size = select(9.0 * scale, (4.0 + 14.0 * age) * scale, water);
+        world = base + vec3(c * size, 0.3 + distance * 0.0015);
+        output.uv = c;
+        output.kind = select(0u, 1u, water);
+    } else if part <= CROWN_SEGMENTS {
+        let segment = part - 1u;
+        let jag = hash3(index ^ (segment * 0x9E3779B1u) ^ (cycle * 0x7FEB352Du)).x;
+        // Out fast and slowing; up and back down before the end.
+        let expand = 1.0 - (1.0 - age) * (1.0 - age);
+        let reach = (0.8 + 4.5 * expand) * scale * select(1.0, 0.7, water);
+        let rise = pow(max(sin(PI * min(age / 0.8, 1.0)), 0.0), 0.7);
+        let height = 4.0 * scale * select(1.0, 0.6, water) * rise * (0.75 + 0.45 * jag);
+        if height < 0.15 { return output; }
+        let across = c.x * 0.5 + 0.5;
+        let up = c.y * 0.5 + 0.5;
+        let angle = spin + (f32(segment) + across) * TAU / f32(CROWN_SEGMENTS);
+        // The wall leans outwards as it rises.
+        let out = reach + up * height * 0.45;
+        world = base + vec3(vec2(cos(angle), sin(angle)) * out, 0.15 + up * height);
+        let middle = spin + (f32(segment) + 0.5) * TAU / f32(CROWN_SEGMENTS);
+        let normal = vec3(cos(middle), sin(middle), 0.0);
+        output.detail.y = 1.0 - abs(dot(normal, normalize(camera.position - base)));
+        output.uv = vec2(across, up);
+        output.kind = 2u;
+    } else {
+        let k = part - 1u - CROWN_SEGMENTS;
+        let drop = hash3(index * 0xB5297A4Du ^ (k * 0x68E31DA4u) ^ (cycle * 0x1B56C4E9u));
+        // Drops leave once the crown has formed.
+        if age < 0.08 { return output; }
+        let flight = clamp((age - 0.08) / 0.92, 0.0, 1.0);
+        let angle = spin + (f32(k) + 0.6 * drop.x) * TAU / f32(DROPLETS);
+        let outward = vec2(cos(angle), sin(angle));
+        let travel = (5.0 + 9.0 * drop.y) * scale;
+        let peak = (3.0 + 6.0 * drop.z) * scale * select(1.0, 1.4, water);
+        let head = base + vec3(outward * (scale + travel * flight),
+            0.3 + peak * 4.0 * flight * (1.0 - flight));
+        let velocity = vec3(outward * travel, peak * 4.0 * (1.0 - 2.0 * flight));
+        let direction = normalize(velocity);
+        let along = c.y * 0.5 + 0.5;
+        let centre = head - direction * 1.6 * scale * along;
+        var side = cross(direction, camera.position - centre);
+        if dot(side, side) < 1e-6 { side = vec3(0.0, 0.0, 1.0); }
+        side = normalize(side);
+        // At least about a pixel wide, fainter instead of thinner, as the rain is.
+        let a = camera.view_projection * vec4(centre, 1.0);
+        let b = camera.view_projection * vec4(centre + side, 1.0);
+        if a.w <= 1.0 || b.w <= 1.0 { return output; }
+        let pixels = length((b.xy / b.w - a.xy / a.w) * weather.view.xy * 0.5);
+        let width = 0.35 * scale;
+        let half_width = max(width, 0.6 / max(pixels, 0.0001));
+        output.opacity *= width / half_width;
+        world = centre + side * c.x * half_width;
+        output.uv = vec2(c.x, along);
+        output.kind = 3u;
+    }
+    output.position = camera.view_projection * vec4(world, 1.0);
+    return output;
+}
+
+@fragment fn fragment_splash(input: SplashOutput) -> @location(0) vec4<f32> {
+    let age = input.detail.x;
+    let tint = min(weather.light.rgb * RAIN_TINT, vec3(1.0));
+    var bright = 0.0;
+    var dark = 0.0;
+    switch input.kind {
+        case 0u: {
+            // The ring where the drop struck, a flash at its centre, and a darker wet spot
+            // under it that dries more slowly than the ring fades.
+            let d = length(input.uv);
+            if d > 1.0 { discard; }
+            let spread = 0.12 + 0.55 * (1.0 - (1.0 - age) * (1.0 - age));
+            let off = (d - spread) / 0.05;
+            let ring = exp(-off * off) * pow(1.0 - age, 1.5) * 0.9;
+            let flash = exp(-d * d * 60.0) * pow(1.0 - age, 3.0) * 0.8;
+            bright = ring + flash;
+            dark = (1.0 - smoothstep(0.0, 0.55, d)) * 0.22 * (1.0 - 0.5 * age);
+        }
+        case 1u: {
+            // Two ripples widening on the water, the second a beat behind.
+            let d = length(input.uv);
+            if d > 1.0 { discard; }
+            let near = (d - (0.15 + 0.8 * age)) / 0.035;
+            let far = (d - (0.05 + 0.5 * age)) / 0.035;
+            let first = exp(-near * near);
+            let second = exp(-far * far) * 0.6
+                * smoothstep(0.1, 0.25, age);
+            bright = (first + second) * pow(1.0 - age, 1.3) * 1.1;
+        }
+        case 2u: {
+            // A thin sheet of water, thicker at the rim, which breaks into beads; it
+            // catches more light seen edge-on, as a film does.
+            let up = input.uv.y;
+            let sheet = 0.18 + 0.5 * smoothstep(0.55, 1.0, up);
+            let rim = smoothstep(0.8, 0.95, up) * (1.0 - smoothstep(0.95, 1.0, up));
+            let beads = 0.6 + 0.4 * sin((input.uv.x + input.detail.z) * TAU * 2.0);
+            let glint = 0.6 + 0.9 * input.detail.y * input.detail.y;
+            bright = (sheet * (1.0 - 0.5 * smoothstep(0.92, 1.0, up)) + rim * beads * 0.8)
+                * glint * pow(1.0 - age, 1.2) * 1.15;
+        }
+        default: {
+            // A drop in flight: bright head, short tail.
+            let across = 1.0 - input.uv.x * input.uv.x;
+            bright = across * mix(1.0, 0.3, input.uv.y) * (1.0 - age * age * age) * 1.1;
+        }
+    }
+    bright *= input.opacity;
+    dark *= input.opacity;
+    // Blended over the scene: the bright part adds the rain's light, the dark part only
+    // darkens what is under it.
+    let alpha = clamp(bright + dark, 0.0, 1.0);
+    if alpha <= 0.001 { discard; }
+    return vec4(tint * min(bright / alpha, 1.0), alpha);
+}
+// The volumetric fog: rain haze and ground fog over the scene, one full-screen pass
+// before the particles. Each pixel marches its ray to the surface it shows and counts
+// only open-sky air (the cover): a roof keeps the fog out as it keeps the rain out.
+// Ground fog is densest at each column's floor, thins upwards and drifts with the
+// wind through the noise volume.
+@vertex fn vertex_volume(@builtin(vertex_index) vertex: u32) -> @builtin(position) vec4<f32> {
+    let corner = vec2(f32((vertex << 1u) & 2u), f32(vertex & 2u));
+    return vec4(corner * 2.0 - 1.0, 0.0, 1.0);
+}
+
+// The far cover's span under `p` (x bottom, y top), its edge columns carried on
+// beyond it; empty until it is surveyed.
+fn far_span(p: vec2<f32>) -> vec2<f32> {
+    if weather.far.w == 0.0 { return vec2(3.0e38, -3.0e38); }
+    let last = vec2<i32>(textureDimensions(far_cover)) - 1;
+    let cell = clamp(vec2<i32>(floor((p - weather.far.xy) / weather.far.z)), vec2(0), last);
+    return textureLoad(far_cover, cell, 0).xy;
+}
+
+// The cover for the fog: the window's columns, and the far cover beyond the window and
+// wherever a column holds none of the map's air (past its walls, or not surveyed yet).
+// Neither depends on where the camera is, so distant fog keeps its height as the player
+// moves and jumps, and haze carries on past the walls to the horizon.
+fn fog_span(p: vec2<f32>) -> vec2<f32> {
+    if weather.cover.z == 0.0 { return vec2(-3.0e38, 3.0e38); }
+    let column = cover_at(p);
+    if (u32(column.z) & VOID) == 0u { return column.xy; }
+    return far_span(p);
+}
+
+// The fog's ray from the eye through texel `xy` of the depth, at that depth: xyz its
+// direction, w its length.
+fn view_ray(xy: vec2<f32>, depth: f32) -> vec4<f32> {
+    let size = vec2<f32>(textureDimensions(scene_depth));
+    let ndc = vec2(xy.x / size.x * 2.0 - 1.0, 1.0 - xy.y / size.y * 2.0);
+    let far = weather.inverse_view_projection * vec4(ndc, min(depth, 0.999999), 1.0);
+    let ray = far.xyz / far.w - camera.position;
+    let length_ = length(ray);
+    return vec4(ray / max(length_, 0.001), length_);
+}
+
+// Rays shorter than this many units a step take fewer steps: a wall near the eye needs
+// few, the horizon all of them.
+const FOG_STEP_MIN: f32 = 110.0;
+// The ground fog is skipped where it has thinned below this share of its floor's.
+const FOG_THIN: f32 = 0.01;
+
+// How much of the light along `direction`, out to `reach`, the fog and haze take (alpha):
+// the march counts only open-sky air; ground fog is densest at each column's floor and
+// thins upwards, billowing through the noise volume where it is thick enough to show.
+fn fog_along(direction: vec3<f32>, reach: f32, jitter: f32) -> f32 {
+    let most = max(u32(weather.haze.w), 1u);
+    let steps = clamp(u32(ceil(reach / FOG_STEP_MIN)), min(4u, most), most);
+    let step = reach / f32(steps);
+    var optical = 0.0;
+    for (var i = 0u; i < steps; i++) {
+        let p = camera.position + direction * ((f32(i) + jitter) * step);
+        let span = fog_span(p.xy);
+        if p.z < span.x - 16.0 || p.z > span.y { continue; }
+        var density = weather.haze.x;
+        if weather.haze.y > 0.0 {
+            let ground = exp(-max(p.z - span.x, 0.0) / weather.haze.z);
+            if ground > FOG_THIN {
+                var billow = 1.0;
+                if weather.fog_color.w != 0.0 {
+                    let q = p + weather.fog_flow.xyz;
+                    let n = textureSampleLevel(noise, noise_sampler, q * vec3(1.0 / 1400.0, 1.0 / 1400.0, 1.0 / 500.0), 0.0);
+                    billow = smoothstep(0.3, 0.9, n.r) * 1.4 + 0.25 * n.g;
+                }
+                density += weather.haze.y * ground * billow;
+            }
+        }
+        optical += density;
+        // Past 99.7 % of the light lost the rest cannot show.
+        if optical * step > 6.0 { break; }
+    }
+    return 1.0 - exp(-optical * step);
+}
+
+// The fog's march at half size, one texel for each 2x2 block of the depth: it marches to
+// the block's nearest point or its farthest, in a checkerboard, so the full-size blend
+// finds a texel of the right side at every edge. r the fog's alpha, g how far the ray
+// went (the blend's guide).
+@fragment fn fragment_volume_half(@builtin(position) pixel: vec4<f32>) -> @location(0) vec4<f32> {
+    let last = vec2<i32>(textureDimensions(scene_depth)) - 1;
+    let half = vec2<i32>(pixel.xy);
+    let block = half * 2;
+    let farthest = ((half.x + half.y) & 1) == 1;
+    var chosen = min(block, last);
+    var depth = textureLoad(scene_depth, chosen, 0);
+    for (var k = 1; k < 4; k++) {
+        let texel = min(block + vec2(k & 1, k >> 1), last);
+        let d = textureLoad(scene_depth, texel, 0);
+        if (farthest && d > depth) || (!farthest && d < depth) {
+            depth = d;
+            chosen = texel;
+        }
+    }
+    let ray = view_ray(vec2<f32>(chosen) + 0.5, depth);
+    let jitter = fract(52.9829189 * fract(dot(pixel.xy, vec2(0.06711056, 0.00583715))));
+    let alpha = fog_along(ray.xyz, min(ray.w, weather.fog_flow.w), jitter);
+    return vec4(alpha, min(ray.w, 60000.0), 0.0, 0.0);
+}
+
+// How the fog's light changes towards the sun: forward scattering (Henyey-Greenstein,
+// g 0.35, 1 on average over the sky), brighter towards it, dimmer away, by `weather.sun.w`.
+fn sun_glow(direction: vec3<f32>) -> f32 {
+    if weather.sun.w <= 0.0 { return 1.0; }
+    let g = 0.35;
+    let phase = (1.0 - g * g) / pow(1.0 + g * g - 2.0 * g * dot(direction, weather.sun.xyz), 1.5);
+    return 1.0 + (phase - 1.0) * weather.sun.w;
+}
+
+// The spray a downpour raises where it beats on the ground: a thin layer over each floor
+// (thinning to a third every SPRAY_HEIGHT units), too thin for the march's steps, so it is
+// worked out exactly along the pixel's ray over the floor of the column the ray ends in:
+// what the ray takes of the light (alpha). It shows where the view skims the ground, and
+// drifts in gusts through the noise.
+const SPRAY_HEIGHT: f32 = 10.0;
+
+fn spray_over(ray: vec4<f32>, depth: f32) -> f32 {
+    if weather.tune.x <= 0.0 || depth >= 1.0 { return 0.0; }
+    let hit = camera.position + ray.xyz * ray.w;
+    let span = fog_span(hit.xy);
+    if span.x > span.y || hit.z > span.y { return 0.0; }
+    // The eye's and the surface's heights over that floor, in layer heights.
+    let a = (camera.position.z - span.x) / SPRAY_HEIGHT;
+    let b = max(hit.z - span.x, 0.0) / SPRAY_HEIGHT;
+    if min(max(a, 0.0), b) > 7.0 { return 0.0; }
+    var through: f32;
+    if a < 0.0 {
+        // The eye is below that floor (looking up at a roof): only the ray's end is in it.
+        through = (1.0 - exp(-b)) / (b - a);
+    } else if abs(a - b) < 0.001 {
+        through = exp(-a);
+    } else {
+        through = (exp(-b) - exp(-a)) / (a - b);
+    }
+    var gusts = 1.0;
+    if weather.fog_color.w != 0.0 {
+        let q = hit + vec3(2.5, 2.5, 2.0) * weather.fog_flow.xyz;
+        gusts = 0.35 + 1.3 * textureSampleLevel(noise, noise_sampler,
+            q * vec3(1.0 / 700.0, 1.0 / 700.0, 1.0 / 500.0), 0.0).r;
+    }
+    return 1.0 - exp(-weather.tune.x * gusts * min(ray.w, 6000.0) * through);
+}
+
+// The volumetric fog: rain haze and ground fog over the scene, drawn before the particles.
+// Each pixel takes its half-size march's texels round it, by nearness and by how close
+// their ray's length is to its own (a joint bilateral blend), so the fog keeps to the
+// edges of what stands in it; where none is close, the closest.
+@fragment fn fragment_volume(@builtin(position) pixel: vec4<f32>) -> @location(0) vec4<f32> {
+    let depth = textureLoad(scene_depth, vec2<i32>(pixel.xy), 0);
+    let ray = view_ray(pixel.xy, depth);
+    let reach = min(ray.w, 60000.0);
+    let last = vec2<i32>(textureDimensions(pass_image)) - 1;
+    let h = pixel.xy * 0.5 - 0.5;
+    let base = vec2<i32>(floor(h));
+    let f = h - floor(h);
+    let tolerance = 0.05 * reach + 16.0;
+    var sum = 0.0;
+    var total = 0.0;
+    var best = 3.0e38;
+    var nearest = 0.0;
+    for (var k = 0; k < 4; k++) {
+        let o = vec2(k & 1, k >> 1);
+        let s = textureLoad(pass_image, clamp(base + o, vec2(0), last), 0).xy;
+        let near = select(1.0 - f, f, o == vec2(1));
+        let delta = abs(s.y - reach) / tolerance;
+        let w = near.x * near.y / (1.0 + delta * delta);
+        sum += w * s.x;
+        total += w;
+        if delta < best {
+            best = delta;
+            nearest = s.x;
+        }
+    }
+    let marched = select(nearest, sum / max(total, 1e-6), total > 0.05);
+    let alpha = marched + (1.0 - marched) * spray_over(ray, depth);
+    // A lightning flash lights the storm's air: a cool veil over everything, strongest
+    // where the ray runs far into the open sky, faint over a wall near the eye.
+    let flash = weather.rain.w;
+    let veil = flash * (0.12 + 0.43 * smoothstep(800.0, 6000.0, reach));
+    if alpha <= 0.001 && veil <= 0.001 { discard; }
+    let lit = alpha + veil * (1.0 - alpha);
+    let colour = (weather.fog_color.rgb * sun_glow(ray.xyz) * alpha * (1.0 - veil)
+        + vec3(0.86, 0.9, 1.0) * veil) / max(lit, 1e-4);
+    return vec4(colour, lit);
+}
+
+// Rain-wet surfaces: one full-screen pass over the opaque world before the players are
+// drawn, so the depth holds only the world. A surface is wet where the air just in front
+// of it is under open sky (the cover, and the far cover beyond the window): it darkens
+// as water fills its pores, and its film mirrors the overcast sky, most at grazing
+// angles. From level 2 water runs down slopes and walls in streaks; at level 3 flat
+// ground gathers puddles. The alpha multiplies the scene and the colour is added
+// (blend One, SrcAlpha), so the pass never reads the scene.
+
+// The world point under texel `xy` of the depth, and that depth.
+fn wet_point(xy: vec2<i32>, size: vec2<f32>) -> vec4<f32> {
+    let depth = textureLoad(scene_depth, xy, 0);
+    let uv = (vec2<f32>(xy) + 0.5) / size;
+    let ndc = vec2(uv.x * 2.0 - 1.0, 1.0 - uv.y * 2.0);
+    let p = weather.inverse_view_projection * vec4(ndc, depth, 1.0);
+    return vec4(p.xyz / p.w, depth);
+}
+
+// What the cover's four columns round a face's point say of it, blended between them so
+// nothing ends in the columns' steps (`lift` is the point a little off the face):
+// x how open to the sky the air in front of it is (1 open, 0 under a roof; a little below a
+//   column's floor still counts: on a slope a pixel off the column's centre lies below the
+//   floor surveyed there),
+// y how much higher ground stands right beside it (the foot of a wall or a kerb, 0..1),
+// z its height over the floor it stands on (10 000 where no column tells).
+fn shelter(p: vec3<f32>, lift: vec3<f32>) -> vec3<f32> {
+    let cell = lift.xy / weather.cover.x - 0.5;
+    let first = floor(cell);
+    let blend = cell - first;
+    var open = 0.0;
+    var rise = 0.0;
+    var floor_sum = 0.0;
+    var floor_weight = 0.0;
+    for (var k = 0u; k < 4u; k++) {
+        let o = vec2(f32(k & 1u), f32(k >> 1u));
+        let span = fog_span((first + 0.5 + o) * weather.cover.x);
+        if span.x > span.y { continue; }
+        let share = mix(1.0 - blend, blend, o);
+        let w = share.x * share.y;
+        if lift.z >= span.x - 8.0 && lift.z <= span.y { open += w; }
+        if span.x > p.z + 12.0 {
+            rise += w;
+        } else {
+            floor_sum += w * span.x;
+            floor_weight += w;
+        }
+    }
+    let height = select(1.0e4, p.z - floor_sum / max(floor_weight, 1e-4), floor_weight > 0.05);
+    return vec3(open, rise, height);
+}
+
+// Running water: the scroll down the walls wraps after this many units (one noise tile).
+const STREAK_LENGTH: f32 = 520.0;
+// The headings round the vertical the running water is laid in, and its lanes' width.
+const RUN_HEADINGS: f32 = 16.0;
+const RUN_LANE: f32 = 14.0;
+
+// Water running down a wall or a slope: x the film over the surface, y the rivulets, z the
+// drops running down them (each 0..1), w how a rivulet's surface leans across it (-1..1,
+// for what it mirrors). `below` is how far under the wall's top the point is and `height`
+// how far over its foot (10 000 each where the cover cannot tell).
+fn run_in(p: vec3<f32>, heading: u32, upp: f32, below: f32, height: f32) -> vec4<f32> {
+    let angle = f32(heading) * TAU / RUN_HEADINGS;
+    let outward = vec2(cos(angle), sin(angle));
+    // Across the way down runs level along the surface; down it runs the height, so a lane
+    // follows the slope whatever its steepness.
+    let across = dot(p.xy, vec2(-outward.y, outward.x)) / RUN_LANE;
+    let lane = floor(across);
+    let x = across - lane;
+    let key = bitcast<u32>(i32(lane)) * 0x8DA6B343u ^ (heading + 1u) * 0xD8163841u;
+    let a = hash3(key);
+    let b = hash3(key ^ 0x68E31DA4u);
+    let down = (p.z + weather.wet.z) / STREAK_LENGTH;
+    // The film: a thin sheet, thicker in bands that run down, broken up by the noise.
+    let sheet = textureSampleLevel(noise, noise_sampler,
+        vec3(across / 6.0, down, dot(p.xy, outward) / 700.0 + weather.wet.w), 0.0);
+    let film = 0.3 + 0.7 * smoothstep(0.3, 0.8, sheet.r);
+    // A rivulet in about two lanes of five, its line wandering across the lane as it goes
+    // down, fixed on the surface; it runs in stretches with dry gaps between.
+    if a.x > 0.42 { return vec4(film, 0.0, 0.0, 0.0); }
+    let z = p.z;
+    let wander = 0.17 * sin(z * (0.011 + 0.012 * a.y) + a.z * TAU)
+        + 0.07 * sin(z * (0.043 + 0.02 * b.x) + b.y * TAU);
+    // Its half width, 1 to 1.8 units, half as wide again near the wall's foot, where the
+    // water has gathered; at least about a pixel (fainter instead).
+    let width = (0.07 + 0.06 * b.z) * (1.0 + 0.5 * (1.0 - smoothstep(40.0, 420.0, height)));
+    let wide = max(width, 0.8 * upp / RUN_LANE);
+    let lean = (x - (0.5 + wander)) / wide;
+    let off = abs(lean);
+    let line = (1.0 - smoothstep(0.55, 1.0, off)) * (width / wide);
+    let stretch = fract(z / (240.0 + 220.0 * b.x) + a.y);
+    // Each rivulet begins a little under the wall's lip, at its own depth (8 to 160 units).
+    let begun = smoothstep(0.0, 24.0, below - (8.0 + 152.0 * b.y * b.y));
+    let wet = smoothstep(0.0, 0.06, stretch) * (1.0 - smoothstep(0.68, 0.76, stretch)) * begun;
+    let rivulet = line * wet;
+    // Drops running down it, a few in each wrap of the scroll: a bright head and a short
+    // tail above it, gone where they would be too small to see.
+    let count = 3.0 + floor(b.x * 5.0);
+    let above = fract(down * count + a.z) * STREAK_LENGTH / count;
+    let size = max(upp, 2.0);
+    let drop = exp(-above / size) + 0.35 * exp(-above / (4.0 * size));
+    let seen = 1.0 - smoothstep(1.5, 3.0, upp);
+    return vec4(film, rivulet, rivulet * drop * seen, clamp(lean, -1.0, 1.0) * rivulet);
+}
+
+// The running water of the heading nearest the face's (the face's normal from the depth is
+// a little unsteady, so it only chooses the heading, and blends the two nearest only half
+// way between them): the water stays put on the surface however the camera moves.
+fn running(p: vec3<f32>, n: vec3<f32>, upp: f32, below: f32, height: f32) -> vec4<f32> {
+    let heading = fract(atan2(n.y, n.x) / TAU) * RUN_HEADINGS;
+    let first = u32(floor(heading)) % u32(RUN_HEADINGS);
+    let between = smoothstep(0.38, 0.62, fract(heading));
+    if between <= 0.0 { return run_in(p, first, upp, below, height); }
+    let second = (first + 1u) % u32(RUN_HEADINGS);
+    if between >= 1.0 { return run_in(p, second, upp, below, height); }
+    return mix(run_in(p, first, upp, below, height), run_in(p, second, upp, below, height), between);
+}
+
+// Rain rings on standing water, 0 to 1: a drop lands in each 16-unit cell now and
+// then (about every other second), at a random spot, and its thin ring widens and fades.
+fn ripples(xy: vec2<f32>, time: f32) -> f32 {
+    let size = 16.0;
+    let base = floor(xy / size - 0.5);
+    var ring = 0.0;
+    for (var k = 0u; k < 4u; k++) {
+        let cell = base + vec2(f32(k & 1u), f32(k >> 1u));
+        let key = bitcast<u32>(i32(cell.x)) * 0x8DA6B343u ^ bitcast<u32>(i32(cell.y)) * 0xD8163841u;
+        let timing = hash3(key);
+        let clock = time / (0.5 + 0.4 * timing.z) + timing.x;
+        let age = fract(clock);
+        let spot = hash3(key ^ (u32(floor(clock)) * 0x9E3779B1u));
+        if spot.z > 0.5 { continue; }
+        let centre = (cell + 0.2 + 0.6 * spot.xy) * size;
+        let off = (length(xy - centre) - (0.5 + 6.5 * age)) / 0.45;
+        let fading = 1.0 - age;
+        ring += exp(-off * off) * fading * fading * fading;
+    }
+    return min(ring, 1.0);
+}
+
+// The scene at half size: one bilinear tap between each four of its texels.
+@fragment fn fragment_mirror_copy(@builtin(position) pixel: vec4<f32>) -> @location(0) vec4<f32> {
+    let half = ceil(vec2<f32>(textureDimensions(pass_image)) * 0.5);
+    return vec4(textureSampleLevel(pass_image, pass_sampler, pixel.xy / half, 0.0).rgb, 1.0);
+}
+
+// The mirror's march (VisionJK's `Mirror()` in `wet.frag`, by Blackwolf): for a puddle,
+// steps from 2 units growing by 1.18, about 2000 units in all, then halvings round the
+// hit. A wet street or wall (`r_weatherReflections` 3) mirrors softly, so its march is
+// half as many longer steps (about 1500 units) and fewer halvings.
+const MIRROR_STEPS: u32 = 32u;
+const MIRROR_REFINE: u32 = 5u;
+const MIRROR_FIRST: f32 = 2.0;
+const MIRROR_GROWTH: f32 = 1.18;
+const FILM_STEPS: u32 = 16u;
+const FILM_REFINE: u32 = 3u;
+const FILM_FIRST: f32 = 4.0;
+const FILM_GROWTH: f32 = 1.38;
+// Puddles mirror the world out to here, fading from 1500 units.
+const MIRROR_REACH: f32 = 2500.0;
+
+// `q` on the screen: xy its uv, z its depth, w 1 when it is on the screen (else -1).
+fn screen_of(q: vec3<f32>) -> vec4<f32> {
+    let clip = camera.view_projection * vec4(q, 1.0);
+    if clip.w <= 1e-4 { return vec4(0.0, 0.0, 0.0, -1.0); }
+    let ndc = clip.xyz / clip.w;
+    let uv = vec2(ndc.x * 0.5 + 0.5, 0.5 - ndc.y * 0.5);
+    let inside = all(uv > vec2(0.0)) && all(uv < vec2(1.0)) && ndc.z < 1.0;
+    return vec4(uv, ndc.z, select(-1.0, 1.0, inside));
+}
+
+// How far `q` lies behind the world drawn at its spot `s` on the screen, along the view
+// (negative: in front of it; very negative where the sky is drawn).
+fn behind(q: vec3<f32>, s: vec4<f32>, size: vec2<f32>) -> f32 {
+    let xy = clamp(vec2<i32>(s.xy * size), vec2(0), vec2<i32>(size) - 1);
+    let surface = wet_point(xy, size);
+    if surface.w >= 1.0 { return -1.0e9; }
+    return distance(q, camera.position) - distance(surface.xyz, camera.position);
+}
+
+// What a puddle at `p` mirrors along `dir`: the world's colour where the march meets it
+// in the depth, or the sky drawn where the ray leaves for it, and how sure that is (a,
+// 0 when neither: the overcast sky the wet pass knows stands in).
+// `sharp` chooses the puddle's march over the film's; `level` is the copy's level read
+// (0 sharp, each next one softer).
+fn mirrored(p: vec3<f32>, dir: vec3<f32>, size: vec2<f32>, sharp: bool, level: f32) -> vec4<f32> {
+    var stride = select(FILM_FIRST, MIRROR_FIRST, sharp);
+    let growth = select(FILM_GROWTH, MIRROR_GROWTH, sharp);
+    let steps = select(FILM_STEPS, MIRROR_STEPS, sharp);
+    let halvings = select(FILM_REFINE, MIRROR_REFINE, sharp);
+    var near = 0.0;
+    var far = 0.0;
+    var hit = false;
+    for (var i = 0u; i < steps; i++) {
+        near = far;
+        far += stride;
+        let q = p + dir * far;
+        let s = screen_of(q);
+        if s.w < 0.0 { break; }
+        let gap = behind(q, s, size);
+        // Just behind a surface: the ray went through it. Far behind: it passes behind
+        // something nearer the eye, and goes on.
+        if gap > 0.0 && gap < stride * 2.0 + 16.0 {
+            hit = true;
+            break;
+        }
+        stride *= growth;
+    }
+    var s: vec4<f32>;
+    // How far the light came along the mirrored ray, for the haze it went through.
+    var travel = far;
+    var sure = 1.0;
+    if hit {
+        for (var i = 0u; i < halvings; i++) {
+            let middle = 0.5 * (near + far);
+            let q = p + dir * middle;
+            if behind(q, screen_of(q), size) > 0.0 { far = middle; } else { near = middle; }
+        }
+        s = screen_of(p + dir * far);
+        travel = far;
+        sure = 1.0 - smoothstep(1400.0, 2000.0, far);
+    } else {
+        // Nothing met within the march: what lies that way far off, the sky or a distant
+        // building. Seen from the eye, its direction alone places it closely enough (the
+        // spot on the screen of the eye plus that direction), where the screen shows
+        // something farther than the march went; a nearer surface there is in front of
+        // the ray, not on it.
+        s = screen_of(camera.position + dir * 64.0);
+        if s.w < 0.0 { return vec4(0.0); }
+        let xy = clamp(vec2<i32>(s.xy * size), vec2(0), vec2<i32>(size) - 1);
+        let surface = wet_point(xy, size);
+        if surface.w < 1.0 {
+            let away = distance(surface.xyz, camera.position);
+            if away < distance(p, camera.position) + far { return vec4(0.0); }
+            travel = away;
+            sure = 0.85;
+        } else {
+            travel = 1.0e6;
+        }
+    }
+    if s.w < 0.0 { return vec4(0.0); }
+    let edge = min(min(s.x, 1.0 - s.x), min(s.y, 1.0 - s.y));
+    sure *= smoothstep(0.0, 0.08, edge);
+    // The copy is the world before the fog: the rain's haze along the mirrored ray greys
+    // it towards the overcast sky, as the fog greys what is seen straight.
+    let hazed = 1.0 - exp(-weather.haze.x * travel);
+    let colour = mix(textureSampleLevel(pass_image, pass_sampler, s.xy, level).rgb, weather.wet_sky.rgb, hazed);
+    return vec4(colour, sure);
+}
+
+@fragment fn fragment_wet(@builtin(position) pixel: vec4<f32>) -> @location(0) vec4<f32> {
+    let size = vec2<f32>(textureDimensions(scene_depth));
+    let last = vec2<i32>(size) - 1;
+    let xy = vec2<i32>(pixel.xy);
+    let centre = wet_point(xy, size);
+    if centre.w >= 1.0 { discard; }
+    let p = centre.xyz;
+    // The face's normal, from the neighbour on each axis whose depth is nearer this
+    // pixel's, so a pixel at an edge takes the face it belongs to.
+    let left = wet_point(max(xy - vec2(1, 0), vec2(0)), size);
+    let right = wet_point(min(xy + vec2(1, 0), last), size);
+    let above = wet_point(max(xy - vec2(0, 1), vec2(0)), size);
+    let below = wet_point(min(xy + vec2(0, 1), last), size);
+    let use_right = xy.x == 0 || (xy.x < last.x && abs(right.w - centre.w) < abs(left.w - centre.w));
+    let use_below = xy.y == 0 || (xy.y < last.y && abs(below.w - centre.w) < abs(above.w - centre.w));
+    let dx = select(p - left.xyz, right.xyz - p, use_right);
+    let dy = select(p - above.xyz, below.xyz - p, use_below);
+    var n = cross(dx, dy);
+    if dot(n, n) < 1e-12 { discard; }
+    n = normalize(n);
+    let view = camera.position - p;
+    if dot(n, view) < 0.0 { n = -n; }
+
+    // Rain reaches the face where the air in front of it is under open sky; the cover also
+    // tells the ground beside it and under it (`shelter`).
+    let around = shelter(p, p + n * 6.0);
+    let open = around.x;
+    let distance = length(view);
+    let ground = smoothstep(0.75, 0.97, n.z);
+    // Faces the rain slants onto take more of it, the lee side of a wall less.
+    let facing = clamp(0.55 + 0.9 * dot(n, -weather.rain.xyz), 0.3, 1.0);
+    let wet = weather.wet.x * open * facing;
+    // Snow settles on what faces up, thicker in drifts and against the foot of a wall.
+    var snow = 0.0;
+    var snow_shade = 1.0;
+    if weather.looks.z > 0.0 && open > 0.0 {
+        let drifts = textureSampleLevel(noise, noise_sampler, vec3(p.xy / 420.0, 0.61), 0.0);
+        let grain = textureSampleLevel(noise, noise_sampler, vec3(p.xy / 96.0, 0.23), 0.0);
+        let lying = 0.2 + 0.8 * smoothstep(0.25, 0.7, drifts.r) + 0.4 * around.y;
+        snow = clamp(weather.looks.z * open * smoothstep(0.3, 0.75, n.z) * lying
+            * (0.75 + 0.25 * grain.g), 0.0, 0.8);
+        snow_shade = 0.78 + 0.22 * grain.r;
+    }
+    if wet <= 0.004 && snow <= 0.004 { discard; }
+
+    let level = u32(weather.wet.y);
+    // Water fills the pores and darkens the surface; its film mirrors the sky, thin and
+    // rough on a wall, smoother on the ground. The ground is not evenly wet: water stands
+    // where a broad noise says and where higher ground beside it sheds it (the foot of a
+    // wall, a kerb), from merely damp through glossy to a puddle.
+    let amount = weather.looks.y;
+    let patches = textureSampleLevel(noise, noise_sampler, vec3(p.xy / 1100.0, 0.37), 0.0);
+    let pool = patches.r + 0.16 * around.y + 0.2 * (amount - 1.0);
+    let gloss = smoothstep(0.5, 0.76, pool) * ground;
+    var darken = (0.36 + 0.06 * gloss) * wet;
+    var film = wet * mix(0.1, mix(0.16, 0.42, gloss), ground);
+    var glint = 0.0;
+    var rings = 0.0;
+    var puddle = 0.0;
+    // How smooth the water here is (0 a rough film, 1 a rivulet or a puddle), and how its
+    // surface leans along the wall, for what it mirrors.
+    var smooth_water = 0.5 * gloss;
+    var lean = 0.0;
+    let steep = length(n.xy);
+    let wall = smoothstep(0.5, 0.85, steep);
+    if wall > 0.0 && wet > 0.004 {
+        // Rain splashing off the ground soaks the foot of a wall: darker and glossier for a
+        // hand or two up.
+        let soaked = (1.0 - smoothstep(4.0, 34.0, around.z)) * wall * wet;
+        darken += 0.12 * soaked;
+        film += 0.16 * soaked;
+    }
+    if level >= 2u && n.z > -0.2 && wet > 0.004 {
+        // Running water: a film on every slope from about 10 degrees, rivulets and their
+        // drops on walls and steep slopes; fine detail, so it fades out with distance and
+        // at grazing views, where it would shimmer.
+        let slope = smoothstep(0.15, 0.45, steep);
+        let fade = (1.0 - smoothstep(600.0, 1600.0, distance))
+            * smoothstep(0.05, 0.2, abs(dot(n, view)) / max(distance, 0.001));
+        if fade * slope > 0.0 {
+            // World units a pixel covers here, for lines no thinner than a pixel.
+            let upp = distance * 2.0 / max(weather.view.y, 1.0);
+            // How far under the wall's top: the floor of the column behind the face.
+            var below = 1.0e4;
+            if wall > 0.0 {
+                let top = fog_span(p.xy - n.xy / max(steep, 0.001) * 12.0);
+                if top.x <= top.y && top.x > p.z { below = top.x - p.z; }
+            }
+            let water = running(p, n, upp, below, around.z);
+            let sheet = water.x * slope * fade * wet;
+            let rivulet = water.y * wall * fade * wet;
+            darken += 0.1 * sheet + 0.28 * rivulet;
+            film += 0.22 * sheet + 0.55 * rivulet;
+            glint = 0.45 * rivulet + 1.8 * water.z * wall * fade * wet;
+            smooth_water = max(smooth_water, min(rivulet * 2.0, 1.0));
+            lean = water.w * wall * fade;
+        }
+    }
+    let film_only = film;
+    if level >= 3u && amount > 0.0 {
+        // Standing water on flat ground: darker still, and smooth enough to mirror the sky.
+        puddle = smoothstep(0.77, 0.83, pool) * smoothstep(0.96, 0.995, n.z) * open
+            * weather.wet.x;
+        darken = mix(darken, 0.55, puddle);
+        film = mix(film, 1.0, puddle);
+        // Rings where drops land in it, near enough to see.
+        rings = puddle * ripples(p.xy, weather.cover.w) * (1.0 - smoothstep(300.0, 700.0, distance));
+    }
+    let to_eye = view / max(distance, 0.001);
+    let fresnel = 0.02 + 0.98 * pow(1.0 - clamp(dot(n, to_eye), 0.0, 1.0), 5.0);
+    // The mirrored ray sees the sky only above the horizon.
+    let sky = smoothstep(-0.05, 0.35, reflect(-to_eye, n).z);
+    let mirror = clamp(fresnel * film * sky, 0.0, 1.0);
+    var mirror_colour = weather.wet_sky.rgb * mirror;
+    var mirror_share = mirror;
+    // With the copy, water mirrors the world and the sky drawn round it, fading out with
+    // distance: puddles as standing water does (a fifth even seen from above, VisionJK's
+    // pond blend), rippled by the rain rings; with `r_weatherReflections` 3 the film on
+    // wet ground and walls too, by its own strength and softly (a softer level of the copy
+    // the rougher the water), and the rivulets by the lean of their surface.
+    let everything = weather.looks.x >= 2.0;
+    let near = 1.0 - smoothstep(1500.0, MIRROR_REACH, distance);
+    // A wet street shines more than its thin sky-coloured film says once it has a world to
+    // mirror: up to four fifths at a glancing view, by how much water lies on it.
+    let shine = clamp(film_only * 2.2, 0.0, 1.0);
+    let filmed = select(0.0, clamp(1.4 * fresnel + 0.04, 0.0, 0.8) * shine * (1.0 - puddle), everything);
+    if weather.wet_sky.w > 0.5 && near > 0.0 && (puddle > 0.002 || filmed > 0.025) {
+        var bumped = n;
+        if puddle > 0.002 && distance < 700.0 {
+            let e = 0.6;
+            let slope = vec2(
+                ripples(p.xy + vec2(e, 0.0), weather.cover.w) - ripples(p.xy - vec2(e, 0.0), weather.cover.w),
+                ripples(p.xy + vec2(0.0, e), weather.cover.w) - ripples(p.xy - vec2(0.0, e), weather.cover.w));
+            bumped = normalize(n - vec3(slope * 0.3 * (1.0 - smoothstep(300.0, 700.0, distance)), 0.0));
+        } else if abs(lean) > 0.001 {
+            // Level along the wall, across the way the water runs.
+            bumped = normalize(n + vec3(-n.y, n.x, 0.0) / max(steep, 0.001) * lean * 0.5);
+        }
+        let dir = reflect(-to_eye, bumped);
+        let sharp = puddle > 0.3;
+        let soft = mix(2.6, 0.8, smooth_water) * (1.0 - puddle)
+            + 1.5 * smoothstep(500.0, 2000.0, distance);
+        let seen = mirrored(p + n * 1.5, dir, size, sharp, soft);
+        let glance = 0.02 + 0.98 * pow(1.0 - clamp(dot(bumped, to_eye), 0.0, 1.0), 5.0);
+        let pond = clamp(2.0 * glance + 0.2, 0.0, 0.92);
+        let reflectance = select(pond, filmed + puddle * pond, everything);
+        // Where the march found what the water mirrors, it shows; elsewhere the water keeps
+        // its sky alone, as without the mirror.
+        let found = near * seen.a * select(puddle, 1.0, everything);
+        mirror_colour = mix(mirror_colour, reflectance * seen.rgb, found);
+        mirror_share = mix(mirror_share, reflectance, found);
+    }
+    // Running water and rain rings catch the light even seen from above.
+    let added = mirror_colour + weather.wet_sky.rgb * (0.2 * glint + 0.2 * rings);
+    let through = (1.0 - clamp(darken, 0.0, 0.6)) * (1.0 - clamp(mirror_share, 0.0, 1.0));
+    // Settled snow covers what is under it and gives back the sky's light.
+    return vec4(added * (1.0 - snow) + weather.snow.rgb * (snow * snow_shade), through * (1.0 - snow));
+}

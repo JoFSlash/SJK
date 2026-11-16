@@ -1,0 +1,540 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sol JK — Jedi Academy multiplayer, classic at heart</title>
+<meta name="description" content="Sol JK (SJK) is Sol's vision of Jedi Academy: a native client and server for Star Wars Jedi Knight: Jedi Academy multiplayer, with its own SJK UI, the classic menus and HUDs, and JA+ and JoF support, and the SJK Launcher that installs and updates it. For Windows, Linux and, experimentally, Mac.">
+<meta name="theme-color" content="#060a14">
+<meta property="og:title" content="Sol JK">
+<meta property="og:description" content="A native client and server for Jedi Academy multiplayer, classic at heart.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://sol-vulpes.github.io/SJK/">
+<meta property="og:image" content="https://sol-vulpes.github.io/SJK/assets/social-preview.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="The Sol JK emblem, a gold starburst with the JK blade, beside the name Sol JK">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Sol JK">
+<meta name="twitter:description" content="A native client and server for Jedi Academy multiplayer, classic at heart.">
+<meta name="twitter:image" content="https://sol-vulpes.github.io/SJK/assets/social-preview.jpg">
+<meta name="twitter:image:alt" content="The Sol JK emblem, a gold starburst with the JK blade, beside the name Sol JK">
+<link rel="icon" href="assets/favicon.ico" sizes="16x16 32x32 48x48">
+<link rel="icon" href="assets/favicon-32.png" type="image/png" sizes="32x32">
+<link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Exo+2:ital,wght@0,400;0,600;1,400&amp;family=Rajdhani:wght@500;600;700&amp;display=swap">
+<link rel="preload" as="image" href="screenshots/tour-1.jpg">
+<link rel="canonical" href="https://sol-vulpes.github.io/SJK/">
+<link rel="stylesheet" href="assets/style.css">
+<script>document.documentElement.classList.add("js");</script>
+<script src="assets/site.js" defer></script>
+<script type="module" src="assets/effects.js"></script>
+<script data-goatcounter="https://sjkclient.goatcounter.com/count" async src="assets/vendor/goatcounter/count.js"></script>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+
+<nav class="nav over-home" aria-label="Sections">
+  <a class="nav-brand" href="#top"><img src="assets/favicon-32.png" alt="" width="24" height="24"> Sol JK</a>
+  <ul>
+    <li><a href="#features">What SJK brings</a></li>
+    <li><a href="#launcher">Launcher</a></li>
+    <li data-gallery-link hidden><a href="#screenshots">Screenshots</a></li>
+    <li><a href="#changelog">What's new</a></li>
+    <li><a href="#install">Install</a></li>
+    <li><a href="#credits">Credits</a></li>
+    <li hidden><a href="#support">Support</a></li>
+  </ul>
+  <p class="nav-out"><a href="https://github.com/Sol-Vulpes/SJK">GitHub</a><a href="https://discord.gg/dGBdMygvJw" rel="noopener">Discord</a></p>
+</nav>
+
+<!-- After the SJK UI's main page: the emblem in its turning ring, the title and the
+     download beside it, the latest release's recap where the client lists the servers
+     joined last, Sol's card bottom left, all on the tour of mp/duel6 (docs/sjk.md). -->
+<header class="home" id="top">
+  <div class="backdrop" aria-hidden="true">
+    <img class="shown" src="screenshots/tour-1.jpg" alt="">
+    <img data-src="screenshots/tour-2.jpg" alt="">
+    <img data-src="screenshots/tour-3.jpg" alt="">
+    <img data-src="screenshots/tour-4.jpg" alt="">
+  </div>
+
+  <div class="hero">
+    <div class="ring" aria-hidden="true">
+      <div class="sun"><div class="glow"></div><div class="godrays"></div><div class="burst"></div></div>
+      <div class="ticks"></div>
+      <div class="gold-arc"></div>
+      <img class="emblem" src="assets/sjk-logo-512.png" alt="" width="380" height="380">
+    </div>
+
+    <div class="intro">
+      <p class="eyebrow">Star Wars Jedi Knight: Jedi Academy multiplayer</p>
+      <h1>Sol JK</h1>
+      <p class="lede">Sol's vision of Jedi Academy: a native client and server, classic at
+      heart. Its own menus over the live map, the retail menus one switch away, JA+ and JoF
+      servers that feel right, and a game that stays sharp on today's screens.</p>
+      <div class="get">
+        <a class="download" id="download" href="https://github.com/Sol-Vulpes/SJK/releases/latest">
+          <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v12"/><path d="M6 11l6 6 6-6"/><path d="M4 20h16"/></svg>
+          <span id="download-label">Download</span>
+        </a>
+        <div class="get-lines">
+          <p class="get-main" id="download-line">Windows 10/11 x64, Linux x64, Mac with Apple Silicon (experimental)</p>
+          <p id="download-others"><a href="https://github.com/Sol-Vulpes/SJK/releases/latest">All files and checksums</a></p>
+        </div>
+      </div>
+      <p class="get-launcher"><a class="button" href="#launcher">SJK Launcher</a>
+      <span>New: installs Sol JK, keeps it up to date and starts it, in one window.</span></p>
+      <p class="fine">Free and open source. Needs your own copy of Jedi Academy: SJK ships no game files.</p>
+    </div>
+  </div>
+
+  <aside class="recent" aria-labelledby="recent-title">
+    <div class="recent-head">
+      <h2 id="recent-title">Latest release</h2>
+      <p class="recent-name" id="release-name"><a href="https://github.com/Sol-Vulpes/SJK/releases/latest">Sol JK (Alpha)</a></p>
+      <p class="recent-date" id="release-date"></p>
+    </div>
+    <ul class="recap" id="release-recap">
+      <li><strong>Release notes</strong> <span>Every release's changes are in
+      <a href="https://github.com/Sol-Vulpes/SJK/blob/main/CHANGELOG.md">the changelog</a>.</span></li>
+    </ul>
+  </aside>
+
+  <a class="card" href="https://github.com/Sol-Vulpes">
+    <span class="disc" aria-hidden="true">S<img src="https://github.com/Sol-Vulpes.png?size=144" alt="" width="72" height="72" onerror="this.remove()"></span>
+    <span class="card-text">
+      <span class="card-name">Sol</span>
+      <span class="card-facts"><span class="tick" aria-hidden="true">✓</span> Develops SJK and sets its direction</span>
+      <span class="card-hint">Open Sol's GitHub</span>
+    </span>
+  </a>
+</header>
+
+<main id="main">
+
+<section id="features" class="page" aria-labelledby="features-title">
+  <header class="page-head">
+    <h2 id="features-title">What SJK brings</h2>
+    <p>SJK is Sol's vision of Jedi Academy, developed by Sol with contributors from the community.</p>
+  </header>
+  <div class="settings" data-settings>
+    <ul class="rail" aria-label="Categories">
+      <li><a href="#cat-ui">The SJK UI</a></li>
+      <li><a href="#cat-classic">Classic Jedi Academy</a></li>
+      <li><a href="#cat-collection">Collection</a></li>
+      <li><a href="#cat-toys">Toys and emotes</a></li>
+      <li><a href="#cat-servers">Community servers</a></li>
+      <li><a href="#cat-profile">Identity and chat</a></li>
+      <li><a href="#cat-world">Graphics and comfort</a></li>
+    </ul>
+
+    <section class="cat" id="cat-ui" aria-labelledby="cat-ui-title">
+      <h3 id="cat-ui-title">The SJK UI</h3>
+      <ul class="rows">
+        <li><strong>The ring</strong><span>The main page: SJK's emblem in a turning ring, the menu beside it, recent servers and SJK chat, over a camera tour of Yavin Training Grounds.</span></li>
+        <li><strong>Settings</strong><span>Simple and Advanced views, a detail column saying what each setting does, and a search that finds any of them.</span></li>
+        <li><strong>Character creator</strong><span>One grid of tiles for model, head, torso, legs, skin, hat and cape. Every hat and cape is open to everyone.</span></li>
+        <li><strong>Servers</strong><span>A sortable list from two master servers, names in their colours, favourites, and the map's levelshot and players beside it.</span></li>
+        <li><strong>Loading to scoreboard</strong><span>The same look from the first connection to the last round, with the classic versions one setting away.</span></li>
+        <li><strong>News</strong><span>Release notes and the SJK team's announcements in one panel, with links and pictures.</span></li>
+      </ul>
+      <figure class="detail">
+        <img src="screenshots/main-menu.jpg" alt="The SJK UI's main page: the emblem in its ring, the menu and SJK chat, over Yavin Training Grounds" loading="lazy" decoding="async">
+        <figcaption><strong>Content floats on the world</strong>No boxes or window frames: gold for what you choose, holo blue line-work, the live map behind.</figcaption>
+      </figure>
+    </section>
+
+    <section class="cat" id="cat-classic" aria-labelledby="cat-classic-title">
+      <h3 id="cat-classic-title">Classic Jedi Academy</h3>
+      <ul class="rows">
+        <li><strong>Classic menus</strong><span>Main, profile, setup, controls and the join-server browser laid out like retail, one switch away in First setup or Settings.</span></li>
+        <li><strong>Classic scoreboard</strong><span>Client IDs, compact rows on full servers, and JoF EternalJK's rules for when it opens.</span></li>
+        <li><strong>Game HUDs from your files</strong><span>The original HUD, any custom HUD pack that replaces <code>ui/hud.menu</code>, or SJK's classic HUD along the bottom; drag its pieces where you want them with <code>hud_edit</code>.</span></li>
+        <li><strong>Sharp type</strong><span>The game's fonts redrawn as vector fonts, crisp at 4K, with Russian, Japanese and emoji in chat and names.</span></li>
+      </ul>
+      <figure class="detail">
+        <img src="screenshots/scoreboard.jpg" alt="The scoreboard over a match on Yavin Training Grounds" loading="lazy" decoding="async">
+        <figcaption><strong>The original game comes first</strong>Its behaviour and feel are the reference; SJK's own screens sit beside them.</figcaption>
+      </figure>
+    </section>
+
+    <section class="cat" id="cat-collection" aria-labelledby="cat-collection-title">
+      <h3 id="cat-collection-title">Collection</h3>
+      <ul class="rows">
+        <li><strong>Holocrons</strong><span>Earned by real play in four tiers, up to the sculpted Sith pyramid, and opened crate-style for saber shaders and cards.</span></li>
+        <li><strong>Saber shaders</strong><span>Blades from Common to Mythical, more than 250 of Creyon's Blade Lab signature blades among them, each with its own sounds. Each saber of a pair can wear its own.</span></li>
+        <li><strong>Forge and trading</strong><span>Break spare copies down into kyber shards, craft what you lack, and trade with other players, chatting while the trade is open.</span></li>
+        <li><strong>Finishers and loadouts</strong><span>Finishers change what your saber kills do; five loadout slots put a whole look back on in one click.</span></li>
+        <li><strong>Medals and achievements</strong><span>Medals ranked from I Issued to V Solar, and achievement pages for play, toys and hobbies, shown on your profile, your card and the scoreboard.</span></li>
+      </ul>
+      <figure class="detail">
+        <img src="screenshots/collection-shaders.jpg" alt="The Collection's Shaders tab: the Mythical Sun blade, worn and lit on the menu map" loading="lazy" decoding="async">
+        <figcaption><strong>Nothing for sale</strong>Every feature stays free for everyone, and nothing you collect gives an edge in a fight.</figcaption>
+      </figure>
+    </section>
+
+    <section class="cat" id="cat-toys" aria-labelledby="cat-toys-title">
+      <h3 id="cat-toys-title">Toys and emotes</h3>
+      <ul class="rows">
+        <li><strong>Ragdoll</strong><span><code>toy_ragdoll</code> makes you go limp and fall; every SJK player sees the same fall, and lifts and trains carry you.</span></li>
+        <li><strong>Drone</strong><span><code>freecam</code> and <code>peek</code> fly a training remote others see. Nobody is peeked without their consent.</span></li>
+        <li><strong>Hax, Order 66, cardboard box, banana peels</strong><span>Hack a willing player, die together when the order comes, hide in a carton, or leave a peel to slip on.</span></li>
+        <li><strong>Monitor</strong><span>Charge and throw an old CRT at players who turned the toy on and send them flying.</span></li>
+        <li><strong>Fishing and mining</strong><span>Get a rod or a pickaxe out, fill your fish log, find nine ores, and earn their achievements.</span></li>
+        <li><strong>Mystery boxes</strong><span>Chests placed on maps, opened for credits, and the box hunt, where everyone chases a mark for a free roll.</span></li>
+        <li><strong>Illuminate</strong><span>A holocron floats by your shoulder and lights the way in dark maps.</span></li>
+        <li><strong>Emotes</strong><span><code>emotes</code> opens a picker; other SJK players on your server see them and hear their music.</span></li>
+      </ul>
+      <figure class="detail">
+        <img src="screenshots/collection-toys.jpg" alt="The Collection's Toys tab, the Illuminate holocron lit beside the player" loading="lazy" decoding="async">
+        <figcaption><strong>Every toy is opt-in</strong>Switch them on in Collection › Toys or on the quick wheel's Toys page.</figcaption>
+      </figure>
+    </section>
+
+    <section class="cat" id="cat-servers" aria-labelledby="cat-servers-title">
+      <h3 id="cat-servers-title">Community servers</h3>
+      <ul class="rows">
+        <li><strong>JA+ servers</strong><span>SJK joins as a JA+ plugin client, with RGB sabers, predicted JA+ moves without snap-backs, and JA+ tools under <code>japlus.</code></span></li>
+        <li><strong>JoF servers</strong><span>JoF tools under <code>jof.</code>: Destruction on the Force wheel, server dialogue, and JoF's own content when you opt in. No more Heimdall kicks.</span></li>
+        <li><strong>Host JA+ games</strong><span>SJK's own server runs in JA+ mode, with JA+'s Force rules, duels, emotes, grappling hook and admins who log in with their SJK key.</span></li>
+        <li><strong>Siege and CTF</strong><span>Respawn waves, objectives and their announcements, the hack bar, and flag carriers named on the scoreboard.</span></li>
+        <li><strong>Reliable joining</strong><span>Lost handshake packets and gamestates are recovered, and old 72-bone player models load.</span></li>
+      </ul>
+      <figure class="detail">
+        <img src="screenshots/servers.jpg" alt="The SJK UI's server browser" loading="lazy" decoding="async">
+        <figcaption><strong>Made for the servers people play on</strong>Community servers such as JA+ and JoF are where SJK is tested.</figcaption>
+      </figure>
+    </section>
+
+    <section class="cat" id="cat-profile" aria-labelledby="cat-profile-title">
+      <h3 id="cat-profile-title">Identity and chat</h3>
+      <ul class="rows">
+        <li><strong>SJK identity</strong><span>A key made on your PC proves who you are to the SJK hub, with no account or password.</span></li>
+        <li><strong>Profile and card</strong><span>Your picture, bio, medals and blade, on a card other players can open.</span></li>
+        <li><strong>SJK chat</strong><span>Talk with SJK players wherever they play, see who is online and on which client, and reach verified JoF and S players in their clan's chat.</span></li>
+        <li><strong>Encrypted whispers</strong><span>Whispers between SJK players are encrypted end to end, with safety codes to compare.</span></li>
+        <li><strong>Status bubbles</strong><span>The bubble over an SJK player says why it is up: typing, in a menu, or away.</span></li>
+        <li><strong>Discord status</strong><span>Your Discord profile shows the server, map and mode you play.</span></li>
+      </ul>
+      <figure class="detail">
+        <img src="screenshots/profile.jpg" alt="The SJK UI's Profile screen with medals and achievements" loading="lazy" decoding="async">
+        <figcaption><strong>One profile, every server</strong>Your identity and medals travel with you.</figcaption>
+      </figure>
+    </section>
+
+    <section class="cat" id="cat-world" aria-labelledby="cat-world-title">
+      <h3 id="cat-world-title">Graphics and comfort</h3>
+      <ul class="rows">
+        <li><strong>Graphics presets</strong><span>Vanilla style, SJK (recommended) or Experimental real-time lighting, from one dropdown.</span></li>
+        <li><strong>Modern lighting</strong><span>HDR, bloom, shadows, volumetrics and day and night, each in Settings › Graphics; <code>r_drawTimings</code> shows what each one costs.</span></li>
+        <li><strong>Weather</strong><span>Rain, storms, snow and fog on maps, with lightning, puddles that mirror the world, and rain and wind sounds.</span></li>
+        <li><strong>Nameplates</strong><span>Holo, Capsule or Classic, with health, shield and Force shared between the SJK players who share theirs.</span></li>
+        <li><strong>Sound</strong><span>3D sound muffled behind walls, and a sonar for hard-of-hearing players, both opt-in.</span></li>
+        <li><strong>Quick wheel</strong><span>Pages of actions, toys and emotes on one key, with a searchable catalogue.</span></li>
+        <li><strong>Smooth pacing</strong><span>The FPS cap holds its exact rate and can follow your monitor.</span></li>
+      </ul>
+      <figure class="detail">
+        <img src="screenshots/settings.jpg" alt="The SJK UI's Settings screen" loading="lazy" decoding="async">
+        <figcaption><strong>No bloat</strong>Every feature has to earn its place and its frame time.</figcaption>
+      </figure>
+    </section>
+  </div>
+</section>
+
+<!-- The SJK Launcher (github.com/Sol-Vulpes/sjk-launcher): the script points the button
+     at the latest release's archive for the visitor's platform (loadLauncher in
+     assets/site.js) and makes the cards switch the big picture (setUpLauncherShots).
+     The pictures are the launcher's own (screenshots/README.md). -->
+<section id="launcher" class="page" aria-labelledby="launcher-title">
+  <header class="page-head">
+    <h2 id="launcher-title">SJK Launcher</h2>
+    <p>The easiest way to get SJK and keep it up to date.</p>
+  </header>
+  <div class="launcher">
+    <div class="launcher-text">
+      <p class="launcher-lede">A small program that sits beside the game. It finds Jedi
+      Academy in your Steam libraries, installs Sol JK into it in one click, starts it with
+      the big Play button, and brings every new release by itself. It also keeps your
+      maps and mods in order, and helps when the game won't start.</p>
+      <div class="get">
+        <a class="download" id="launcher-download" href="https://github.com/Sol-Vulpes/sjk-launcher/releases/latest">
+          <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v12"/><path d="M6 11l6 6 6-6"/><path d="M4 20h16"/></svg>
+          <span id="launcher-download-label">Get the launcher</span>
+        </a>
+        <div class="get-lines">
+          <p class="get-main" id="launcher-line">Windows 10/11 x64, Linux x64, Mac with Apple Silicon (experimental)</p>
+          <p id="launcher-others"><a href="https://github.com/Sol-Vulpes/sjk-launcher/releases/latest">All files and checksums</a></p>
+        </div>
+      </div>
+      <p class="fine">Extract it anywhere and start <code>sjk-launcher</code>. Like SJK it is
+      not code-signed, so Windows may warn the first time: <em>More info › Run anyway</em>.
+      Free and open source: <a href="https://github.com/Sol-Vulpes/sjk-launcher">Sol-Vulpes/sjk-launcher</a>.</p>
+    </div>
+    <figure class="detail launcher-frame">
+      <img id="launcher-shot" src="screenshots/launcher-home.jpg" alt="The SJK Launcher's Sol JK page: the version you play, up to date, the emblem and the Play button" width="1800" height="1140" decoding="async" loading="lazy">
+      <figcaption id="launcher-caption"><strong>Install, update, play</strong>The version you play and the newest one, any older release a click away, and the release notes.</figcaption>
+    </figure>
+  </div>
+
+  <ul class="launcher-shots">
+    <li><a href="screenshots/launcher-home.jpg" data-launcher-shot="The version you play and the newest one, any older release a click away, and the release notes." aria-current="true">
+      <img src="screenshots/launcher-home.jpg" alt="The SJK Launcher's Sol JK page" width="1800" height="1140" loading="lazy" decoding="async">
+      <strong>Install, update, play</strong><span>Archives checked against GitHub's checksums before they are extracted.</span></a></li>
+    <li><a href="screenshots/launcher-content.jpg" data-launcher-shot="JoF's maps, skins, hilts and packs, and the Sith cloud's, chosen group by group and kept up to date." aria-current="false">
+      <img src="screenshots/launcher-content.jpg" alt="The launcher's Content tab: JoF's map, skin, hilt and asset packs" width="1800" height="1140" loading="lazy" decoding="async">
+      <strong>Community content</strong><span>JoF content and the Sith cloud, downloaded and updated for you.</span></a></li>
+    <li><a href="screenshots/launcher-pk3s.jpg" data-launcher-shot="Every PK3 in GameData, searched by name and by the files inside; what each holds, its safety scan, and what it replaces." aria-current="false">
+      <img src="screenshots/launcher-pk3s.jpg" alt="The launcher's PK3s tab, Jedi Academy's assets1.pk3 opened beside the list" width="1800" height="1140" loading="lazy" decoding="async">
+      <strong>PK3s</strong><span>Find, scan, turn off or remove any PK3, or single files inside one.</span></a></li>
+    <li><a href="screenshots/launcher-doctor.jpg" data-launcher-shot="What usually stops Sol JK from starting, checked on your PC, with fixes where the launcher can make them, and Send my logs to the SJK team." aria-current="false">
+      <img src="screenshots/launcher-doctor.jpg" alt="The launcher's Doctor: every check passed, the graphics choice and the settings reset" width="1800" height="1140" loading="lazy" decoding="async">
+      <strong>Doctor</strong><span>Checks and fixes what stops the game from starting, and sends your logs if you ask.</span></a></li>
+    <li><a href="screenshots/launcher-tools.jpg" data-launcher-shot="SJK's folders and files a click away, a backup of your SJK setup to keep or move to another PC, and Steam's file check." aria-current="false">
+      <img src="screenshots/launcher-tools.jpg" alt="The launcher's Tools tab: SJK's folders and files" width="1800" height="1140" loading="lazy" decoding="async">
+      <strong>Tools</strong><span>Folders, settings files, and a backup of your setup in one zip.</span></a></li>
+  </ul>
+
+  <ul class="rows launcher-more">
+    <li><strong>JoF EternalJK too</strong><span>Installs, updates and starts JoF's EternalJK client beside Sol JK.</span></li>
+    <li><strong>SJK chat</strong><span>SJK's chat in a window of its own, as the same player you are in the game.</span></li>
+    <li><strong>Crashes and freezes</strong><span>When the game goes down or stops answering, the launcher says why in plain words and makes sure the SJK team gets the report.</span></li>
+    <li><strong>Quietly up to date</strong><span>Waits in the tray, can start with your computer, installs new versions while the game is closed, and updates itself.</span></li>
+  </ul>
+</section>
+
+<section id="goal" class="page" aria-labelledby="goal-title">
+  <header class="page-head">
+    <h2 id="goal-title">Why SJK</h2>
+  </header>
+  <div class="goal">
+    <p>SJK aims to be a true JKA+: everything players expect from today's community
+    clients, from the retail look and feel to mod servers such as JA+ and JoF and modern
+    screens, in a client that stays clean and fast. No bloat: every feature has to earn
+    its place and its frame time, and the original game's behaviour comes first.</p>
+  </div>
+</section>
+
+<!-- Donations (docs/sjk.md, "Donations"): the script fills the card from the SJK hub's
+     live goal, or from DONATION at the top of assets/site.js when the hub cannot be
+     reached. Without the script the card keeps the Ko-fi link below.
+     Shelved since 14/10/2026 (DONATION.shelved in site.js): the section and its two nav
+     links are hidden; remove the three hidden attributes to bring it back. -->
+<section id="support" class="page" aria-labelledby="support-title" hidden>
+  <header class="page-head">
+    <h2 id="support-title">Support SJK</h2>
+    <p>Optional: SJK stays free and open source either way.</p>
+  </header>
+  <div class="support">
+    <div class="support-text">
+      <p>Sol develops SJK alone, with Claude, Anthropic's AI, writing much of the code
+      under his direction. Donations have one purpose: a full Claude plan used only
+      for SJK.</p>
+      <p>Sol has a long list of tasks ready, and many of them can run side by side as
+      separate agents. A full plan means more of that work at once, so SJK gets better
+      faster.</p>
+      <p class="muted">Nothing is sold: every feature stays free for everyone, and a
+      donation brings no advantage in the game.</p>
+    </div>
+    <div class="support-card" id="donation" aria-live="polite">
+      <p class="support-label">Monthly goal</p>
+      <p class="support-amount" id="donation-amount">200&nbsp;€ a month</p>
+      <div class="support-bar" id="donation-bar" role="progressbar" aria-labelledby="donation-amount" hidden><span></span></div>
+      <p class="support-note" id="donation-note" hidden>A Claude plan is billed every
+      month, so the bar starts again each month.</p>
+      <a class="download support-button" id="donation-link" href="https://ko-fi.com/soljk" rel="noopener">Donate on Ko-fi</a>
+      <div class="medal-note">
+        <img src="assets/medal-supporter.png" alt="" width="64" height="64">
+        <p><strong>Supporter medal</strong> Donate more than 1&nbsp;€ with your SJK key id
+        in the Ko-fi message and the Supporter medal is yours as soon as Ko-fi tells the SJK
+        hub, shown on your SJK profile, your player card and the scoreboard. Your key id is
+        in Settings › Network › SJK identity key (Copy key id). Without one, Sol matches the
+        donation by hand.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="screenshots" class="page" aria-labelledby="screenshots-title" hidden>
+  <header class="page-head">
+    <h2 id="screenshots-title">Screenshots</h2>
+    <p>Frames rendered by the SJK client itself, on the game's own data.</p>
+  </header>
+  <div class="gallery" id="gallery"></div>
+  <dialog class="lightbox" id="lightbox" aria-label="Screenshot viewer">
+    <figure>
+      <img id="lightbox-image" alt="">
+      <figcaption id="lightbox-caption"></figcaption>
+    </figure>
+    <div class="lightbox-controls">
+      <button type="button" class="button" data-step="-1" aria-label="Previous screenshot"><kbd>←</kbd> Previous</button>
+      <button type="button" class="button" data-close aria-label="Close viewer"><kbd>Esc</kbd> Close</button>
+      <button type="button" class="button" data-step="1" aria-label="Next screenshot">Next <kbd>→</kbd></button>
+    </div>
+  </dialog>
+</section>
+
+<!-- What's new: the script lists the last releases from CHANGELOG.md, each with its
+     introduction and its "> Heading: sentence" recap (site.js, loadChangelog). -->
+<section id="changelog" class="page" aria-labelledby="changelog-title">
+  <header class="page-head">
+    <h2 id="changelog-title">What's new</h2>
+  </header>
+  <div id="releases" aria-live="polite">
+    <p class="muted">Every release's changes are in
+    <a href="https://github.com/Sol-Vulpes/SJK/blob/main/CHANGELOG.md">the changelog</a>,
+    and its files on <a href="https://github.com/Sol-Vulpes/SJK/releases">the releases page</a>.</p>
+  </div>
+</section>
+
+<section id="install" class="page" aria-labelledby="install-title">
+  <header class="page-head">
+    <h2 id="install-title">Install</h2>
+    <p>You need a legally owned copy of <em>Star Wars Jedi Knight: Jedi Academy</em>
+    (Steam, GOG or disc). SJK ships no game files.</p>
+  </header>
+  <!-- One platform at a time once the script runs (the visitor's, guessed), all three
+       without it. -->
+  <p class="install-launcher"><strong>Easiest: the SJK Launcher.</strong> Download it, start
+  it and press Install: it finds the game, puts Sol JK in place and keeps it up to date.
+  <a href="#launcher">Get the launcher</a></p>
+  <p class="install-by-hand">Or install Sol JK by hand:</p>
+  <div class="platforms" data-platforms>
+    <div class="platform-pick" role="group" aria-label="Platform" hidden>
+      <button type="button" class="button" data-platform="windows-x64" aria-pressed="true">Windows</button>
+      <button type="button" class="button" data-platform="linux-x64" aria-pressed="false">Linux</button>
+      <button type="button" class="button" data-platform="macos-arm64" aria-pressed="false">Mac (experimental)</button>
+    </div>
+
+    <section class="platform" data-for="windows-x64" aria-labelledby="install-windows">
+      <h3 id="install-windows">Windows 10/11, x64</h3>
+      <ol class="steps">
+        <li>
+          <h4>Extract into GameData</h4>
+          <p>Download the Windows ZIP and extract <strong>all</strong> of it into the game's
+          <code>GameData</code> folder, beside <code>base</code>:</p>
+<pre><code>GameData/
+├─ base/          (assets0-3.pk3)
+├─ sjk.exe         ← start
+├─ sjk-server.exe
+└─ README-SJK.txt</code></pre>
+          <p class="muted">On Steam: right-click Jedi Academy › Manage › Browse local files ›
+          GameData.</p>
+        </li>
+        <li>
+          <h4>Launch</h4>
+          <p>Start <code>sjk</code>. No path or setting is needed. Windows may warn about an
+          unrecognised app because the builds are not code-signed; choose <em>More info › Run
+          anyway</em> if you trust the download (checksums are in the release).</p>
+          <p class="muted">Kept outside GameData, SJK finds a Steam copy of the game in any Steam
+          library, and a GOG copy. To start SJK with Steam's Play button: right-click Jedi
+          Academy › Properties › General › Launch options, and write the path of
+          <code>sjk.exe</code> followed by <code>%command%</code>, for example
+          <code>"C:\Games\SJK\sjk.exe" %command%</code>.</p>
+        </li>
+      </ol>
+    </section>
+
+    <section class="platform" data-for="linux-x64" aria-labelledby="install-linux">
+      <h3 id="install-linux">Linux, x64</h3>
+      <ol class="steps">
+        <li>
+          <h4>Extract into GameData</h4>
+          <p>Download the Linux ZIP and extract <strong>all</strong> of it into the game's
+          <code>GameData</code> folder, beside <code>base</code>.</p>
+        </li>
+        <li>
+          <h4>Launch</h4>
+          <p>Run <code>./sjk</code>. It needs a working Vulkan or OpenGL graphics driver.</p>
+        </li>
+      </ol>
+    </section>
+
+    <section class="platform" data-for="macos-arm64" aria-labelledby="install-mac">
+      <h3 id="install-mac">Mac with Apple Silicon (experimental)</h3>
+      <ol class="steps">
+        <li>
+          <h4>Extract</h4>
+          <p>For M1 or later; there is no build for Intel Macs. Extract the Mac ZIP into the
+          game's <code>GameData</code> folder, beside <code>base</code>; SJK also looks for the
+          game in Steam's Mac library.</p>
+        </li>
+        <li>
+          <h4>Launch</h4>
+          <p>Open <code>SJK.app</code>. It is not signed by Apple, so macOS blocks it until
+          you allow it once: its README says how. It has not been played on a Mac yet, so
+          reports are welcome.</p>
+        </li>
+      </ol>
+    </section>
+
+    <ol class="steps steps-shared">
+      <li>
+        <h4>Settings and updates</h4>
+        <p>Settings, binds, screenshots and demos live in <code>GameData/SJK/</code>. SJK
+        checks for a new release when it starts and installs it from its Update page,
+        keeping that folder. It opens on the SJK UI; First setup or Settings › Interface ›
+        Menu style switches to the classic menus.</p>
+      </li>
+      <li>
+        <h4>On JA+ servers</h4>
+        <p>SJK identifies as a JA+ plugin client. JA+ puts new players in its alternate
+        dimension, where the grapple is off: use <code>/amAltDim</code> to leave it.
+        <code>serverconfig</code> lists the server's JA+ options.</p>
+      </li>
+      <li>
+        <h4>From source</h4>
+        <p>Install Rust 1.88+, then <code>cargo build --release -p sjk-viewer -p
+        sjk-dedicated</code>, which builds <code>sjk</code> and <code>sjk-server</code>. See the <a href="https://github.com/Sol-Vulpes/SJK#build">README</a>
+        for platform notes and the dedicated server.</p>
+      </li>
+    </ol>
+  </div>
+</section>
+
+<!-- Credits: the script adds each contributor's merged pull requests, counted by
+     GitHub's search (contributorCounts in assets/site.js). -->
+<section id="credits" class="page" aria-labelledby="credits-title">
+  <header class="page-head">
+    <h2 id="credits-title">Credits and community</h2>
+  </header>
+  <p class="credits-lede"><a href="https://github.com/Sol-Vulpes">Sol</a> develops SJK and
+  decides where it goes. Contributors send pull requests; players' ideas, art and reports
+  are credited in every release's notes and in
+  <a href="https://github.com/Sol-Vulpes/SJK/blob/main/CREDITS.md">CREDITS.md</a>.</p>
+  <ul class="people">
+    <li><a href="https://github.com/Sol-Vulpes/SJK/pulls?q=is%3Apr+is%3Amerged+author%3ACreyon94" data-author="Creyon94"><strong>Creyon</strong><span class="count">Pull requests</span><span class="known">EternalJK parity, trading, and the Blade Lab's signature blades, more than 250 of them.</span></a></li>
+    <li><a href="https://github.com/Sol-Vulpes/SJK/pulls?q=is%3Apr+is%3Amerged+author%3Alumayaa" data-author="lumayaa"><strong>Lumaya</strong><span class="count">Pull requests</span><span class="known">Free camera, jetpack, JoF EternalJK's scoreboard and Force effects.</span></a></li>
+    <li><a href="https://github.com/Sol-Vulpes/SJK/pulls?q=is%3Apr+is%3Amerged+author%3AJoFSlash" data-author="JoFSlash"><strong>Slash</strong><span class="count">Pull requests</span><span class="known">Siege and CTF, the vehicle HUD, and the whispers' safety codes.</span></a></li>
+    <li><a href="https://github.com/Sol-Vulpes/SJK/pulls?q=is%3Apr+is%3Amerged+author%3ALukasMoudry" data-author="LukasMoudry"><strong>Lukas</strong><span class="count">Pull requests</span><span class="known">Combo binds, camera settings, chat and console comfort.</span></a></li>
+    <li><a href="https://github.com/Sol-Vulpes/SJK/pulls?q=is%3Apr+is%3Amerged+author%3AMilamber0" data-author="Milamber0"><strong>Milamber</strong><span class="count">Pull requests</span><span class="known">See and share nameplates, JoF EternalJK in SJK chat, and the cause of the Heimdall kicks.</span></a></li>
+    <li><a href="https://github.com/Sol-Vulpes/SJK/pulls?q=is%3Apr+is%3Amerged+author%3AkushinaSJK" data-author="kushinaSJK"><strong>Kushina</strong><span class="count">Pull requests</span><span class="known">Hair and capes that move on rig models, medal ribbons on the scoreboard, and many ideas.</span></a></li>
+    <li><a href="https://github.com/Sol-Vulpes/SJK/pulls?q=is%3Apr+is%3Amerged+author%3ABlackwolf1337" data-author="Blackwolf1337"><strong>Blackwolf</strong><span class="count">Pull requests</span><span class="known">JA+ rules, and the VisionJK work behind 3D sound, puddles and JA+ server mode.</span></a></li>
+  </ul>
+  <p class="credits-lede">Found a bug or have an idea? Use Report a bug in the client, open
+  an issue on the <a href="https://github.com/Sol-Vulpes/SJK/issues">issue tracker</a>, or
+  talk to us on the <a href="https://discord.gg/dGBdMygvJw" rel="noopener">SJK Discord</a>.</p>
+  <p class="legal">SJK is free software under the
+  <a href="https://github.com/Sol-Vulpes/SJK/blob/main/LICENSE">GPL-2.0-only</a>
+  license. It began in October 2026 as a modified version of
+  <a href="https://github.com/Bishop-R/JKR">JKR</a>, an engine by
+  <a href="https://github.com/Bishop-R">Bishop</a>. Copyright &copy; 2026 Sol-Vulpes,
+  Bishop-R and the JKR contributors; copies and modified versions keep the
+  <a href="https://github.com/Sol-Vulpes/SJK/blob/main/NOTICE">notice</a> and credits, and use
+  their own name and emblem. Every release includes its matching source snapshot,
+  and the full source is on GitHub. Star Wars, Jedi Knight and Jedi Academy are trademarks
+  of their respective owners. SJK is a fan project, not affiliated with or endorsed by
+  Lucasfilm, Disney, Raven Software or Activision. No game files are included; the
+  screenshots show SJK running on a legally owned copy of the game.</p>
+</section>
+
+</main>
+
+<footer class="footer">
+  <p>Sol JK · <a href="https://github.com/Sol-Vulpes/SJK">Sol-Vulpes/SJK</a></p>
+  <p>Visits are counted with <a href="https://www.goatcounter.com">GoatCounter</a>, without cookies or personal data.</p>
+</footer>
+</body>
+</html>

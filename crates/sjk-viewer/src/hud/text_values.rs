@@ -1,0 +1,103 @@
+//! Retained HUD text resolution, independent of layout.
+use super::*;
+
+impl HudOverlay {
+    /// Resolve a widget text ID without formatting or allocating.
+    pub(crate) fn resolve_text(&self, id: TextId) -> &str {
+        match id.0 {
+            0 => &self.health,
+            1 => &self.armor,
+            2 => &self.force,
+            3 => &self.weapon,
+            4 => &self.ammo,
+            6 => &self.health_value,
+            8 => &self.armor_value,
+            10 => &self.force_value,
+            12 => &self.weapon_value,
+            14 => &self.ammo_value,
+            15 => &self.style_value,
+            value @ 200..=vote::TEXT_LAST => self.vote_text(value),
+            310 => &self.crosshair_name,
+            311 => &self.match_timer,
+            312 => &self.warmup_text,
+            313 => "CONNECTION INTERRUPTED",
+            314 => &self.speed.text,
+            clock::TEXT => &self.clock.text,
+            315 => &self.score_text,
+            316 => &self.snapshot_text,
+            317 => &self.targeting.position,
+            318 => &self.enemy_info.name,
+            319 => &self.enemy_info.detail,
+            324 => &self.followed_name,
+            325 => &self.lagometer_readout.ping,
+            326 => &self.lagometer_readout.interpolation,
+            327 => &self.lagometer_readout.speed,
+            value @ (vehicle::TEXT_FIRST..=vehicle::TEXT_LAST
+            | vehicle::VALUE_TEXT
+            | vehicle::LABEL_TEXT
+            | vehicle::SPEED_VALUE_TEXT..=vehicle::AMMO2_VALUE_TEXT) => self.vehicle.text(value),
+            value @ super::data_source::LABEL_FIRST..=super::data_source::LABEL_LAST => {
+                super::data_source::LABELS[(value - super::data_source::LABEL_FIRST) as usize].1
+            }
+            value @ crate::scope::binoculars::TEXT_FIRST..=crate::scope::binoculars::TEXT_LAST => {
+                crate::scope::binoculars::DIGIT_TEXT
+                    [(value - crate::scope::binoculars::TEXT_FIRST) as usize]
+            }
+            value @ flag_status::TEXT_FIRST..=flag_status::TEXT_LAST => {
+                self.flag_status.text(value)
+            }
+            value @ 400..=415 => self.icons.text((value - 400) as usize),
+            value @ kill_feed::TEXT_FIRST..=kill_feed::TEXT_LAST => self.kill_feed.text(value),
+            _ => selection::text(id),
+        }
+    }
+}
+
+/// The retail font the cgame drew a HUD text with, for `ui_gameFont`; `None`
+/// keeps the HUD's own font (Inter, or `arialnb` with `cg_classicHudFont`).
+///
+/// OpenJK `codemp` `cg_draw.c`: `CG_DrawCrosshairNames`, `CG_DrawWarmup`,
+/// `CG_DrawTimer`, `CG_DrawEnemyInfo` and JoF EternalJK's `CG_DrawFollow` paint with
+/// `FONT_MEDIUM`; the Force and inventory selection names, and JoF EJK's lagometer
+/// numbers (`CG_DrawLagometer`, `CG_DrawSpeedGraph`), use `UI_SMALLFONT` (`FONT_SMALL`); vote,
+/// snapshot and `CG_DrawDisconnect` draw console characters
+/// (`CG_DrawSmallString`, `CG_DrawStringExt`, `CG_DrawBigString`). Retail has no
+/// kill feed (obituaries are console prints, `CG_Obituary`): SJK's
+/// ([`super::kill_feed`]) stays on the HUD font it is measured in.
+pub(super) fn retail_font(id: TextId) -> Option<RetailFont> {
+    match id.0 {
+        310..=312 | 318 | 319 | 324 => Some(RetailFont::Medium),
+        325..=327 | 1000..=1022 | 1100..=1111 => Some(RetailFont::Small),
+        313 | 316 => Some(RetailFont::Console),
+        _ => None,
+    }
+}
+
+#[cfg(test)]
+mod retail_font_tests {
+    use super::*;
+
+    #[test]
+    fn crosshair_name_uses_the_medium_font_and_status_values_their_own() {
+        assert_eq!(retail_font(TextId(310)), Some(RetailFont::Medium));
+        assert_eq!(retail_font(TextId(1003)), Some(RetailFont::Small));
+        assert_eq!(retail_font(TextId(316)), Some(RetailFont::Console));
+        // Health, ammo, the selector headings, the vote card and the kill feed stay on the
+        // HUD font.
+        for id in [
+            0,
+            6,
+            14,
+            100,
+            1200,
+            1201,
+            200,
+            201,
+            vote::TEXT_LAST,
+            kill_feed::TEXT_FIRST,
+            kill_feed::TEXT_LAST,
+        ] {
+            assert_eq!(retail_font(TextId(id)), None);
+        }
+    }
+}

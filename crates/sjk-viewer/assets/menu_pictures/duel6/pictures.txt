@@ -1,0 +1,17 @@
+# The menu pictures of maps/mp/duel6.bsp, written by world_shot_menu_pictures.rs: do not edit.
+message Yavin Training Grounds
+fov 90
+size 3840 2160
+view tour-0 -2142 0 877 0 -0.11138789
+view tour-1 -1100 -1100 700 0.7853982 -0.25167766
+view tour-2 2224 0 884 3.1415927 -0.11003356
+view tour-3 -260 -260 400 0.7853982 0.7748233
+view tour-4 1100 1100 705 -2.3561945 -0.2546901
+view tour-5 -590 0 710 0 -0.60730517
+view tour-6 0 -1220 340 -1.5707964 0.22679886
+view tour-7 -430 -430 470 -2.3561945 -0.111187965
+view tour-8 1100 -1100 700 2.3561945 -0.25167766
+view tour-9 0 -2224 884 1.5707964 -0.11003356
+view player -405 -424 394 1.2217305 -0.034906585
+view saber -425 -458 392 1.2566371 -0.05235988
+view holocrons -405 -424 394 1.2217305 -0.034906585

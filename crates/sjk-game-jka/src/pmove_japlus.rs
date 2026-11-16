@@ -1,0 +1,623 @@
+//! JA+ movement and saber rules that a JA+ server runs and its clients predict.
+//!
+//! JA+ is closed source, so the client side follows EternalJK's reimplementation of the
+//! JA+ client plugin (`codemp/game/bg_pmove.c`, `bg_saber.c`, the `SVMOD_JAPLUS` and
+//! `JAPLUS_CINFO_*` branches) and, where that and a JA+ server disagree, the server as
+//! the replay checks observed it. Some rules follow a `jp_cinfo` bit the server
+//! publishes in its serverinfo; others apply on every JA+ server. Stock and other
+//! servers, SJK's own included, keep the stock rules ([`JaPlusRules::default`]).
+//!
+//! Not predicted: the `jp_cinfo` options EternalJK never reads outside its
+//! `serverconfig` listing (single-player attacks, the new DFA, model scale, kata,
+//! the auto replier, ledge grab, the alternate dimension, macro scan); the Jedi
+//! Outcast red DFA (`jp_jk2RedDFA`, off by default), whose jump-hack start sets a saber
+//! move from the jump code (`bg_pmove.c:3165-3203`); and the animation stiffening for
+//! JA+'s extra GLA animations, which stock animation tables lack.
+
+use sjk_protocol::{GameState, InfoString, JaPlusCapabilities, ServerDialect, ServerProfile};
+
+/// `WP_MELEE`.
+const WP_MELEE: u8 = 2;
+
+/// The JA+ rules in force for one session.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct JaPlusRules {
+    /// The server runs JA+ (`cgs.serverMod == SVMOD_JAPLUS`).
+    pub enabled: bool,
+    /// `JAPLUS_CINFO_FLIPKICK` (`jp_allowFlipKick`): wall flips and runs off players,
+    /// and the front flip off a player run at.
+    pub flip_kick: bool,
+    /// `JAPLUS_CINFO_HEADSLIDE` (`jp_slideOnPlayer`): standing on a player keeps stock's
+    /// frictionless slide; without it JA+ applies ground friction there.
+    pub head_slide: bool,
+    /// `JAPLUS_CINFO_YELLOWDFA` (`jp_improveYellowDFA`): the medium style's flip over
+    /// leaps 60 forward instead of 150 and does not spin or lock the view.
+    pub yellow_dfa: bool,
+    /// The server leaves the view free through knockdowns and their get-ups, where
+    /// EternalJK's cgame (`CG_JAPlusViewLockedState`) holds it, as some JA+ servers do.
+    /// No serverinfo says which: the client sets it from its table of server families
+    /// (`sjk-viewer`'s `held_view::FREE_KNOCKDOWN_VIEW`, with a cvar override); off,
+    /// a JA+ server keeps EternalJK's held view.
+    pub free_knockdown_view: bool,
+    /// `dmflags` 256 (`JP_DF_OLD_COLLISION` of the JA+ 2.4 B7 game module): the server
+    /// keeps the original game's collision boxes, so the dual forward jump attack raises
+    /// its feet whether or not a player is in front.
+    pub old_collision: bool,
+    /// `jp_gripSpeedScale`, a serverinfo setting of every JA+ server (default 0.8): the
+    /// run speed kept while gripping, within 0.4 and 1.01 ([`Self::grip_speed_scale`]).
+    /// Only read on JA+.
+    pub grip_speed: f32,
+    /// The held emotes a JA+ server freezes (`PM_FREEZE`) for the clients that do not
+    /// predict them ([`crate::pmove_japlus_emotes`]); a client's own movement holds them
+    /// itself and leaves this off.
+    pub emote_freeze: crate::pmove_japlus_emotes::EmoteFreeze,
+}
+
+impl Default for JaPlusRules {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            flip_kick: false,
+            head_slide: false,
+            yellow_dfa: false,
+            free_knockdown_view: false,
+            old_collision: false,
+            grip_speed: JP_GRIP_SPEED_SCALE,
+            emote_freeze: crate::pmove_japlus_emotes::EmoteFreeze::Off,
+        }
+    }
+}
+
+/// The `dmflags` bit with which a JA+ server keeps the original collision boxes.
+const JP_DF_OLD_COLLISION: i32 = 256;
+/// `jp_gripSpeedScale`'s default (VisionJK `codemp/game/japlus/g_japlus_xcvar.h:102`).
+pub const JP_GRIP_SPEED_SCALE: f32 = 0.8;
+
+impl JaPlusRules {
+    /// The rules a parsed dialect selects: JA+ ones only for a JA+ server.
+    pub fn from_dialect(dialect: &ServerDialect) -> Self {
+        let ServerDialect::JaPlus { capabilities } = dialect else {
+            return Self::default();
+        };
+        Self {
+            enabled: true,
+            flip_kick: capabilities.contains(JaPlusCapabilities::FLIP_KICK),
+            head_slide: capabilities.contains(JaPlusCapabilities::HEAD_SLIDE),
+            yellow_dfa: capabilities.contains(JaPlusCapabilities::YELLOW_DFA),
+            free_knockdown_view: false,
+            old_collision: false,
+            grip_speed: JP_GRIP_SPEED_SCALE,
+            emote_freeze: crate::pmove_japlus_emotes::EmoteFreeze::Off,
+        }
+    }
+
+    /// Read the dialect from `CS_SERVERINFO`.
+    pub fn from_game_state(game_state: &GameState) -> Self {
+        game_state
+            .config_string(0)
+            .and_then(|bytes| std::str::from_utf8(bytes).ok())
+            .and_then(|text| InfoString::parse(text).ok())
+            .map_or_else(Self::default, |info| {
+                let rules = Self::from_dialect(&ServerProfile::from_server_info(&info).dialect);
+                Self {
+                    // `cgs.dmflags`, `atoi` of the serverinfo key (`cg_servercmds.c`).
+                    old_collision: rules.enabled
+                        && info.get_i32("dmflags").unwrap_or_default() & JP_DF_OLD_COLLISION != 0,
+                    // `atof` of the serverinfo key, as VisionJK's cgame reads it
+                    // (`codemp/cgame/cg_servercmds.c:160`). A JA+ server always publishes
+                    // it (`CVAR_SERVERINFO`); without it the module's default stands.
+                    grip_speed: info
+                        .get("jp_gripSpeedScale")
+                        .map_or(JP_GRIP_SPEED_SCALE, atof),
+                    ..rules
+                }
+            })
+    }
+
+    /// Whether standing on a player is frictionless, as stock has it
+    /// (`bg_pmove.c:1236-1248`).
+    pub(crate) fn slides_on_players(self) -> bool {
+        !self.enabled || self.head_slide
+    }
+
+    /// The run speed kept while gripping (`bg_pmove.c:10063-10073`): stock 0.4; on JA+
+    /// the server's `jp_gripSpeedScale`, held within 0.4 and 1.01 (VisionJK
+    /// `codemp/game/bg/bg_pmove.c:8883-8886`).
+    pub(crate) fn grip_speed_scale(self) -> f32 {
+        if self.enabled {
+            self.grip_speed.clamp(0.4, 1.01)
+        } else {
+            0.4
+        }
+    }
+
+    /// Whether an attack pressed with the holdable button cancels both
+    /// (`bg_pmove.c:12035-12048`): not for melee on JA+.
+    pub(crate) fn cancels_attack_with_holdable(self, weapon: u8) -> bool {
+        !(self.enabled && weapon == WP_MELEE)
+    }
+
+    /// The medium style's flip-over leap speed (`bg_saber.c:1697-1703`). EternalJK uses
+    /// jaPRO's 50 for JA+ too; a JA+ 2.4 server launches it at 60.
+    pub(crate) fn flip_over_forward_speed(self) -> f32 {
+        if self.yellow_dfa { 60.0 } else { 150.0 }
+    }
+
+    /// Whether the flip over turns and locks the view (`bg_pmove.c:12119-12135`).
+    pub(crate) fn flip_over_spins(self) -> bool {
+        !self.yellow_dfa
+    }
+
+    /// Whether a staff's alternate attack standing still is a front kick
+    /// (`bg_saber.c:2857-2866`).
+    pub(crate) fn standing_front_kick(self) -> bool {
+        self.enabled
+    }
+
+    /// Whether the server holds the view through knockdowns and get-ups
+    /// (`CG_JAPlusViewLockedState`), unless [`Self::free_knockdown_view`].
+    pub fn holds_knockdown_view(self) -> bool {
+        self.enabled && !self.free_knockdown_view
+    }
+
+    /// Whether wall flips and runs, and the front flip, push off players
+    /// (`bg_pmove.c:2655-2665, 2919-2990`).
+    pub(crate) fn flip_kick(self) -> bool {
+        self.enabled && self.flip_kick
+    }
+
+    /// Whether a run up a wall may start from the Force jump's flips forward, left and
+    /// right as well as from a plain jump. Not in EternalJK (stock and it require
+    /// `BOTH_JUMP1`/`BOTH_INAIR1`); observed on a JA+ 2.4 server.
+    pub(crate) fn wall_runs_from_force_flips(self) -> bool {
+        self.enabled
+    }
+}
+
+/// C's `atof`: the longest leading decimal number (after blanks), 0 for none.
+fn atof(text: &str) -> f32 {
+    let text = text.trim_start();
+    let bytes = text.as_bytes();
+    let mut end = 0;
+    if matches!(bytes.first(), Some(b'+' | b'-')) {
+        end = 1;
+    }
+    let digits = |from: usize| {
+        bytes[from..]
+            .iter()
+            .take_while(|byte| byte.is_ascii_digit())
+            .count()
+    };
+    end += digits(end);
+    if bytes.get(end) == Some(&b'.') {
+        end += 1 + digits(end + 1);
+    }
+    let mut number = &text[..end];
+    // An exponent counts only with its digits.
+    if matches!(bytes.get(end), Some(b'e' | b'E')) {
+        let mut at = end + 1;
+        if matches!(bytes.get(at), Some(b'+' | b'-')) {
+            at += 1;
+        }
+        let exponent = digits(at);
+        if exponent > 0 {
+            number = &text[..at + exponent];
+        }
+    }
+    number.parse().unwrap_or(0.0)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn rules(gamename: &str, cinfo: u32) -> JaPlusRules {
+        let info =
+            InfoString::parse(&format!("\\gamename\\{gamename}\\jp_cinfo\\{cinfo}")).unwrap();
+        JaPlusRules::from_dialect(&ServerProfile::from_server_info(&info).dialect)
+    }
+
+    #[test]
+    fn only_ja_plus_selects_the_rules() {
+        assert_eq!(rules("basejka", u32::MAX), JaPlusRules::default());
+        assert_eq!(rules("TaystJK", u32::MAX), JaPlusRules::default());
+        let stock = JaPlusRules::default();
+        assert!(stock.slides_on_players());
+        assert_eq!(stock.grip_speed_scale(), 0.4);
+        assert!(stock.cancels_attack_with_holdable(2));
+        assert_eq!(stock.flip_over_forward_speed(), 150.0);
+        assert!(stock.flip_over_spins());
+        assert!(!stock.standing_front_kick());
+        assert!(!stock.flip_kick());
+    }
+
+    #[test]
+    fn default_ja_plus_server_bits() {
+        // JA+ 2.4 B7's default jp_cinfo: flip kick, fix roll 1, yellow DFA, SP attacks,
+        // new DFA, ledge grab, alternate dimension.
+        let japlus = rules("JA+ Mod v2.4 B7", 196_819);
+        assert!(japlus.enabled && japlus.flip_kick && japlus.yellow_dfa);
+        assert!(!japlus.head_slide);
+        assert!(!japlus.slides_on_players());
+        assert_eq!(japlus.grip_speed_scale(), 0.8);
+        assert!(!japlus.cancels_attack_with_holdable(2));
+        assert!(japlus.cancels_attack_with_holdable(3));
+        assert_eq!(japlus.flip_over_forward_speed(), 60.0);
+        assert!(!japlus.flip_over_spins());
+        assert!(japlus.standing_front_kick() && japlus.flip_kick());
+    }
+
+    #[test]
+    fn dmflags_256_keeps_the_old_collision_on_ja_plus_only() {
+        let rules = |serverinfo: &str| {
+            let mut game = GameState::empty_local(0);
+            game.replace_config_string(0, serverinfo.as_bytes().to_vec())
+                .unwrap();
+            JaPlusRules::from_game_state(&game)
+        };
+        let japlus = r"\gamename\JA+ Mod v2.4 B7\jp_cinfo\196819";
+        assert!(!rules(japlus).old_collision);
+        assert!(!rules(&format!(r"{japlus}\dmflags\8")).old_collision);
+        assert!(rules(&format!(r"{japlus}\dmflags\264")).old_collision);
+        assert!(!rules(r"\gamename\basejka\dmflags\256").old_collision);
+    }
+
+    #[test]
+    fn the_grip_speed_is_the_ja_plus_servers_own() {
+        let rules = |serverinfo: &str| {
+            let mut game = GameState::empty_local(0);
+            game.replace_config_string(0, serverinfo.as_bytes().to_vec())
+                .unwrap();
+            JaPlusRules::from_game_state(&game).grip_speed_scale()
+        };
+        let japlus = r"\gamename\JA+ Mod v2.4 B7\jp_cinfo\19";
+        let with = |scale: &str| rules(&format!(r"{japlus}\jp_gripSpeedScale\{scale}"));
+        // Not published: the module's default.
+        assert_eq!(rules(japlus), 0.8);
+        assert_eq!(with("0.8"), 0.8);
+        assert_eq!(with("1"), 1.0);
+        // Held within 0.4 and 1.01, as `atof` reads it.
+        assert_eq!(with("0.1"), 0.4);
+        assert_eq!(with("3"), 1.01);
+        assert_eq!(with("0.65xyz"), 0.65);
+        assert_eq!(with("none"), 0.4);
+        // Anywhere else, stock's 0.4 whatever the key says.
+        assert_eq!(rules(r"\gamename\basejka\jp_gripSpeedScale\1"), 0.4);
+    }
+
+    #[test]
+    fn atof_reads_as_c_does() {
+        assert_eq!(atof(" 0.5"), 0.5);
+        assert_eq!(atof("-2"), -2.0);
+        assert_eq!(atof(".25x"), 0.25);
+        assert_eq!(atof("1e1"), 10.0);
+        assert_eq!(atof("1e"), 1.0);
+        assert_eq!(atof(""), 0.0);
+        assert_eq!(atof("-"), 0.0);
+    }
+
+    /// No world: every trace misses.
+    struct Open;
+
+    impl crate::pmove::MovementCollision for Open {
+        fn trace(
+            &self,
+            _: [f32; 3],
+            _: [f32; 3],
+            _: [f32; 3],
+            end: [f32; 3],
+            _: u32,
+        ) -> crate::pmove::MovementTrace {
+            crate::pmove::MovementTrace::miss(end)
+        }
+
+        fn point_contents(&self, _: [f32; 3]) -> u32 {
+            0
+        }
+    }
+
+    fn animation(name: &str) -> u16 {
+        crate::legacy_animation_index(name).unwrap() as u16
+    }
+
+    /// Run the head of `PmoveSingle`'s command filter on `state` with a command that
+    /// pushes forward and turns 90 degrees.
+    fn filtered(
+        mut state: crate::pmove::MovementState,
+        rules: JaPlusRules,
+    ) -> (crate::pmove::MovementState, sjk_protocol::UserCommand) {
+        let mut command = sjk_protocol::UserCommand {
+            server_time: 1_000,
+            forward_move: 127,
+            angles: [0, 16_384, 0],
+            ..Default::default()
+        };
+        state.ground_entity_number = 1_022;
+        crate::pmove_input_freeze::apply(&mut state, &mut command, 8, &Open, None, rules);
+        (state, command)
+    }
+
+    fn ja_plus() -> JaPlusRules {
+        rules("JA+ Mod v2.4 B7", 196_819)
+    }
+
+    #[test]
+    fn ja_plus_taunts_leave_the_controls_free() {
+        let state = crate::pmove::MovementState {
+            legs_anim: animation("BOTH_BOW"),
+            torso_anim: animation("BOTH_BOW"),
+            legs_timer: 500,
+            torso_timer: 500,
+            ..Default::default()
+        };
+        let (stock_state, stock) = filtered(state.clone(), JaPlusRules::default());
+        assert_eq!(stock.forward_move, 0);
+        assert_ne!(stock_state.delta_angles, state.delta_angles);
+        let (japlus_state, japlus) = filtered(state.clone(), ja_plus());
+        assert_eq!(japlus.forward_move, 127);
+        assert_eq!(japlus_state.delta_angles, state.delta_angles);
+    }
+
+    #[test]
+    fn ja_plus_meditation_keeps_still_but_looks_around() {
+        let state = crate::pmove::MovementState {
+            legs_anim: animation("BOTH_MEDITATE"),
+            torso_anim: animation("BOTH_MEDITATE"),
+            legs_timer: 500,
+            torso_timer: 500,
+            ..Default::default()
+        };
+        let (stock_state, stock) = filtered(state.clone(), JaPlusRules::default());
+        assert_eq!(stock.forward_move, 0);
+        assert_ne!(stock_state.delta_angles, state.delta_angles);
+        let (japlus_state, japlus) = filtered(state.clone(), ja_plus());
+        assert_eq!(japlus.forward_move, 0);
+        assert_eq!(japlus_state.delta_angles, state.delta_angles);
+    }
+
+    /// The command filter for one command of `step` ms with `buttons` and `up_move`, the
+    /// pose's lengths known when `lengths` (every animation 10 frames of 50 ms).
+    fn emote_filtered(
+        mut state: crate::pmove::MovementState,
+        rules: JaPlusRules,
+        step: i32,
+        buttons: u16,
+        up_move: i8,
+        lengths: bool,
+    ) -> (crate::pmove::MovementState, sjk_protocol::UserCommand) {
+        let table = crate::AnimationLengthTable::new(vec![
+            crate::pmove_anim::AnimationTiming {
+                frame_count: 10,
+                frame_lerp_ms: 50,
+            };
+            crate::legacy_animation_count()
+        ]);
+        let mut command = sjk_protocol::UserCommand {
+            server_time: 1_000 + step,
+            forward_move: 127,
+            up_move,
+            buttons,
+            angles: [0, 16_384, 0],
+            ..Default::default()
+        };
+        state.ground_entity_number = 1_022;
+        let lengths: Option<&dyn crate::AnimationLengths> = lengths.then_some(&table);
+        crate::pmove_input_freeze::apply(&mut state, &mut command, step, &Open, lengths, rules);
+        (state, command)
+    }
+
+    fn posed(name: &str, timer: i32) -> crate::pmove::MovementState {
+        crate::pmove::MovementState {
+            legs_anim: animation(name),
+            torso_anim: animation(name),
+            legs_timer: timer,
+            torso_timer: timer,
+            force_hand_extend: 10,
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn a_ja_plus_emote_holds_the_body_until_a_button() {
+        use crate::pmove_japlus_emotes::EmoteFreeze;
+        for step in [8, 7, 4, 3] {
+            // `amsit3`: held still with the view free, the timers topped up to a second.
+            let (held, command) =
+                emote_filtered(posed("BOTH_SIT6", 20), ja_plus(), step, 0, 0, false);
+            assert_eq!(command.forward_move, 0, "{step} ms");
+            assert_eq!(held.delta_angles, [0; 3]);
+            assert_eq!(held.legs_timer, 1_000);
+            assert_eq!(
+                (held.force_hand_extend, held.force_hand_extend_time),
+                (10, 2_000 + step)
+            );
+            assert_eq!(held.movement_type, 0, "a client predicts it, unfrozen");
+            // A stock server knows no such taunt.
+            let (_, stock) = emote_filtered(
+                posed("BOTH_SIT6", 20),
+                JaPlusRules::default(),
+                step,
+                0,
+                0,
+                false,
+            );
+            assert_eq!(stock.forward_move, 127);
+            // An attack ends it with the pose's own end.
+            let (ended, _) = emote_filtered(posed("BOTH_SIT6", 20), ja_plus(), step, 1, 0, true);
+            assert_eq!(ended.legs_anim, animation("BOTH_SIT2TOSTAND5"));
+            assert_eq!(ended.torso_anim, animation("BOTH_SIT2TOSTAND5"));
+            assert_eq!(ended.force_hand_extend, 0);
+            // The hook's button and a jump too; without the lengths, the timers end.
+            let (hooked, _) =
+                emote_filtered(posed("BOTH_SIT6", 20), ja_plus(), step, 4_096, 0, false);
+            assert_eq!((hooked.legs_timer, hooked.torso_timer), (0, 0));
+            let (jumped, _) = emote_filtered(posed("BOTH_SIT6", 20), ja_plus(), step, 0, 127, true);
+            assert_eq!(jumped.legs_anim, animation("BOTH_SIT2TOSTAND5"));
+            // A server that freezes the held emotes.
+            let server = JaPlusRules {
+                emote_freeze: EmoteFreeze::Held,
+                ..ja_plus()
+            };
+            let (frozen, _) = emote_filtered(posed("BOTH_SIT6", 20), server, step, 0, 0, false);
+            assert_eq!(frozen.movement_type, 6);
+        }
+    }
+
+    #[test]
+    fn only_the_server_holds_and_freezes_at_ease() {
+        use crate::pmove_japlus_emotes::EmoteFreeze;
+        // `amatease`: a client lets it go, the server holds and freezes it, `jp_fixEmot`
+        // or not; meditation is never frozen.
+        let (client, command) = emote_filtered(posed("BOTH_STAND4", 50), ja_plus(), 8, 0, 0, false);
+        assert_eq!((command.forward_move, client.legs_timer), (127, 50));
+        for freeze in [EmoteFreeze::AtEase, EmoteFreeze::Held] {
+            let server = JaPlusRules {
+                emote_freeze: freeze,
+                ..ja_plus()
+            };
+            let (held, command) = emote_filtered(posed("BOTH_STAND4", 50), server, 8, 0, 0, false);
+            assert_eq!((command.forward_move, held.movement_type), (0, 6));
+            let (meditating, command) =
+                emote_filtered(posed("BOTH_MEDITATE", 50), server, 8, 0, 0, false);
+            assert_eq!((command.forward_move, meditating.movement_type), (0, 0));
+            let (sitting, _) = emote_filtered(posed("BOTH_SIT6", 50), server, 8, 0, 0, false);
+            assert_eq!(sitting.movement_type == 6, freeze == EmoteFreeze::Held);
+        }
+    }
+
+    #[test]
+    fn ja_plus_melee_kicks_hold_the_kicker_still() {
+        for kick in [
+            "BOTH_MELEE_SPINKICK",
+            "BOTH_MELEE_BACKKICK",
+            "BOTH_JUMP_BACKKICK_SPIN",
+            "BOTH_JUMP_BACKFLIP_ATCK",
+            "BOTH_FLIP_STAB",
+            "BOTH_JUMP_BACKFLIP_ATCK_MISSED",
+        ] {
+            let state = crate::pmove::MovementState {
+                legs_anim: animation(kick),
+                torso_anim: animation(kick),
+                legs_timer: 600,
+                torso_timer: 600,
+                ..Default::default()
+            };
+            let (_, stock) = filtered(state.clone(), JaPlusRules::default());
+            assert_eq!(
+                stock.forward_move, 127,
+                "{kick}: stock does not know the kick"
+            );
+            let (japlus_state, japlus) = filtered(state.clone(), ja_plus());
+            assert_eq!(japlus.forward_move, 0, "{kick}: JA+ holds the kicker still");
+            assert_eq!(
+                japlus_state.delta_angles, state.delta_angles,
+                "{kick}: view free"
+            );
+        }
+    }
+
+    #[test]
+    fn ja_plus_kiss_and_backflip_victim_lock_the_view() {
+        for (legs, torso) in [
+            ("BOTH_KISSEE", "BOTH_KISSEE"),
+            ("BOTH_LEDGE_MERCPULL", "BOTH_LEDGE_MERCPULL"),
+            ("BOTH_STAND1", "BOTH_NEW_STABEE"),
+            ("BOTH_JUMP_BACKFLIP_ATCKEE", "BOTH_STAND1"),
+            ("BOTH_STAND1", "BOTH_JUMP_BACKFLIP_ATCKEE"),
+        ] {
+            let state = crate::pmove::MovementState {
+                legs_anim: animation(legs),
+                torso_anim: animation(torso),
+                ..Default::default()
+            };
+            let (japlus_state, japlus) = filtered(state.clone(), ja_plus());
+            assert_eq!(japlus.forward_move, 0, "{legs}/{torso}");
+            assert_ne!(
+                japlus_state.delta_angles, state.delta_angles,
+                "{legs}/{torso}"
+            );
+        }
+    }
+
+    #[test]
+    fn ja_plus_kiss_emote_holds_the_body_but_not_the_view() {
+        // `amkiss`: the kiss's animation with the body frozen by the emote.
+        let state = crate::pmove::MovementState {
+            legs_anim: animation("BOTH_KISSER"),
+            torso_anim: animation("BOTH_KISSER"),
+            movement_type: 6,
+            ..Default::default()
+        };
+        let (japlus_state, japlus) = filtered(state.clone(), ja_plus());
+        assert_eq!(japlus.forward_move, 0);
+        assert_eq!(japlus_state.delta_angles, state.delta_angles);
+    }
+
+    #[test]
+    fn ja_plus_get_up_holds_the_view_unless_the_server_leaves_it_free() {
+        let state = crate::pmove::MovementState {
+            legs_anim: animation("BOTH_STAND1"),
+            torso_anim: animation("BOTH_GETUP1"),
+            ..Default::default()
+        };
+        // EternalJK's rule, kept on JA+ servers not known to differ.
+        let (held_state, held) = filtered(state.clone(), ja_plus());
+        assert_eq!(held.forward_move, 0);
+        assert_ne!(held_state.delta_angles, state.delta_angles);
+        // The JoF server turns the view through `BOTH_GETUP1` (hub report #164).
+        let free_rules = JaPlusRules {
+            free_knockdown_view: true,
+            ..ja_plus()
+        };
+        assert!(ja_plus().holds_knockdown_view() && !free_rules.holds_knockdown_view());
+        let (free_state, free) = filtered(state.clone(), free_rules);
+        assert_eq!(free.forward_move, 0, "the body is still held");
+        assert_eq!(free_state.delta_angles, state.delta_angles);
+        // An emote that plays it holds the body only, wherever.
+        let emote = crate::pmove::MovementState {
+            movement_type: 6,
+            ..state.clone()
+        };
+        let (emote_state, _) = filtered(emote.clone(), ja_plus());
+        assert_eq!(emote_state.delta_angles, emote.delta_angles);
+    }
+
+    #[test]
+    fn other_servers_leave_ja_plus_animations_alone() {
+        let state = crate::pmove::MovementState {
+            legs_anim: animation("BOTH_KISSEE"),
+            torso_anim: animation("BOTH_KISSEE"),
+            ..Default::default()
+        };
+        let (stock_state, stock) = filtered(state.clone(), JaPlusRules::default());
+        assert_eq!(stock.forward_move, 127);
+        assert_eq!(stock_state.delta_angles, state.delta_angles);
+    }
+
+    #[test]
+    fn improved_yellow_dfa_does_not_spin() {
+        let state = crate::pmove::MovementState {
+            legs_anim: animation("BOTH_JUMPFLIPSLASHDOWN1"),
+            torso_anim: animation("BOTH_JUMPFLIPSLASHDOWN1"),
+            legs_timer: 1_200,
+            torso_timer: 1_200,
+            saber_move: u32::from(crate::saber_move_data::movement::LS_A_FLIP_SLASH),
+            ..Default::default()
+        };
+        let (stock, _) = filtered(state.clone(), JaPlusRules::default());
+        assert!((stock.view_angles[1] - 240.0 * 0.008).abs() < 1e-4);
+        let (japlus, command) = filtered(state.clone(), ja_plus());
+        assert_eq!(japlus.view_angles[1], 0.0);
+        assert_eq!(japlus.delta_angles, state.delta_angles);
+        // Still frozen in place.
+        assert_eq!(command.forward_move, 0);
+    }
+
+    #[test]
+    fn optional_bits_follow_the_server() {
+        let japlus = rules("JA+ Mod v2.4 B7", 1 << 5);
+        assert!(japlus.head_slide && !japlus.flip_kick && !japlus.yellow_dfa);
+        assert!(japlus.slides_on_players());
+        assert_eq!(japlus.flip_over_forward_speed(), 150.0);
+    }
+}

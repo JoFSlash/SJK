@@ -1,0 +1,50 @@
+Particle
+{
+	name				Glyphs
+
+	spawnFlags			orgOnCylinder
+
+	count				5 7
+
+	rotation			0 0
+
+	life				700 1100
+
+	origin				8 0 0
+
+	radius				18 24
+
+	height				70
+
+	velocity			-40 0 0 -90 0 0
+
+	rgb
+	{
+		start			0.25 1.0 0.35	0.45 1.0 0.55
+	}
+
+	alpha
+	{
+		start			0.45 0.6
+		end				0
+		parm			60
+		flags			nonlinear
+	}
+
+	size
+	{
+		start			4.2 5.8
+	}
+
+	shaders
+	[
+		gfx/sjk/hax/glyph_0
+		gfx/sjk/hax/glyph_1
+		gfx/sjk/hax/glyph_2
+		gfx/sjk/hax/glyph_3
+		gfx/sjk/hax/glyph_4
+		gfx/sjk/hax/glyph_5
+		gfx/sjk/hax/glyph_6
+		gfx/sjk/hax/glyph_7
+	]
+}

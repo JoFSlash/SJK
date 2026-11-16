@@ -1,0 +1,9 @@
+# The menu pictures of maps/mp/ffa3.bsp, written by world_shot_menu_pictures.rs: do not edit.
+message Tatooine FFA
+fov 90
+size 3840 2160
+view main 1752 800 24 -2.9340963 0.40178308
+view browser 704 -1120 -60 -1.5707965 0.05235988
+view settings 2280 985 345 -3.0368733 -0.17453292
+view player 562 508 518 -2.4609146 -0.13962634
+view saber 665 540 506 0.27925265 -0.017453292

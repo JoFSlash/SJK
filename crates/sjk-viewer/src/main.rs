@@ -1,0 +1,3633 @@
+// A Windows release client is a windowed program: no console opens beside the game.
+// Debug builds keep theirs for `cargo run`; the log is standard error either way, so
+// a redirected start (play.bat) still writes it to a file.
+#![cfg_attr(all(windows, not(debug_assertions)), windows_subsystem = "windows")]
+mod achievements;
+mod actor_instance;
+mod actor_load;
+mod actor_mesh;
+mod actor_pose;
+mod actor_tint;
+mod actor_world_submission;
+mod admin_key_login;
+mod alpha_notice_card;
+mod am_color;
+mod animation_timing;
+mod anti_emote;
+mod app_launch;
+mod assets;
+mod audio;
+mod audio_mute;
+mod audio_output;
+mod auto_switch;
+mod avatar_command;
+mod avatars;
+mod away_emote;
+mod banana;
+mod banana_frame;
+mod block_command;
+mod bolt;
+mod boombox;
+mod box_hunt;
+mod brush_view;
+mod build_info;
+mod camera;
+mod camera_uniform;
+mod capture;
+mod card_outline;
+mod card_scenes;
+mod cardboard_box;
+mod cards;
+mod catch_book;
+mod cgame_options;
+mod chat;
+mod chat_ban;
+mod chat_gifs;
+mod chat_mutes;
+mod chat_sounds;
+mod cinematic_roq;
+mod client_guid;
+mod client_state;
+mod clientinfo_refresh;
+mod debug_collectibles;
+mod drone;
+mod duel_blades;
+mod duel_ghost;
+mod duel_visibility;
+mod economy;
+mod editions;
+mod entity_view;
+mod fishing;
+mod fishing_sell;
+mod forge_alert;
+mod forge_fuse;
+mod kyber;
+mod loot_odds;
+mod propgun;
+mod propgun_frame;
+mod quests;
+#[cfg(any(target_os = "linux", test))]
+#[path = "../stack_size.rs"]
+mod stack_size;
+
+mod saber_colour_command;
+mod shader_image;
+mod shader_marks;
+mod shared_textures;
+
+mod body_fade;
+mod clock_trace;
+mod combat_effects;
+mod config_import;
+mod config_string_refresh;
+mod connection;
+mod connection_commands;
+mod console;
+mod console_backdrop;
+mod console_move;
+mod console_overlay;
+mod console_runtime;
+mod cosmetics;
+mod crash_report;
+mod crosshair_scan;
+mod cut_trace;
+mod damage_feedback;
+mod day_sky_guard;
+mod decal_marks;
+mod decal_store;
+mod decoded_image_cache;
+mod demo_playback;
+mod demp2_shell;
+mod discord_ipc;
+mod discord_presence;
+mod disintegration;
+mod dismember;
+mod dust_motes;
+mod dynamic_lights;
+mod effect_assets;
+mod effect_aux;
+mod effect_blend;
+mod effect_debug;
+mod effect_electricity;
+mod effect_emitter;
+mod effect_envelope;
+mod effect_flash;
+mod effect_geometry;
+mod effect_geometry_gpu;
+mod vehicle_assets;
+mod vehicle_burning;
+mod vehicle_fire;
+mod vehicle_pose;
+mod vfs_lifetime;
+
+mod effect_library;
+mod effect_runtime;
+mod effect_shapes;
+mod effect_submission;
+mod effect_texcoords;
+mod effect_wave;
+mod entity_instance;
+mod entity_lighting;
+mod entity_materials;
+mod external_lightmaps;
+mod fall_camera;
+mod first_person_view;
+mod first_person_weapon;
+mod flat_world;
+mod fog_frame;
+mod fog_volumes;
+mod force_overlay_submission;
+mod frame_pacing;
+mod frame_queue;
+mod frame_split;
+mod lightmap_styles;
+mod vertex_light;
+
+mod charge_flash;
+mod devmap_bar;
+mod e2e_whisper_card;
+mod e2e_whispers;
+mod emote_end_debug;
+mod emote_help;
+mod emote_picker;
+mod emplaced_swivel;
+mod eweb_view;
+mod fake_noclip;
+mod file_dialog;
+mod finishers;
+mod fps_help;
+mod frame_target;
+mod frame_timings;
+mod free_camera;
+mod fs_restart;
+mod game_font;
+mod game_menu_actions;
+mod gameplay_fps;
+mod ghost_replay;
+mod glow_pass;
+mod gpu_context;
+mod gpu_guard;
+mod gpu_phases;
+mod gpu_texture;
+mod graphics_quality;
+mod graphics_reload;
+mod ground_hud;
+mod hax;
+mod held_view;
+mod hitch_log;
+mod holocron_popup;
+mod holocrons;
+mod hud;
+mod hud_edit;
+mod hud_runtime;
+mod impact_spawn;
+mod impacts;
+mod ingame_menu;
+mod input;
+mod input_health;
+#[cfg(feature = "mod-jof")]
+mod jof_content;
+mod jof_tag;
+mod keybind_editor;
+mod lamp_lights;
+mod launch;
+mod load_profile;
+mod local_actor_state;
+mod local_prediction;
+mod localization;
+mod log;
+mod log_request_card;
+mod main_scene_pass;
+mod medal_popup;
+mod medals;
+mod menu;
+mod menu_backdrop;
+mod menu_hud;
+mod menu_pictures;
+#[cfg(test)]
+mod menu_snapshot;
+mod menu_stage;
+mod menu_widgets;
+mod menu_world;
+mod mimic;
+mod mining;
+mod mining_sell;
+mod missile_trails;
+mod mod_notice_card;
+mod model_materials;
+#[cfg(feature = "mod-jof")]
+mod model_sync;
+mod mods;
+mod monitor;
+mod movement_collision;
+mod mover_models;
+mod movers;
+mod muted_players;
+mod muted_players_frame;
+mod muzzle_effects;
+mod muzzle_flash;
+mod notice;
+mod npc_refresh;
+mod object_meshes;
+mod oblique_clip;
+mod official;
+mod order66;
+mod ordered_json;
+mod particle_atlas;
+mod particle_draw;
+mod peek;
+mod pipeline_cache;
+mod player_trades;
+mod playstyle;
+mod portable_shields;
+mod portal;
+mod prediction_preview;
+mod ragdoll;
+mod scene_views;
+mod scope;
+mod seasons;
+mod sender_card;
+mod server_caps;
+mod siege_objective_notice;
+mod siege_sabers;
+#[cfg(feature = "mod-jof")]
+mod sith_cloud;
+mod surface_tables;
+mod tag_copies;
+mod tag_icons;
+mod tag_render;
+mod tags;
+mod tags_frame;
+mod team_sabers;
+mod tickrate_help;
+mod toon_choice;
+mod toy_master;
+mod toy_saved;
+mod toy_sight;
+mod toy_sounds;
+mod toy_switch_words;
+mod trade_window;
+mod trip_mine_lasers;
+mod video_memory;
+mod viewer_app;
+use object_meshes::StaticModelMesh;
+mod achievements_frame;
+mod blade_builder;
+mod blade_editor;
+mod blade_extras;
+mod blade_lab_designs;
+mod blade_load_all;
+mod blade_pictures;
+mod blade_signatures;
+mod blade_skin_file;
+mod blade_skin_shape;
+mod bug_report;
+mod electrify;
+mod emote_icons;
+mod emotes;
+mod emotes_frame;
+mod footprints;
+mod gi_voxels;
+mod holocrons_frame;
+mod holstered_sabers;
+mod identity_command;
+mod identity_frame;
+mod illuminate;
+mod inline_code;
+mod installed_models;
+mod jetpack;
+mod launcher_notice;
+mod live_session;
+mod looks;
+mod looks_frame;
+mod map_blocks;
+mod map_edits;
+mod mystery_box;
+mod net_timing;
+mod news_images;
+mod news_panel;
+mod particle_motion;
+mod particle_physics;
+mod particle_room;
+mod particle_spawn;
+mod particle_types;
+mod pickups;
+mod platform;
+mod player_animation;
+mod player_assets;
+mod player_identity;
+mod player_ids;
+mod player_menu;
+#[cfg(test)]
+mod player_model_scan;
+mod player_mutes;
+mod player_report;
+mod player_shadows;
+mod player_skin;
+mod playstyle_card;
+mod pointer_input;
+mod presentation_clock;
+mod profile_card;
+mod profile_hub;
+mod projectiles;
+mod quick_wheel;
+mod rarity_fx;
+mod remap_blocked_maps;
+mod render_helpers;
+mod rig_model;
+mod rig_reload;
+mod runtime_settings;
+mod saber;
+mod saber_clash_flare;
+mod saber_core;
+mod saber_defs;
+mod saber_ghosts;
+mod saber_gpu;
+mod saber_hilt_command;
+mod saber_hilts;
+mod saber_lab;
+mod saber_motion;
+mod saber_persona;
+mod saber_petals;
+mod saber_rgb;
+mod saber_ribbons;
+mod saber_skin_command;
+mod saber_skin_options;
+mod saber_skins;
+mod saber_smoke;
+mod saber_sound_choice;
+mod saber_sparks;
+mod saber_submission;
+mod saber_trail;
+mod saber_trail_gpu;
+mod scene_flatten;
+mod scoreboard;
+mod screenshot;
+mod server_browser;
+mod server_commands;
+mod server_passwords;
+mod server_view;
+mod session_log;
+mod session_transition;
+mod settings;
+mod settings_icons;
+mod settings_usage;
+mod shared_geometry;
+mod sjk_chat_field;
+mod sjk_chat_frame;
+mod sjk_chat_look;
+mod sjk_packs;
+mod sky_stage;
+mod small_card_notice;
+mod snapshot_presentation;
+mod sound_mutes;
+mod sound_sonar;
+#[cfg(test)]
+mod startup_stack;
+mod static_models;
+mod status_balloons;
+mod status_balloons_frame;
+mod stock_blades;
+mod support_links;
+mod symbols;
+mod tactical;
+mod terms;
+mod text;
+mod text_dialog;
+mod text_entry;
+mod text_select;
+mod tile_shine;
+mod ui_links;
+mod ui_renderer;
+mod ui_scale;
+mod ui_target;
+mod unlock_toast;
+mod unlockables;
+mod update;
+mod use_prompt;
+mod version_overlay;
+mod wall_hold_pose;
+mod weapon_select;
+mod weapon_view;
+mod weather;
+mod wgsl_source;
+mod wheel_of_doom;
+mod window_icon;
+mod wishlist;
+mod world_materials;
+mod world_muzzles;
+mod world_notes;
+mod world_ping;
+mod world_ping_frame;
+#[cfg(test)]
+mod world_shot;
+mod world_stage;
+
+/// Counts allocator calls inside `assert_no_alloc` blocks (tests of per-frame
+/// bookkeeping); every call goes on to the system allocator.
+#[cfg(all(test, debug_assertions))]
+#[global_allocator]
+static ALLOCATOR: assert_no_alloc::AllocDisabler = assert_no_alloc::AllocDisabler;
+use actor_instance::ActorInstance;
+use actor_mesh::ActorMesh;
+use animation_timing::animation_frame;
+use camera_uniform::CameraUniform;
+use effect_runtime::{EffectLibrary, Particle};
+use entity_instance::EntityInstance;
+use glam::camera::rh::{proj::directx::perspective, view::look_at_mat4};
+use glam::{Mat4, Quat, Vec3};
+use gpu_context::FrameStatus;
+use gpu_texture::{create_rgba8_texture, decode_image, load_shader_texture};
+use ingame_menu::Page as GameMenuPage;
+use local_prediction::LocalPrediction;
+use localization::Localization;
+use particle_types::ParticleBlend;
+use player_animation::{GpuPlayerAnimation, PreviewVertexRange};
+use player_assets::{PlayerPreview, load_player_preview};
+use render_helpers::{angle_to_short, append_instance_group, mesh_center, texture_layout_entry};
+use sjk_bsp::{Aabb, Bsp, TraceScratch};
+use sjk_client::{
+    ClientSession, LegacyMapEffects, LegacyMissileEffects, LegacySaberClashFlare,
+    LegacyWorldAdapter, ServerClock,
+};
+use sjk_effect::ComponentKind;
+use sjk_model::{AnimationConfig, AnimationSequence, Gla, Glm, Md3, Md3Tag, Skin, SkinnedVertex};
+use sjk_protocol::{GameState, InfoString, Snapshot};
+use sjk_runtime::{Appearance, EntityId, EntityKind, World, WorldId};
+use sjk_scene::{MeshBuildOptions, StaticWorld};
+use sjk_shader::{ShaderCatalog, StageBlend, WaveForm};
+use sjk_vfs::VirtualFileSystem;
+
+use scene_flatten::{
+    ActorDraw, DrawBatch, FlattenedScene, ViewerMaterial, append_actor_mesh, append_md3_mesh,
+    append_static_glm_mesh, append_static_glm_surfaces, append_static_glm_triangles,
+    preview_gpu_vertex,
+};
+use shared_geometry::SharedGeometry;
+use std::collections::{BTreeMap, BTreeSet, HashMap};
+use std::error::Error;
+use std::ops::Range;
+use std::path::PathBuf;
+use std::sync::Arc;
+use std::time::{Duration, Instant};
+use text::vertex_buffer::TextVertexBuffer;
+use text::{TextVertex, UiFont, append_text};
+use ui_renderer::ShapeRenderer;
+use wgpu::util::DeviceExt;
+use winit::application::ApplicationHandler;
+use winit::dpi::PhysicalSize;
+use winit::event::{DeviceEvent, ElementState, KeyEvent, WindowEvent};
+use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop};
+use winit::keyboard::{KeyCode, PhysicalKey};
+use winit::window::{Window, WindowAttributes, WindowId};
+fn main() {
+    log::init();
+    platform::configure_main_stack();
+    platform::raise_open_file_limit();
+    crash_report::install();
+    if let Err(error) = app_launch::run() {
+        log::progress(format_args!("sjk: {error}"));
+        crash_report::fatal_error(&error.to_string());
+        show_start_failure(&error.to_string());
+        std::process::exit(1);
+    }
+    crash_report::clean_exit();
+    // What the driver compiled this run, for the next one (`pipeline_cache.rs`).
+    pipeline_cache::save_at_exit();
+    // Keep the last achievement counts, then withdraw the identity claim on the hub.
+    achievements::sync(None, player_identity::hub_on(), true);
+    player_identity::shutdown();
+    // After the settings were saved on the way out, start an installed update.
+    update::restart_if_requested();
+}
+/// Tell the player why the game closed: a release build on Windows has no console, so
+/// without this the window only vanished (a laptop with two graphics cards, #sjk player
+/// chat 28-29/10/2026). `SJK_NO_START_DIALOG` leaves it out for unattended runs (the
+/// release's package smoke check), where nobody would close it.
+fn show_start_failure(error: &str) {
+    if std::env::var_os("SJK_NO_START_DIALOG").is_some() {
+        return;
+    }
+    let _ = rfd::MessageDialog::new()
+        .set_level(rfd::MessageLevel::Error)
+        .set_title("SJK could not start")
+        .set_description(format!(
+            "{error}
+
+On a laptop with two graphics cards, set sjk.exe to the fast card \
+             (NVIDIA Control Panel > Manage 3D settings, or Windows Settings > Display > \
+             Graphics > High performance) and start it again. Updating the graphics \
+             driver can help too."
+        ))
+        .set_buttons(rfd::MessageButtons::Ok)
+        .show();
+}
+
+mod gpu_vertex;
+use gpu_vertex::GpuVertex;
+
+use audio::GameAudio;
+use hud_runtime::HudUniform;
+
+struct GpuState {
+    context: Arc<gpu_context::Context>,
+    /// This world's claim on the textures it shares with other worlds of its context.
+    _shared_textures: shared_textures::Holder,
+    /// The context the world loading now is built on, when it is newer than this
+    /// world's: a graphics reload on a server ([`graphics_reload`]).
+    next_context: Option<Arc<gpu_context::Context>>,
+    /// The graphics reload's card and rebuild ([`graphics_reload`]).
+    graphics_reload: graphics_reload::State,
+    /// The low-FPS check of this world's map ([`fps_help`]).
+    fps_help: fps_help::State,
+    /// The low-FPS card (`help_fps`).
+    fps_card: fps_help::card::Card,
+    /// The HUD edit mode (`hud_edit`, [`hud_edit`]).
+    hud_edit: hud_edit::HudEdit,
+    /// The emote help card (`help_emotes`, [`emote_help`]).
+    emote_help: emote_help::State,
+    /// The emote picker (`emotes`, [`emote_picker`]).
+    emote_picker: emote_picker::State,
+    /// End-to-end encrypted whispers and their card ([`e2e_whispers`]).
+    e2e_whispers: e2e_whispers::State,
+    /// Trades between players: the trade window and its toast ([`player_trades`]).
+    trades: player_trades::State,
+    /// The alpha notice, until the player accepts it ([`alpha_notice_card`]).
+    alpha_card: alpha_notice_card::Card,
+    /// The SJK team's request for the player's logs ([`log_request_card`]).
+    log_request_card: log_request_card::Card,
+    /// A client mod's notice, shown once on its servers ([`mod_notice_card`]).
+    mod_notice: mod_notice_card::State,
+    small_card_notice: small_card_notice::Card,
+    /// The playstyle card ([`playstyle_card`]).
+    playstyle_card: playstyle_card::Card,
+    /// What the update brought and the SJK team's announcements ([`news_panel`]).
+    news: news_panel::Panel,
+    /// The SJK team's announcements and contributor rewards ([`official`]).
+    official: official::Official,
+    window: Option<Arc<Window>>,
+    post_aa: Option<frame_target::aa::Runtime>,
+    render_scale: Option<frame_target::scale::Runtime>,
+    screenshots: screenshot::Manager,
+    /// The menu pictures' drawing, while the menu world is a picture one.
+    menu_pictures: menu_pictures::Painter,
+    /// The image frames render into without a window: only the off-screen
+    /// world shots set it (`world_shot`); without one a windowless frame is
+    /// skipped.
+    headless_frame: Option<wgpu::Texture>,
+    device: wgpu::Device,
+    queue: frame_queue::FrameQueue,
+    configuration: wgpu::SurfaceConfiguration,
+    present_modes: Vec<wgpu::PresentMode>,
+    adapter_name: String,
+    adapter_backend: String,
+    size: PhysicalSize<u32>,
+    world_materials: world_materials::Runtime,
+    scene_views: scene_views::Runtime,
+    entity_pipeline: wgpu::RenderPipeline,
+    particle_pipelines: particle_draw::Pipelines,
+    particle_atlas: ParticleAtlas,
+    effect_geometry: effect_geometry_gpu::Runtime,
+    /// Players' tags on the world, drawn at their pictures' full size (`tag_render.rs`).
+    tag_render: tag_render::TagRender,
+    hud_pipeline: wgpu::RenderPipeline,
+    ui_shapes: ShapeRenderer,
+    text_pipeline: wgpu::RenderPipeline,
+    /// Text pipeline for the retail fonts' distance-field atlases.
+    sdf_text_pipeline: wgpu::RenderPipeline,
+    saber_gpu: saber_gpu::Runtime,
+    /// The Collection's live blade pictures, once a swatch asked for one.
+    blade_pictures: Option<blade_pictures::Target>,
+    dust_motes: dust_motes::Runtime,
+    /// The quick wheel open while its key is held (`quick_wheel.rs`).
+    quick_wheel: quick_wheel::QuickWheel,
+    /// The devmap bar of cheat buttons (`devmap_bar.rs`).
+    devmap_bar: devmap_bar::DevBar,
+    /// The map's rain, snow and mist (`weather.rs`).
+    weather: weather::Runtime,
+    geometry: SharedGeometry,
+    entity_instance_buffer: wgpu::Buffer,
+    actor_instance_buffer: wgpu::Buffer,
+    actor_meshes: Vec<ActorMesh>,
+    actor_workers: actor_pose::evaluation::Pool,
+    object_meshes: Vec<StaticModelMesh>,
+    /// Where each emplaced gun's top was last turned (`emplaced_swivel.rs`).
+    emplaced_turned: emplaced_swivel::Turned,
+    emitter_model_catalog: effect_emitter::ModelCatalog,
+    mover_catalog: movers::Catalog,
+    pickup_catalog: pickups::Catalog,
+    first_person_weapon: first_person_weapon::Catalog,
+    first_person_view: first_person_view::Tracker,
+    model_material_overrides: model_materials::Overrides,
+    saber_hilts: Option<saber::HiltCatalog>,
+    /// Who wears which blade skin (`saber_skins.rs`).
+    saber_skins: saber_skins::SaberSkins,
+    /// The blade skins the packs brought (`sjk_packs.rs`), as uploaded to `saber_gpu`.
+    blade_skins: std::sync::Arc<saber_skins::LoadedSkins>,
+    saber_states: saber_trail::StateSlab,
+    saber_trail_segments: saber_trail::SegmentPool,
+    /// Blade skins' smoke ribbons, and the frame they were last moved to.
+    smoke_ribbons: saber_ribbons::Ribbons,
+    ribbons_at: Option<i64>,
+    /// Blade skins' spark emitters.
+    saber_sparks: saber_sparks::Sparks,
+    speed_trails: actor_world_submission::speed_trail::Trails,
+    /// Illuminate's holocron, the client's own toy (`toy_illuminate`).
+    illuminate: illuminate::Holocron,
+    /// The other players' holocrons, lit by their looks.
+    illuminate_others: illuminate::Others,
+    /// The cardboard box toy (`toy_box`): the player's own and the boxes of others.
+    cardboard_box: cardboard_box::CardboardBox,
+    /// The Fishing toy (`toy_fishing`): the player's own rod and the rods of others.
+    fishing: fishing::Fishing,
+    /// The Fishing toy's sounds to play this frame.
+    fishing_cues: Vec<&'static str>,
+    /// The Mining toy (`toy_mining`): the player's own pickaxe and vein, and the pickaxes
+    /// of others.
+    mining: mining::Mining,
+    /// The Mining toy's sounds to play this frame.
+    mining_cues: Vec<&'static str>,
+    /// The Order 66 toy (`toy_order66`, `order66`): the order and the pieces flying.
+    order66: order66::Order66,
+    /// The Hax toy (`toy_hax`): a hack under way, the player steered or steering.
+    hax: hax::Hax,
+    /// The Drone toy (`toy_drone`): its consent switch and the other players' drones.
+    drone: drone::Drone,
+    /// The Boombox toy (`toy_boombox`): the own stereo and track, and what plays here.
+    boombox: boombox::Boombox,
+    /// The Monitor toy (`toy_monitor`): its switch and the monitors thrown.
+    monitor: monitor::Monitor,
+    /// The Box hunt toy (`toy_boxhunt`): its switch, the consent to hunt and be the mark.
+    box_hunt: box_hunt::BoxHunt,
+    quests: quests::Quests,
+    /// The Banana peel toy (`toy_banana`): its switch and the peels on the floor.
+    banana: banana::Banana,
+    /// The Prop gun toy (`toy_propgun`): the gun held, the bolts and what others hold.
+    propgun: propgun::PropGun,
+    /// The status balloons (`cg_statusBalloons`): each talking player's selected picture.
+    status_balloons: status_balloons::StatusBalloons,
+    /// The Tag toy (`toy_tag`): the own tag stuck on the world.
+    tags: tags::Tags,
+    /// The Ragdoll toy (`toy_ragdoll`): the player's own fall and the falls of others.
+    ragdoll: ragdoll::Ragdoll,
+    /// Order 66's, the Hax's, the Drone's, the Monitor's, Box hunt's, the Banana peel's and
+    /// the Prop gun's switches as last saved (`toy_saved`).
+    toys_saved: [toy_saved::Saved; 8],
+    /// The Holocrons tab's 3D holocron ([`holocrons::stage`]).
+    holocron_stage: holocrons::stage::Stage,
+    /// The time its turn and bob are drawn at, instead of the clock's, for a world shot.
+    #[cfg(test)]
+    holocron_stage_seconds: Option<f32>,
+    /// The form it draws in place of the tab's, for a world shot (a kyber crystal).
+    #[cfg(test)]
+    holocron_stage_request: Option<holocrons::stage::Request>,
+    /// What each player wears that SJK draws (blade skin, Illuminate).
+    looks: looks::Looks,
+    trick_fades: sjk_client::LegacyTrickFades,
+    projectiles: Vec<projectiles::Presented>,
+    missile_effects: LegacyMissileEffects,
+    dynamic_lights: dynamic_lights::PointLightList,
+    effect_aux: effect_aux::Runtime,
+    muzzle_effects: sjk_client::LegacyMuzzleEffects,
+    /// Vehicle volleys waiting for their vehicle to be posed (`vehicle_fire.rs`).
+    vehicle_fires: vehicle_fire::Pending,
+    /// Destroyed vehicles' flames' debounce.
+    vehicle_flames: vehicle_burning::Flames,
+    force_overlays: sjk_client::LegacyForceOverlayTracker,
+    /// `EV_BODYFADE` per body (`body_fade.rs`).
+    body_fades: Box<sjk_client::LegacyBodyFadeTracker>,
+    /// The DEMP2 alternate fire's bubbles (`demp2_shell.rs`).
+    demp2_shells: demp2_shell::Shells,
+    /// The jetpack model and its jet bolts.
+    jetpack: jetpack::Catalog,
+    /// Which entities' jets have sounded their start.
+    jetpack_sounds: jetpack::Sounds,
+    force_overlays_last: usize,
+    actor_groups: Vec<Vec<ActorInstance>>,
+    object_groups: Vec<Vec<ActorInstance>>,
+    static_models: static_models::StaticModels,
+    pickup_override_instances: Vec<entity_materials::OverrideInstance>,
+    mover_groups: Vec<Vec<ActorInstance>>,
+    movers: Vec<movers::Presented>,
+    pickups: Vec<pickups::Presented>,
+    entity_instances: Vec<EntityInstance>,
+    saber_instances: Vec<saber::Instance>,
+    /// What this frame's blades of skins with a crackle are heard doing (`saber_smoke`).
+    saber_heard: saber_smoke::Heard,
+    particle_groups: [Vec<EntityInstance>; effect_blend::PIPELINE_COUNT],
+    actor_instances: Vec<ActorInstance>,
+    actor_instance_ranges: Vec<Range<u32>>,
+    object_instance_ranges: Vec<Range<u32>>,
+    pickup_override_ranges: Vec<entity_materials::OverrideRange>,
+    entity_draw_queue: entity_materials::Queue,
+    mover_instance_ranges: Vec<Range<u32>>,
+    /// Shared with the weather's cover survey thread.
+    bsp: Arc<Bsp>,
+    trace_scratch: TraceScratch,
+    /// `worldnote`: the selection and the note being written.
+    world_notes: world_notes::Notes,
+    /// Map entity markers (`r_showEntities`).
+    entity_view: entity_view::EntityView,
+    /// `+ping`: the pings on show and their limits (`world_ping`).
+    world_pings: world_ping::WorldPings,
+    /// The note and bug report panel, and the Report a bug button (`text_dialog`).
+    text_dialog: text_dialog::TextDialog,
+    /// The new medal pop-up (`medal_popup`).
+    medal_popup: medal_popup::MedalPopup,
+    /// The holocron drop pop-up (`holocron_popup`).
+    holocron_popup: holocron_popup::HolocronPopup,
+    /// The unlock pop-up over play and the menus (`unlock_toast`): achievements, and
+    /// medals and holocrons that arrive in a match.
+    unlock_toast: unlock_toast::UnlockToast,
+    /// A bug report is on its way to the hub (`bug_report`).
+    bug_report_waiting: bool,
+    /// The report card open now was opened from the main menu (its SJK page): the
+    /// report says "menu" for the map and names no server.
+    bug_report_from_menu: bool,
+    /// The outcome last shown, so the next one is told apart.
+    bug_report_serial: u64,
+    entity_lighting: entity_lighting::EntityLighting,
+    /// Live player model behind the Player screen.
+    menu_stage: menu_stage::MenuStage,
+    /// Card pictures drawn from the game's models (`cards::scene`).
+    card_scenes: card_scenes::CardScenes,
+    clientinfo_watch: clientinfo_refresh::ClientInfoWatch,
+    config_string_refresh: config_string_refresh::ConfigStringRefresh,
+    /// Black-blade server/clientinfo scan, redone on configstring changes.
+    black_sabers: saber_rgb::black::Cache,
+    /// Siege class saber colours, redone on configstring changes.
+    siege_sabers: siege_sabers::Cache,
+    /// Holstered-hilt contract detected from the serverinfo, redone on its change.
+    holster_server: holstered_sabers::ServerCache,
+    /// Parsed shader catalogue, kept for materials compiled after map load.
+    /// Shared with the workers that load players' models (`player_loads.rs`).
+    shaders: Arc<ShaderCatalog>,
+    decal_surfaces: decal_marks::DecalSurfaces,
+    /// SJK's edits of the loaded map ([`map_edits`]).
+    map_edits: map_edits::State,
+    /// The mystery boxes standing on the loaded map (`mystery_box`).
+    mystery_boxes: mystery_box::MysteryBoxes,
+    /// The WHEEL OF DOOM toy (`toy_wheelofdoom`): the wheels spinning and the spinner's
+    /// effects.
+    wheel_of_doom: wheel_of_doom::WheelOfDoom,
+    /// What the player's Use key does at what they face, by the crosshair (`use_prompt`).
+    use_prompt: use_prompt::UsePrompt,
+    /// The Toy Master's toys hidden on the loaded map (`toy_master`).
+    toy_master: toy_master::ToyMaster,
+    player_shadows: player_shadows::State,
+    camera_buffer: wgpu::Buffer,
+    camera_bind_group: wgpu::BindGroup,
+    /// The camera uniform's layout, for views with a camera of their own
+    /// (the classic profile's model preview).
+    camera_layout: wgpu::BindGroupLayout,
+    hud_buffer: wgpu::Buffer,
+    /// Where this frame's HUD program can draw (`hud_runtime::HudScissors`).
+    hud_scissors: hud_runtime::HudScissors,
+    hud_bind_group: wgpu::BindGroup,
+    text_vertex_buffer: TextVertexBuffer,
+    classic_text_vertex_buffer: TextVertexBuffer,
+    text_bind_group: wgpu::BindGroup,
+    /// The Inter atlas `text_bind_group` binds, kept to bind it again with the wide atlas.
+    text_atlas: wgpu::TextureView,
+    text_layout: wgpu::BindGroupLayout,
+    text_sampler: wgpu::Sampler,
+    /// Glyphs beyond the code-page atlases, bound with every text atlas.
+    wide_text: text::wide_texture::WideTexture,
+    /// The retail `¬` logo spliced into the Inter atlas, kept for DPI rebuilds.
+    logo_glyph: Option<text::LogoGlyph>,
+    classic_text_bind_group: Option<wgpu::BindGroup>,
+    /// The classic HUD atlas `classic_text_bind_group` binds.
+    classic_text_atlas: Option<wgpu::TextureView>,
+    /// The classic HUD atlas is a distance field (see `text::sdf::for_atlas`).
+    classic_text_sdf: bool,
+    ui_font: UiFont,
+    classic_hud_font: Option<UiFont>,
+    game_fonts: game_font::GameFonts,
+    text_vertices: Vec<TextVertex>,
+    classic_text_vertices: Vec<TextVertex>,
+    hud: hud::HudOverlay,
+    scoreboard: scoreboard::Scoreboard,
+    chat: chat::ChatOverlay,
+    /// Players muted on this PC who are on the server being played.
+    muted_players: muted_players::MutedPlayers,
+    /// Players blocked until the map changes, by this player or by staff for everyone.
+    map_blocks: map_blocks::MapBlocks,
+    /// Players whose sounds are muted until the map changes (`mutesounds`).
+    sound_mutes: sound_mutes::SoundMutes,
+    game_menu: bool,
+    in_game_menu: ingame_menu::InGameMenu,
+    game_menu_page: GameMenuPage,
+    game_menu_row: usize,
+    auto_opened_team_menu: bool,
+    depth: DepthTarget,
+    camera_position: Vec3,
+    /// The rendered view's origin (`cg.refdef.vieworg`), as last uploaded.
+    view_origin: Vec3,
+    camera_yaw: f32,
+    camera_pitch: f32,
+    mouse_look: pointer_input::MouseLook,
+    field_of_view: f32,
+    scope: scope::Zoom,
+    scope_mask: Option<scope::Mask>,
+    /// The player outlines' mask and rings, the card's and the teams' (`card_outline.rs`).
+    card_outline: card_outline::Gpu,
+    /// The classic console's background, bar and text, drawn over all other 2D.
+    console_layer: console_backdrop::ConsoleLayer,
+    /// The game's menu-file status HUD (`cg_hudStyle game`).
+    menu_hud: menu_hud::MenuHud,
+    ground_hud: ground_hud::GroundHud,
+    /// Invisible brushes (`r_showBrushes`).
+    brush_view: brush_view::BrushView,
+    /// Display mode last applied to the window; `None` forces a reapply.
+    applied_display: Option<settings::DisplayMode>,
+    /// Exclusive fullscreen is paused while the window lacks focus, so Alt+Tab
+    /// and Win+D reach the desktop (`runtime_settings.rs`).
+    display_suspended: bool,
+    /// When the window's display mode last changed.
+    display_changed_at: Instant,
+    /// The world is not drawn this frame: the classic menu style covers the
+    /// screen with retail's opaque menu or loading screen.
+    world_hidden: bool,
+    applied_resolution: [u32; 2],
+    /// Whether [`Self::applied_resolution`] counted pixels or points (`r_highDpi`).
+    applied_high_dpi: bool,
+    /// Monitor refresh rate behind `com_maxfps -1`, re-read at most once a second.
+    refresh_cap: std::cell::Cell<Option<(Instant, u32)>>,
+    frame_pacer: frame_pacing::FramePacer,
+    /// Storage for the upper right's "125fps" line (`console_overlay`).
+    upper_right_rate: String,
+    /// Always-on gameplay hitch lines (`hitch_log.rs`).
+    hitches: hitch_log::Recorder,
+    /// Optional per-pass GPU timing printed with the frame-budget report.
+    gpu_phases: Option<gpu_phases::Profiler>,
+    /// The frame timings readout and log (`r_drawTimings`, `r_logTimings`).
+    frame_timings: frame_timings::State,
+    third_person_camera: camera::State,
+    /// Where a fall to death began, while it lasts ([`fall_camera`]).
+    fall_camera: fall_camera::FallCamera,
+    far_plane: f32,
+    gameplay_input: input::GameplayInput,
+    /// Windows Alt code being typed into a text field.
+    alt_code: input::alt_code::AltCode,
+    /// The SJK UI's Profile screen: which tab shows, switched here.
+    profile_hub: profile_hub::Hub,
+    /// The last frame's view, for placing 2D over the world outside the HUD pass (the
+    /// Collection's nameplate over the stage model).
+    frame_view: Option<hud::identification::Camera>,
+    pointer_captured: bool,
+    /// A primary press consumed by spectator aim-to-follow; consume its release too.
+    spectator_follow_click: bool,
+    refocus_click: pointer_input::RefocusClick,
+    cursor_policy: pointer_input::CursorPolicy,
+    cursor_position: [f32; 2],
+    ui_epoch: Instant,
+    last_frame: Instant,
+    last_cluster: i32,
+    player_animation: Option<GpuPlayerAnimation>,
+    live_session: Option<ClientSession>,
+    demo_session: Option<demo_playback::Session>,
+
+    live_world: World,
+    legacy_world_adapter: Option<LegacyWorldAdapter>,
+    presentation_clock: presentation_clock::SnapshotPresentationClock,
+    net_timing: net_timing::NetTiming,
+    /// How old our commands are at the server, for the log (`server_view`).
+    server_view: server_view::ServerView,
+    /// The 125 Hz user-command clock and the `cl_maxpackets` packet pace.
+    command_schedule: sjk_client::command_rate::CommandSchedule,
+    packet_pacer: sjk_client::command_rate::PacketPacer,
+    /// Server-time estimate that stamps outgoing user commands.
+    server_clock: ServerClock,
+    clock_trace: clock_trace::ClockTrace,
+    cut_trace: cut_trace::CutTrace,
+    /// Armed trip mines' traced beam ends (`trip_mine_lasers`).
+    trip_mine_beams: trip_mine_lasers::Beams,
+    local_prediction: LocalPrediction,
+    local_actor_state: local_actor_state::Tracker,
+    third_person: bool,
+    /// The player's camera choice (the camera key, a demo's camera); `third_person`
+    /// is derived from it every frame by [`GpuState::update_zoom_view`] and is what
+    /// the camera, HUD and scope read.
+    third_person_choice: bool,
+    /// A zoom forces first person this frame (`ZoomView::forces_first_person`).
+    zoom_first_person: bool,
+    /// Evidence cameras (spectate/look-at/orbit) leave the local actor at
+    /// its entity transform instead of pinning it under the camera.
+    detached_camera: bool,
+    peek: peek::State,
+    /// `ghost`: recording and replaying the player's own run.
+    ghost: ghost_replay::Ghost,
+    /// `mimic`: copying another player's moves live.
+    mimic: mimic::Mimic,
+
+    selected_weapon: Option<u8>,
+    weapon_selection_view: weapon_select::view::Tracker,
+    weapon_selected_at: Option<Instant>,
+    pending_generic_command: u8,
+    /// The `generic_cmd` already on a user command still waiting for its packet
+    /// (`cl.gcmdSentValue`): it rides on every command until the packet leaves.
+    generic_command_sent: u8,
+    anti_emote: anti_emote::State,
+    vfs: Option<Arc<VirtualFileSystem>>,
+    pending_map_reload: bool,
+    world_load_task: Option<session_transition::WorldLoadTask>,
+    world_install_task: Option<session_transition::WorldInstallTask>,
+    /// An empty world standing in for a server's map while its next map builds
+    /// (`session_transition`): the old map is off the graphics card first.
+    map_unloaded: bool,
+    world_load_state: session_transition::LoadStateMachine,
+    world_load_started: Option<Instant>,
+    world_load_map: String,
+    /// Whether `world_load_map` is in `cg_remapsBlockedMaps`.
+    remap_blocked_maps: remap_blocked_maps::Cache,
+    snapshot_observations: snapshot_presentation::Counters,
+    obituaries: sjk_client::ObituaryTracker,
+    /// The siege objectives' notices, read from the map's `.siege` file.
+    siege_notices: siege_objective_notice::Notices,
+    /// The kills taken for the blade skins that burn them away, and those burning
+    /// (`disintegration::Forced`).
+    saber_kills_seen: u64,
+    forced_disintegrations: disintegration::Forced,
+    /// What the player does in matches, for the achievements (`achievements.rs`).
+    achievement_tracker: achievements::tracker::Tracker,
+    lagometer: sjk_client::LagometerSamples,
+    crosshair_scan: crosshair_scan::State,
+    auto_switch: auto_switch::Tracker,
+    previous_particle_events: HashMap<u16, u16>,
+    /// The presented snapshot without the players outside the duel
+    /// (`cg_duelHideOthers`), for the frame's snapshot readers.
+    duel_hidden_view: duel_visibility::HiddenView,
+    particles: Vec<Particle>,
+    /// Frees the old end of the effect pool for each frame's new particles.
+    particle_room: particle_room::Room,
+    pending_particle_effects: particle_physics::PendingEffects,
+    impacts: impacts::Pool,
+    /// `cg.lastFPFlashPoint`: the view gun's flash point of the last frame.
+    last_first_person_flash: Option<[f32; 3]>,
+    /// Each player's world gun muzzle drawn on the last frame, for disruptor beams.
+    world_muzzles: world_muzzles::Points,
+    saber_clash_flare: LegacySaberClashFlare,
+    damage_feedback: damage_feedback::Feedback,
+    effects: EffectLibrary,
+    /// Map music read on the install thread, handed to the audio at the cut.
+    sound_prefetch: audio::SoundPrefetch,
+    map_effects: LegacyMapEffects,
+    localization: Localization,
+    console: Option<console::ViewerConsole>,
+    client_menu: Option<menu::ClientMenu>,
+    join_task: Option<connection::JoinTask>,
+    last_connect_address: Option<String>,
+    /// The `password` the last join sent, to join again when it changes while that
+    /// join is still trying or has just failed ([`Self::rejoin_on_new_password`]).
+    join_password: String,
+    game_data: PathBuf,
+    connect_timeline: Option<log::ConnectTimeline>,
+    load_event_gap: log::EventGap,
+    transition_report_pending: bool,
+
+    completed_map_changes: u32,
+    live_map_installed: bool,
+
+    quit_requested: bool,
+    /// The boot world the standalone menu lives in (see `menu_world`).
+    is_menu_world: bool,
+    /// The map being joined, seen through the menu's gate.
+    portal: portal::Destination,
+    resident: session_transition::resident::State,
+}
+use assets::GpuWorldInput;
+
+impl GpuState {
+    async fn new(window: Arc<Window>, input: GpuWorldInput) -> Result<Self, Box<dyn Error>> {
+        let size = window.inner_size();
+        Self::new_for_target(Some(window), [size.width, size.height], input).await
+    }
+
+    async fn new_for_target(
+        window: Option<Arc<Window>>,
+        target_size: [u32; 2],
+        input: GpuWorldInput,
+    ) -> Result<Self, Box<dyn Error>> {
+        let context = gpu_context::Context::new(window, input.console.as_ref()).await?;
+        Self::new_with_context(context, target_size, input, None).await
+    }
+
+    async fn new_with_context(
+        context: Arc<gpu_context::Context>,
+        target_size: [u32; 2],
+        input: GpuWorldInput,
+        cancelled: Option<&std::sync::atomic::AtomicBool>,
+    ) -> Result<Self, Box<dyn Error>> {
+        // Until the world is built, textures it makes on this thread are shared with
+        // the other worlds alive on the context (a map change keeps the last one).
+        let (shared_holder, _sharing) = shared_textures::building(&context.shared_textures);
+        let input = assets::prepare_instances(input)?;
+        let GpuWorldInput {
+            scene,
+            bsp,
+            vfs,
+            shaders,
+            world_minimums,
+            world_maximums,
+            camera_origin,
+            camera_yaw,
+            player_preview,
+            live_session,
+            demo_session,
+            build_game_state,
+            build_snapshot,
+            mut console,
+            mut client_menu,
+            game_data,
+            mut connect_timeline,
+            game_fonts: preload_game_fonts,
+            remap_mode: build_remap_mode,
+            completed_map_changes,
+        } = input;
+        // The Import page looks for other clients' configs beside SJK's.
+        if let Some(console) = &mut console {
+            console.set_game_data(&game_data);
+        }
+        let mut load_profile = load_profile::LoadProfile::start(cancelled);
+        let session_active =
+            live_session.is_some() || demo_session.is_some() || build_game_state.is_some();
+        let active_game_state = live_session
+            .as_ref()
+            .map(ClientSession::game_state)
+            .or_else(|| {
+                demo_session
+                    .as_ref()
+                    .map(demo_playback::Session::game_state)
+            })
+            .or(build_game_state.as_ref());
+        let active_snapshot = live_session
+            .as_ref()
+            .map(ClientSession::latest_snapshot)
+            .or_else(|| {
+                demo_session
+                    .as_ref()
+                    .map(demo_playback::Session::latest_snapshot)
+            })
+            .or(build_snapshot.as_ref());
+        let world_id = WorldId::new(1);
+        let mut live_world = World::new(world_id);
+        let mut legacy_world_adapter = active_game_state.map(|_| LegacyWorldAdapter::new(world_id));
+        let latest_scene_server_time = active_snapshot.map_or(0, |snapshot| snapshot.server_time);
+        let presentation_clock = presentation_clock::SnapshotPresentationClock::new(
+            latest_scene_server_time,
+            Instant::now(),
+        );
+        if let (Some(adapter), Some(snapshot), Some(game_state)) = (
+            &mut legacy_world_adapter,
+            active_snapshot,
+            active_game_state,
+        ) {
+            adapter.apply_snapshot(snapshot, game_state, &mut live_world);
+        }
+        let server_clock = ServerClock::unanchored(Instant::now());
+        let animation_config = player_preview
+            .as_ref()
+            .map(|preview| preview.config.as_ref());
+        let local_prediction =
+            LocalPrediction::new(active_snapshot, animation_config, active_game_state, &vfs);
+        let config_string_refresh =
+            config_string_refresh::ConfigStringRefresh::new(active_game_state);
+        let map_effects = active_game_state
+            .map_or_else(LegacyMapEffects::empty, LegacyMapEffects::from_game_state);
+        let missile_effects = missile_trails::load(active_game_state, &vfs);
+        let size = PhysicalSize::new(target_size[0].max(1), target_size[1].max(1));
+        let localization = Localization::load(&vfs);
+        menu::attach_world(&mut client_menu, Arc::clone(&vfs), &bsp, console.as_ref());
+        if let Some(console) = &mut console {
+            console.attach_script_vfs(Arc::clone(&vfs));
+        }
+        let gpu_phases = gpu_phases::Profiler::new(&context.device, &context.queue);
+        let device = &context.device;
+        let queue = &context.queue;
+        let window = &context.window;
+        let surface = &context.surface;
+        let format = context.format;
+        let vsync = console
+            .as_ref()
+            .and_then(|console| console.bool_cvar("r_vsync"))
+            .unwrap_or(false);
+        let present_mode = context.present_mode(vsync);
+        let screenshot_setup = screenshot::setup(&context, console.as_ref(), &game_data);
+        let configuration = wgpu::SurfaceConfiguration {
+            usage: screenshot_setup.surface_usage,
+            format,
+            color_space: wgpu::SurfaceColorSpace::Auto,
+            width: size.width.max(1),
+            height: size.height.max(1),
+            present_mode,
+            desired_maximum_frame_latency: 2,
+            alpha_mode: context.alpha_mode,
+            view_formats: ui_target::surface_view_formats(format, context.ui_direct),
+        };
+        if console.is_some()
+            && let Some(surface) = &surface
+        {
+            surface.configure(&device, &configuration);
+        }
+
+        let mut flattened = scene_flatten::prepare(&scene, &bsp, &shaders)?;
+        load_profile.mark("flatten-bsp")?;
+        let player_animation = player_preview
+            .map(|preview| GpuPlayerAnimation::append(&mut flattened, preview))
+            .transpose()?;
+        let clientinfo_watch = clientinfo_refresh::ClientInfoWatch::new(&vfs);
+        let mut actor_meshes = if session_active {
+            let active_world = demo_session
+                .as_ref()
+                .map_or(&live_world, demo_playback::Session::world);
+            actor_load::load_actor_meshes(
+                &vfs,
+                active_game_state,
+                active_world,
+                &mut flattened,
+                &clientinfo_watch.model_policy,
+                console.as_ref(),
+                // A live map load (a join, a map change): the other players' models
+                // load on workers once it is live.
+                live_session.is_none() && demo_session.is_none() && build_game_state.is_some(),
+            )?
+        } else {
+            Vec::new()
+        };
+        load_profile.mark("player-models")?;
+        let mover_catalog = movers::build_catalog(&bsp, &flattened);
+        let decal_surfaces = decal_marks::DecalSurfaces::from_flattened(&flattened, &bsp, &shaders);
+        let mut object_meshes = object_meshes::load(
+            &vfs,
+            &bsp,
+            demo_session
+                .as_ref()
+                .map_or(&live_world, demo_playback::Session::world),
+            active_game_state,
+            map_effects
+                .effect_names()
+                .chain(missile_effects.effect_names()),
+            missile_effects.vehicle_model_paths(),
+            &mut flattened,
+        );
+        let saber_hilts = if session_active {
+            saber::load_hilts(
+                &vfs,
+                actor_meshes
+                    .iter()
+                    .flat_map(|mesh| mesh.saber_names.iter().flatten().map(String::as_str)),
+                &mut flattened,
+                &mut object_meshes,
+            )
+            .map_err(|error| eprintln!("could not load saber hilts: {error}"))
+            .ok()
+        } else {
+            None
+        };
+        let pickup_catalog = pickups::Catalog::build(&object_meshes);
+        let first_person_weapon = first_person_weapon::Catalog::build(
+            &vfs,
+            &object_meshes,
+            actor_meshes
+                .first()
+                .map(|mesh| mesh.preview.config.as_ref()),
+        );
+        let emitter_model_catalog = effect_emitter::ModelCatalog::build(&object_meshes);
+        let static_models = static_models::StaticModels::build(&bsp, &object_meshes);
+        let model_material_overrides = model_materials::append_overrides(&mut flattened.materials);
+        let jetpack = jetpack::Catalog::build(&vfs, &object_meshes);
+        if let Some(timeline) = &mut connect_timeline {
+            timeline.mark(log::TimelinePhase::Models);
+        }
+        load_profile.mark("object-models")?;
+        let geometry = actor_pose::gpu_skinning::upload(&device, &mut actor_meshes, &flattened)?;
+        load_profile.mark("geometry-upload")?;
+        let world_minimums = Vec3::from_array(world_minimums);
+        let world_maximums = Vec3::from_array(world_maximums);
+        let far_plane = (world_maximums - world_minimums).length().max(4096.0) * 2.0;
+        let camera_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("SJK camera"),
+            contents: bytemuck::bytes_of(&CameraUniform {
+                view_projection: Mat4::IDENTITY.to_cols_array_2d(),
+                camera_position: camera_origin,
+                view_forward: [camera_yaw.cos(), camera_yaw.sin(), 0.0],
+                _padding: 0.0,
+                shader_time: 0.0,
+            }),
+            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+        });
+        let camera_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+            label: Some("SJK camera layout"),
+            entries: &[wgpu::BindGroupLayoutEntry {
+                binding: 0,
+                visibility: wgpu::ShaderStages::VERTEX_FRAGMENT | wgpu::ShaderStages::COMPUTE,
+                ty: wgpu::BindingType::Buffer {
+                    ty: wgpu::BufferBindingType::Uniform,
+                    has_dynamic_offset: false,
+                    min_binding_size: None,
+                },
+                count: None,
+            }],
+        });
+        let camera_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("SJK camera bind group"),
+            layout: &camera_layout,
+            entries: &[wgpu::BindGroupEntry {
+                binding: 0,
+                resource: camera_buffer.as_entire_binding(),
+            }],
+        });
+        let hud_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("SJK HUD state"),
+            contents: bytemuck::bytes_of(&HudUniform {
+                crosshair_color: cgame_options::crosshair_color(None),
+                health_ratio: 1.0,
+                armor_ratio: 0.0,
+                force_ratio: 1.0,
+                menu_open: 0.0,
+                inverse_width: 1.0 / configuration.width as f32,
+                inverse_height: 1.0 / configuration.height as f32,
+                menu_row: 0.0,
+                menu_row_count: 1.0,
+                crosshair: 1.0,
+                hud_visible: 1.0,
+                status_visible: 1.0,
+                menu_kind: 0.0,
+                menu_phase: 0.0,
+                damage_x: 0.0,
+                damage_y: 0.0,
+                damage_alpha: 0.0,
+                damage_strength: 0.0,
+                health_bar: [0.0; 4],
+                armor_bar: [0.0; 4],
+                force_bar: [0.0; 4],
+                _padding: [0.0; 3],
+                crosshair_parameters: [0.0, 0.0, 640.0, 480.0],
+                damage_color: [0.0; 4],
+            }),
+            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+        });
+        let hud_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+            label: Some("SJK HUD layout"),
+            entries: &[wgpu::BindGroupLayoutEntry {
+                binding: 0,
+                visibility: wgpu::ShaderStages::FRAGMENT,
+                ty: wgpu::BindingType::Buffer {
+                    ty: wgpu::BufferBindingType::Uniform,
+                    has_dynamic_offset: false,
+                    min_binding_size: None,
+                },
+                count: None,
+            }],
+        });
+        let hud_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("SJK HUD bind group"),
+            layout: &hud_layout,
+            entries: &[wgpu::BindGroupEntry {
+                binding: 0,
+                resource: hud_buffer.as_entire_binding(),
+            }],
+        });
+        let logo_glyph = text::LogoGlyph::bundled()
+            .inspect_err(|error| log::progress(format_args!("warning: no logo glyph: {error}")))
+            .ok();
+        let modern_atlas = text::load_modern(
+            window.as_ref().map_or(1.0, |window| window.scale_factor()),
+            logo_glyph.as_ref(),
+        )?;
+        let ui_font = modern_atlas.font;
+        let font_view = gpu_texture::create_r8_texture_mipmapped(
+            &device,
+            &queue,
+            "SJK UI font atlas",
+            &modern_atlas.image,
+            text::ATLAS_MIP_LEVELS,
+        );
+        // The font's atlas, its sampler and the wide-glyph and emoji atlases
+        // (`text::wide_texture`).
+        let text_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+            label: Some("SJK text layout"),
+            entries: &[
+                texture_layout_entry(0),
+                wgpu::BindGroupLayoutEntry {
+                    binding: 1,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
+                    count: None,
+                },
+                texture_layout_entry(2),
+                texture_layout_entry(3),
+            ],
+        });
+        let wide_text = text::wide_texture::WideTexture::new(&device);
+        let text_sampler = device.create_sampler(&wgpu::SamplerDescriptor {
+            label: Some("SJK text sampler"),
+            address_mode_u: wgpu::AddressMode::ClampToEdge,
+            address_mode_v: wgpu::AddressMode::ClampToEdge,
+            address_mode_w: wgpu::AddressMode::ClampToEdge,
+            mag_filter: wgpu::FilterMode::Linear,
+            min_filter: wgpu::FilterMode::Linear,
+            mipmap_filter: wgpu::MipmapFilterMode::Linear,
+            ..Default::default()
+        });
+        let text_bind_group = text::wide_texture::bind_group(
+            &device,
+            "SJK text bind group",
+            &text_layout,
+            &font_view,
+            &text_sampler,
+            &wide_text,
+        );
+        let classic_atlas = text::load_classic()
+            .inspect_err(|error| {
+                log::progress(format_args!("warning: no classic HUD font: {error}"))
+            })
+            .ok();
+        let classic_text_sdf = classic_atlas
+            .as_ref()
+            .is_some_and(|atlas| atlas.distance_field);
+        let (classic_hud_font, classic_text_bind_group, classic_text_atlas) =
+            classic_atlas.map_or((None, None, None), |atlas| {
+                let view = gpu_texture::create_r8_texture_mipmapped(
+                    &device,
+                    &queue,
+                    "SJK classic HUD font atlas",
+                    &atlas.image,
+                    game_font::mip_levels(atlas.image.width(), atlas.image.height()),
+                );
+                let bind_group = text::wide_texture::bind_group(
+                    &device,
+                    "SJK classic HUD text bind group",
+                    &text_layout,
+                    &view,
+                    &text_sampler,
+                    &wide_text,
+                );
+                (Some(atlas.font), Some(bind_group), Some(view))
+            });
+        let game_fonts = game_font::GameFonts::preload(
+            preload_game_fonts || game_font::enabled(console.as_ref()),
+            console.is_some(),
+            &game_font::Device {
+                device: &device,
+                queue: &queue,
+                layout: &text_layout,
+                sampler: &text_sampler,
+                wide: &wide_text,
+            },
+        );
+        // The map edits' lamp changes, read from the map's document now: the lamps are
+        // found while the world is built (map_edits/lights.rs).
+        let lamp_edits = if session_active {
+            let server = live_session
+                .as_ref()
+                .filter(|session| !session.is_local())
+                .map(|session| session.server().to_string());
+            map_edits::lights::lamp_edits_at_build(&bsp, console.as_ref(), server.as_deref())
+        } else {
+            Default::default()
+        };
+        let (mut world_materials, resolved_world_stages) =
+            world_materials::create_filtered_runtime(
+                &device,
+                &queue,
+                &camera_layout,
+                context.scene_format(),
+                &bsp,
+                &vfs,
+                &shaders,
+                &flattened.materials,
+                &flattened.draws,
+                (&flattened.vertices, &flattened.indices),
+                &mover_catalog.meshes,
+                context.filtering,
+                context.sun_shadows.day.enabled,
+                context.sun_shadows.enabled,
+                context.material_maps,
+                &lamp_edits,
+            )?;
+        world_materials.bind_geometry(&geometry);
+        world_materials.install_gi(
+            &device,
+            &flattened,
+            &mover_catalog.meshes,
+            context.sun_shadows.day.enabled,
+        );
+        let scene_views = scene_views::Runtime::new(
+            &device,
+            &camera_layout,
+            context.scene_format(),
+            &flattened,
+            &bsp,
+            &shaders,
+            &|material| world_materials.floor_maps(material).cloned(),
+        );
+        load_profile.mark("world-materials")?;
+        if let Some(timeline) = &mut connect_timeline {
+            timeline.mark(log::TimelinePhase::Materials);
+        }
+        log::progress(format_args!(
+            "resolved {resolved_world_stages} shared world/entity stages; uploaded {} lightmaps",
+            bsp.render().lightmap_count()
+        ));
+        let particle_layout = particle_atlas::layout(&device);
+        let required_effect_shaders = effect_assets::required_shaders(
+            &vfs,
+            map_effects
+                .effect_names()
+                .chain(missile_effects.effect_names()),
+        );
+        let mut particle_atlas = particle_atlas::create(
+            &device,
+            &queue,
+            &particle_layout,
+            &vfs,
+            &shaders,
+            &required_effect_shaders,
+        )?;
+        let effect_geometry = effect_geometry_gpu::Runtime::new(
+            &device,
+            &camera_layout,
+            &particle_layout,
+            frame_target::aa::effects::FORMAT,
+        );
+        let tag_render = tag_render::TagRender::new(
+            device,
+            &camera_layout,
+            frame_target::aa::effects::FORMAT,
+            context.anisotropy_limit,
+        );
+        load_profile.mark("effect-atlas")?;
+        // The gamestate's shader remaps, applied here on the worker: left to the
+        // first live frame, they took 0.44 s of the main thread under the loading
+        // screen on JoF (11/11/2026). That frame checks them against the session's
+        // own remaps and the real mode, which costs little when nothing changed.
+        if let (Some(game), Some(mode)) = (build_game_state.as_ref(), build_remap_mode) {
+            let remaps = sjk_client::ShaderRemaps::from_game_state(game);
+            if let Err(error) = world_materials.refresh_remaps(
+                device,
+                queue,
+                &vfs,
+                &shaders,
+                &remaps,
+                mode,
+                bsp.render().visibility(),
+            ) {
+                log::progress(format_args!("shader remap failed: {error}"));
+            }
+            let table = remaps.table(mode);
+            if let Err(error) = particle_atlas.refresh_remaps(
+                device,
+                queue,
+                &vfs,
+                &shaders,
+                world_materials.remap_generation(),
+                |name| {
+                    let (target, offset) = world_materials.remap_target(table, name);
+                    (target.to_owned(), offset)
+                },
+            ) {
+                log::progress(format_args!("effect shader remap failed: {error}"));
+            }
+            load_profile.mark("shader-remaps")?;
+        }
+        let (entity_pipeline, particle_pipelines) = particle_draw::create(
+            device,
+            &camera_layout,
+            &particle_layout,
+            context.scene_format(),
+        );
+        let saber_gpu = saber_gpu::Runtime::new(
+            &device,
+            &queue,
+            &vfs,
+            &shaders,
+            &camera_layout,
+            frame_target::aa::effects::FORMAT,
+            &context.blade_signatures,
+        )?;
+        let dust_motes = dust_motes::Runtime::new(&device, &camera_layout, context.scene_format());
+        let weather = weather::Runtime::new(active_game_state, &bsp);
+        // Every 2D pipeline writes display values through a UNORM view (`ui_target.rs`).
+        let ui_format = ui_target::format(format);
+        let hud_shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+            label: Some("SJK HUD shader"),
+            source: wgpu::ShaderSource::Wgsl(include_str!("hud.wgsl").into()),
+        });
+        let hud_pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+            label: Some("SJK HUD pipeline layout"),
+            bind_group_layouts: &[Some(&hud_layout)],
+            immediate_size: 0,
+        });
+        let hud_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+            label: Some("SJK HUD pipeline"),
+            layout: Some(&hud_pipeline_layout),
+            vertex: wgpu::VertexState {
+                module: &hud_shader,
+                entry_point: Some("vertex_main"),
+                compilation_options: wgpu::PipelineCompilationOptions::default(),
+                buffers: &[],
+            },
+            fragment: Some(wgpu::FragmentState {
+                module: &hud_shader,
+                entry_point: Some("fragment_main"),
+                compilation_options: wgpu::PipelineCompilationOptions::default(),
+                targets: &[Some(wgpu::ColorTargetState {
+                    format: ui_format,
+                    blend: Some(wgpu::BlendState::ALPHA_BLENDING),
+                    write_mask: wgpu::ColorWrites::ALL,
+                })],
+            }),
+            primitive: wgpu::PrimitiveState::default(),
+            depth_stencil: Some(wgpu::DepthStencilState {
+                format: DepthTarget::FORMAT,
+                depth_write_enabled: Some(false),
+                depth_compare: Some(wgpu::CompareFunction::Always),
+                stencil: Default::default(),
+                bias: Default::default(),
+            }),
+            multisample: wgpu::MultisampleState::default(),
+            multiview_mask: None,
+            cache: None,
+        });
+        let text_shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+            label: Some("SJK text shader"),
+            source: wgpu::ShaderSource::Wgsl(include_str!("text.wgsl").into()),
+        });
+        let text_pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+            label: Some("SJK text pipeline layout"),
+            bind_group_layouts: &[Some(&text_layout)],
+            immediate_size: 0,
+        });
+        // Inter's coverage atlas and the retail fonts' distance fields share one
+        // layout and vertex format; only the fragment entry differs.
+        let create_text_pipeline = |label, fragment_entry| {
+            device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+                label: Some(label),
+                layout: Some(&text_pipeline_layout),
+                vertex: wgpu::VertexState {
+                    module: &text_shader,
+                    entry_point: Some("vertex_main"),
+                    compilation_options: wgpu::PipelineCompilationOptions::default(),
+                    buffers: &[Some(TextVertex::layout())],
+                },
+                fragment: Some(wgpu::FragmentState {
+                    module: &text_shader,
+                    entry_point: Some(fragment_entry),
+                    compilation_options: wgpu::PipelineCompilationOptions::default(),
+                    targets: &[Some(wgpu::ColorTargetState {
+                        format: ui_format,
+                        blend: Some(wgpu::BlendState::ALPHA_BLENDING),
+                        write_mask: wgpu::ColorWrites::ALL,
+                    })],
+                }),
+                primitive: wgpu::PrimitiveState::default(),
+                depth_stencil: Some(wgpu::DepthStencilState {
+                    format: DepthTarget::FORMAT,
+                    depth_write_enabled: Some(false),
+                    depth_compare: Some(wgpu::CompareFunction::Always),
+                    stencil: Default::default(),
+                    bias: Default::default(),
+                }),
+                multisample: wgpu::MultisampleState::default(),
+                multiview_mask: None,
+                cache: None,
+            })
+        };
+        let text_pipeline = create_text_pipeline("SJK text pipeline", "fragment_main");
+        let sdf_text_pipeline =
+            create_text_pipeline("SJK distance-field text pipeline", "fragment_sdf");
+        let text_vertex_buffer = TextVertexBuffer::new(device, "SJK dynamic text vertices");
+        let classic_text_vertex_buffer =
+            TextVertexBuffer::new(device, "SJK dynamic classic HUD text vertices");
+        let entity_instance_buffer = device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("SJK dynamic entity instances"),
+            size: (particle_types::INSTANCE_CAPACITY * std::mem::size_of::<EntityInstance>())
+                as u64,
+            usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
+            mapped_at_creation: false,
+        });
+        let actor_instance_buffer = device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("SJK actor instances"),
+            size: (actor_instance::CAPACITY * std::mem::size_of::<ActorInstance>()) as u64,
+            usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
+            mapped_at_creation: false,
+        });
+        let depth = DepthTarget::new(&device, configuration.width, configuration.height);
+        let (ui_shapes, hud) = hud::icons::install(&device, &queue, ui_format, &vfs, &shaders);
+        let emojis = chat::emoji::Emojis::load(&vfs, &shaders, |id, rgba| {
+            ui_shapes.upload_icon(queue, id, rgba)
+        });
+        let menu_hud = menu_hud::MenuHud::new(&device, ui_format);
+        let console_layer = console_backdrop::ConsoleLayer::new(
+            device,
+            queue,
+            ui_format,
+            &vfs,
+            &shaders,
+            game_font::classic_console(console.as_ref()),
+        );
+        let card_outline = card_outline::Gpu::new(device, ui_format);
+        let (scope_mask, ground_hud) = (
+            scope::Mask::new(&device, &queue, ui_format, &vfs, &shaders),
+            ground_hud::GroundHud::new(device, context.scene_format(), &text_layout),
+        );
+        load_profile.mark("pipelines-ui")?;
+
+        let third_person = live_session.is_some()
+            || build_game_state.is_some()
+            || demo_session
+                .as_ref()
+                .is_some_and(|session| session.camera().third_person());
+        let game_menu = active_snapshot.is_some_and(|snapshot| snapshot.player.is_spectator());
+        let actor_groups = (0..actor_meshes.len())
+            .map(|_| Vec::with_capacity(4))
+            .collect();
+        let object_groups = object_meshes::instance_groups(&object_meshes, saber_hilts.as_ref());
+        let mover_groups = movers::instance_groups(&mover_catalog.meshes);
+        let effects = config_string_refresh::preload_effects(&vfs, &map_effects, &missile_effects);
+        load_profile.mark("effect-graphs")?;
+        let sound_prefetch = audio::SoundPrefetch::read(&vfs, build_game_state.as_ref(), &bsp);
+        load_profile.mark("sound-prefetch")?;
+        if let Some(timeline) = &mut connect_timeline {
+            timeline.mark(log::TimelinePhase::Sounds);
+        }
+        let resident = session_transition::resident::State::new(active_game_state, active_snapshot);
+        let live_map_installed = live_session.is_some();
+        let trace_scratch = bsp.trace_scratch();
+        let entity_lighting = entity_lighting::EntityLighting::from_world(&bsp);
+        Ok(Self {
+            _shared_textures: shared_holder,
+            render_scale: None,
+            post_aa: frame_target::aa::Runtime::for_context(
+                &context,
+                [configuration.width, configuration.height],
+            ),
+            window: context.window.clone(),
+            device: context.device.clone(),
+            queue: context.queue.clone(),
+            present_modes: context.present_modes.clone(),
+            adapter_name: context.adapter_name.clone(),
+            adapter_backend: context.adapter_backend.clone(),
+            context,
+            next_context: None,
+            graphics_reload: graphics_reload::State::default(),
+            fps_help: fps_help::State::default(),
+            fps_card: fps_help::card::Card::default(),
+            hud_edit: hud_edit::HudEdit::default(),
+            emote_help: emote_help::State::default(),
+            emote_picker: emote_picker::State::default(),
+            e2e_whispers: e2e_whispers::State::default(),
+            trades: player_trades::State::default(),
+            alpha_card: alpha_notice_card::Card::default(),
+            log_request_card: log_request_card::Card::default(),
+            mod_notice: mod_notice_card::State::default(),
+            small_card_notice: small_card_notice::Card::default(),
+            playstyle_card: playstyle_card::Card::default(),
+            news: news_panel::Panel::default(),
+            official: official::Official::default(),
+
+            screenshots: screenshot_setup.manager,
+            menu_pictures: menu_pictures::Painter::default(),
+            headless_frame: None,
+            configuration,
+            size,
+            world_materials,
+            scene_views,
+            entity_pipeline,
+            particle_pipelines,
+            particle_atlas,
+            effect_geometry,
+            tag_render,
+            hud_pipeline,
+            ui_shapes,
+            text_pipeline,
+            sdf_text_pipeline,
+            saber_gpu,
+            blade_pictures: None,
+            dust_motes,
+            quick_wheel: quick_wheel::QuickWheel::default(),
+            devmap_bar: devmap_bar::DevBar::default(),
+            weather,
+            geometry,
+            entity_instance_buffer,
+            actor_instance_buffer,
+            actor_meshes,
+            actor_workers: actor_pose::evaluation::Pool::new(),
+            object_meshes,
+            emplaced_turned: Default::default(),
+            emitter_model_catalog,
+            mover_catalog,
+            pickup_catalog,
+            first_person_weapon,
+            first_person_view: first_person_view::Tracker::default(),
+
+            model_material_overrides,
+            saber_hilts,
+            saber_skins: Default::default(),
+            blade_skins: Default::default(),
+            saber_states: saber_trail::StateSlab::default(),
+            saber_trail_segments: saber_trail::SegmentPool::default(),
+            smoke_ribbons: saber_ribbons::Ribbons::default(),
+            ribbons_at: None,
+            saber_sparks: saber_sparks::Sparks::default(),
+            speed_trails: Default::default(),
+            illuminate: Default::default(),
+            illuminate_others: Default::default(),
+            cardboard_box: Default::default(),
+            fishing: Default::default(),
+            fishing_cues: Vec::with_capacity(4),
+            mining: Default::default(),
+            mining_cues: Vec::with_capacity(4),
+            order66: Default::default(),
+            hax: Default::default(),
+            drone: Default::default(),
+            boombox: Default::default(),
+            monitor: Default::default(),
+            box_hunt: Default::default(),
+            quests: Default::default(),
+            banana: Default::default(),
+            propgun: Default::default(),
+            status_balloons: Default::default(),
+            tags: Default::default(),
+            ragdoll: Default::default(),
+            toys_saved: Default::default(),
+            holocron_stage: Default::default(),
+            #[cfg(test)]
+            holocron_stage_seconds: None,
+            #[cfg(test)]
+            holocron_stage_request: None,
+            looks: Default::default(),
+            trick_fades: Default::default(),
+            projectiles: Vec::with_capacity(sjk_protocol::MAX_LEGACY_ENTITIES),
+            missile_effects,
+            dynamic_lights: dynamic_lights::PointLightList::default(),
+            effect_aux: effect_aux::Runtime::default(),
+            muzzle_effects: sjk_client::LegacyMuzzleEffects::new(),
+            vehicle_fires: Default::default(),
+            vehicle_flames: Default::default(),
+            force_overlays: sjk_client::LegacyForceOverlayTracker::default(),
+            body_fades: Box::default(),
+            demp2_shells: Default::default(),
+            jetpack,
+            jetpack_sounds: Default::default(),
+            force_overlays_last: 0,
+            actor_groups,
+            object_groups,
+            static_models,
+            pickup_override_instances: Vec::with_capacity(force_overlay_submission::CAPACITY),
+            mover_groups,
+            movers: Vec::with_capacity(sjk_protocol::MAX_LEGACY_ENTITIES),
+            pickups: Vec::with_capacity(sjk_protocol::MAX_LEGACY_ENTITIES),
+            entity_instances: Vec::with_capacity(particle_types::INSTANCE_CAPACITY),
+            saber_instances: Vec::with_capacity(saber::MAX_BLADE_INSTANCES),
+            saber_heard: saber_smoke::Heard::default(),
+            particle_groups: std::array::from_fn(|_| {
+                Vec::with_capacity(particle_types::PARTICLE_POOL)
+            }),
+            actor_instances: Vec::with_capacity(actor_instance::CAPACITY),
+            actor_instance_ranges: Vec::with_capacity(64),
+            object_instance_ranges: Vec::with_capacity(256),
+            pickup_override_ranges: Vec::with_capacity(sjk_protocol::MAX_LEGACY_ENTITIES),
+            entity_draw_queue: entity_materials::Queue::new(),
+            mover_instance_ranges: Vec::with_capacity(bsp.render().models().len()),
+            crosshair_scan: crosshair_scan::State::new(&bsp),
+            bsp: Arc::new(bsp),
+            trace_scratch,
+            world_notes: world_notes::Notes::default(),
+            entity_view: Default::default(),
+            world_pings: world_ping::WorldPings::default(),
+            text_dialog: text_dialog::TextDialog::default(),
+            medal_popup: medal_popup::MedalPopup::default(),
+            holocron_popup: holocron_popup::HolocronPopup::default(),
+            unlock_toast: unlock_toast::UnlockToast::default(),
+            bug_report_waiting: false,
+            bug_report_from_menu: false,
+            bug_report_serial: 0,
+            entity_lighting,
+            menu_stage: menu_stage::MenuStage::default(),
+            card_scenes: card_scenes::CardScenes::default(),
+            clientinfo_watch,
+            config_string_refresh,
+            black_sabers: Default::default(),
+            siege_sabers: Default::default(),
+            holster_server: Default::default(),
+            shaders: Arc::new(shaders),
+            decal_surfaces,
+            map_edits: Default::default(),
+            mystery_boxes: Default::default(),
+            wheel_of_doom: Default::default(),
+            use_prompt: Default::default(),
+            toy_master: Default::default(),
+            player_shadows: player_shadows::State::default(),
+            camera_buffer,
+            camera_bind_group,
+            camera_layout: camera_layout.clone(),
+            hud_buffer,
+            hud_scissors: None,
+            hud_bind_group,
+            text_vertex_buffer,
+            classic_text_vertex_buffer,
+            text_bind_group,
+            text_atlas: font_view,
+            text_layout,
+            text_sampler,
+            wide_text,
+            logo_glyph,
+            classic_text_bind_group,
+            classic_text_atlas,
+            classic_text_sdf,
+            ui_font,
+            classic_hud_font,
+            game_fonts,
+            text_vertices: Vec::with_capacity(text::vertex_buffer::INITIAL_VERTICES),
+            classic_text_vertices: Vec::with_capacity(4_096),
+            hud,
+            scoreboard: scoreboard::Scoreboard::new(),
+            chat: chat::ChatOverlay::with_emojis(emojis),
+            muted_players: muted_players::MutedPlayers::default(),
+            map_blocks: map_blocks::MapBlocks::default(),
+            sound_mutes: sound_mutes::SoundMutes::default(),
+            game_menu,
+            in_game_menu: ingame_menu::InGameMenu::new(),
+            game_menu_page: if game_menu {
+                GameMenuPage::Team
+            } else {
+                GameMenuPage::Main
+            },
+            game_menu_row: 0,
+            auto_opened_team_menu: game_menu,
+            depth,
+            camera_position: Vec3::from_array(camera_origin),
+            view_origin: Vec3::from_array(camera_origin),
+            camera_yaw,
+            camera_pitch: 0.0,
+            mouse_look: pointer_input::MouseLook::default(),
+            field_of_view: 90.0,
+            scope: scope::Zoom::default(),
+            scope_mask,
+            card_outline,
+            console_layer,
+            menu_hud,
+            ground_hud,
+            brush_view: Default::default(),
+            applied_display: Some(settings::DisplayMode::Windowed),
+            display_suspended: false,
+            display_changed_at: Instant::now(),
+            world_hidden: false,
+            applied_resolution: [size.width, size.height],
+            applied_high_dpi: true,
+            refresh_cap: std::cell::Cell::new(None),
+            frame_pacer: frame_pacing::FramePacer::new(),
+            upper_right_rate: String::with_capacity(16),
+            hitches: hitch_log::Recorder::default(),
+            gpu_phases,
+            frame_timings: frame_timings::State::default(),
+            third_person_camera: camera::State::default(),
+            fall_camera: fall_camera::FallCamera::default(),
+            far_plane,
+            gameplay_input: input::GameplayInput::default(),
+            alt_code: input::alt_code::AltCode::default(),
+            profile_hub: profile_hub::Hub::default(),
+            frame_view: None,
+            pointer_captured: false,
+            spectator_follow_click: false,
+            refocus_click: Default::default(),
+            cursor_policy: pointer_input::CursorPolicy::new(),
+            cursor_position: [0.0; 2],
+            ui_epoch: Instant::now(),
+            last_frame: Instant::now(),
+            last_cluster: i32::MIN,
+            player_animation,
+            live_session,
+            demo_session,
+
+            live_world,
+            legacy_world_adapter,
+            presentation_clock,
+            net_timing: net_timing::NetTiming::default(),
+            server_view: Default::default(),
+            command_schedule: Default::default(),
+            packet_pacer: Default::default(),
+            server_clock,
+            clock_trace: clock_trace::ClockTrace::new(),
+            cut_trace: cut_trace::CutTrace::new(),
+            trip_mine_beams: trip_mine_lasers::Beams::default(),
+            local_prediction,
+            local_actor_state: local_actor_state::Tracker::default(),
+            third_person,
+            third_person_choice: third_person,
+            zoom_first_person: false,
+            detached_camera: false,
+            peek: peek::State::default(),
+            ghost: ghost_replay::Ghost::default(),
+            mimic: mimic::Mimic::default(),
+
+            selected_weapon: None,
+            weapon_selection_view: Default::default(),
+            weapon_selected_at: None,
+            pending_generic_command: 0,
+            generic_command_sent: 0,
+            anti_emote: anti_emote::State::default(),
+            effects,
+            sound_prefetch,
+            vfs: Some(vfs),
+            pending_map_reload: false,
+            world_load_task: None,
+            world_install_task: None,
+            map_unloaded: false,
+            world_load_state: session_transition::LoadStateMachine::new(),
+            world_load_started: None,
+            world_load_map: String::with_capacity(64),
+            remap_blocked_maps: Default::default(),
+            snapshot_observations: snapshot_presentation::Counters::default(),
+            obituaries: sjk_client::ObituaryTracker::new(),
+            siege_notices: siege_objective_notice::Notices::default(),
+            saber_kills_seen: 0,
+            forced_disintegrations: disintegration::Forced::default(),
+            achievement_tracker: achievements::tracker::Tracker::default(),
+            lagometer: sjk_client::LagometerSamples::new(),
+            auto_switch: auto_switch::Tracker::default(),
+            previous_particle_events: HashMap::new(),
+            duel_hidden_view: Default::default(),
+            particles: Vec::with_capacity(particle_types::PARTICLE_POOL),
+            particle_room: particle_room::Room::default(),
+            pending_particle_effects: particle_physics::PendingEffects::new(),
+            impacts: impacts::Pool::new(),
+            last_first_person_flash: None,
+            world_muzzles: world_muzzles::Points::default(),
+            saber_clash_flare: LegacySaberClashFlare::default(),
+            damage_feedback: damage_feedback::Feedback::default(),
+            map_effects,
+            localization,
+            console,
+            client_menu,
+            join_task: None,
+            last_connect_address: None,
+            join_password: String::new(),
+            game_data,
+            connect_timeline,
+            load_event_gap: log::EventGap::default(),
+            transition_report_pending: false,
+
+            completed_map_changes,
+            live_map_installed,
+
+            quit_requested: false,
+            is_menu_world: false,
+            portal: portal::Destination::new(),
+            resident,
+        }
+        .with_render_scale()
+        .with_sun_shadows())
+    }
+
+    fn rebuild_modern_text(&mut self, dpi_scale: f64) -> Result<(), Box<dyn Error>> {
+        let atlas = text::load_modern(dpi_scale, self.logo_glyph.as_ref())?;
+        let view = gpu_texture::create_r8_texture_mipmapped(
+            &self.device,
+            &self.queue,
+            "SJK Inter UI font atlas",
+            &atlas.image,
+            text::ATLAS_MIP_LEVELS,
+        );
+        self.text_bind_group = text::wide_texture::bind_group(
+            &self.device,
+            "SJK text bind group",
+            &self.text_layout,
+            &view,
+            &self.text_sampler,
+            &self.wide_text,
+        );
+        self.text_atlas = view;
+        self.ui_font = atlas.font;
+        Ok(())
+    }
+
+    fn render_inner(
+        &mut self,
+        game_audio: &mut Option<GameAudio>,
+        timing: &mut frame_pacing::budget::Timer,
+    ) -> FrameStatus {
+        use frame_pacing::budget::Phase;
+        timing.mark(Phase::Shell);
+        self.prepare_timed_frame(game_audio);
+        // Before anything spawns this frame: trail puffs and impacts always fit.
+        self.particle_room.make_room(
+            &mut self.particles,
+            Instant::now(),
+            particle_room::take_refused(),
+        );
+        let now = Instant::now();
+        let delta_seconds = now.duration_since(self.last_frame).as_secs_f32().min(0.05);
+        self.last_frame = now;
+        let visual_now = now;
+        self.local_prediction
+            .begin_frame(visual_now.duration_since(self.ui_epoch).as_millis() as i32);
+        self.update_live_session(game_audio, visual_now, timing);
+        self.update_identity();
+        self.follow_saber_lab();
+        timing.mark(Phase::Preview);
+        self.update_demo_playback(game_audio, visual_now);
+        let presentation_time = self.demo_session.as_ref().map_or_else(
+            || self.presentation_clock.sample(Instant::now()),
+            demo_playback::Session::current_server_time,
+        );
+        prediction_preview::tick(self, game_audio, Instant::now(), presentation_time as i32);
+        // Hidden in the box, the eye stays down while the server stands the player up.
+        self.keep_boxed_eye();
+        // The Monitor's monitors and the Banana peel's peels, then the Ragdoll's bodies
+        // (one may strike, one may trip) at this frame's time, for the camera and the
+        // actors.
+        self.step_monitors(presentation_time);
+        self.step_bananas(presentation_time);
+        self.step_propgun(presentation_time);
+        self.step_ragdolls(presentation_time);
+        timing.mark(Phase::Config);
+        self.refresh_config_strings(game_audio);
+        timing.mark(Phase::View);
+        menu_backdrop::drive(self, visual_now);
+        menu_pictures::prepare(self);
+        // The backdrop keeps the view while a joined map loads behind it.
+        let backdrop_view = menu_backdrop::standalone_menu_visible(self);
+        self.world_hidden = menu_backdrop::classic_hides_world(self);
+        let world_hidden = self.world_hidden;
+        if let Some(menu) = &mut self.client_menu {
+            menu.set_world_hidden(world_hidden);
+        }
+        self.update_menu_stage(visual_now);
+        self.play_saber_lab_sounds(game_audio, visual_now);
+        self.prepare_eye_adaptation(delta_seconds, backdrop_view);
+        let local_view = self
+            .demo_session
+            .as_ref()
+            .is_none_or(|session| !matches!(session.camera(), demo_playback::Camera::Spectate(_)));
+        self.update_zoom_view(presentation_time as i32);
+        let intermission_view = self
+            .live_session
+            .as_ref()
+            .map(ClientSession::latest_snapshot)
+            .or_else(|| {
+                self.demo_session
+                    .as_ref()
+                    .map(demo_playback::Session::latest_snapshot)
+            })
+            .and_then(|snapshot| sjk_client::IntermissionView::from_player_state(&snapshot.player))
+            .filter(|_| !backdrop_view);
+        let forward = Vec3::new(
+            self.camera_yaw.cos() * self.camera_pitch.cos(),
+            self.camera_yaw.sin() * self.camera_pitch.cos(),
+            self.camera_pitch.sin(),
+        );
+        // Quake's `AngleVectors` right axis (+Y is the listener's left).
+        let right = Vec3::new(self.camera_yaw.sin(), -self.camera_yaw.cos(), 0.0);
+        self.finish_audio_frame(game_audio, forward, right);
+        self.advance_resident_movement(delta_seconds);
+        net_timing::frame(self, presentation_time);
+        clock_trace::tick(self, presentation_time, visual_now);
+        let first_person = (!backdrop_view)
+            .then(|| first_person_view::camera(self, presentation_time as i32))
+            .flatten();
+        // cg_view.c:1597-1608: the decaying prediction error shifts only the
+        // view origin; the model root keeps the predicted origin.
+        let error_offset = self.local_prediction.view_offset();
+        let mut view_up = Vec3::Z;
+        let peek_view = (!backdrop_view && intermission_view.is_none())
+            .then(|| {
+                peek::camera(self, presentation_time)
+                    .or_else(|| hax::camera(self, presentation_time))
+                    .or_else(|| ragdoll::camera(self, presentation_time))
+            })
+            .flatten();
+        let fall = self.update_fall_camera(presentation_time as i32);
+        let detached_before_peek = self.detached_camera;
+        if self.live_session.is_some() && peek_view.is_some() {
+            self.detached_camera = true;
+        }
+        let (branch, (view_position, view_target)) = if let Some(view) = intermission_view {
+            self.third_person_camera = camera::State::default();
+            let pitch = -view.angles[0].to_radians();
+            let yaw = view.angles[1].to_radians();
+            let direction = Vec3::new(
+                yaw.cos() * pitch.cos(),
+                yaw.sin() * pitch.cos(),
+                pitch.sin(),
+            );
+            let origin = Vec3::from_array(view.origin);
+            ("intermission", (origin, origin + direction * 256.0))
+        } else if let Some(view) = peek_view {
+            self.third_person_camera = camera::State::default();
+            ("peek", view)
+        } else if (self.live_session.is_some() || self.demo_session.is_some())
+            && self.third_person
+            && !self.detached_camera
+            && !backdrop_view
+        {
+            (
+                "third-person",
+                camera::damped_third_person(self, error_offset, delta_seconds, presentation_time),
+            )
+        } else if let Some(camera) = first_person {
+            self.third_person_camera = camera::State::default();
+            let (position, target, up) = camera.look();
+            view_up = up;
+            ("first-person", (position, target))
+        } else {
+            self.third_person_camera = camera::State::default();
+            let free = (self.camera_position, self.camera_position + forward * 256.0);
+            (if backdrop_view { "backdrop" } else { "free" }, free)
+        };
+        // A fall to death holds the player's own view where the fall began, looking
+        // down at him (`cg_view.c:3224-3233`, `fall_camera`).
+        let fall = fall.filter(|_| local_view && matches!(branch, "third-person" | "first-person"));
+        let (view_position, view_target) = match fall {
+            Some((fall, origin)) => {
+                let (position, target, up) =
+                    fall_camera::look(fall, origin, view_position, view_target);
+                view_up = up;
+                (position, target)
+            }
+            _ => (view_position, view_target),
+        };
+        cut_trace::tick(self, branch, (view_position, view_target), visual_now);
+        self.effect_aux
+            .set_viewer(view_position, view_target - view_position);
+        // `CG_DoCameraShake` measures from the rendered view (`cg.refdef.vieworg`),
+        // so an effect's short-range shake reaches a first-person eye but not the
+        // third-person camera behind the player.
+        self.effect_aux.resolve_shakes(
+            view_position,
+            visual_now,
+            local_view && cgame_options::screen_shake(self.console.as_ref()),
+        );
+        // The third-person camera already traced from the shifted origin, and the
+        // fall camera replaces the view origin outright.
+        let error_offset = if branch == "third-person" || branch == "peek" || fall.is_some() {
+            Vec3::ZERO
+        } else {
+            error_offset
+        };
+        let (view_position, view_target) = effect_aux::apply_camera_offset(
+            view_position + error_offset,
+            view_target + error_offset,
+            self.effect_aux.camera_offset(visual_now),
+        );
+        self.update_fog_setting();
+        // The WHEEL OF DOOM turns the player's own view over or sways it (`wheel_of_doom`).
+        let (view_target, view_up) = if local_view && branch != "backdrop" {
+            self.wheel_of_doom
+                .turn_view(view_position, view_target, view_up, Instant::now())
+        } else {
+            (view_target, view_up)
+        };
+        let view = look_at_mat4(view_position, view_target, view_up);
+        let aspect = self.configuration.width as f32 / self.configuration.height as f32;
+        let fov = self.scope_fov(presentation_time as i32, game_audio);
+        // A menu picture's camera sees what the picture shows, whatever cg_fov is.
+        let fov = self.menu_pictures.field_of_view().unwrap_or(fov);
+        // Behind the Collection's stage the page's frame sees the same view at every
+        // window shape, so the model keeps its column beside the words.
+        let fov = if branch == "backdrop"
+            && self
+                .client_menu
+                .as_ref()
+                .is_some_and(menu::ClientMenu::collection_stage)
+        {
+            menu_stage::frame_fit_fov(fov, aspect)
+        } else {
+            fov
+        };
+        let projection = perspective(fov.to_radians(), aspect, 2.0, self.far_plane);
+        // rd-vanilla `tr_shade.cpp:367` derives tess.shaderTime from the
+        // frame/refdef time; materials apply their own remap time offsets.
+        self.upload_scene_camera(CameraUniform {
+            view_projection: (projection * view).to_cols_array_2d(),
+            camera_position: view_position.to_array(),
+            view_forward: (view_target - view_position).normalize().to_array(),
+            _padding: if self.scene_views.sky_only_fog {
+                2.0
+            } else {
+                0.0
+            },
+            shader_time: presentation_time as f32 * 0.001,
+        });
+        timing.mark(Phase::Hud);
+        let damage = self
+            .damage_feedback
+            .marker(presentation_time as i32, self.console.as_ref());
+        self.update_auto_switch();
+        let mut hud_visibility = ground_hud::frame(
+            self,
+            intermission_view.is_some(),
+            detached_before_peek,
+            presentation_time as i32,
+        );
+        brush_view::frame(self);
+        let [crosshair, names] = scope::crosshair_visibility(
+            self.scope.mode,
+            cgame_options::scope_style(self.console.as_ref()),
+            self.quick_wheel.is_open(),
+        );
+        hud_visibility.crosshair &= crosshair;
+        hud_visibility.crosshair_names &= names;
+        let viewport = [
+            self.configuration.width as f32,
+            self.configuration.height as f32,
+        ];
+        let text_scale = ui_scale::height_scale(viewport[1]).max(0.85);
+        menu_hud::MenuHud::sync(self);
+        hud_visibility.menu_hud = self.menu_hud.active();
+        self.frame_view = Some(hud::identification::Camera {
+            eye: view_position,
+            target: view_target,
+            up: view_up,
+            fov,
+            viewport,
+        });
+        hud_runtime::update(
+            self,
+            view_position,
+            (view_target, view_up, fov),
+            presentation_time as i32,
+            intermission_view.is_some(),
+        );
+        // `CG_DrawRocketLocking`'s tick and lock, at the target (`CHAN_AUTO`).
+        if let Some((sound, origin)) = self.hud.rocket_lock.take_sound()
+            && let Some(audio) = game_audio.as_mut()
+        {
+            audio.play_on_channel(
+                sound,
+                1.0,
+                origin,
+                sjk_audio::SourceId(1022),
+                sjk_audio::ChannelId(0),
+            );
+        }
+        // A vehicle that hides its rider takes the player's status and weapon HUD.
+        let mut hud_visibility = self.hud.vehicle.apply(hud_visibility);
+        // The game HUD draws the vehicle HUD from `swoopvehiclehud`'s pictures, as
+        // stock does; SJK's vector strip stands in for it with the other looks.
+        let stock_vehicle =
+            hud_visibility.elements && hud_visibility.vehicle && self.menu_hud.draws_vehicle();
+        if stock_vehicle {
+            hud_visibility.vehicle = false;
+        }
+        self.update_sound_sonar(game_audio.as_ref());
+        let hud_style = menu_hud::HudStyle::read(self.console.as_ref());
+        // The radial look is laid out for the bundled font (Inter), whatever
+        // `cg_classicHudFont` says: its numbers are aligned to that font's metrics.
+        let classic_hud = !matches!(hud_style, menu_hud::HudStyle::Radial)
+            && self
+                .console
+                .as_ref()
+                .and_then(|console| console.bool_cvar("cg_classicHudFont"))
+                .unwrap_or(false);
+        let hud_font = if classic_hud {
+            self.classic_hud_font.as_ref().unwrap_or(&self.ui_font)
+        } else {
+            &self.ui_font
+        };
+        self.hud.weapon_select.shown = self.sample_weapon_select(intermission_view.is_some());
+        // JoF EJK's Force wheel (the retail icon bar) with the retail-looking HUDs.
+        self.hud
+            .set_force_wheel_bar(hud_style != menu_hud::HudStyle::Radial);
+        self.hud
+            .set_radial_placement(hud::RadialPlacement::read(self.console.as_ref()));
+        let hud_offsets = hud::placement::Offsets::read(self.console.as_ref());
+        self.hud.set_offsets(hud_offsets);
+        let hud_layout = self.hud.layout(
+            hud_font,
+            match hud_style {
+                menu_hud::HudStyle::Radial => hud::HudLook::Radial,
+                menu_hud::HudStyle::Classic => hud::HudLook::Classic,
+                menu_hud::HudStyle::Game => hud::HudLook::Game,
+            },
+            viewport,
+            runtime_settings::hud_scale(self.console.as_ref()),
+            hud_visibility,
+            presentation_time.max(0) as u64,
+        );
+        if hud_style == menu_hud::HudStyle::Game {
+            // The game-data HUD draws its meters as pictures, not one of the layouts.
+            self.hud.nameplate.set_hud_colors(None, None, None);
+        }
+        // The shader's own bars hold one maximum; the layouts draw the overflow.
+        let [health_ratio, armor_ratio, force_ratio] = self
+            .hud
+            .displayed_ratios()
+            .map(|ratio| ratio.clamp(0.0, 1.0));
+        let (menu_kind, visual_menu_row) = self
+            .client_menu
+            .as_ref()
+            .filter(|menu| menu.is_visible())
+            .map_or(
+                (0.0, self.game_menu_row as f32),
+                menu::ClientMenu::visual_selection,
+            );
+        let hud_uniform = HudUniform {
+            crosshair_color: self.hud.targeting.color,
+            health_ratio,
+            armor_ratio,
+            force_ratio,
+            menu_open: menu_backdrop::shader_menu_state(self),
+            inverse_width: 1.0 / self.configuration.width as f32,
+            inverse_height: 1.0 / self.configuration.height as f32,
+            menu_row: visual_menu_row,
+            menu_row_count: self.game_menu_row_count() as f32,
+            // The classic picture replaces the procedural cross when it loaded.
+            crosshair: hud::options::crosshair_size(
+                self.console.as_ref(),
+                hud_visibility.crosshair && !self.hud.crosshair_picture_drawn,
+            ) * self.hud.vehicle_crosshair_factor(),
+            hud_visible: f32::from(hud_visibility.hud),
+            status_visible: 0.0,
+            menu_kind,
+            menu_phase: now.duration_since(self.ui_epoch).as_secs_f32(),
+            damage_x: damage.map_or(0.0, |sample| sample.x),
+            damage_y: damage.map_or(0.0, |sample| sample.y),
+            damage_alpha: damage.map_or(0.0, |sample| sample.alpha),
+            damage_strength: damage.map_or(0.0, |sample| sample.strength),
+            health_bar: hud_layout.health_bar,
+            armor_bar: hud_layout.armor_bar,
+            force_bar: hud_layout.force_bar,
+            _padding: [0.0; 3],
+            crosshair_parameters: self.hud.targeting.parameters(viewport),
+            damage_color: damage.map_or([0.0; 4], damage_feedback::Sample::color),
+        };
+        self.queue
+            .write_buffer(&self.hud_buffer, 0, bytemuck::bytes_of(&hud_uniform));
+        self.hud_scissors =
+            hud_uniform.scissors(self.configuration.width, self.configuration.height);
+        let console_covers_frame = self.console_covers_frame();
+        // The alpha notice comes before everything, and every other card waits for it.
+        let alpha_shown = self.prepare_alpha_card();
+        let covered = console_covers_frame || alpha_shown || self.alpha_card.wants();
+        // A new medal, or a holocron drop after it, shows over the menus, which are not
+        // drawn under it.
+        let medal_shown = self.prepare_medal_popup(covered);
+        let holocron_shown = self.prepare_holocron_popup(covered || medal_shown);
+        // The graphics reload card waits for the others.
+        let reload_card_shown = self.prepare_reload_card(
+            covered
+                || medal_shown
+                || holocron_shown
+                || self.medal_popup.pending()
+                || self.holocron_popup.pending(),
+        );
+        // Then the small-card notice, once a start; the cards after wait for both.
+        let small_card_shown = self.prepare_small_card_notice(
+            covered
+                || medal_shown
+                || holocron_shown
+                || reload_card_shown
+                || self.medal_popup.pending()
+                || self.holocron_popup.pending(),
+        );
+        let reload_shown = reload_card_shown || small_card_shown;
+        // The low-FPS card too.
+        self.update_fps_help();
+        let fps_shown = self.prepare_fps_card(
+            covered
+                || medal_shown
+                || holocron_shown
+                || reload_shown
+                || self.medal_popup.pending()
+                || self.holocron_popup.pending(),
+        );
+        // And the SJK team's request for the player's logs.
+        let logs_shown = self.prepare_log_request_card(
+            covered
+                || medal_shown
+                || holocron_shown
+                || reload_shown
+                || fps_shown
+                || self.medal_popup.pending()
+                || self.holocron_popup.pending(),
+        );
+        // The SJK team's windows: an announcement or the rounds asked for (over the
+        // console too), or a reward waiting.
+        let official_shown = self.prepare_official(
+            alpha_shown
+                || self.alpha_card.wants()
+                || medal_shown
+                || holocron_shown
+                || reload_shown
+                || fps_shown
+                || logs_shown
+                || self.medal_popup.pending()
+                || self.holocron_popup.pending(),
+        );
+        // And what the update brought, last.
+        let news_shown = self.prepare_news_panel(
+            covered
+                || medal_shown
+                || holocron_shown
+                || reload_shown
+                || fps_shown
+                || logs_shown
+                || official_shown
+                || self.medal_popup.pending()
+                || self.holocron_popup.pending(),
+        );
+        // The playstyle card, once a start until turned off, after what the update brought.
+        let playstyle_shown = self.prepare_playstyle_card(
+            covered
+                || medal_shown
+                || holocron_shown
+                || reload_shown
+                || fps_shown
+                || logs_shown
+                || official_shown
+                || news_shown
+                || self.medal_popup.pending()
+                || self.holocron_popup.pending(),
+        );
+        // The emote help card, asked for, after them all.
+        let emote_help_shown = self.prepare_emote_help_card(
+            covered
+                || medal_shown
+                || holocron_shown
+                || reload_shown
+                || fps_shown
+                || logs_shown
+                || official_shown
+                || news_shown
+                || playstyle_shown
+                || self.medal_popup.pending()
+                || self.holocron_popup.pending(),
+        );
+        // The emote picker, likewise, under the help card.
+        let emote_picker_shown = self.prepare_emote_picker(
+            covered
+                || medal_shown
+                || holocron_shown
+                || reload_shown
+                || fps_shown
+                || logs_shown
+                || official_shown
+                || news_shown
+                || playstyle_shown
+                || emote_help_shown
+                || self.medal_popup.pending()
+                || self.holocron_popup.pending(),
+        );
+        // The encrypted whisper card, under the emote cards.
+        let whisper_shown = self.prepare_e2e_whisper_card(
+            covered
+                || medal_shown
+                || holocron_shown
+                || reload_shown
+                || fps_shown
+                || logs_shown
+                || official_shown
+                || news_shown
+                || playstyle_shown
+                || emote_help_shown
+                || emote_picker_shown
+                || self.medal_popup.pending()
+                || self.holocron_popup.pending(),
+        );
+        // A mod's notice on its servers.
+        let mod_notice_shown = self.prepare_mod_notice_card(
+            covered
+                || medal_shown
+                || holocron_shown
+                || reload_shown
+                || fps_shown
+                || logs_shown
+                || official_shown
+                || news_shown
+                || playstyle_shown
+                || emote_help_shown
+                || emote_picker_shown
+                || whisper_shown
+                || self.medal_popup.pending()
+                || self.holocron_popup.pending(),
+        );
+        // The trade window, last: it waits under every other card.
+        let trade_shown = self.prepare_trade_window(
+            covered
+                || medal_shown
+                || holocron_shown
+                || reload_shown
+                || fps_shown
+                || logs_shown
+                || news_shown
+                || playstyle_shown
+                || emote_help_shown
+                || emote_picker_shown
+                || whisper_shown
+                || mod_notice_shown
+                || self.medal_popup.pending()
+                || self.holocron_popup.pending(),
+        );
+        let medal_popup = alpha_shown
+            || official_shown
+            || mod_notice_shown
+            || medal_shown
+            || holocron_shown
+            || reload_shown
+            || fps_shown
+            || logs_shown
+            || news_shown
+            || playstyle_shown
+            || emote_help_shown
+            || emote_picker_shown
+            || whisper_shown
+            || trade_shown;
+        // Nor under the SJK UI's report card, as under its other cards.
+        let report_card = self.text_dialog.is_open() && self.text_dialog.is_sjk();
+        // A card or the console over a held slider takes the pointer and keys from
+        // Settings, so its release would never come: the peek ends now (`slider_peek.rs`).
+        let console_open = self
+            .console
+            .as_ref()
+            .is_some_and(console::ViewerConsole::is_open);
+        if (medal_popup || report_card || console_open)
+            && let Some(menu) = &mut self.client_menu
+        {
+            menu.cancel_slider_peek();
+        }
+        self.text_vertices.clear();
+        self.classic_text_vertices.clear();
+        game_font::prepare(self);
+        let information_visible = (self.live_session.is_some() || self.demo_session.is_some())
+            && self
+                .console
+                .as_ref()
+                .and_then(|c| c.bool_cvar("cg_draw2D"))
+                .unwrap_or(true)
+            && !self.game_menu
+            && !self
+                .console
+                .as_ref()
+                .is_some_and(|console| console.is_open())
+            && !self
+                .client_menu
+                .as_ref()
+                .is_some_and(|menu| menu.is_visible());
+        let scoreboard_held = self.gameplay_input.held(input::GameButton::Scores);
+        self.append_world_pings(
+            viewport,
+            information_visible && intermission_view.is_none() && !scoreboard_held,
+        );
+        self.append_drone_names(
+            viewport,
+            information_visible && intermission_view.is_none() && !scoreboard_held,
+        );
+        self.append_mystery_box_labels(
+            viewport,
+            information_visible && intermission_view.is_none() && !scoreboard_held,
+        );
+        self.append_wheel_of_doom_draw(
+            viewport,
+            information_visible && intermission_view.is_none() && !scoreboard_held,
+        );
+        self.append_fishing_cue(
+            viewport,
+            information_visible && intermission_view.is_none() && !scoreboard_held,
+        );
+        self.append_use_prompt(
+            viewport,
+            information_visible && intermission_view.is_none() && !scoreboard_held,
+        );
+        self.append_entity_view(
+            viewport,
+            information_visible && intermission_view.is_none() && !scoreboard_held,
+        );
+        if information_visible && intermission_view.is_none() {
+            hud_runtime::append(
+                self,
+                classic_hud,
+                hud_visibility,
+                hud_layout,
+                text_scale,
+                viewport,
+            );
+        }
+        quick_wheel::append(
+            self,
+            viewport,
+            information_visible && intermission_view.is_none(),
+        );
+        devmap_bar::append(
+            self,
+            viewport,
+            information_visible && intermission_view.is_none() && !self.quick_wheel.is_open(),
+        );
+        let hud_scale = runtime_settings::hud_scale(self.console.as_ref());
+        let menu_readout = (information_visible && intermission_view.is_none())
+            .then(|| menu_hud::readout(self, presentation_time as i32))
+            .flatten();
+        let vehicle_readout = (stock_vehicle && information_visible && intermission_view.is_none())
+            .then(|| self.hud.vehicle.readout())
+            .flatten();
+        self.menu_hud.prepare(
+            &self.queue,
+            menu_readout.as_ref(),
+            vehicle_readout.as_ref(),
+            viewport,
+            hud_scale,
+            [
+                hud::placement::Element::Vitals,
+                hud::placement::Element::Force,
+            ]
+            .map(|element| hud_offsets.get(element)),
+        );
+        for (element, bounds) in [
+            hud::placement::Element::Vitals,
+            hud::placement::Element::Force,
+        ]
+        .into_iter()
+        .zip(self.menu_hud.block_bounds(viewport, hud_scale))
+        {
+            self.hud.element_bounds.add(element, bounds);
+        }
+        if classic_hud && let Some(font) = &self.classic_hud_font {
+            self.menu_hud
+                .append_text(&mut self.classic_text_vertices, font, viewport, hud_scale);
+        } else {
+            self.menu_hud
+                .append_text(&mut self.text_vertices, &self.ui_font, viewport, hud_scale);
+        }
+        scoreboard::update_context(self, intermission_view.is_some());
+        let scores_requested = scoreboard::requested(self, intermission_view.is_some());
+        let scores_allowed = information_visible
+            && self
+                .console
+                .as_ref()
+                .and_then(|c| c.bool_cvar("cg_drawScores"))
+                .unwrap_or(true);
+        let scoreboard_visible =
+            self.scoreboard
+                .present(self.console.as_ref(), scores_requested, scores_allowed);
+        // An open console goes over the chat, as stock draws it last: its text would
+        // otherwise draw above the console (text goes above every shape). A composer
+        // left open under it keeps its draft for when the console closes.
+        let console_open = self
+            .console
+            .as_ref()
+            .is_some_and(console::ViewerConsole::is_open);
+        let chat_visible = !console_open
+            && !hud::toggle::hides(self.console.as_ref(), hud::toggle::Part::Chat)
+            && scoreboard::chat_visible(
+                information_visible,
+                self.chat.wants_history(self.console.as_ref()),
+            );
+        // The trade window shades the menu and drops the text before it: the chat then
+        // draws after it, over it, so the players can talk while they trade (#215).
+        let chat_over_trade = !console_open && self.chat_over_trade_window(trade_shown);
+        if chat_visible && !chat_over_trade {
+            self.append_configured_chat(viewport, text_scale, scoreboard_visible);
+        }
+        self.append_weapon_select_name(viewport);
+        // The ghost editor's path, under its column (or over play while looking about).
+        let ghost_overlay =
+            !self.console_covers_frame() && !medal_popup && self.append_ghost_overlay(viewport);
+        // The map editor's panel stays drawn while it flies (the menu stepped aside).
+        let menu_drawn = self.game_menu || self.map_edit_panel_shown();
+        if menu_drawn && !self.console_covers_frame() && !medal_popup {
+            self.refresh_game_menu_players();
+            let team_sizes = self.live_session.as_ref().map_or([0, 0], |session| {
+                ingame_menu::team_sizes(session.game_state())
+            });
+            let own_side = self.live_session.as_ref().map(|session| {
+                ingame_menu::OwnSide::of(session.game_state(), &session.latest_snapshot().player)
+            });
+            let view = ingame_menu::View {
+                page: self.game_menu_page,
+                selected_row: self.game_menu_row,
+                team: own_side.map_or(3, |own| own.team),
+                following: own_side.is_some_and(|own| own.following),
+                team_game: self.is_team_game(),
+                siege: self.is_siege_game(),
+                red_players: team_sizes[0],
+                blue_players: team_sizes[1],
+                vote_active: self.vote_active(),
+                staff: profile_card::with(|summary| summary.staff),
+                _frame: std::marker::PhantomData,
+            };
+            if view.page == GameMenuPage::GhostEdit {
+                // The ghost editor has only the SJK UI's look, in every menu style.
+                let target = ingame_menu::sjk_view::text_target(
+                    &mut self.game_fonts,
+                    &mut self.text_vertices,
+                    &self.ui_font,
+                );
+                if let Some(editor) = self.ghost.editor.as_deref_mut() {
+                    self.in_game_menu.append_own_page(
+                        GameMenuPage::GhostEdit,
+                        |canvas| editor.build(canvas, viewport),
+                        target,
+                        viewport,
+                    );
+                }
+            } else if view.page == GameMenuPage::MapEdit {
+                // The map editor's panel has only the SJK UI's look, in every menu style.
+                self.refresh_map_edit_panel();
+                let target = ingame_menu::sjk_view::text_target(
+                    &mut self.game_fonts,
+                    &mut self.text_vertices,
+                    &self.ui_font,
+                );
+                let panel = &mut self.map_edits.panel;
+                self.in_game_menu.append_own_page(
+                    GameMenuPage::MapEdit,
+                    |canvas| panel.build(canvas, viewport),
+                    target,
+                    viewport,
+                );
+                self.map_edit_pictures_frame();
+            } else if view.page == GameMenuPage::Shot && !self.in_game_menu.is_sjk() {
+                // Camera control has only the SJK UI's look, in every menu style.
+                let target = ingame_menu::sjk_view::text_target(
+                    &mut self.game_fonts,
+                    &mut self.text_vertices,
+                    &self.ui_font,
+                );
+                self.in_game_menu.append_sjk(view, target, viewport);
+            } else if self.in_game_menu.is_sjk() {
+                // Camera control has no match card.
+                if view.page != GameMenuPage::Shot {
+                    self.refresh_game_menu_card();
+                }
+                let chat_on = self
+                    .console
+                    .as_ref()
+                    .is_some_and(|console| console.sjk_chat_on());
+                self.in_game_menu.sync_chat(chat_on);
+                let target = ingame_menu::sjk_view::text_target(
+                    &mut self.game_fonts,
+                    &mut self.text_vertices,
+                    &self.ui_font,
+                );
+                self.in_game_menu.append_sjk(view, target, viewport);
+            } else {
+                let (vertices, font) = self.game_fonts.menu(&mut self.text_vertices, &self.ui_font);
+                self.in_game_menu.append(view, vertices, font, viewport);
+            }
+        }
+        if scoreboard_visible {
+            scoreboard::append_overlay(self, viewport, text_scale * 1.05);
+        }
+        if let Some(menu) = self
+            .client_menu
+            .as_mut()
+            .filter(|_| !console_covers_frame && !medal_popup && !report_card)
+        {
+            if menu.sjk_screen() {
+                // The SJK UI draws in its own families once they are loaded.
+                let target = if self.game_fonts.has_sjk() {
+                    let style = self.ui_font.style();
+                    match self.game_fonts.sjk() {
+                        Some(fonts) => menu::sjk::TextTarget::Families(fonts, style),
+                        None => unreachable!("checked above"),
+                    }
+                } else {
+                    let (vertices, font) =
+                        self.game_fonts.menu(&mut self.text_vertices, &self.ui_font);
+                    menu::sjk::TextTarget::Inter(vertices, font)
+                };
+                menu.append_sjk_screen(target, self.console.as_ref(), viewport);
+            } else {
+                let (vertices, font) = self.game_fonts.menu(&mut self.text_vertices, &self.ui_font);
+                menu.append_overlay(vertices, font, viewport);
+            }
+        }
+        self.append_console_overlay(viewport, text_scale);
+        self.append_version_overlay(viewport, text_scale);
+        let launcher = self.game_menu
+            && !matches!(
+                self.game_menu_page,
+                GameMenuPage::Shot | GameMenuPage::MapEdit | GameMenuPage::GhostEdit
+            )
+            && !self.in_game_menu.is_sjk()
+            && !console_covers_frame
+            && !medal_popup
+            && !self.text_dialog.is_open();
+        if launcher {
+            let (vertices, font) = self.game_fonts.menu(&mut self.text_vertices, &self.ui_font);
+            self.text_dialog.append_launcher(vertices, font, viewport);
+        }
+        if self.text_dialog.is_open() {
+            self.append_text_dialog(viewport);
+        } else {
+            self.world_notes.composer_closed();
+        }
+        let mut chat_drawn_over_trade = false;
+        if alpha_shown {
+            self.append_alpha_card(viewport);
+        } else if medal_shown {
+            self.append_medal_popup(viewport);
+        } else if holocron_shown {
+            self.append_holocron_popup(viewport);
+        } else if reload_card_shown {
+            self.append_reload_card(viewport);
+        } else if small_card_shown {
+            self.append_small_card_notice(viewport);
+        } else if fps_shown {
+            self.append_fps_card(viewport);
+        } else if logs_shown {
+            self.append_log_request_card(viewport);
+        } else if official_shown {
+            self.append_official(viewport);
+        } else if news_shown {
+            self.append_news_panel(viewport);
+        } else if playstyle_shown {
+            self.append_playstyle_card(viewport);
+        } else if emote_help_shown {
+            self.append_emote_help_card(viewport);
+        } else if emote_picker_shown {
+            self.append_emote_picker(viewport);
+        } else if whisper_shown {
+            self.append_e2e_whisper_card(viewport);
+        } else if mod_notice_shown {
+            self.append_mod_notice_card(viewport);
+        } else if trade_shown {
+            self.append_trade_window(viewport);
+            if chat_over_trade {
+                self.append_configured_chat(viewport, text_scale, false);
+                chat_drawn_over_trade = true;
+            }
+        }
+        // A trade running while its window is closed: the toast at the top, over play.
+        // The frame timings over everything but the full-frame console, so they can be
+        // watched while settings change in the menus; laid out before the HUD edit
+        // mode, which outlines the panel to move it.
+        let timings_shown = self.append_frame_timings(viewport, console_covers_frame);
+        // The HUD edit mode's outlines and panel, over the game it edits.
+        let hud_edit_shown = !console_covers_frame && self.prepare_hud_edit();
+        if hud_edit_shown {
+            self.append_hud_edit(viewport);
+        }
+        let trade_toast = self.append_trade_toast(viewport, console_covers_frame || medal_popup);
+        // An achievement unlocked, or a medal or holocron in a match: its card over play or
+        // the menus, never input-taking.
+        let unlock_toast = self.append_unlock_toast(viewport, console_covers_frame || medal_popup);
+        self.world_notes.draw_highlight(viewport);
+        self.map_edit_gizmo_draw();
+        // The menu camera tour's fades, over the menu world only.
+        let world_fade = menu_backdrop::standalone_menu_visible(self)
+            && self
+                .client_menu
+                .as_mut()
+                .is_some_and(|menu| menu.prepare_world_fade(viewport));
+        let layers = [
+            self.client_menu
+                .as_ref()
+                .filter(|_| world_fade)
+                .map(menu::ClientMenu::world_fade),
+            self.world_notes.fill(),
+            self.world_notes.highlight(),
+            self.map_edits.gizmo.list(),
+            self.entity_view.active().then(|| self.entity_view.list()),
+            Some(&self.world_pings.list),
+            Some(&self.drone.list),
+            Some(self.mystery_boxes.labels()),
+            Some(&self.wheel_of_doom.draw.list),
+            Some(self.use_prompt.list()),
+            information_visible.then(|| &self.hud.team_logo.list),
+            information_visible.then(|| &self.hud.nameplate.list),
+            information_visible.then(|| &self.hud.identification.list),
+            information_visible.then(|| &self.hud.card.list),
+            self.devmap_bar.shown().then(|| self.devmap_bar.draw_list()),
+            self.quick_wheel
+                .is_open()
+                .then(|| self.quick_wheel.draw_list()),
+            information_visible.then(|| self.hud.draw_list()),
+            (chat_visible && !chat_over_trade).then(|| self.chat.draw_list()),
+            self.ghost
+                .editor
+                .as_deref()
+                .filter(|_| ghost_overlay)
+                .map(|editor| editor.overlay.draw_list()),
+            scoreboard_visible.then(|| self.scoreboard.draw_list()),
+            ((self.game_menu || self.map_edit_panel_shown())
+                && !console_covers_frame
+                && !medal_popup)
+                .then(|| self.in_game_menu.draw_list()),
+            self.client_menu
+                .as_ref()
+                .filter(|_| !console_covers_frame)
+                .and_then(|menu| menu.backdrop_draw_list()),
+            self.client_menu
+                .as_ref()
+                .filter(|_| !console_covers_frame && !medal_popup && !report_card)
+                .and_then(|menu| menu.draw_list()),
+            self.console.as_ref().map(|console| console.draw_list()),
+            launcher.then(|| self.text_dialog.launcher_draw_list()),
+            self.text_dialog
+                .is_open()
+                .then(|| self.text_dialog.draw_list()),
+            medal_shown.then(|| self.medal_popup.draw_list()),
+            holocron_shown.then(|| self.holocron_popup.draw_list()),
+            reload_card_shown.then(|| self.graphics_reload.card.draw_list()),
+            small_card_shown.then(|| self.small_card_notice.draw_list()),
+            fps_shown.then(|| self.fps_card.draw_list()),
+            logs_shown.then(|| self.log_request_card.draw_list()),
+            official_shown.then(|| self.official.window.draw_list()),
+            news_shown.then(|| self.news.draw_list()),
+            playstyle_shown.then(|| self.playstyle_card.draw_list()),
+            emote_help_shown.then(|| self.emote_help.card.draw_list()),
+            emote_picker_shown.then(|| self.emote_picker.card.draw_list()),
+            whisper_shown.then(|| self.e2e_whispers.card.draw_list()),
+            mod_notice_shown.then(|| self.mod_notice.card.draw_list()),
+            trade_shown.then(|| self.trades.window.draw_list()),
+            chat_drawn_over_trade.then(|| self.chat.draw_list()),
+            trade_toast.then(|| self.trades.toast.draw_list()),
+            alpha_shown.then(|| self.alpha_card.draw_list()),
+            unlock_toast.then(|| self.unlock_toast.draw_list()),
+            timings_shown.then(|| self.frame_timings.draw_list()),
+            hud_edit_shown.then(|| self.hud_edit.draw_list()),
+        ];
+        self.ui_shapes
+            .prepare_layers(&self.queue, layers.into_iter().flatten(), viewport);
+        // Wide glyphs this frame asked for first draw next frame.
+        self.update_wide_text();
+        let text_vertex_count =
+            self.text_vertex_buffer
+                .write(&self.device, &self.queue, &self.text_vertices);
+        self.game_fonts.upload(&self.device, &self.queue);
+        let classic_text_vertex_count = self.classic_text_vertex_buffer.write(
+            &self.device,
+            &self.queue,
+            &self.classic_text_vertices,
+        );
+
+        timing.mark(Phase::Pose);
+        {
+            self.observe_saber_kills();
+            self.assign_corpse_meshes(presentation_time);
+            self.update_limbs(presentation_time);
+        }
+        {
+            // Who is in a carton is noted before the poses that crouch them.
+            self.note_boxed_players();
+            if let Err(error) = self.update_actor_animations(presentation_time, game_audio) {
+                eprintln!("remote actor animation stopped: {error}");
+            }
+        }
+
+        timing.mark(Phase::World);
+        // PVS and the area mask belong to where the picture is taken from (`refdef.vieworg`),
+        // not to the player's eye: a third-person camera sits behind and above it, often in
+        // another cluster, and the eye's visible set then culled walls in plain view.
+        let leaf_index = self.bsp.leaf_at(view_position.to_array());
+        let camera_cluster = self.bsp.leaves()[leaf_index].cluster;
+        let source_cluster = usize::try_from(camera_cluster).ok();
+        if camera_cluster != self.last_cluster {
+            self.last_cluster = camera_cluster;
+        }
+
+        let local_entity_id = self
+            .live_session
+            .as_ref()
+            .map(ClientSession::latest_snapshot)
+            .or_else(|| {
+                self.demo_session
+                    .as_ref()
+                    .map(demo_playback::Session::latest_snapshot)
+            })
+            .map(|snapshot| u64::from(snapshot.player.client_num()) + 1);
+        let fallback_mesh = self
+            .actor_meshes
+            .iter()
+            .position(|mesh| !mesh.corpse_pool && mesh.limb.is_none() && mesh.entity_id.is_none());
+        self.actor_groups.iter_mut().for_each(Vec::clear);
+        self.object_groups.iter_mut().for_each(Vec::clear);
+        self.pickup_override_instances.clear();
+        self.mover_groups.iter_mut().for_each(Vec::clear);
+        self.entity_instances.clear();
+        self.dynamic_lights.clear();
+        // Map edits' added lights get slots of their own, filled before the upload.
+        self.dynamic_lights
+            .reserve(map_edits::lights::reserve(&self.map_edits));
+        self.begin_saber_instances(presentation_time);
+        self.particle_groups.iter_mut().for_each(Vec::clear);
+        self.submit_illuminate(presentation_time, visual_now);
+        self.submit_cardboard_boxes(presentation_time, visual_now);
+        self.submit_fishing(presentation_time, visual_now);
+        self.submit_mining(visual_now);
+        self.submit_order66(presentation_time, visual_now);
+        self.submit_drones(presentation_time, visual_now);
+        self.submit_monitors(presentation_time);
+        self.submit_bananas(presentation_time);
+        self.submit_boomboxes();
+        self.submit_propgun(presentation_time);
+        self.submit_holocron_stage(visual_now);
+        self.sync_saber_skins(game_audio, presentation_time);
+        let debug_missiles = effect_debug::sync(self.console.as_ref());
+        let active_snapshot = first_person_view::presented_snapshot(
+            self.live_session.as_ref(),
+            self.demo_session.as_ref(),
+            presentation_time as i32,
+        );
+        // Players outside the duel and what they bring leave every snapshot reader
+        // below (`cg_duelHideOthers`, `sjk_client::DuelHide`).
+        let active_game = self
+            .live_session
+            .as_ref()
+            .map(ClientSession::game_state)
+            .or_else(|| {
+                self.demo_session
+                    .as_ref()
+                    .map(demo_playback::Session::game_state)
+            });
+        self.duel_hidden_view.update(
+            active_snapshot.zip(active_game),
+            self.console
+                .as_ref()
+                .map(console::ViewerConsole::duel_hide)
+                .unwrap_or_default(),
+        );
+        let active_snapshot = self.duel_hidden_view.get().or(active_snapshot);
+        if let Some(snapshot) = active_snapshot {
+            let active_world = self
+                .demo_session
+                .as_ref()
+                .map_or(&self.live_world, demo_playback::Session::world);
+            if let Some(audio) = game_audio {
+                let predicted = self
+                    .local_prediction
+                    .predicted_state()
+                    .filter(|_| self.live_session.is_some());
+                audio.observe_saber_switches(snapshot, predicted);
+                audio.set_box_music(self.cardboard_box.music());
+                audio.set_hax_loop(self.hax_loop(presentation_time));
+                audio.set_weather(self.vfs.as_deref(), self.weather.heard());
+                audio.play_weather_cues(self.weather.take_cues());
+                audio.update_frame_loops(
+                    snapshot,
+                    presentation_time as i32,
+                    self.camera_position.to_array(),
+                    active_world,
+                    &self.bsp,
+                    predicted,
+                );
+            }
+            self.map_effects.update(snapshot, presentation_time as i32);
+            effect_runtime::spawn_map_effect_requests(
+                &mut self.particles,
+                &mut self.effect_aux,
+                &self.map_effects,
+                self.vfs
+                    .as_ref()
+                    .expect("live sessions retain their mounted VFS"),
+                &mut self.effects,
+                game_audio,
+                visual_now,
+            );
+            let missile_metrics = missile_trails::update_and_spawn(
+                &mut self.missile_effects,
+                snapshot,
+                presentation_time as i32,
+                &mut self.particles,
+                &mut self.effect_aux,
+                &mut self.effects,
+                self.vfs
+                    .as_ref()
+                    .expect("live sessions retain their mounted VFS"),
+                game_audio,
+                &mut self.dynamic_lights,
+                visual_now,
+            );
+            if debug_missiles {
+                missile_trails::debug_report(
+                    &self.missile_effects,
+                    missile_metrics,
+                    snapshot,
+                    &mut self.effects,
+                    self.vfs
+                        .as_ref()
+                        .expect("live sessions retain their mounted VFS"),
+                    presentation_time as i32,
+                );
+            }
+            projectiles::collect(snapshot, presentation_time as i32, &mut self.projectiles);
+            movers::collect(snapshot, presentation_time as i32, &mut self.movers);
+            self.local_prediction.pickups(
+                snapshot,
+                presentation_time as i32,
+                self.console
+                    .as_ref()
+                    .is_none_or(console::ViewerConsole::hide_pickups_in_duel),
+                &mut self.pickups,
+            );
+            trip_mine_lasers::spawn(
+                &mut self.trip_mine_beams,
+                snapshot,
+                &self.bsp,
+                &mut self.trace_scratch,
+                self.camera_position,
+                &mut self.particles,
+                &mut self.effect_aux,
+                &mut self.effects,
+                self.vfs
+                    .as_ref()
+                    .expect("live sessions retain their mounted VFS"),
+                game_audio,
+                visual_now,
+                presentation_time as i32,
+            );
+            portable_shields::spawn(
+                snapshot,
+                &mut self.particles,
+                &mut self.effect_aux,
+                &mut self.effects,
+                visual_now,
+            );
+            pickups::simple::prepare(&mut self.pickups, self.console.as_ref());
+            pickups::spawn_cones(
+                &self.pickups,
+                &mut self.particles,
+                &mut self.effect_aux,
+                &mut self.effects,
+                self.vfs
+                    .as_ref()
+                    .expect("live sessions retain their mounted VFS"),
+                game_audio,
+                presentation_time as i32,
+                visual_now,
+            );
+            self.muzzle_effects
+                .update(snapshot, presentation_time as i32);
+        } else {
+            self.projectiles.clear();
+            if !self.resident.exploring() && !world_shot_movers_pinned() {
+                self.movers.clear();
+            }
+            self.pickups.clear();
+        }
+        // A held prop gun hangs on the pistol's hand rig, whatever the player holds.
+        let prop_view = self.propgun_view();
+        let view_weapon = first_person_weapon::frame_inputs(
+            self,
+            active_snapshot,
+            first_person,
+            local_entity_id,
+            presentation_time,
+            prop_view.map(|_| first_person_weapon::PROP_RIG),
+        );
+        let first_person_charge = view_weapon.and(active_snapshot).and_then(|snapshot| {
+            let predicted = self
+                .live_session
+                .as_ref()
+                .and_then(|_| self.local_prediction.predicted_state());
+            charge_flash::Charges::collect(Some(snapshot), predicted)
+                .of(snapshot.player.client_num())
+        });
+        self.propgun.view_muzzle = None;
+        if let Some(inputs) = view_weapon
+            && let Some(prop) = prop_view
+        {
+            self.propgun.view_muzzle = first_person_weapon::submit_prop(
+                &self.first_person_weapon,
+                inputs,
+                prop,
+                &mut self.object_groups,
+            );
+            self.last_first_person_flash = None;
+        } else if let Some(inputs) = view_weapon {
+            first_person_weapon::submit(&self.first_person_weapon, inputs, &mut self.object_groups);
+            // `CG_AddPlayerWeapon` records the view gun's `tag_flash` for
+            // trace-weapon beams (`cg_weapons.c:579`) and plays the
+            // first-person muzzle effect there (`cg_weapons.c:704-762`).
+            let socket = first_person_weapon::flash_socket(&self.first_person_weapon, inputs);
+            self.last_first_person_flash = socket.map(|socket| socket.origin);
+            if let Some(request) = active_snapshot
+                .and_then(|snapshot| self.muzzle_effects.request(snapshot.player.client_num()))
+                && let Some(socket) = socket
+            {
+                muzzle_effects::spawn(
+                    &mut self.particles,
+                    &mut self.effect_aux,
+                    &mut self.effects,
+                    self.vfs
+                        .as_ref()
+                        .expect("sessions retain their mounted VFS"),
+                    game_audio,
+                    request,
+                    socket,
+                    true,
+                    visual_now,
+                    presentation_time as i32,
+                );
+            }
+        } else {
+            // No view gun this frame (zoomed in, third person, a saber): stock keeps
+            // the last drawn flash point, so a zoomed sniper shot started where the
+            // gun was before zooming in. The beam keeps the server muzzle instead.
+            self.last_first_person_flash = None;
+        }
+        self.prepare_scene_views(view, projection, presentation_time as i32);
+        movers::append_frame(self, presentation_time);
+        self.static_models.append_instances(&mut self.object_groups);
+        self.append_map_edit_instances();
+        self.append_mystery_box_instances();
+        self.append_wheel_of_doom_instances();
+        self.append_toy_master_instances();
+        pickups::simple::append_frame(self, visual_now);
+        // The charge glow on the view gun's muzzle (`cg_weapons.c` charge bits), after
+        // this frame's sprites were cleared.
+        if let (Some(origin), Some(charge)) = (
+            view_weapon.and(self.last_first_person_flash),
+            first_person_charge,
+        ) {
+            charge_flash::push(
+                &mut self.particles,
+                &mut self.effects,
+                charge,
+                Vec3::from_array(origin),
+                presentation_time as i32,
+                visual_now,
+            );
+        }
+        self.force_overlays_last = actor_world_submission::submit(
+            self,
+            local_entity_id,
+            fallback_mesh,
+            presentation_time,
+            visual_now,
+            game_audio,
+        );
+        // The sabers took this frame's clashes; the walls' touches come next.
+        self.impacts.clear_clashes();
+        // Their crackle heard: the snaps now, the buzzes in the next frame's loops.
+        match game_audio.as_mut() {
+            Some(audio) => audio.hear_sabers(&mut self.saber_heard),
+            None => {
+                self.saber_heard.snaps.clear();
+                self.saber_heard.buzzes.clear();
+            }
+        }
+        let depth_size = self.depth.view.texture().size();
+        self.card_outline.prepare(
+            &self.device,
+            &self.queue,
+            self.hud.card.outline().map(|(_, frame)| frame),
+            self.hud.team_outline.areas(),
+            [depth_size.width, depth_size.height],
+            [self.configuration.width, self.configuration.height],
+        );
+        timing.mark(Phase::Acquire);
+        let target = match frame_target::prepare(self) {
+            Ok(target) => target,
+            Err(status) => {
+                self.detached_camera = detached_before_peek;
+                return status;
+            }
+        };
+        let target_view = target.scene.clone();
+        timing.mark(Phase::Effects);
+        let mut encoder = self
+            .device
+            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                label: Some("SJK frame encoder"),
+            });
+        if let Some(phases) = &self.gpu_phases {
+            phases.begin(&mut encoder);
+        }
+        dynamic_lights::entities::finish(self, presentation_time, visual_now, game_audio);
+        // Bright flashes (`cg_reduceFlashes`, the clash flare's settings), once a frame.
+        let clash_flare = saber_clash_flare::Options::read(self.console.as_ref());
+        effect_flash::set_reduced(
+            self.console
+                .as_ref()
+                .and_then(|console| console.bool_cvar(effect_flash::REDUCE_CVAR))
+                .unwrap_or(false),
+        );
+        let detached_flight = self.free_camera_active();
+        let object_groups = &mut self.object_groups;
+        let mover_groups = &mut self.mover_groups;
+        let actor_groups = &mut self.actor_groups;
+        let entity_instances = &mut self.entity_instances;
+        let saber_instances = &mut self.saber_instances;
+        let particle_groups = &mut self.particle_groups;
+        let active_world = self
+            .demo_session
+            .as_ref()
+            .map_or(&self.live_world, demo_playback::Session::world);
+        projectiles::append_models(
+            &self.projectiles,
+            &self.missile_effects,
+            self.live_session
+                .as_ref()
+                .map(ClientSession::game_state)
+                .or_else(|| {
+                    self.demo_session
+                        .as_ref()
+                        .map(demo_playback::Session::game_state)
+                }),
+            &self.object_meshes,
+            object_groups,
+        );
+        saber_clash_flare::append(
+            clash_flare,
+            &self.saber_clash_flare,
+            presentation_time as i32,
+            view_position,
+            (view_target - view_position).normalize_or(forward),
+            projection * view,
+            // A perspective projection's y scale over its x scale is the aspect.
+            projection.y_axis.y / projection.x_axis.x,
+            &self.bsp,
+            &mut self.trace_scratch,
+            &self.particle_atlas,
+            &mut particle_groups[1],
+        );
+        map_edits::lights::append(&self.map_edits, view_position, &mut self.dynamic_lights);
+        self.context.dynamic_light_settings.upload(
+            &self.world_materials,
+            &self.queue,
+            &mut self.dynamic_lights,
+        );
+        if let Some(vfs) = self.vfs.as_deref() {
+            self.world_materials
+                .update_videos(&self.queue, vfs, visual_now);
+        }
+        let particle_now = Instant::now();
+        particle_physics::update_and_spawn(
+            &mut self.particles,
+            &mut self.pending_particle_effects,
+            &mut self.effect_aux,
+            &mut self.effects,
+            self.vfs
+                .as_ref()
+                .expect("particle effects retain their VFS"),
+            game_audio,
+            particle_now,
+            &self.bsp,
+            &mut self.trace_scratch,
+        );
+        effect_emitter::append_model_instances(
+            &mut self.effect_aux.emitters,
+            &self.emitter_model_catalog,
+            object_groups,
+        );
+        self.world_materials.fogged_entities = entity_lighting::apply_frame(
+            &self.entity_lighting,
+            &self.bsp,
+            &self.dynamic_lights,
+            actor_groups,
+            object_groups,
+            &mut self.pickup_override_instances,
+            self.world_materials.fogs(),
+        );
+        // Saber shaders taking the colour of the light where they are read the grid too.
+        saber_persona::light_instances(saber_instances, &self.blade_skins, |at| {
+            let light = self.entity_lighting.sample(&self.bsp, at, &[]);
+            std::array::from_fn(|i| light.ambient[i] + 0.5 * light.directed[i])
+        });
+        let global_particle_seconds = presentation_time as f32 * 0.001;
+        player_shadows::request_all(
+            &self.player_shadows,
+            player_shadows::Inputs {
+                world: active_world,
+                presentation_time,
+                local_entity: local_entity_id.filter(|_| !detached_flight),
+                local_root: camera::local_actor_root(
+                    self.camera_position,
+                    self.local_prediction.view_height(),
+                    self.camera_yaw,
+                )
+                .0,
+                bsp: &self.bsp,
+                scratch: &mut self.trace_scratch,
+                decals: &mut self.effect_aux.decals,
+            },
+            player_shadows::mesh_legs_yaw(&self.actor_meshes),
+        );
+        let atlas = &self.particle_atlas;
+        self.effect_aux.decals.project_pending(
+            &self.decal_surfaces,
+            &self.bsp,
+            particle_now,
+            |shader| {
+                effect_blend::slot(
+                    atlas
+                        .layers_for(shader, 0.0)
+                        .iter()
+                        .next()
+                        .map_or(ParticleBlend::Add, |layer| layer.blend),
+                )
+            },
+        );
+        self.tag_render.prepare(
+            &self.device,
+            &self.queue,
+            &self.effect_aux.decals,
+            particle_now,
+            global_particle_seconds,
+        );
+        timing.mark(Phase::Encode);
+        let particle_ranges = effect_submission::prepare(
+            timing,
+            effect_submission::Inputs {
+                geometry: &mut self.effect_geometry,
+                queue: &self.queue,
+                encoder: &mut encoder,
+                particles: &mut self.particles,
+                decals: &mut self.effect_aux.decals,
+                atlas: &self.particle_atlas,
+                now: particle_now,
+                global_seconds: global_particle_seconds,
+                camera: self.camera_position,
+                field_of_view: self.field_of_view,
+                // A perspective projection's y scale over its x scale is the aspect.
+                aspect: projection.y_axis.y / projection.x_axis.x,
+                bsp: &self.bsp,
+                trace_scratch: &mut self.trace_scratch,
+
+                entity_instances,
+                blended: particle_groups,
+            },
+        );
+        timing.mark(Phase::EncodeInstances);
+        Self::pack_frame_instances(
+            &mut self.actor_instances,
+            &mut self.actor_instance_ranges,
+            &mut self.object_instance_ranges,
+            &mut self.mover_instance_ranges,
+            actor_groups,
+            object_groups,
+            mover_groups,
+        );
+        let actor_instances = &mut self.actor_instances;
+        let actor_instance_ranges = &mut self.actor_instance_ranges;
+        let object_instance_ranges = &mut self.object_instance_ranges;
+        entity_materials::append_override_ranges(
+            actor_instances,
+            &self.pickup_override_instances,
+            &mut self.pickup_override_ranges,
+        );
+        self.entity_draw_queue.rebuild(
+            &self.world_materials,
+            &self.actor_meshes,
+            actor_instance_ranges,
+            &self.object_meshes,
+            object_instance_ranges,
+            &self.pickup_override_ranges,
+            actor_instances,
+            self.camera_position,
+            crate::card_outline::Group::ALL
+                .map(|group| self.model_material_overrides.outline(group)),
+        );
+        // The smoke ribbons move on to this frame, then are drawn with the blades.
+        let ribbons_then = self
+            .ribbons_at
+            .replace(presentation_time)
+            .unwrap_or(presentation_time);
+        self.smoke_ribbons.advance(ribbons_then, presentation_time);
+        self.saber_sparks.forget(presentation_time);
+        self.saber_gpu.prepare(
+            &self.queue,
+            saber_instances,
+            &mut self.saber_trail_segments,
+            &self.smoke_ribbons,
+            presentation_time,
+        );
+        if !entity_instances.is_empty() {
+            self.queue.write_buffer(
+                &self.entity_instance_buffer,
+                0,
+                bytemuck::cast_slice(entity_instances),
+            );
+        }
+        if !actor_instances.is_empty() {
+            self.queue.write_buffer(
+                &self.actor_instance_buffer,
+                0,
+                bytemuck::cast_slice(actor_instances),
+            );
+        }
+        let has_entity_instances = !entity_instances.is_empty();
+        timing.mark(Phase::EncodeViews);
+        if let Some(phases) = &self.gpu_phases {
+            phases.mark(&mut encoder, "uploads");
+        }
+        if !self.world_hidden {
+            // Walls stop dynamic lights: their shadow tiles before any view lights with them.
+            self.world_materials
+                .trace_dynamic_light_shadows(&mut encoder, self.gpu_phases.as_ref());
+            self.draw_scene_views(&mut encoder, &particle_ranges);
+        }
+        if let Some(phases) = &self.gpu_phases {
+            phases.mark(&mut encoder, "views");
+        }
+        timing.mark(Phase::EncodeWorld);
+        if self.world_hidden {
+            self.encode_cleared_scene(&mut encoder, &target_view);
+        } else {
+            self.encode_world_scene(
+                &mut encoder,
+                &target_view,
+                source_cluster,
+                &particle_ranges,
+                has_entity_instances,
+            );
+        }
+        self.encode_stage_preview(&mut encoder);
+        self.encode_blade_pictures(&mut encoder);
+        self.draw_card_scenes();
+        let (output, mut encoder) = match target.finish(self, encoder, timing) {
+            Ok(output) => output,
+            Err(status) => {
+                self.detached_camera = detached_before_peek;
+                return status;
+            }
+        };
+        let visibility = self.bsp.render().visibility();
+        timing.mark(Phase::EncodeOverlays);
+        self.draw_frame_overlays(
+            &mut encoder,
+            &target_view,
+            &output.view,
+            &output.ui,
+            source_cluster,
+            visibility,
+            text_vertex_count,
+            classic_text_vertex_count,
+        );
+        timing.mark(Phase::EncodeCopy);
+        if let Some(phases) = &self.gpu_phases {
+            phases.mark(&mut encoder, "overlays+post+hud");
+        }
+        // The WHEEL OF DOOM's Mirror flips the finished picture (`wheel_of_doom`).
+        self.encode_wheel_of_doom_mirror(&mut encoder, output.frame.as_ref(), &output.view);
+        self.encode_console_screenshot(&mut encoder, output.frame.as_ref());
+        if let Some(phases) = &self.gpu_phases {
+            phases.mark(&mut encoder, "capture");
+            phases.finish(&mut encoder);
+        }
+        timing.mark(Phase::Submit);
+        self.frame_pacer
+            .split
+            .submit(&self.queue, encoder, output.frame, timing);
+        timing.mark(Phase::Present);
+        timing.mark(Phase::Other);
+        self.complete_render_transition(game_audio);
+        self.detached_camera = detached_before_peek;
+        FrameStatus::Rendered
+    }
+}
+
+struct ParticleAtlas {
+    bind_group: wgpu::BindGroup,
+    animations: HashMap<String, Vec<ParticleAtlasAnimation>>,
+    fallback: [f32; 4],
+    /// Some stage is a dynamic glow stage, so effects sort glowing layers apart.
+    any_glow: bool,
+    remaps: effect_remaps::State,
+    /// The atlas being rebuilt on a worker for new effects (`particle_atlas.rs`).
+    pending: particle_atlas::Pending,
+    /// Shaders asked for besides the map's effects' (a blade skin's smoke,
+    /// `saber_smoke.rs`): every rebuild ([`particle_atlas::Pending`]) takes them in.
+    admitted: std::collections::BTreeSet<String>,
+}
+
+#[derive(Clone)]
+struct ParticleAtlasAnimation {
+    frames: Vec<[f32; 4]>,
+    frequency: f32,
+    one_shot: bool,
+    blend: ParticleBlend,
+    rgb_wave: Option<WaveForm>,
+    alpha_wave: Option<WaveForm>,
+    tc_scale: [f32; 2],
+    tc_scroll: [f32; 2],
+    /// The stage is drawn into the dynamic glow image too.
+    glow: bool,
+    /// The stage asks for the effect's colour (`rgbGen vertex`, `exactVertex` or
+    /// `entity`); see [`ParticleLayerSample::tint`].
+    tinted: bool,
+    /// Remap destination clock, subtracted from the sampled shader time.
+    time_offset: f32,
+}
+
+#[derive(Clone, Copy)]
+struct ParticleLayerSample {
+    uv_rect: [f32; 4],
+    blend: ParticleBlend,
+    rgb: f32,
+    alpha: f32,
+    uv_transform: [f32; 4],
+    glow: bool,
+    tinted: bool,
+}
+
+mod effect_remaps;
+mod particle_atlas_sampling;
+
+mod depth_target;
+use depth_target::DepthTarget;
+
+/// World shots place movers by hand (`world_shot::movers`); nothing else keeps them
+/// without a snapshot.
+#[cfg(test)]
+fn world_shot_movers_pinned() -> bool {
+    world_shot::MOVERS_PINNED.with(std::cell::Cell::get)
+}
+#[cfg(not(test))]
+fn world_shot_movers_pinned() -> bool {
+    false
+}

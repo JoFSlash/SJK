@@ -1,0 +1,11 @@
+/target/
+*.log
+*.tmp
+.idea/
+.vscode/
+/GameData/
+*.pk3
+identity.key
+__pycache__/
+# Sol's card art and texts before they go into a card pack.
+/card_import/

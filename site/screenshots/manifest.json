@@ -1,0 +1,15 @@
+[
+  { "file": "main-menu.jpg", "caption": "The main page: the ring, the menu on its arc, recent servers and SJK chat" },
+  { "file": "collection-shaders.jpg", "caption": "Collection: saber shaders, the Sun blade worn" },
+  { "file": "collection-toys.jpg", "caption": "Collection: the toys, the Illuminate holocron lit" },
+  { "file": "servers.jpg", "caption": "Servers: filters, a sortable list, the map and its players" },
+  { "file": "settings.jpg", "caption": "Settings: categories down the rail, a detail column, search" },
+  { "file": "key-bindings.jpg", "caption": "Key bindings in Settings" },
+  { "file": "force.jpg", "caption": "Force powers, priced level by level" },
+  { "file": "profile.jpg", "caption": "Profile: your record, medals and achievements" },
+  { "file": "loading.jpg", "caption": "The loading screen, with the map's own levelshot" },
+  { "file": "scoreboard.jpg", "caption": "The scoreboard in a free-for-all" },
+  { "file": "scoreboard-ctf.jpg", "caption": "The scoreboard in Capture the flag" },
+  { "file": "ingame-menu.jpg", "caption": "The in-game menu and its match card" },
+  { "file": "credits.jpg", "caption": "Credits, under SJK's sun" }
+]

@@ -1,0 +1,15 @@
+schema_version = "1.0.0"
+
+id = "sjk_rig_export"
+version = "1.12.0"
+name = "SJK Rig Model Export"
+tagline = "Export a rigged character as an SJK rig model player"
+maintainer = "Sol-Vulpes"
+type = "add-on"
+website = "https://github.com/Sol-Vulpes/SJK/blob/main/docs/rig-models.md"
+tags = ["Import-Export", "Game Engine"]
+blender_version_min = "4.2.0"
+license = ["SPDX:GPL-2.0-or-later"]
+
+[permissions]
+files = "Write the exported model into the game's GameData folder"
