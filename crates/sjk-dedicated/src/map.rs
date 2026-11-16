@@ -109,13 +109,40 @@ pub fn brush_bounds(bsp: &Bsp, model: usize) -> Option<([f32; 3], [f32; 3])> {
     ))
 }
 
-/// Mount `<game_data>/base/*.pk3`, with the PK3s of the assets folder, in the
-/// reference's search order and load `maps/<name>.bsp`, as `SV_SpawnServer` finds a map.
-pub fn load(game_data: &Path, name: &str) -> Result<LoadedMap, Box<dyn Error>> {
+/// Folders that stand in for `base` beside the game data's own (`--extra-base`): the
+/// client's content folders, such as SJK's JoF content, so a map it lists starts on the
+/// server it launches. Set once at startup; every mount reads them.
+static EXTRA_BASES: std::sync::RwLock<Vec<std::path::PathBuf>> = std::sync::RwLock::new(Vec::new());
+
+/// Set the [extra `base` folders](EXTRA_BASES).
+pub fn set_extra_bases(folders: Vec<std::path::PathBuf>) {
+    *EXTRA_BASES
+        .write()
+        .unwrap_or_else(|error| error.into_inner()) = folders;
+}
+
+/// The [extra `base` folders](EXTRA_BASES).
+pub fn extra_bases() -> Vec<std::path::PathBuf> {
+    EXTRA_BASES
+        .read()
+        .unwrap_or_else(|error| error.into_inner())
+        .clone()
+}
+
+/// Mount `<game_data>/base/*.pk3`, with the PK3s of the [extra `base`
+/// folders](extra_bases) and of the assets folder, in the reference's search order.
+pub fn mount_game_data(game_data: &Path) -> Result<VirtualFileSystem, sjk_vfs::VfsError> {
     let mut files = VirtualFileSystem::new();
-    files.mount_base_pk3s_with_warnings(game_data, |archive, error| {
+    files.mount_base_pk3s_with_extras(game_data, &extra_bases(), |archive, error| {
         eprintln!("skipping {}: {error}", archive.display());
     })?;
+    Ok(files)
+}
+
+/// Mount the game data ([`mount_game_data`]) and load `maps/<name>.bsp`, as
+/// `SV_SpawnServer` finds a map.
+pub fn load(game_data: &Path, name: &str) -> Result<LoadedMap, Box<dyn Error>> {
+    let files = mount_game_data(game_data)?;
     let mut map = load_from(files, name)?;
     if let Some(pak) = &mut map.pak {
         list_assets_pak_in_base(pak, game_data);

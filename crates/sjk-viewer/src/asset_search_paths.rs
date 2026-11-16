@@ -46,6 +46,15 @@ pub(crate) fn set_extra_root(owner: &'static str, root: Option<PathBuf>) -> bool
     }
 }
 
+/// The extra roots' `base` folders, which the owned server mounts beside the
+/// game data's (`--extra-base`), so a map they hold starts there too.
+pub(crate) fn extra_base_folders() -> Vec<PathBuf> {
+    extra_roots()
+        .into_iter()
+        .map(|root| root.join("base"))
+        .collect()
+}
+
 fn extra_roots() -> Vec<PathBuf> {
     EXTRA_ROOTS
         .read()

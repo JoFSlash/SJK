@@ -50,10 +50,29 @@ impl VirtualFileSystem {
     pub fn mount_base_pk3s_with_warnings(
         &mut self,
         game_data: impl AsRef<Path>,
+        warning: impl FnMut(&Path, &VfsError),
+    ) -> Result<Vec<MountId>, VfsError> {
+        self.mount_base_pk3s_with_extras(game_data, &[] as &[PathBuf], warning)
+    }
+
+    /// [`Self::mount_base_pk3s_with_warnings`] with `extra` folders that stand in for
+    /// files installed in `base` (a content folder's `base`, such as SJK's JoF
+    /// content): their PK3s sort among `base`'s by name, as the client mounts them.
+    /// A folder that does not exist is left out.
+    pub fn mount_base_pk3s_with_extras<P: AsRef<Path>>(
+        &mut self,
+        game_data: impl AsRef<Path>,
+        extra: &[P],
         mut warning: impl FnMut(&Path, &VfsError),
     ) -> Result<Vec<MountId>, VfsError> {
         let game_data = game_data.as_ref();
         let mut folders = vec![game_data.join("base")];
+        folders.extend(
+            extra
+                .iter()
+                .map(|folder| folder.as_ref().to_path_buf())
+                .filter(|folder| folder.is_dir()),
+        );
         folders.extend(assets_folders(game_data));
         let mut mounts = Vec::new();
         for archive in pk3_search_order_merged(&folders)? {
@@ -147,4 +166,52 @@ fn pak_order(archive: &Path) -> (bool, Vec<u8>) {
         .to_ascii_lowercase()
         .into_bytes();
     (name.starts_with(b"dl_"), name)
+}
+
+#[cfg(test)]
+mod extra_base_tests {
+    use super::*;
+    use std::io::Write;
+
+    fn pk3(path: &Path, name: &str, bytes: &[u8]) {
+        let mut zip = zip::ZipWriter::new(fs::File::create(path).unwrap());
+        zip.start_file(name, zip::write::SimpleFileOptions::default())
+            .unwrap();
+        zip.write_all(bytes).unwrap();
+        zip.finish().unwrap();
+    }
+
+    #[test]
+    fn extra_folders_mount_among_base_by_name_and_a_missing_one_is_skipped() {
+        let root = std::env::temp_dir().join(format!("sjk-vfs-extra-base-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&root);
+        let base = root.join("GameData/base");
+        let extra = root.join("jof/base");
+        fs::create_dir_all(&base).unwrap();
+        fs::create_dir_all(&extra).unwrap();
+        pk3(&base.join("b.pk3"), "maps/shared.bsp", b"base");
+        pk3(&extra.join("a.pk3"), "maps/shared.bsp", b"extra-a");
+        pk3(&extra.join("c.pk3"), "maps/only-extra.bsp", b"extra-c");
+
+        let mut plain = VirtualFileSystem::new();
+        plain
+            .mount_base_pk3s_with_warnings(root.join("GameData"), |_, _| {})
+            .unwrap();
+        assert!(!plain.contains("maps/only-extra.bsp").unwrap());
+
+        let mut files = VirtualFileSystem::new();
+        files
+            .mount_base_pk3s_with_extras(
+                root.join("GameData"),
+                &[extra.clone(), root.join("missing/base")],
+                |_, _| {},
+            )
+            .unwrap();
+        let read = |name: &str| files.read(name).unwrap().unwrap().bytes.to_vec();
+        assert_eq!(read("maps/only-extra.bsp"), b"extra-c");
+        // By name, as one folder: base's b.pk3 sorts after the extra a.pk3 and wins.
+        assert_eq!(read("maps/shared.bsp"), b"base");
+        drop(files);
+        fs::remove_dir_all(&root).unwrap();
+    }
 }

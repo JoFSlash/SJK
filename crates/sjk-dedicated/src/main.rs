@@ -23,6 +23,8 @@ struct Options {
     wire_clients: usize,
     peers: usize,
     game_data: Option<std::path::PathBuf>,
+    /// `--extra-base`: further folders whose PK3s count as `base`'s.
+    extra_bases: Vec<std::path::PathBuf>,
     /// `fs_homepath`: where configs are read first and archived variables written.
     home: Option<std::path::PathBuf>,
     spawn_order: SpawnOrder,
@@ -38,7 +40,7 @@ struct Options {
 }
 
 const USAGE: &str = "sjk-server [--bind ADDRESS:PORT] [--hostname NAME] [--map NAME]
-                     [--game-data DIRECTORY] [--wire-clients 0..32] [--peers N]
+                     [--game-data DIRECTORY] [--extra-base DIRECTORY]... [--wire-clients 0..32] [--peers N]
                      [--team-auto-join] [--spawn-order random|map|map:N] [--cheats]
                      [--gametype ffa|holocron|jm|duel|powerduel|team|siege|ctf|cty] [--fraglimit N] [--duel-fraglimit N] [--timelimit MINUTES]
                      [--capturelimit N] [--maps NAME,NAME,...]
@@ -48,6 +50,9 @@ const USAGE: &str = "sjk-server [--bind ADDRESS:PORT] [--hostname NAME] [--map N
 
   --game-data     the game's GameData directory; with it the map is loaded from
                   base/*.pk3, without it only its name is advertised
+  --extra-base    a further folder whose PK3s mount as if they were in base/ (by name
+                  among base's, as the client mounts a content folder such as SJK's
+                  JoF content); may be given more than once. A missing one is skipped
   --maps          the maps played after this one, in order, comma-separated; the list
                   wraps. Without it the server replays its own map when a match ends,
                   which is what a server with no `nextmap` set does
@@ -119,6 +124,7 @@ fn options() -> Result<Options, Box<dyn Error>> {
         wire_clients: 32,
         peers: 64,
         game_data: None,
+        extra_bases: Vec::new(),
         home: None,
         spawn_order: SpawnOrder::Random,
         maps: Vec::new(),
@@ -227,6 +233,7 @@ fn options() -> Result<Options, Box<dyn Error>> {
             }
             "--peers" => options.peers = value()?.parse()?,
             "--game-data" => options.game_data = Some(value()?.into()),
+            "--extra-base" => options.extra_bases.push(value()?.into()),
             "--home" => options.home = Some(value()?.into()),
             _ => return Err(format!("unknown option {flag}\n{USAGE}").into()),
         }
@@ -291,6 +298,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         println!("{line}");
     }
     let options = options()?;
+    map::set_extra_bases(options.extra_bases.clone());
     let mut secret = [0; 16];
     getrandom::fill(&mut secret)
         .map_err(|error| format!("no operating-system randomness: {error}"))?;
