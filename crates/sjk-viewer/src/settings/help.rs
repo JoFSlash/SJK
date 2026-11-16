@@ -174,6 +174,9 @@ const CHOICE_NAMES: &[(&str, &str, &str)] = &[
     (crate::player_trades::SIZE_CVAR, "0", "Small"),
     (crate::player_trades::SIZE_CVAR, "1", "Normal"),
     (crate::player_trades::SIZE_CVAR, "2", "Large"),
+    (crate::devmap_bar::CVAR, "0", "While held"),
+    (crate::devmap_bar::CVAR, "1", "Bottom"),
+    (crate::devmap_bar::CVAR, "2", "Top"),
     (crate::holocron_popup::NOTIFICATIONS_CVAR, "0", "Off"),
     (
         crate::holocron_popup::NOTIFICATIONS_CVAR,
@@ -1593,6 +1596,10 @@ const HELP: &[(&str, &str)] = &[
     (
         crate::player_trades::SIZE_CVAR,
         "How big the trade window is in the middle of the screen. Small leaves the most of the match in view.",
+    ),
+    (
+        crate::devmap_bar::CVAR,
+        "Cheat buttons in games with cheats on (devmap): bottom, top, or only while +devbar (Ctrl) is held. Hold it to click them.",
     ),
     (
         crate::holocron_popup::NOTIFICATIONS_CVAR,

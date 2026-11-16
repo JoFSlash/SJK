@@ -3065,6 +3065,30 @@ Like the `debug_panel` list it is drawn in the SJK UI's look in every menu style
 [spawn_panel_view.rs](../crates/sjk-viewer/src/spawn_panel_view.rs)). World shot:
 `duel6_spawn_panel`.
 
+### Devmap bar
+
+In a game whose server has cheats on (`sv_cheats 1` in its system info, or a server
+this client hosts with cheats, as `devmap` starts: SJK's server leaves `sv_cheats` out
+of its system info), a bar of cheat buttons shows along the bottom of the screen, like a toolbar:
+Noclip, God, No target, Jetpack (gold, run again to turn off); Give all, Health,
+Armor, Ammo, Weapons, Force (`give`, holo); Spawn list (`spawn_panel`), Clear NPCs
+(`npc kill all`), NPC bounds (`npc showbounds`) (ember); 3rd person
+(`toggle cg_thirdPerson`) and Respawn (`kill`).
+
+While play has the mouse the bar cannot take clicks, so holding the key bound to
+`+devbar` (Ctrl by default, Key bindings > Other > "Devmap bar (hold)") lends it the
+mouse, as the quick wheel does: the view stops turning, a pointer shows over the bar,
+the line under the pointer's button says what it does, and a left click runs it as if
+typed in the console (it lights a moment). Mouse buttons never attack meanwhile;
+movement keys keep working. Letting go of the key, or Escape, gives the mouse back.
+
+`cg_devBar` (Settings, "Devmap bar") chooses where it shows: 0 (default) only while the
+key is held, at the bottom, since stock shows nothing; 1 always at the bottom; 2 always
+at the top. It never shows over a menu, the console, the quick wheel or the
+intermission, nor without cheats; a `devmap` start says so in the console. The table of
+buttons is `ENTRIES` in [devmap_bar.rs](../crates/sjk-viewer/src/devmap_bar.rs), drawn
+in the SJK UI's look in every menu style.
+
 ## Invisible brushes
 
 `r_showBrushes` draws the brushes a map is built with but never shows (clip,

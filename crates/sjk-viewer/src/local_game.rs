@@ -76,7 +76,8 @@ impl crate::GpuState {
                 .join(" ")
         ));
         match LocalServer::start(&program, &arguments, settings.console_lines(), &log) {
-            Ok(server) => {
+            Ok(mut server) => {
+                server.set_cheats(settings.cheats);
                 // Detach before replacing the old owned child, so its disconnect
                 // cannot be mistaken for a failure of the new local game.
                 self.leave_session();

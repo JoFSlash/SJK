@@ -1743,6 +1743,11 @@ pub(super) const GAME: &[Setting] = &[
         kind: ValueKind::Bool,
     },
     Setting {
+        label: "Devmap bar",
+        cvar: crate::devmap_bar::CVAR,
+        kind: ValueKind::Choice(&["0", "1", "2"]),
+    },
+    Setting {
         label: "Trade window size",
         cvar: crate::player_trades::SIZE_CVAR,
         kind: ValueKind::Choice(&["0", "1", "2"]),

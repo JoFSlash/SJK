@@ -1333,6 +1333,11 @@ impl ClientMenu {
         self.create_game.hosting()
     }
 
+    /// Whether the client hosts the server it joins with cheats on (`devmap`).
+    pub(crate) fn hosting_with_cheats(&self) -> bool {
+        self.create_game.hosting_with_cheats()
+    }
+
     /// Show map preparation using the existing cancellable connection notice.
     pub(crate) fn state_loading(&mut self, map: &str) {
         self.state_connecting(map.to_owned());

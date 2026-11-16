@@ -3682,6 +3682,14 @@
 - fed9acd |  | Hide duel opponents' bars and send nothing while duelling
 
 = Slash
++ 16/11/2026 | SJK #427 | Devmap bar: cheat buttons over play, hold Ctrl to click
+- f124da7 |  | Devmap bar: cheat buttons over play, held key lends it the mouse
+- ba23951 |  | Changelog: PR number for the devmap bar
++ 16/11/2026 | SJK #426 | Vote panel: F1/F2 vote, voted card folds to one row; ampoll and testpoll
+- d5f3f69 |  | Vote panel: F1/F2 vote, the voted card folds to one row; ampoll and testpoll
++ 16/11/2026 | SJK #423 | Devmap and Create game start maps from JoF content
+- a24eb81 |  | devmap and Create game start maps from JoF content
+- c012070 |  | cargo fmt: saber_petals and world_shot_saber_skins
 + 13/11/2026 | - | Credits and debug panel for PR #419
 - ee23bce |  | Credits and debug panel for PR #419
 - 63ce78d |  | Release 2026.1112.1 (Alpha)

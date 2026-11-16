@@ -825,7 +825,7 @@ merged into SJK
 - #306 long game-chat messages sent whole, as up to four messages split at a word; at the
   merge a draft refused past four pieces stays in the composer.
 
-Slash ([JoFSlash](https://github.com/JoFSlash)), contributor, has 152 pull requests merged
+Slash ([JoFSlash](https://github.com/JoFSlash)), contributor, has 155 pull requests merged
 into SJK ([all of them](https://github.com/Sol-Vulpes/SJK/pulls?q=is%3Apr+author%3AJoFSlash)):
 
 - #114 Tab completes the cfg file argument of `exec`, `execq`, `writeconfig` and `write`
@@ -1092,6 +1092,12 @@ medal pictures carry their own labels in `vram` and crash reports.
 - #419 easier fishing: bites every 12 to 25 seconds with 1.5 to 2 seconds to hook them,
   5% empty (was 15%), and an Echo bite holds 3 seconds with three tries; Echoes drop as
   before.
+- #423 `devmap` and Create game start maps from the JoF content folder: the owned server
+  mounts each extra content root (`--extra-base`), so a JoF map no longer stops it.
+- #426 F1 and F2 vote YES and NO while a vote waits, the voted card folds to one row,
+  JA+ admins' `ampoll` (anyone on a devmap) and `testpoll`.
+- #427 the devmap bar: cheat buttons over play in a game with cheats, held on Ctrl
+  (`+devbar`), `cg_devBar` 0 by default.
 
 Milamber ([Milamber0](https://github.com/Milamber0)), contributor, has 4 pull requests merged
 into SJK ([all of them](https://github.com/Sol-Vulpes/SJK/pulls?q=is%3Apr+author%3AMilamber0)):

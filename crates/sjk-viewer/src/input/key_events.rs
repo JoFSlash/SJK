@@ -72,6 +72,14 @@ impl GpuState {
             self.quick_wheel.cancel();
             return;
         }
+        // And gives the mouse back from the devmap bar.
+        if self.devmap_bar.is_held()
+            && event.state == winit::event::ElementState::Pressed
+            && event.physical_key == PhysicalKey::Code(winit::keyboard::KeyCode::Escape)
+        {
+            self.devmap_bar.release();
+            return;
+        }
         // The console key precedes the message catcher as in stock (`cl_keys.cpp:1318`);
         // `console_key_leaves_chat` says which keys the composer keeps.
         let console_open = self

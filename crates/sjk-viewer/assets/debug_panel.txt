@@ -9977,6 +9977,33 @@ test: toy_fishing online: bites come often, Use about a second late still hooks 
 test: Press Use with no bite: the next bite comes 5 to 10 s later than usual.
 test: debug_holocron is no Echo; wait for a real drop: the golden bite holds 3 s.
 
+[devmap-jof-maps]
+area: Gameplay
+title: devmap and Create game start JoF content maps (Slash, #423)
+change: The owned server mounts the JoF content folder too (--extra-base) while jof.content is 1.
+test: jof.content 1, then devmap jofs-gwingv2classic: the map loads, no "none of the mounted".
+test: Create game with a jofs-gwing map: the server starts and you join.
+test: jof.content 0: devmap mp/ffa3 starts as before.
+
+[vote-f1-fold]
+area: HUD
+title: F1/F2 vote, the voted card folds to one row, ampoll, testpoll (Slash, #426)
+change: While a vote waits for you F1 votes YES and F2 NO; after voting they push and pull again.
+change: Once voted the card folds to one row: question over the YES / NO bar with its counts.
+change: Server: ampoll <question> asks everyone for 30 s and runs nothing (anyone on a devmap).
+test: testpoll do you like pie?: the card shows the question; F1 votes and the card folds.
+test: Online callvote: your own call counts as YES, the card is one row at once.
+test: devmap mp/ffa3, ampoll do you like pie?: Poll: card for everyone; when it passes, nothing runs.
+
+[devmap-bar]
+area: Gameplay
+title: Devmap bar: cheat buttons over play, hold Ctrl to click (Slash, #427)
+change: In a game with cheats, hold Ctrl (+devbar) for a bar of cheat buttons to click.
+change: cg_devBar 0 (default) shows it only while held; 1 always at the bottom, 2 at the top.
+test: devmap mp/ffa3, hold Ctrl: the bar and a pointer; click Noclip, God, Give all, Spawn list.
+test: Let go of Ctrl or press Escape: the view turns again; mouse buttons never attack meanwhile.
+test: On a server without cheats nothing shows, whatever cg_devBar says.
+
 [forge-shatter-many]
 area: Menus & settings
 title: The Forge breaks several shaders down at once (Slash, #367)

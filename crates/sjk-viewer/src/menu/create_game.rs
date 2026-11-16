@@ -402,6 +402,11 @@ impl CreateGameMenu {
         self.server.is_some()
     }
 
+    /// Whether a server this screen started is running with cheats on.
+    pub(crate) fn hosting_with_cheats(&self) -> bool {
+        self.server.as_ref().is_some_and(LocalServer::cheats)
+    }
+
     /// Whether the server is started but not yet answering.
     pub(crate) fn starting(&self) -> bool {
         self.server.is_some() && self.join_pending.is_none() && !self.joined

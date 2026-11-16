@@ -143,6 +143,7 @@ mod lightmap_styles;
 mod vertex_light;
 
 mod charge_flash;
+mod devmap_bar;
 mod e2e_whisper_card;
 mod e2e_whispers;
 mod emote_end_debug;
@@ -599,6 +600,8 @@ struct GpuState {
     dust_motes: dust_motes::Runtime,
     /// The quick wheel open while its key is held (`quick_wheel.rs`).
     quick_wheel: quick_wheel::QuickWheel,
+    /// The devmap bar of cheat buttons (`devmap_bar.rs`).
+    devmap_bar: devmap_bar::DevBar,
     /// The map's rain, snow and mist (`weather.rs`).
     weather: weather::Runtime,
     geometry: SharedGeometry,
@@ -1703,6 +1706,7 @@ impl GpuState {
             blade_pictures: None,
             dust_motes,
             quick_wheel: quick_wheel::QuickWheel::default(),
+            devmap_bar: devmap_bar::DevBar::default(),
             weather,
             geometry,
             entity_instance_buffer,
@@ -2605,6 +2609,11 @@ impl GpuState {
             viewport,
             information_visible && intermission_view.is_none(),
         );
+        devmap_bar::append(
+            self,
+            viewport,
+            information_visible && intermission_view.is_none() && !self.quick_wheel.is_open(),
+        );
         let hud_scale = runtime_settings::hud_scale(self.console.as_ref());
         let menu_readout = (information_visible && intermission_view.is_none())
             .then(|| menu_hud::readout(self, presentation_time as i32))
@@ -2880,6 +2889,7 @@ impl GpuState {
             information_visible.then(|| &self.hud.nameplate.list),
             information_visible.then(|| &self.hud.identification.list),
             information_visible.then(|| &self.hud.card.list),
+            self.devmap_bar.shown().then(|| self.devmap_bar.draw_list()),
             self.quick_wheel
                 .is_open()
                 .then(|| self.quick_wheel.draw_list()),
