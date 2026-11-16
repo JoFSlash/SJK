@@ -1137,7 +1137,22 @@ impl Panel {
             FontWeight::Regular,
             TextAlign::Start,
         );
-        y += LOG_LINE + 4.0;
+        y += LOG_LINE;
+        // The day's goal, the market's wanted catch (15/11/2026): room is kept for them.
+        for line in card.extra.iter().take(crate::fishing_sell::EXTRA_LINES) {
+            text(
+                &mut self.ui,
+                TextFamily::Body,
+                format_args!("{line}"),
+                frame.rect(x, y, width, LOG_LINE * k),
+                14.0 * s,
+                color::MUTED,
+                FontWeight::Regular,
+                TextAlign::Start,
+            );
+            y += LOG_LINE;
+        }
+        y += 4.0;
         let Some(pays) = card.sell else {
             return;
         };
@@ -1194,7 +1209,67 @@ impl Panel {
         if live {
             self.ui.hit_region(SELL_JUNK_TOKEN, rect);
         }
-        // Beside it, the last sale's result, else why it does nothing.
+        let mut note_x = x + button_width + 12.0;
+        // The catch market's own button beside it, while the hub buys fish or ore.
+        if let Some(catch_pays) = card.catch_sell {
+            let catch_goods = card.catch_goods;
+            let catch_shown = if card.selling {
+                "Selling...".to_owned()
+            } else if catch_pays > 0 {
+                format!("Sell {catch_goods} (+{catch_pays})")
+            } else {
+                format!("Sell {catch_goods}")
+            };
+            let catch_live = !card.selling && catch_pays > 0 && card.catch_pieces > 0;
+            let catch_width = ((crate::text::display_width(&catch_shown, 17.0) * k + 32.0)
+                .max(120.0))
+            .min((x + width - note_x).max(0.0));
+            let rect = frame.rect(note_x, y, catch_width, 36.0);
+            let hovered = catch_live && self.ui.token_hovered(SELL_CATCH_TOKEN);
+            let _ = self.ui.draw_list_mut().push(DrawCommand::RoundedRect {
+                rect,
+                radius: 8.0 * s,
+                color: color::alpha(
+                    color::GOLD,
+                    if hovered {
+                        0.22
+                    } else if catch_live {
+                        0.12
+                    } else {
+                        0.04
+                    },
+                ),
+            });
+            let _ = self.ui.draw_list_mut().push(DrawCommand::Border {
+                rect,
+                radius: 8.0 * s,
+                width: 1.2 * s,
+                color: if catch_live {
+                    color::GOLD
+                } else {
+                    color::alpha(color::TEXT, 0.3)
+                },
+            });
+            text(
+                &mut self.ui,
+                TextFamily::Display,
+                format_args!("{catch_shown}"),
+                frame.rect(note_x, y + 6.0, catch_width, 24.0),
+                17.0 * s,
+                if catch_live {
+                    color::GOLD_BRIGHT
+                } else {
+                    color::QUIET
+                },
+                FontWeight::Semibold,
+                TextAlign::Center,
+            );
+            if catch_live {
+                self.ui.hit_region(SELL_CATCH_TOKEN, rect);
+            }
+            note_x += catch_width + 12.0;
+        }
+        // Beside them, the last sale's result, else why it does nothing.
         let nothing = format!("No {goods} to sell");
         let note = match &card.line {
             Some(line) => line.as_str(),
@@ -1202,7 +1277,6 @@ impl Panel {
             None if pays == 0 => "The hub buys no more today",
             None => "A small sum a day",
         };
-        let note_x = x + button_width + 12.0;
         text(
             &mut self.ui,
             TextFamily::Body,
@@ -1219,7 +1293,7 @@ impl Panel {
 /// How tall the Fishing card's fish log (and the Mining card's log) stands below its
 /// switch.
 fn fish_log_height() -> f32 {
-    30.0 + LOG_HEAD + LOG_LINE + 4.0 + SELL_ROW
+    30.0 + LOG_HEAD + LOG_LINE * (1 + crate::fishing_sell::EXTRA_LINES) as f32 + 4.0 + SELL_ROW
 }
 
 /// `body` from (`x`, `y`) in a column `width` wide, wrapped at `chars` to a line at the

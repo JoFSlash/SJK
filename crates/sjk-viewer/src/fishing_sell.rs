@@ -12,6 +12,8 @@ use std::time::{Duration, Instant};
 
 /// The console command that sells the junk held.
 pub(crate) const COMMAND: &str = "fishing_sell";
+/// The console command that sells the fish held at the catch market (15/11/2026).
+pub(crate) const FISH_COMMAND: &str = "fishing_sellfish";
 /// The console command that prints the fish log in full.
 pub(crate) const LOG_COMMAND: &str = "fishing_log";
 /// How often the card asks the hub what it still pays, while it is on show.
@@ -32,6 +34,53 @@ pub(crate) struct Sale {
     pub(crate) line: Option<String>,
     /// When the hub was last asked what it pays.
     pub(crate) read_at: Option<Instant>,
+    /// What the sale waiting sells, for its result line: "" junk or rubble, "fish",
+    /// "ore" (the catch market, 15/11/2026).
+    pub(crate) goods: &'static str,
+    /// The last kyber find told ([`GpuState::catch_news_frame`], Fishing's sale only).
+    pub(crate) find_seen: u64,
+    /// The day (its end) and goals last told won, so each is told once.
+    pub(crate) goals_told: (i64, bool, bool),
+}
+
+/// What a kyber find says: "A kyber glint in the water! +3 kyber shards."
+pub(crate) fn find_line(find: &sjk_identity::catch::KyberFind) -> String {
+    let place = if find.fishing() {
+        "in the water"
+    } else {
+        "in the rock"
+    };
+    let shard = if find.shards == 1 { "shard" } else { "shards" };
+    format!(
+        "A kyber glint {place}! +{} kyber {shard} ({} now).",
+        find.shards, find.balance
+    )
+}
+
+/// What newly won goal `day` tells after `told` (the day's end and the goals told won):
+/// the line to say, if any, and what is told after.
+pub(crate) fn goal_news(
+    day: &sjk_identity::catch::CatchQuests,
+    told: (i64, bool, bool),
+) -> (Option<&'static str>, (i64, bool, bool)) {
+    let (until, fishing, mining) = if told.0 == day.until {
+        told
+    } else {
+        // A new day: what was won before it was told then (or not at all, before the
+        // first answer).
+        (day.until, false, false)
+    };
+    let line = if day.fishing_won && !fishing && day.won.as_deref() == Some("fishing") {
+        Some("Today's fishing goal is done: an Echo is yours!")
+    } else if day.mining_won && !mining && day.won.as_deref() == Some("mining") {
+        Some("Today's mining goal is done: an Echo is yours!")
+    } else {
+        None
+    };
+    (
+        line,
+        (until, fishing || day.fishing_won, mining || day.mining_won),
+    )
 }
 
 impl Sale {
@@ -67,6 +116,65 @@ pub(crate) struct Card {
     pub(crate) selling: bool,
     /// The last sale's result, or why the button does nothing.
     pub(crate) line: Option<String>,
+    /// Lines under the junk's (15/11/2026, at most [`EXTRA_LINES`]): the day's catch
+    /// quest, the catch market's wanted fish or ore.
+    pub(crate) extra: Vec<String>,
+    /// What the catch market buys of this toy, for its button: "fish", "ore".
+    pub(crate) catch_goods: &'static str,
+    /// How many fish (or ores) are held unsold.
+    pub(crate) catch_pieces: u32,
+    /// The Sell fish / Sell ore button: what it would pay now; `None` hides it (the
+    /// market is closed to this player, or the hub has none).
+    pub(crate) catch_sell: Option<u32>,
+}
+
+/// The most lines a card shows under its junk line (its height keeps room for them).
+pub(crate) const EXTRA_LINES: usize = 1;
+
+/// The card's lines for the catch market and the day's quest, and its catch button:
+/// `goal` the day's goal line (from the hub's claim answers), `held` the fish or ore
+/// held unsold, `junk` what the hub said of selling, `name_of` a catch's name by id.
+/// Fills [`Card::extra`], [`Card::catch_pieces`] and [`Card::catch_sell`].
+pub(crate) fn add_market(
+    card: &mut Card,
+    goal: Option<String>,
+    held: &std::collections::BTreeMap<String, u32>,
+    junk: Option<&sjk_identity::junk::JunkStatus>,
+    name_of: impl Fn(&str) -> Option<&'static str>,
+) {
+    card.extra.clear();
+    card.catch_pieces = held.values().sum();
+    card.catch_sell = None;
+    let market = junk
+        .filter(|junk| junk.open)
+        .and_then(|junk| junk.market.as_ref().map(|market| (junk, market)));
+    let wanted = market.map(|(junk, market)| {
+        card.catch_sell = Some(junk.payable(held));
+        match name_of(&market.wanted) {
+            Some(name) => {
+                let price = market.prices.get(&market.wanted).copied().unwrap_or(0);
+                let times = market.wanted_times.max(1);
+                format!("Wanted: {name} x{times} ({price} credits)")
+            }
+            None => format!("The market buys {} too", card.catch_goods),
+        }
+    });
+    let line = [goal, wanted]
+        .into_iter()
+        .flatten()
+        .collect::<Vec<_>>()
+        .join(" \u{b7} ");
+    if !line.is_empty() {
+        card.extra.push(line);
+    }
+}
+
+/// The name of the fish `id` for the market's line ("Moon eel").
+pub(crate) fn fish_name(id: &str) -> Option<&'static str> {
+    CATCHES
+        .iter()
+        .find(|c| c.kind == Kind::Fish && c.id == id)
+        .map(short_name)
 }
 
 /// A catch's name for the card: without its article, and before any comma ("Old
@@ -124,6 +232,7 @@ pub(crate) fn card(
     Card {
         title: "Fish log",
         goods: "junk",
+        catch_goods: "fish",
         summary,
         fish: listed(log, Kind::Fish, Log::count),
         junk: listed(log, Kind::Junk, Log::held),
@@ -132,6 +241,7 @@ pub(crate) fn card(
         sell: payable.map(|(pays, _)| pays),
         selling,
         line,
+        ..Card::default()
     }
 }
 
@@ -139,6 +249,11 @@ pub(crate) fn card(
 pub(crate) fn sold_line(pieces: u32, credits: u32) -> String {
     let piece = if pieces == 1 { "piece" } else { "pieces" };
     format!("Sold {pieces} {piece} of junk for {credits} credits.")
+}
+
+/// The result line of a market sale that took `pieces` fish (or ores) for `credits`.
+pub(crate) fn sold_catch_line(goods: &str, pieces: u32, credits: u32) -> String {
+    format!("Sold {pieces} {goods} for {credits} credits.")
 }
 
 impl GpuState {
@@ -177,6 +292,17 @@ impl GpuState {
     /// `fishing_sell`, or the card's Sell button: sell the junk the log holds, once a sale
     /// is not waiting already.
     pub(crate) fn sell_fishing_junk(&mut self) {
+        self.sell_fishing(false);
+    }
+
+    /// `fishing_sell fish`, or the card's Sell fish button (the catch market,
+    /// 15/11/2026): sell the fish the log holds unsold, while the hub buys them.
+    pub(crate) fn sell_fishing_catch(&mut self) {
+        self.sell_fishing(true);
+    }
+
+    /// Sell the junk held, or the fish (`fish`).
+    fn sell_fishing(&mut self, fish: bool) {
         let now = Instant::now();
         // One sale at a time, the Mining card's too: the hub answers one.
         if self.fishing.sale.waiting(now) || self.mining.sale.waiting(now) {
@@ -189,15 +315,23 @@ impl GpuState {
         else {
             return;
         };
-        let held = self.fishing.log_in(&directory).junk_held();
+        let log = self.fishing.log_in(&directory);
+        let held = if fish {
+            log.fish_held()
+        } else {
+            log.junk_held()
+        };
+        let goods = if fish { "fish" } else { "junk" };
         let said = if held.is_empty() {
-            "No junk to sell: fish some up first.".to_owned()
+            format!("No {goods} to sell: fish some up first.")
         } else {
             let open = crate::player_identity::with_snapshot(|snapshot| {
-                snapshot
-                    .junk
-                    .as_ref()
-                    .map(|junk| (junk.open, junk.payable(&held)))
+                snapshot.junk.as_ref().map(|junk| {
+                    (
+                        junk.open && (!fish || junk.market.is_some()),
+                        junk.payable(&held),
+                    )
+                })
             })
             .flatten();
             match open {
@@ -206,18 +340,19 @@ impl GpuState {
                         .is_some()
                     {
                         self.fishing.sale.asked = Some(now);
+                        self.fishing.sale.goods = goods;
                         self.fishing.sale.line = Some("Selling...".to_owned());
                         return;
                     }
-                    "SJK online is off: the hub buys the junk.".to_owned()
+                    format!("SJK online is off: the hub buys the {goods}.")
                 }
                 Some((true, _)) => {
-                    "The hub buys no more junk from you today: come back tomorrow.".to_owned()
+                    format!("The hub buys no more {goods} from you today: come back tomorrow.")
                 }
                 _ => {
                     // Not known yet, or closed: ask again for the next try.
                     let _ = crate::player_identity::with_service(|service| service.read_junk());
-                    "The hub does not buy junk from you now.".to_owned()
+                    format!("The hub does not buy {goods} from you now.")
                 }
             }
         };
@@ -230,10 +365,52 @@ impl GpuState {
         );
     }
 
+    /// Tell a kyber find and a daily goal won, once each, as the claims' answers bring
+    /// them (`sjk_identity::catch`, since 15/11/2026).
+    fn catch_news_frame(&mut self) {
+        let seen = self.fishing.sale.find_seen;
+        let told = self.fishing.sale.goals_told;
+        let Some((find, goal)) = crate::player_identity::with_snapshot(|snapshot| {
+            let find = snapshot
+                .kyber_find
+                .as_ref()
+                .filter(|(count, _)| *count != seen)
+                .cloned();
+            let goal = snapshot
+                .catch_quests
+                .as_ref()
+                .map(|day| goal_news(day, told));
+            (find, goal)
+        }) else {
+            return;
+        };
+        let mut said = Vec::new();
+        if let Some((count, find)) = find {
+            self.fishing.sale.find_seen = count;
+            said.push(find_line(&find));
+        }
+        if let Some((line, after)) = goal {
+            self.fishing.sale.goals_told = after;
+            said.extend(line.map(str::to_owned));
+        }
+        for line in said {
+            if let Some(console) = self.console.as_mut() {
+                console.push_log(line.clone());
+            }
+            self.chat.receive(
+                sjk_client::ServerEventKind::CenterPrint,
+                line,
+                None,
+                Instant::now(),
+            );
+        }
+    }
+
     /// The sale's frame: act on the hub's answer once, keep what it pays read while the
     /// card is on show, and give the console the card.
     pub(super) fn fishing_sale_frame(&mut self, now: Instant) {
         self.read_fishing_sale_answer();
+        self.catch_news_frame();
         let shown = self
             .console
             .as_ref()
@@ -269,7 +446,12 @@ impl GpuState {
                 .map(|junk| (junk.payable(&held), junk.left))
         })
         .flatten();
-        let card = card(log, payable, selling, line);
+        let fish = log.fish_held();
+        let mut card = card(log, payable, selling, line);
+        crate::player_identity::with_snapshot(|snapshot| {
+            let goal = snapshot.catch_quests.as_ref().map(|day| day.fishing_line());
+            add_market(&mut card, goal, &fish, snapshot.junk.as_ref(), fish_name);
+        });
         if let Some(console) = self.console.as_mut() {
             console.set_fishing_card(card);
         }
@@ -304,7 +486,10 @@ impl GpuState {
                 };
                 let pieces = self.fishing.log_in(&directory).sell(&sold.sold);
                 self.fishing.save_log(&directory);
-                sold_line(pieces, sold.credits)
+                match std::mem::take(&mut self.fishing.sale.goods) {
+                    "fish" => sold_catch_line("fish", pieces, sold.credits),
+                    _ => sold_line(pieces, sold.credits),
+                }
             }
             Err(why) => why,
         };
@@ -348,6 +533,75 @@ mod tests {
         let sold = card(&log, Some((0, 0)), false, None);
         assert!(sold.junk.is_empty());
         assert_eq!(sold.junk_line, "Junk: none");
+    }
+
+    #[test]
+    fn finds_and_goals_are_told_once() {
+        use sjk_identity::catch::{CatchQuests, KyberFind};
+        let find = KyberFind {
+            toy: "mining".to_owned(),
+            shards: 3,
+            balance: 40,
+        };
+        assert_eq!(
+            find_line(&find),
+            "A kyber glint in the rock! +3 kyber shards (40 now)."
+        );
+        let mut day = CatchQuests {
+            until: 100,
+            ..CatchQuests::default()
+        };
+        let (line, told) = goal_news(&day, (0, false, false));
+        assert_eq!((line, told), (None, (100, false, false)));
+        day.fishing_won = true;
+        day.won = Some("fishing".to_owned());
+        let (line, told) = goal_news(&day, told);
+        assert!(line.unwrap().contains("fishing goal"));
+        assert_eq!(goal_news(&day, told).0, None, "told once");
+        // A goal won before the first answer seen is not told again later.
+        let (line, _) = goal_news(
+            &CatchQuests {
+                won: None,
+                ..day.clone()
+            },
+            (0, false, false),
+        );
+        assert_eq!(line, None);
+    }
+
+    #[test]
+    fn the_market_line_names_the_wanted_catch() {
+        let junk = sjk_identity::junk::JunkStatus {
+            open: true,
+            left: 15,
+            market: Some(sjk_identity::junk::Market {
+                prices: [("moon_eel".to_owned(), 6), ("sun_carp".to_owned(), 3)]
+                    .into_iter()
+                    .collect(),
+                wanted: "moon_eel".to_owned(),
+                wanted_times: 2,
+                until: 0,
+            }),
+            ..Default::default()
+        };
+        let log = Log::parse("moon_eel 2\nsun_carp 1\n");
+        let mut shown = card(&log, None, false, None);
+        add_market(
+            &mut shown,
+            Some("Goal".to_owned()),
+            &log.fish_held(),
+            Some(&junk),
+            fish_name,
+        );
+        assert_eq!(shown.catch_sell, Some(15));
+        assert_eq!(shown.catch_pieces, 3);
+        assert_eq!(
+            shown.extra,
+            vec!["Goal \u{b7} Wanted: Moon eel x2 (6 credits)".to_owned()]
+        );
+        // Closed market: no button, the goal still shows.
+        add_market(&mut shown, None, &log.fish_held(), None, fish_name);
+        assert_eq!((shown.catch_sell, shown.extra.len()), (None, 0));
     }
 
     #[test]

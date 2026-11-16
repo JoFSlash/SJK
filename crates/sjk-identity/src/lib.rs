@@ -12,6 +12,7 @@ pub mod assets;
 pub mod avatar;
 pub mod ban;
 pub mod bio;
+pub mod catch;
 pub mod channels;
 pub mod chat;
 pub mod crash;

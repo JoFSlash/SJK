@@ -15,6 +15,8 @@
 //!   another client killing the player.
 //! - **bites**: bites of the fishing toy (`crate::fishing`) hooked in time (04/11/2026),
 //!   so a player standing at the water earns while they answer the bites.
+//! - **rocks**: boulders of the mining toy (`crate::mining`) broken (15/11/2026), for the
+//!   hub's kyber finds and daily catch quests; they set no pace.
 //!
 //! Only counted while the player is actively playing ([`super::activity`]): the viewer
 //! sets [`set_counting`] twice a second with the activity it tells the hub. The counts
@@ -49,6 +51,7 @@ static HURT: AtomicU64 = AtomicU64::new(0);
 static KILLS: AtomicU64 = AtomicU64::new(0);
 static DEATHS: AtomicU64 = AtomicU64::new(0);
 static BITES: AtomicU64 = AtomicU64::new(0);
+static ROCKS: AtomicU64 = AtomicU64::new(0);
 
 thread_local! {
     static WATCH: RefCell<Watch> = const { RefCell::new(Watch::new()) };
@@ -63,6 +66,14 @@ pub(crate) fn set_counting(on: bool) {
 pub(crate) fn bite() {
     if COUNTING.load(Ordering::Relaxed) {
         BITES.fetch_add(1, Ordering::Relaxed);
+    }
+}
+
+/// A boulder of the mining toy broken (15/11/2026): the hub counts them for kyber finds
+/// and the daily catch quests.
+pub(crate) fn rock() {
+    if COUNTING.load(Ordering::Relaxed) {
+        ROCKS.fetch_add(1, Ordering::Relaxed);
     }
 }
 
@@ -115,6 +126,7 @@ pub(crate) fn take() -> PlaySignals {
         kills: KILLS.swap(0, Ordering::Relaxed),
         deaths: DEATHS.swap(0, Ordering::Relaxed),
         bites: BITES.swap(0, Ordering::Relaxed),
+        rocks: ROCKS.swap(0, Ordering::Relaxed),
     }
 }
 

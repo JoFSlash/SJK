@@ -10004,6 +10004,17 @@ test: devmap mp/ffa3, hold Ctrl: the bar and a pointer; click Noclip, God, Give 
 test: Let go of Ctrl or press Escape: the view turns again; mouse buttons never attack meanwhile.
 test: On a server without cheats nothing shows, whatever cg_devBar says.
 
+[catch-rewards]
+area: Gameplay
+title: Kyber finds, daily catch goals, catch market (Slash, after adwe's idea)
+change: Hub rolls a few kyber shards on claims with bites or broken boulders (3 a day).
+change: Daily goals: 25 bites, 40 boulders win an Echo each. Market buys fish and ore.
+test: Local hub with --kyber-finds, --catch-market, --junk-selling, --catch-quests staff.
+test: Fish or mine a while: "A kyber glint ... +N kyber shards", shards rise in Profile.
+test: Collection > Toys > Fishing: goal line counts bites; at 25 the Echo comes once.
+test: Sell fish: Wanted today line, the wanted one pays double, the 15 a day cap holds.
+note: Needs the hub's feat/catch-rewards deployed; without it nothing new shows.
+
 [forge-shatter-many]
 area: Menus & settings
 title: The Forge breaks several shaders down at once (Slash, #367)

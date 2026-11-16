@@ -653,6 +653,10 @@ pub struct PlaySignals {
     /// while they come.
     #[serde(default)]
     pub bites: u64,
+    /// Boulders of the mining toy broken (15/11/2026): the hub counts them for kyber
+    /// finds and the daily catch quests; they set no pace.
+    #[serde(default)]
+    pub rocks: u64,
 }
 
 impl PlaySignals {
@@ -665,6 +669,7 @@ impl PlaySignals {
         self.kills = self.kills.saturating_add(other.kills);
         self.deaths = self.deaths.saturating_add(other.deaths);
         self.bites = self.bites.saturating_add(other.bites);
+        self.rocks = self.rocks.saturating_add(other.rocks);
     }
 
     /// Whether any fight shows: a hit, a hurt, a kill or a death.

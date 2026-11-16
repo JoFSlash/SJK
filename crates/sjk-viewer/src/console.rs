@@ -312,6 +312,9 @@ pub(crate) struct ViewerConsole {
     fishing_card: crate::fishing_sell::Card,
     /// The Fishing card's Sell junk button was pressed.
     pending_fishing_sell: bool,
+    /// The Fishing or Mining card's Sell fish / Sell ore button (the catch market,
+    /// 15/11/2026) was pressed: `Some(true)` fish, `Some(false)` ore.
+    pending_catch_sell: Option<bool>,
     /// A WHEEL OF DOOM of the player's runs, mirrored as [`Self::order66_on`] is.
     wheel_of_doom_on: bool,
     /// The Toys tab pressed the WHEEL OF DOOM's switch, not yet taken.

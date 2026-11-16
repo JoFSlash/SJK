@@ -1377,6 +1377,8 @@ pub(crate) mod tests {
             mystery_box: None,
             junk: None,
             junk_sale: None,
+            kyber_find: None,
+            catch_quests: None,
             wheel_of_doom: None,
             wheel_of_doom_revision: 0,
             wheel_of_doom_spin: None,

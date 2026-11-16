@@ -17,6 +17,8 @@ use std::time::Instant;
 
 /// The console command that sells the rubble held.
 pub(crate) const COMMAND: &str = "mining_sell";
+/// The console command that sells the ore held at the catch market (15/11/2026).
+pub(crate) const ORE_COMMAND: &str = "mining_sellore";
 /// The console command that prints the mining log in full.
 pub(crate) const LOG_COMMAND: &str = "mining_log";
 
@@ -81,6 +83,7 @@ pub(crate) fn card(
     Card {
         title: "Mining log",
         goods: "rubble",
+        catch_goods: "ore",
         summary,
         fish: listed(log, Kind::Ore, Log::count),
         junk: listed(log, Kind::Rubble, Log::held),
@@ -89,7 +92,16 @@ pub(crate) fn card(
         sell: payable.map(|(pays, _)| pays),
         selling,
         line,
+        ..Card::default()
     }
+}
+
+/// The name of the ore `id` for the market's line ("void crystal").
+pub(crate) fn ore_name(id: &str) -> Option<&'static str> {
+    FINDS
+        .iter()
+        .find(|f| f.kind == Kind::Ore && f.id == id)
+        .map(short_name)
 }
 
 /// The result line of a sale that took `pieces` for `credits`.
@@ -136,6 +148,17 @@ impl GpuState {
     /// `mining_sell`, or the card's Sell button: sell the rubble the log holds, once no
     /// sale (this toy's or Fishing's) waits already.
     pub(crate) fn sell_mining_rubble(&mut self) {
+        self.sell_mining(false);
+    }
+
+    /// `mining_sell ore`, or the card's Sell ore button (the catch market, 15/11/2026):
+    /// sell the ore the log holds unsold, while the hub buys it.
+    pub(crate) fn sell_mining_ore(&mut self) {
+        self.sell_mining(true);
+    }
+
+    /// Sell the rubble held, or the ore (`ore`).
+    fn sell_mining(&mut self, ore: bool) {
         let now = Instant::now();
         if self.mining.sale.waiting(now) || self.fishing.sale.waiting(now) {
             return;
@@ -143,16 +166,24 @@ impl GpuState {
         let Some(directory) = self.config_directory() else {
             return;
         };
-        let held = self.mining.log_in(&directory).rubble_held();
+        let log = self.mining.log_in(&directory);
+        let held = if ore {
+            log.ore_held()
+        } else {
+            log.rubble_held()
+        };
+        let goods = if ore { "ore" } else { "rubble" };
         let said = if held.is_empty() {
-            "No rubble to sell: break some boulders first.".to_owned()
+            format!("No {goods} to sell: break some boulders first.")
         } else {
             let open = crate::player_identity::with_snapshot(|snapshot| {
                 snapshot.junk.as_ref().map(|junk| {
-                    (
-                        junk.open && hub_buys_rubble(&junk.prices),
-                        junk.payable(&held),
-                    )
+                    let buys = if ore {
+                        junk.market.is_some()
+                    } else {
+                        hub_buys_rubble(&junk.prices)
+                    };
+                    (junk.open && buys, junk.payable(&held))
                 })
             })
             .flatten();
@@ -162,19 +193,20 @@ impl GpuState {
                         .is_some()
                     {
                         self.mining.sale.asked = Some(now);
+                        self.mining.sale.goods = goods;
                         self.mining.sale.line = Some("Selling...".to_owned());
                         return;
                     }
-                    "SJK online is off: the hub buys the rubble.".to_owned()
+                    format!("SJK online is off: the hub buys the {goods}.")
                 }
                 Some((true, _)) => {
-                    "The hub buys no more today (junk and rubble share it): come back tomorrow."
+                    "The hub buys no more today (one sum for all it buys): come back tomorrow."
                         .to_owned()
                 }
                 _ => {
                     // Not known yet, or closed: ask again for the next try.
                     let _ = crate::player_identity::with_service(|service| service.read_junk());
-                    "The hub does not buy rubble from you now.".to_owned()
+                    format!("The hub does not buy {goods} from you now.")
                 }
             }
         };
@@ -222,7 +254,18 @@ impl GpuState {
                 .map(|junk| (junk.payable(&held), junk.left))
         })
         .flatten();
-        let card = card(log, payable, selling, line);
+        let ore = log.ore_held();
+        let mut card = card(log, payable, selling, line);
+        crate::player_identity::with_snapshot(|snapshot| {
+            let goal = snapshot.catch_quests.as_ref().map(|day| day.mining_line());
+            crate::fishing_sell::add_market(
+                &mut card,
+                goal,
+                &ore,
+                snapshot.junk.as_ref(),
+                ore_name,
+            );
+        });
         if let Some(console) = self.console.as_mut() {
             console.set_mining_card(card);
         }
@@ -253,7 +296,10 @@ impl GpuState {
                 };
                 let pieces = self.mining.log_in(&directory).sell(&sold.sold);
                 self.mining.save_log(&directory);
-                sold_line(pieces, sold.credits)
+                match std::mem::take(&mut self.mining.sale.goods) {
+                    "ore" => crate::fishing_sell::sold_catch_line("ores", pieces, sold.credits),
+                    _ => sold_line(pieces, sold.credits),
+                }
             }
             Err(why) => why,
         };

@@ -738,6 +738,17 @@ hub leaves the list out and clients keep the one they had. With `cg_serverRemaps
 (the default) server remaps are already ignored, and a map the player allowed is `on`,
 which the list leaves alone: the list matters to players who turned Server remaps on.
 
+## Kyber finds, daily catch goals and the catch market
+
+15/11/2026, `feat/catch-rewards` (adwè's idea in #ideas), with the hub's
+`feat/catch-rewards`. Client: `sjk_identity::catch` reads a claim's `kyber_find` and
+`catch_quests`, `junk::Market` the junk status's `market`; mining sends `rocks`; the
+Fishing and Mining cards show the day's goal, the wanted catch and Sell fish / Sell ore
+(`SELL_CATCH_TOKEN`). Unit tests cover the wire, the card lines, the news told once and
+the logs selling ore. Not tried in game; every hub switch is off by default, so a hub
+without them shows nothing new. Numbers are provisional and Sol's to tune: the market
+earns nothing past the junk's 15 a day, and a goal's Echo counts in the holocrons' cap.
+
 ## Mining rubble selling (phase 2)
 
 05/11/2026, `feat/mining-sell-rubble` on `feat/mining` (#363); hub side

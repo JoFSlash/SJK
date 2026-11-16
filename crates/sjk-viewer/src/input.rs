@@ -107,6 +107,10 @@ pub(crate) enum InputAction {
     FishingSell,
     /// `fishing_log`: print the fish log in full to the console.
     FishingLog,
+    /// `fishing_sellfish`: sell the fish held at the catch market.
+    FishingSellFish,
+    /// `mining_sellore`: sell the ore held at the catch market.
+    MiningSellOre,
     /// `mining_sell`: sell the dug rubble to the hub ([`crate::mining_sell`]).
     MiningSell,
     /// `mining_log`: print the mining log in full to the console.
@@ -380,6 +384,8 @@ impl GameplayInput {
                     | crate::mining::COMMAND
                     | crate::fishing_sell::COMMAND
                     | crate::fishing_sell::LOG_COMMAND
+                    | crate::fishing_sell::FISH_COMMAND
+                    | crate::mining_sell::ORE_COMMAND
                     | crate::mining_sell::COMMAND
                     | crate::mining_sell::LOG_COMMAND
                     | crate::order66::COMMAND
@@ -570,6 +576,8 @@ impl GameplayInput {
             crate::mining::COMMAND => Some(InputAction::Mining),
             crate::fishing_sell::COMMAND => Some(InputAction::FishingSell),
             crate::fishing_sell::LOG_COMMAND => Some(InputAction::FishingLog),
+            crate::fishing_sell::FISH_COMMAND => Some(InputAction::FishingSellFish),
+            crate::mining_sell::ORE_COMMAND => Some(InputAction::MiningSellOre),
             crate::mining_sell::COMMAND => Some(InputAction::MiningSell),
             crate::mining_sell::LOG_COMMAND => Some(InputAction::MiningLog),
             crate::order66::COMMAND => Some(InputAction::Order66),
@@ -776,6 +784,8 @@ impl super::GpuState {
             Some(InputAction::Mining) => self.toggle_mining(),
             Some(InputAction::FishingSell) => self.sell_fishing_junk(),
             Some(InputAction::FishingLog) => self.print_fishing_log(),
+            Some(InputAction::FishingSellFish) => self.sell_fishing_catch(),
+            Some(InputAction::MiningSellOre) => self.sell_mining_ore(),
             Some(InputAction::MiningSell) => self.sell_mining_rubble(),
             Some(InputAction::MiningLog) => self.print_mining_log(),
             Some(InputAction::Order66) => self.toggle_order66(),

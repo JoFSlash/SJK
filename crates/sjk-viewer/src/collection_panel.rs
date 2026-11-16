@@ -142,6 +142,9 @@ const QUESTS_TOKEN: u16 = 1_397;
 /// The Fishing card's Sell junk button: past the nameplate styles' and the toy
 /// options' tokens, which a click reads by range.
 const SELL_JUNK_TOKEN: u16 = 1_395;
+/// The Fishing card's Sell fish button and the Mining card's Sell ore (the catch market,
+/// 15/11/2026), in the free run above the panel's other tokens.
+const SELL_CATCH_TOKEN: u16 = 1_420;
 /// Fishing's place among the toys (`collection_toys::TOYS`).
 const FISHING_TOY: usize = 10;
 /// The WHEEL OF DOOM's niche on Toys, and its place among the toys.
@@ -492,6 +495,10 @@ pub(crate) enum PanelAction {
     WheelOfDoom,
     /// Sell the dug rubble to the hub: the same as `mining_sell`.
     SellRubble,
+    /// Sell the fish held at the catch market: the same as `fishing_sellfish`.
+    SellFish,
+    /// Sell the ore held at the catch market: the same as `mining_sellore`.
+    SellOre,
     /// Set `cg_tag` to this tag's id: the one `toy_tag` sticks.
     /// Pick a tag (or a card) for `toy_tag`, in a finish (`cg_tag`, `cg_tagFinish`).
     ChooseTag(String, &'static str),
@@ -2635,6 +2642,8 @@ impl Panel {
             // One card shows at a time: the button sells what that toy's log holds.
             SELL_JUNK_TOKEN if self.toy == MINING_TOY => PanelAction::SellRubble,
             SELL_JUNK_TOKEN => PanelAction::SellJunk,
+            SELL_CATCH_TOKEN if self.toy == MINING_TOY => PanelAction::SellOre,
+            SELL_CATCH_TOKEN => PanelAction::SellFish,
             loadouts::OPEN_TOKEN => {
                 self.loadouts.open();
                 PanelAction::None

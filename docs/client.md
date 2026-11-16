@@ -6756,7 +6756,28 @@ brings up are the ones the hub drops anyway.
   pays (`GET /v1/fishing/junk`) when shown and every 30 seconds after; the button shows
   only while the hub says this player may sell (the operator's switch, off until Sol
   turns it on) and is greyed with nothing payable or no junk. One sale at a time
-  (`fishing_sell.rs`). Fish never sell: they stay in the log for the achievements.
+  (`fishing_sell.rs`). Fish never sold before the catch market (below); the log keeps
+  every count for the achievements either way.
+- **Kyber finds, daily goals and the catch market** (15/11/2026, adwè's idea in #ideas;
+  hub `PROTOCOL.md` "Holocrons" Kyber finds, "Quests" Daily catch quests, "Fishing junk"
+  Catch market; `sjk_identity::catch`; each behind its own hub switch, off by default):
+  - A claim's answer may carry `kyber_find`: the hub rolled a few kyber shards for a
+    claim whose play signals had a hooked bite or a broken boulder (at most 3 a day).
+    The client says it on the centre of the screen and in the console ("A kyber glint
+    in the water! +3 kyber shards") and takes the new shard balance
+    (`GpuState::catch_news_frame` in `fishing_sell.rs`).
+  - It may carry `catch_quests`: the hub's own count of the day's bites and boulders
+    against two goals (25 bites, 40 boulders), each winning an Echo once a day within
+    the holocrons' daily cap. The Fishing and Mining cards show the goal in one line
+    under the junk's ("Goal: 12/25 bites for an Echo"), and the claim that wins it says
+    so once.
+  - `GET /v1/fishing/junk` may carry `market`: fish and ore sell too, under the junk's
+    one cap, one of them wanted each day at double its price. The cards then add
+    "Wanted: Moon eel x2 (6 credits)" to that line and a **Sell fish** / **Sell ore** button beside Sell junk /
+    Sell rubble (`fishing_sellfish`, `mining_sellore` in the console). Only what the
+    hub's `sold` names is counted sold; the catch counts never change.
+  - Mining sends a new play signal, `rocks` (boulders broken,
+    `holocrons::signals::rock`), which sets no pace.
 - **Bite cue** (03/11/2026, for players with the sound off): Settings > Sound > Toys,
   "Fishing bite cue" (`cg_fishingBiteCue`: 0 off, 1 when the sound is off, the default,
   2 always). While shown, a bite puts a pulsing "!" over the float (gold for an Echo's

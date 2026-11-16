@@ -32,6 +32,7 @@ Add each release's notes here when it is tagged (docs/sjk.md "Releases").
 -->
 ## Unreleased
 
+- Fishing and Mining: now and then a kyber glint brings a few kyber shards, a daily goal (25 bites hooked, 40 boulders broken) wins an Echo, and the catch market buys fish and ore with one wanted each day at double price (`fishing_sellfish`, `mining_sellore`); each once the hub turns it on _(Slash, after adwe's idea)_
 - Status balloons: `cg_statusBalloons` offers stock, SJK animations, static clan pictures or clan animations; name tags select clan art, with static pictures for non-SJK players _(Hormorn, PR #421)_
 - JoF maps: `devmap` and Create game start the maps in the JoF content folder too, instead of the local server stopping at once _(Slash, PR #423)_
 - Vote panel: F1 votes YES and F2 votes NO while a vote waits for you (then they are push and pull again), and once you have voted the card folds to one row, the question over the YES / NO bar with its counts, so it covers less of the game _(Slash, PR #426)_
