@@ -12,8 +12,10 @@
 //!   neither English nor one of `cl_chatTranslateSkip`'s. `/tr <text>` translates the
 //!   text given.
 //! - The SJK chat page offers Translate on the chosen message (`sjk_chat_panel.rs`).
+//! - In the console, a click on another player's chat line translates it
+//!   (`console_translate.rs`).
 //!
-//! The translation shows under the line in the feed, dim, as `» (fr) ...`, and goes to
+//! The translation shows under the line in the feed, light grey, as `» (fr) ...`, and goes to
 //! the console; why there is none (an older hub, a hub without a translator, the day's
 //! or the month's limit) shows as a local notice. `cl_chatTranslate 0` turns it off.
 
@@ -166,7 +168,16 @@ pub(crate) fn line(translation: &sjk_identity::Translation) -> String {
     format!("\u{bb} ({from}) {}", translation.text)
 }
 
-/// A translation's line in the feed and the console, dim.
+/// A translation in the feed: a light grey, lighter than `^9`'s mid grey that was hard
+/// to read, still apart from the white of chat.
+pub(crate) const FEED_GREY: [f32; 3] = [0.78, 0.79, 0.81];
+
+/// Whether a feed line is a translation, drawn in [`FEED_GREY`].
+pub(super) fn is_translation(line: &ChatLine) -> bool {
+    line.local && line.body.starts_with('\u{bb}')
+}
+
+/// A translation's line in the console, dim.
 pub(crate) fn shown(translation: &sjk_identity::Translation) -> String {
     format!("^9{}", line(translation))
 }
@@ -215,12 +226,13 @@ impl ChatOverlay {
 
     /// Show the outcomes in `state` of the translations waiting: each translation under
     /// its line (at the end when the line is gone or there was none), or why there is
-    /// none as a notice. Returns the lines for the console.
+    /// none as a notice. Returns the lines for the console, each with the serial it
+    /// answers.
     pub(crate) fn follow_translations(
         &mut self,
         state: &sjk_identity::ChatState,
         now: Instant,
-    ) -> Vec<String> {
+    ) -> Vec<(u64, String)> {
         let mut console = Vec::new();
         let mut waiting = std::mem::take(&mut self.translations.0);
         waiting.retain(|(serial, key)| {
@@ -231,12 +243,16 @@ impl ChatOverlay {
             else {
                 return true;
             };
-            let text = match &outcome.result {
-                Ok(translation) => shown(translation),
-                Err(error) => format!("^3Translate: {error}"),
+            // The feed draws a translation in its own light grey ([`FEED_GREY`]).
+            let (console_text, feed_text) = match &outcome.result {
+                Ok(translation) => (shown(translation), line(translation)),
+                Err(error) => {
+                    let text = format!("^3Translate: {error}");
+                    (text.clone(), text)
+                }
             };
-            console.push(text.clone());
-            self.put_translation(text, key.as_ref(), now);
+            console.push((*serial, console_text));
+            self.put_translation(feed_text, key.as_ref(), now);
             false
         });
         self.translations.0 = waiting;
@@ -353,6 +369,18 @@ impl ChatOverlay {
         self.translate_click.take()
     }
 
+    /// The newest line in the feed a click may translate whose plain text is `text`:
+    /// its key, the line marked as asked for.
+    fn ask_line_with(&mut self, text: &str) -> Option<LineKey> {
+        let index = self
+            .lines
+            .iter()
+            .rposition(|line| self.translatable(line) && plain(&line.body) == text)?;
+        let line = &mut self.lines[index];
+        line.asked = true;
+        Some((line.received_ms, line.body.clone()))
+    }
+
     /// The line of `key` may be clicked again: its translation was not asked after all.
     fn unask(&mut self, key: &LineKey) {
         if let Some(line) = self
@@ -428,19 +456,19 @@ impl crate::GpuState {
                 (Some(key), text)
             }
         };
-        self.ask_translation(key, text)
+        self.ask_translation(key, text).map(drop)
     }
 
-    /// Translate the line whose text was clicked: whatever its guessed language, unless
-    /// the guess is sure it is English or a skipped one.
-    fn translate_clicked(&mut self, click: Click) -> Result<(), String> {
+    /// Why a clicked line is not translated: the guess is sure it is English or a
+    /// skipped language.
+    fn passed_over(&self, text: &str) -> Result<(), String> {
         let skip = Skip::parse(
             self.console
                 .as_ref()
                 .and_then(|console| console.text_cvar(SKIP_CVAR).ok())
                 .unwrap_or(SKIP_DEFAULT),
         );
-        if let Some(guess) = guess(&click.text)
+        if let Some(guess) = guess(text)
             && guess.sure
             && skip.skips(guess.code)
         {
@@ -453,13 +481,33 @@ impl crate::GpuState {
                 )
             });
         }
+        Ok(())
+    }
+
+    /// Translate the line whose text was clicked: whatever its guessed language, unless
+    /// the guess is sure it is English or a skipped one.
+    fn translate_clicked(&mut self, click: Click) -> Result<(), String> {
+        self.passed_over(&click.text)?;
         let key = click.key.clone();
         self.ask_translation(Some(click.key), click.text)
+            .map(drop)
             .inspect_err(|_| self.chat.unask(&key))
     }
 
+    /// Translate the chat line clicked in the console (`console_translate.rs`), its
+    /// translation under the same line in the feed while the feed still has it.
+    fn translate_console_click(&mut self, text: String) -> Result<u64, String> {
+        self.passed_over(&text)?;
+        let key = self.chat.ask_line_with(&text);
+        self.ask_translation(key.clone(), text).inspect_err(|_| {
+            if let Some(key) = &key {
+                self.chat.unask(key);
+            }
+        })
+    }
+
     /// Ask the hub for `text` in English, its translation to go under the line of `key`.
-    fn ask_translation(&mut self, key: Option<LineKey>, text: String) -> Result<(), String> {
+    fn ask_translation(&mut self, key: Option<LineKey>, text: String) -> Result<u64, String> {
         if sjk_identity::translate::check(&text).is_none() {
             return Err(format!(
                 "nothing to translate (1 to {} characters)",
@@ -469,7 +517,7 @@ impl crate::GpuState {
         let serial = crate::player_identity::translate(text)
             .ok_or("translation needs the SJK identity (cl_identity 1)")?;
         self.chat.translation_asked(serial, key);
-        Ok(())
+        Ok(serial)
     }
 
     /// Show the translations the hub answered (each frame; nothing to do while none
@@ -485,6 +533,22 @@ impl crate::GpuState {
         {
             self.chat.translation_notice(&why, Instant::now());
         }
+        let console_click = self
+            .console
+            .as_mut()
+            .and_then(|console| console.take_translate_click(Instant::now()));
+        if let Some((number, text)) = console_click {
+            let asked = self.translate_console_click(text);
+            if let Some(console) = self.console.as_mut() {
+                match asked {
+                    Ok(serial) => console.translation_asked(serial, number),
+                    Err(why) => {
+                        console.unask_translation(number);
+                        console.put_under(number, format!("^3Translate: {why}"));
+                    }
+                }
+            }
+        }
         if !self.chat.translations_waiting() {
             return;
         }
@@ -497,8 +561,11 @@ impl crate::GpuState {
             return;
         };
         if let Some(console) = self.console.as_mut() {
-            for line in lines {
-                console.push_log(line);
+            for (serial, line) in lines {
+                // A line clicked in the console gets it right under it.
+                if let Some(line) = console.translation_answered(serial, line) {
+                    console.push_log(line);
+                }
             }
         }
     }
@@ -683,12 +750,18 @@ mod tests {
         let console = chat.follow_translations(&state, Instant::now());
         assert_eq!(
             console,
-            ["^9\u{bb} (fr) Hi, are you coming to the duel tonight?"]
+            [(
+                7,
+                "^9\u{bb} (fr) Hi, are you coming to the duel tonight?".to_owned()
+            )]
         );
         assert!(!chat.translations_waiting());
         let bodies: Vec<&str> = chat.lines.iter().map(|line| line.body.as_str()).collect();
-        assert_eq!(bodies[1], console[0], "under its line: {bodies:?}");
-        assert!(chat.lines[1].local);
+        assert_eq!(
+            bodies[1], "\u{bb} (fr) Hi, are you coming to the duel tonight?",
+            "under its line: {bodies:?}"
+        );
+        assert!(chat.lines[1].local && is_translation(&chat.lines[1]));
         // The translation is not foreign itself, and the French line is taken again.
         let (_, again) = chat.last_foreign(&Skip::parse("en")).unwrap();
         assert!(again.starts_with("Salut"));
@@ -719,7 +792,10 @@ mod tests {
                 result: Err(sjk_identity::TranslateError::Off),
             });
         let console = chat.follow_translations(&state, Instant::now());
-        assert_eq!(console, ["^3Translate: This SJK hub does not translate"]);
-        assert_eq!(chat.lines.back().unwrap().body, console[0]);
+        assert_eq!(
+            console,
+            [(3, "^3Translate: This SJK hub does not translate".to_owned())]
+        );
+        assert_eq!(chat.lines.back().unwrap().body, console[0].1);
     }
 }

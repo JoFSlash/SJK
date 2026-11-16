@@ -338,6 +338,39 @@ impl ChatOverlay {
         let name = self.roster.display_name(target)?;
         private_whisper_body(&display, name)
     }
+
+    /// The plain words of server chat `text` (from `sender`, when the server named one)
+    /// that a click in the console may translate (`console_translate.rs`), taken as
+    /// the chat box takes its body: `None` for the player's own line.
+    pub(crate) fn console_translation_text(
+        &self,
+        text: &str,
+        sender: Option<u16>,
+    ) -> Option<String> {
+        let display = chat_display_text(&chat_unescape(text));
+        let target = self
+            .roster
+            .target(sender)
+            .or_else(|| self.line_sender(&display));
+        if target.is_some_and(|target| Some(target.slot()) == self.own_slot) {
+            return None;
+        }
+        let name = target
+            .and_then(|target| self.roster.display_name(target))
+            .unwrap_or("");
+        let body = if name.is_empty() {
+            display.as_str()
+        } else {
+            chat_body(&display, name).0
+        };
+        let body = options::clean_body(body, self.options.clean);
+        let body = if self.options.emojis {
+            self.emojis.markup(&body).0
+        } else {
+            body
+        };
+        Some(translate::plain(&body)).filter(|text| !text.is_empty())
+    }
     pub(crate) fn new() -> Self {
         Self {
             lines: VecDeque::with_capacity(HISTORY_LIMIT),

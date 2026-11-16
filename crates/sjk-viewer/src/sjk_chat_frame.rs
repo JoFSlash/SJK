@@ -112,7 +112,12 @@ impl GpuState {
             });
             let console_lines = if in_console {
                 after.map_or_else(Vec::new, |after| {
-                    chat::sjk::console_lines(chat::sjk::merged(state), after, is_muted)
+                    chat::sjk::console_entries(
+                        chat::sjk::merged(state),
+                        after,
+                        is_muted,
+                        own_key.as_deref(),
+                    )
                 })
             } else {
                 Vec::new()
@@ -123,8 +128,11 @@ impl GpuState {
             return;
         };
         if let Some(console) = self.console.as_mut() {
-            for line in console_lines {
-                console.push_chat_line(line.clone(), &line, None);
+            for (line, words) in console_lines {
+                let number = console.push_chat_line(line.clone(), &line, None);
+                if let (Some(number), Some(words)) = (number, words) {
+                    console.offer_translation(number, words);
+                }
             }
         }
         if sound && news && self.chat.sjk_sound_due(now) {

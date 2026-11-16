@@ -118,19 +118,19 @@ pub(super) fn register_command(shell: &mut Shell, state: &State) -> Result<(), B
 impl ViewerConsole {
     /// Add a chat line to the scrollback without notifying, as `push_log_quiet`
     /// does, and keep `raw` (the server's text, `0x19` separators included) for
-    /// the console socket.
+    /// the console socket. Returns the line's number, unless `cl_noprint` left it out.
     pub(crate) fn push_chat_line(
         &mut self,
         display: String,
         raw: &str,
         own_whisper_body: Option<&str>,
-    ) {
+    ) -> Option<u64> {
         let number = self.shell.lines_written();
         // Chat stays out of crash reports.
         crate::crash_report::privately(|| self.shell.push_log_quiet(display));
         // A line `cl_noprint` suppressed has no number to name.
         if self.shell.lines_written() == number {
-            return;
+            return None;
         }
         self.note_chat_line(number);
         if let Some(body) = own_whisper_body {
@@ -142,6 +142,7 @@ impl ViewerConsole {
             }
             self.socket.raw_chat.push_back((number, raw.to_owned()));
         }
+        Some(number)
     }
 
     /// Once per frame: follow `cl_consoleSocket`, stream the console's new lines to

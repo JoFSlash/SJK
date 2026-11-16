@@ -207,11 +207,19 @@ pub(crate) fn consume_messages(
                 let own_whisper = chat.own_whisper_body(&event.kind, &text, event.sender);
                 let private = event.is_private;
                 if !blocked && let Some(console) = &mut console {
-                    console.push_chat_line(
+                    let number = console.push_chat_line(
                         sjk_client::chat_display_text(&text),
                         &text,
                         own_whisper.as_deref(),
                     );
+                    // A click on it translates another player's line
+                    // (`console_translate.rs`).
+                    if let Some(number) = number
+                        && own_whisper.is_none()
+                        && let Some(words) = chat.console_translation_text(&text, event.sender)
+                    {
+                        console.offer_translation(number, words);
+                    }
                 }
                 chat.receive_classified(
                     event.kind,

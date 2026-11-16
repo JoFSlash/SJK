@@ -14,7 +14,7 @@ use sjk_ui::{InputEvent, PointerButton, Rect, Vec2};
 use std::time::{Duration, Instant};
 
 /// A second press this soon and this close to the first is a double click.
-const DOUBLE_CLICK: Duration = Duration::from_millis(500);
+pub(super) const DOUBLE_CLICK: Duration = Duration::from_millis(500);
 const DOUBLE_CLICK_DISTANCE: f32 = 6.0;
 
 /// A position in scrollback: a line by its number, and a byte offset in the text the
@@ -66,6 +66,9 @@ pub(super) struct Selection {
     by_token: bool,
     /// The button came up; the gesture ends after the next frame.
     released: bool,
+    /// The gesture began with a plain press: no Shift, no double click. Released
+    /// with nothing selected, it is a click ([`Selection::clicked`]).
+    plain: bool,
     last_press: Option<(Instant, Vec2)>,
     prompt: Option<PromptPointer>,
     /// Latest pointer position while it remains over the window, even without a press.
@@ -82,6 +85,7 @@ impl Selection {
             held: false,
             by_token: false,
             released: false,
+            plain: false,
             last_press: None,
             prompt: None,
             hover: None,
@@ -113,6 +117,7 @@ impl Selection {
                 self.held = true;
                 self.by_token = double;
                 self.released = false;
+                self.plain = !double && !shift;
             }
             InputEvent::PointerMove(position) => {
                 self.hover = Some(position);
@@ -163,6 +168,17 @@ impl Selection {
             self.released = false;
             self.gesture = Gesture::Idle;
         }
+    }
+
+    /// Where a click on scrollback came up this frame: a plain press released with
+    /// nothing selected (a drag selects text instead).
+    pub(super) fn clicked(&self) -> Option<Vec2> {
+        (self.released
+            && self.plain
+            && self.gesture == Gesture::Output
+            && self.range.is_none_or(|(from, to)| from == to))
+        .then_some(self.hover)
+        .flatten()
     }
 
     pub(super) fn gesture(&self) -> Gesture {

@@ -3507,7 +3507,7 @@ translated on its own and nothing goes to the game server:
   (a short line the guess cannot tell is offered all the same). The translation shows
   under the message in the list.
 
-The translation shows under its line in the feed, dim, as `» (fr) Hi, are you coming
+The translation shows under its line in the feed, in a light grey, as `» (fr) Hi, are you coming
 to the duel?`, and in the console. Why there is none shows as a short local notice:
 the hub needs an update (a hub before translations), the hub has no translator, the
 day's 50 translations are used (until the time the hub gives), the hub's monthly
@@ -3526,8 +3526,22 @@ and `tr` say "encrypted whispers are not translated" rather than take an older l
 Their words never leave this PC, so they never reach the hub, its translator nor its
 cache (Sol's review of PR #410).
 
-The sender card has no Translate of its own, and the console has no click: its path is
-`tr` (or `tr <text>` with the line copied).
+The sender card has no Translate of its own.
+
+In the console ([console_translate.rs](../crates/sjk-viewer/src/console_translate.rs)),
+a click on a chat line another player sent (game chat of every kind, SJK and clan chat)
+translates it as a click in the feed does; a faint band shows under the pointer resting
+on such a line. The console keeps the plain words of its last 256 chat lines for this;
+the player's own lines, end-to-end encrypted whispers, holocron drops and the SJK team's
+lines are never offered. A drag still selects text and a double click a word: the click
+waits out the double-click time (500 ms) before it asks. The translation, `» (fr) ...`
+in white (the feed's dim grey was hard to read on the console's backdrop)
+(or why there is none, a `Translate:` line), shows right under the line clicked however
+much chat came since, and under the same line in the feed while the feed still holds
+it. The scrollback only grows at its end, so the translation is no scrollback line of
+its own: the console keeps its last 64 beside their lines' numbers and draws each as
+its line's next rows, which a selection or a copy leaves out. `tr` and `tr <text>`
+work as before, their translation at the end of the scrollback.
 
 - `cl_chatTranslate` (archived, default 1; Settings > Chat > Translate chat): 0 turns
   the click, `/tr`, `tr` and Translate off; a typed `/tr` then says so and is still not said.

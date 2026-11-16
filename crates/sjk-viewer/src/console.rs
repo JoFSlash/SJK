@@ -161,6 +161,8 @@ mod console_scripting;
 mod console_session;
 #[path = "console_tell.rs"]
 mod console_tell;
+#[path = "console_translate.rs"]
+mod console_translate;
 #[path = "console_view.rs"]
 mod console_view;
 #[path = "console_whisper_hover.rs"]
@@ -419,6 +421,8 @@ pub(crate) struct ViewerConsole {
     pending_chat: std::collections::VecDeque<(String, u16, u32)>,
     /// Sent whisper recipients paired with their eventual console echo.
     whisper_hover: console_whisper_hover::State,
+    /// Chat lines a click translates (`console_translate.rs`).
+    chat_translate: console_translate::State,
     /// The numbers of the scrollback lines that are chat, oldest first
     /// (`con_chatOnly` shows these alone; [`Self::push_chat_line`]).
     chat_lines: std::collections::VecDeque<u64>,

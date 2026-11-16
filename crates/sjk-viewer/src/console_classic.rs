@@ -401,6 +401,9 @@ struct Row {
     /// Line number ([`sjk_shell::Shell::lines_written`] counting).
     line: u64,
     span: Span,
+    /// The row is of what shows under the line, its translation
+    /// (`console_translate.rs`), not of the line's own text.
+    under: bool,
 }
 
 /// Retained storage and clocks of the classic view.
@@ -830,7 +833,23 @@ impl ViewerConsole {
                 continue;
             }
             let before = rows.len();
-            wrap(&entry.text, width, |span| rows.push(Row { line, span }));
+            wrap(&entry.text, width, |span| {
+                rows.push(Row {
+                    line,
+                    span,
+                    under: false,
+                });
+            });
+            // A translation shows right under its line.
+            if let Some(under) = self.chat_translate.under(line) {
+                wrap(under, width, |span| {
+                    rows.push(Row {
+                        line,
+                        span,
+                        under: true,
+                    });
+                });
+            }
             if line >= self.classic.lines_end {
                 added += rows.len() - before;
             }
@@ -898,6 +917,14 @@ impl ViewerConsole {
         let Some(newest) = total.checked_sub(1 + self.scroll_offset) else {
             return;
         };
+        // The chat line under the pointer that a click translates
+        // (`console_translate.rs`).
+        let translates = self.open && self.translate_clicks_on();
+        let translate_hover = hover_target
+            .filter(|_| translates)
+            .and_then(|(_, position)| {
+                self.translate_line_at(position, rows_bottom, grid.pitch, newest)
+            });
         // Rows above the screen are only walked to resolve a pointer over them.
         let needed = target.map_or(0, |(row, _)| row.max(0) as usize);
         for (index, slot) in (0..=newest).rev().enumerate() {
@@ -905,10 +932,35 @@ impl ViewerConsole {
             if !visible && index > needed {
                 break;
             }
-            let Row { line, span } = self.classic.rows[slot];
+            let Row { line, span, under } = self.classic.rows[slot];
             let Some(entry) = self.shell.line(line) else {
                 continue;
             };
+            if under {
+                // A translation's row: drawn, never selected; a pointer on it
+                // stands for the end of its line.
+                let after = Mark {
+                    line,
+                    byte: entry.text.len(),
+                };
+                if index == 0 {
+                    bottom_end = Some(after);
+                }
+                top_start = Some(after);
+                if visible && let Some(words) = self.chat_translate.under(line) {
+                    let color = span
+                        .colour
+                        .map_or_else(|| ink.line(entry), |code| ink.palette.colour(code));
+                    painter.coloured(frame, &words[span.start..span.end], text_column, y, color);
+                }
+                if let Some((row, _)) = target
+                    && row == index as isize
+                {
+                    resolved = Some((after, (after, after)));
+                }
+                y -= grid.pitch;
+                continue;
+            }
             let text = &entry.text[span.start..span.end];
             let begin = Mark {
                 line,
@@ -943,6 +995,17 @@ impl ViewerConsole {
                         color: ink.highlight,
                     });
                 }
+            }
+            if visible && translate_hover == Some(line) {
+                frame.quads.push(SolidQuad {
+                    rect: [
+                        grid.x(text_column),
+                        y,
+                        column_of(text, text.len()) as f32 * grid.width,
+                        grid.pitch,
+                    ],
+                    color: [1.0, 1.0, 1.0, 0.05],
+                });
             }
             if visible {
                 if stamps {
@@ -995,9 +1058,34 @@ impl ViewerConsole {
                 None => self.selection.drag_output(at),
             }
         }
+        if translates
+            && let Some(position) = self.selection.clicked()
+            && position.y >= layout.rows_top
+            && let Some(line) = self.translate_line_at(position, rows_bottom, grid.pitch, newest)
+        {
+            self.chat_translate.clicked(line, std::time::Instant::now());
+        }
         if let Some((line, row_y, position)) = hovered_whisper {
             self.whisper_tooltip(frame, painter, layout, line, row_y, position);
         }
+    }
+
+    /// The chat line drawn at `position` that a click translates, the bottom row's
+    /// bottom at `rows_bottom` and the newest row on show `newest`.
+    fn translate_line_at(
+        &self,
+        position: Vec2,
+        rows_bottom: f32,
+        pitch: f32,
+        newest: usize,
+    ) -> Option<u64> {
+        let row = ((rows_bottom - position.y) / pitch).floor();
+        if row < 0.0 {
+            return None;
+        }
+        let slot = newest.checked_sub(row as usize)?;
+        let row = self.classic.rows.get(slot)?;
+        (!row.under && self.chat_translate.offered(row.line)).then_some(row.line)
     }
 
     fn whisper_tooltip(
@@ -1158,7 +1246,13 @@ impl ViewerConsole {
         // Newest lines first, each line's rows in reverse, until enough rows.
         for (line, entry) in (0..end).rev().zip(self.shell.lines().rev()) {
             let before = rows.len();
-            wrap(&entry.text, width, |span| rows.push(Row { line, span }));
+            wrap(&entry.text, width, |span| {
+                rows.push(Row {
+                    line,
+                    span,
+                    under: false,
+                });
+            });
             rows[before..].reverse();
             if rows.len() >= wanted {
                 break;
@@ -1168,7 +1262,7 @@ impl ViewerConsole {
         let now = self.shell.command_clock_millis();
         let left = options.notify_x.trunc() + grid.width;
         let mut y = 0.0;
-        for Row { line, span } in rows.iter().rev().copied() {
+        for Row { line, span, .. } in rows.iter().rev().copied() {
             let Some(entry) = self.shell.line(line) else {
                 continue;
             };
@@ -1250,6 +1344,46 @@ fn console_key(character: char) -> GlyphKey {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A translation asked by a click shows right under its line, however much chat
+    /// came after it (`console_translate.rs`).
+    #[test]
+    fn a_translation_shows_right_under_its_line() {
+        let directory = tempfile::tempdir().unwrap();
+        let mut console = ViewerConsole::new(directory.path().join("config.cfg")).unwrap();
+        let salut = console
+            .push_chat_line("Sol^7: salut".into(), "Sol^7\u{19}: salut", None)
+            .expect("printed");
+        console.offer_translation(salut, "salut".into());
+        for n in 0..5 {
+            console.push_chat_line(format!("Fox^7: gg {n}"), "Fox^7\u{19}: gg", None);
+        }
+        console.translation_asked(9, salut);
+        assert_eq!(
+            console.translation_answered(8, "^9\u{bb} (de) other".into()),
+            Some("^7\u{bb} (de) other".to_owned()),
+            "an ask of `tr` goes at the end"
+        );
+        assert_eq!(
+            console.translation_answered(9, "^9\u{bb} (fr) hi".into()),
+            None
+        );
+        console.classic_rows(80, false);
+        let rows: Vec<(u64, bool)> = console
+            .classic
+            .rows
+            .iter()
+            .map(|row| (row.line, row.under))
+            .collect();
+        let at = rows.iter().position(|row| *row == (salut, false)).unwrap();
+        assert_eq!(rows[at + 1], (salut, true));
+        assert_eq!(rows.iter().filter(|row| row.1).count(), 1);
+        assert_eq!(
+            console.shell.lines_written(),
+            salut + 6,
+            "no line of its own"
+        );
+    }
 
     /// `con_chatOnly` (05/11/2026): the rows hold the chat lines alone, and all of them
     /// come back with it off.

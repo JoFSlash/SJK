@@ -395,11 +395,27 @@ pub(crate) fn worth_a_sound<'a>(
 /// muted sender stays out of the console just as they stay out of the visible feed.
 /// The console cannot draw the feed's emblem, tick, emoji or exact gold, so its
 /// plain-text substitute starts with a yellow `SJK` tag.
+#[cfg(test)]
 pub(crate) fn console_lines<'a>(
     messages: impl IntoIterator<Item = &'a ChatMessage>,
     after: u64,
     muted: impl Fn(&str) -> bool,
 ) -> Vec<String> {
+    console_entries(messages, after, muted, None)
+        .into_iter()
+        .map(|(line, _)| line)
+        .collect()
+}
+
+/// [`console_lines`], each with the plain words a click in the console may translate
+/// (`console_translate.rs`): none for the player's own message (`own_key`), a
+/// holocron drop or the SJK team's line.
+pub(crate) fn console_entries<'a>(
+    messages: impl IntoIterator<Item = &'a ChatMessage>,
+    after: u64,
+    muted: impl Fn(&str) -> bool,
+    own_key: Option<&str>,
+) -> Vec<(String, Option<String>)> {
     messages
         .into_iter()
         .filter(|message| message.id > after && !muted(&message.key_id))
@@ -411,11 +427,17 @@ pub(crate) fn console_lines<'a>(
                 sjk_identity::HubChannel::Sith => "^1S",
                 _ => "^3SJK",
             };
-            Some(if shown.name.is_empty() {
+            let line = if shown.name.is_empty() {
                 format!("* {tag}^7: {}", shown.text)
             } else {
                 format!("* {tag}^7 {}^7: {}", shown.name, shown.text)
-            })
+            };
+            let words = (own_key != Some(message.key_id.as_str())
+                && crate::holocrons::line::words(message).is_none()
+                && crate::official::words::game_words(message).is_none())
+            .then(|| super::translate::plain(&crate::sjk_chat_look::message_text(&message.text)))
+            .filter(|words| !words.is_empty());
+            Some((line, words))
         })
         .collect()
 }
@@ -734,6 +756,22 @@ mod tests {
             ]
         );
         assert!(console_lines(&messages, 4, |_| false).is_empty());
+        // A click in the console translates others' messages, not the player's own
+        // nor a holocron drop (`console_translate.rs`).
+        let own = messages[2].key_id.clone();
+        let words: Vec<_> = console_entries(&messages, 0, |_| false, Some(&own))
+            .into_iter()
+            .map(|(_, words)| words)
+            .collect();
+        assert_eq!(
+            words,
+            [
+                Some("hi there".to_owned()),
+                None,
+                None,
+                Some("hi there".to_owned())
+            ]
+        );
     }
 
     #[test]

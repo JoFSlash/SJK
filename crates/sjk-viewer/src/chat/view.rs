@@ -281,7 +281,12 @@ impl ChatOverlay {
                         font,
                         Rect::new(x, y + row as f32 * g.row, g.width, row_box(g)),
                         g.font,
-                        Color::new(0.982, 0.987, 0.996, alpha),
+                        if super::translate::is_translation(line) {
+                            let [r, g, b] = super::translate::FEED_GREY;
+                            Color::new(r, g, b, alpha)
+                        } else {
+                            Color::new(0.982, 0.987, 0.996, alpha)
+                        },
                     );
                 }
                 if follow_links && !line.muted {

@@ -61,6 +61,9 @@ impl ViewerConsole {
                 _ => {}
             }
         } else {
+            if matches!(event, InputEvent::PointerPress { .. }) {
+                self.chat_translate.pressed();
+            }
             self.selection.pointer(event, self.shift);
         }
     }
