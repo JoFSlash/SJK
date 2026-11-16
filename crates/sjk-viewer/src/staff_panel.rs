@@ -141,6 +141,14 @@ const GIFTS_TAB_TOKEN: u16 = 9_007;
 const GIFTS_REFRESH_TOKEN: u16 = 9_008;
 const GIFT_UNDO_BASE: u16 = 9_010;
 const GIFT_ROWS_SHOWN: usize = 16;
+/// The Toys tab (how long players have their look toys out), its Refresh, a page of toys
+/// back and on, and a toy, one token per toy listed, which shows its top players.
+const TOYS_TAB_TOKEN: u16 = 9_030;
+const TOYS_REFRESH_TOKEN: u16 = 9_031;
+const TOYS_PREV_TOKEN: u16 = 9_032;
+const TOYS_NEXT_TOKEN: u16 = 9_033;
+const TOY_ROW_BASE: u16 = 9_040;
+const TOY_ROWS_SHOWN: usize = 14;
 /// Longest shader filter.
 const FILTER_MAX: usize = 32;
 /// Longest amount of credits or shards, in digits.
@@ -253,6 +261,7 @@ pub(crate) enum ShotTab {
     Achievements,
     ChatBans,
     Gifts,
+    Toys,
 }
 
 /// What the page knows this frame.
@@ -285,6 +294,9 @@ enum View {
     ChatBans,
     /// The staff member's own gifts of the last day, with Undo.
     Gifts,
+    /// How long players have their look toys out, of every player, and the chosen
+    /// toy's top players.
+    Toys,
 }
 
 /// A merge waiting for its confirmation: who is kept and who goes.
@@ -383,6 +395,10 @@ struct Shown {
     /// The chat bans listed with Lift, by the banned player's key (empty: the ban holds
     /// only an address, which Lift cannot name).
     ban_rows: Vec<String>,
+    /// The toys listed on the page shown, by their look toy id, and how many the hub
+    /// listed.
+    toy_rows: Vec<String>,
+    toys_listed: usize,
 }
 
 pub(crate) struct Panel {
@@ -420,6 +436,11 @@ pub(crate) struct Panel {
     pending_merge: Option<PendingMerge>,
     /// The crash group whose reports the Crashes view lists, or none for the groups.
     crash_group: Option<String>,
+    /// The toy whose top players the Toys tab shows, by its look toy id; none for the
+    /// first listed.
+    toy_chosen: Option<String>,
+    /// The Toys tab's page of toys, from 0.
+    toy_page: usize,
     /// Where the list of players looks.
     scope: Scope,
     /// The page of players shown, from 0.
@@ -480,6 +501,8 @@ impl Panel {
             picking: false,
             pending_merge: None,
             crash_group: None,
+            toy_chosen: None,
+            toy_page: 0,
             scope: Scope::Everyone,
             player_page: 0,
             unlock_filter: String::new(),
@@ -748,6 +771,26 @@ impl Panel {
             CHAT_BANS_TAB_TOKEN | CHAT_BANS_REFRESH_TOKEN => {
                 self.view = View::ChatBans;
                 PanelAction::Queries(vec![StaffQuery::ChatBans, StaffQuery::Translation])
+            }
+            // The Toys tab reads the toy counts as it opens, like the Chat tab.
+            TOYS_TAB_TOKEN | TOYS_REFRESH_TOKEN => {
+                self.view = View::Toys;
+                PanelAction::Query(StaffQuery::Toys)
+            }
+            TOYS_PREV_TOKEN => {
+                self.toy_page = self.toy_page.saturating_sub(1);
+                PanelAction::None
+            }
+            TOYS_NEXT_TOKEN => {
+                let pages = self.shown.toys_listed.div_ceil(TOY_ROWS_SHOWN).max(1);
+                self.toy_page = (self.toy_page + 1).min(pages - 1);
+                PanelAction::None
+            }
+            token if (TOY_ROW_BASE..TOY_ROW_BASE + TOY_ROWS_SHOWN as u16).contains(&token) => {
+                if let Some(toy) = self.shown.toy_rows.get(usize::from(token - TOY_ROW_BASE)) {
+                    self.toy_chosen = Some(toy.clone());
+                }
+                PanelAction::None
             }
             token if (BAN_LIFT_BASE..BAN_LIFT_BASE + BAN_ROWS_SHOWN as u16).contains(&token) => {
                 match self.shown.ban_rows.get(usize::from(token - BAN_LIFT_BASE)) {
@@ -1111,6 +1154,7 @@ impl Panel {
             ShotTab::Achievements => View::Achievements,
             ShotTab::ChatBans => View::ChatBans,
             ShotTab::Gifts => View::Gifts,
+            ShotTab::Toys => View::Toys,
         };
         if tab == ShotTab::Economy {
             self.amount = "50".to_owned();
@@ -2155,6 +2199,64 @@ mod tests {
             })
         );
         assert_eq!(panel.activate(BAN_LIFT_BASE + 1), PanelAction::None);
+    }
+
+    #[test]
+    fn toys_are_read_as_the_tab_opens_and_a_toy_chosen_shows_its_players() {
+        let (mut panel, me, _) = drawn(Vec::new());
+        assert_eq!(
+            panel.activate(TOYS_TAB_TOKEN),
+            PanelAction::Query(StaffQuery::Toys)
+        );
+        assert_eq!(
+            panel.activate(TOYS_REFRESH_TOKEN),
+            PanelAction::Query(StaffQuery::Toys)
+        );
+        let fonts = crate::text::load_modern(1.0, None).expect("Inter");
+        let build = |panel: &mut Panel, staff: &StaffState| {
+            panel.build(
+                &Inputs {
+                    me: Some(&me),
+                    staff,
+                    server: None,
+                },
+                &fonts.font,
+                [1920.0, 1080.0],
+            );
+        };
+        // A hub from before the toy counts: no row, nothing to choose.
+        build(
+            &mut panel,
+            &StaffState {
+                toys_missing: true,
+                ..StaffState::default()
+            },
+        );
+        assert!(!panel.order.contains(&TOY_ROW_BASE));
+        let toy = |id: &str| sjk_identity::ToyUse {
+            toy: id.to_owned(),
+            ..Default::default()
+        };
+        // Twenty toys: a page of 14, then the other 6.
+        let mut toys: Vec<_> = (0..20).map(|index| toy(&format!("toy_{index}"))).collect();
+        toys[0] = toy(crate::fishing::TOY);
+        toys[1] = toy(crate::mining::TOY);
+        let staff = StaffState {
+            toys: Some(sjk_identity::ToyStats { people: 9, toys }),
+            ..StaffState::default()
+        };
+        build(&mut panel, &staff);
+        assert_eq!(panel.shown.toy_rows.len(), TOY_ROWS_SHOWN);
+        assert!(panel.order.contains(&TOYS_NEXT_TOKEN));
+        assert!(!panel.order.contains(&TOYS_PREV_TOKEN));
+        assert_eq!(panel.activate(TOY_ROW_BASE + 1), PanelAction::None);
+        assert_eq!(panel.toy_chosen.as_deref(), Some(crate::mining::TOY));
+        let _ = panel.activate(TOYS_NEXT_TOKEN);
+        build(&mut panel, &staff);
+        assert_eq!(panel.shown.toy_rows.len(), 6);
+        assert_eq!(panel.shown.toy_rows[0], "toy_14");
+        let _ = panel.activate(TOYS_NEXT_TOKEN);
+        assert_eq!(panel.toy_page, 1, "no page past the last");
     }
 
     #[test]

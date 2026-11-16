@@ -1286,6 +1286,16 @@ impl Held {
     }
 }
 
+/// Whether `error` is a hub's answer for a route it does not have (404 or 405, with its
+/// router's bare status or a JSON refusal), as a hub from before a request answers.
+fn no_route(error: &HubError) -> bool {
+    match error {
+        HubError::Rejected { status, .. } => matches!(status, 404 | 405),
+        HubError::Protocol(why) => why.starts_with("status 404") || why.starts_with("status 405"),
+        _ => false,
+    }
+}
+
 /// What the player is told of a report or a note: what the hub stored it as, or why
 /// it did not.
 /// A hub from before pictures has no `/v1/avatar`: say so in words rather than as the
@@ -2995,6 +3005,14 @@ impl Worker {
             Ok(answer) => {
                 staff.failed = false;
                 staff.answered(query, answer);
+            }
+            // A hub from before the toy counts (12/11/2026) has no route for them: the
+            // Toys tab says it needs a newer hub, and nothing failed.
+            Err(error) if *query == StaffQuery::Toys && no_route(&error) => {
+                staff.failed = false;
+                staff.toys = None;
+                staff.toys_missing = true;
+                staff.message = "Toy counts need a newer SJK hub".to_owned();
             }
             Err(HubError::Rejected {
                 status: 404, code, ..
@@ -6322,6 +6340,8 @@ mod tests {
                     ..LogRequestRow::default()
                 })),
                 StaffQuery::Crash(_) => return Err(refused(404, "not_found")),
+                // A hub from before the toy counts: its router's bare 404.
+                StaffQuery::Toys => return Err(HubError::Protocol("status 404".to_owned())),
                 StaffQuery::Gifts => StaffAnswer::Gifts(crate::staff::GiftLog {
                     gifts: vec![crate::staff::GiftRow {
                         id: 77,
@@ -7149,6 +7169,14 @@ mod tests {
         worker.handle(Command::StaffQuery(StaffQuery::Crash(1)), t0);
         assert!(staff.lock().unwrap().failed);
         assert_eq!(staff.lock().unwrap().message, "The hub no longer has it");
+        // A hub without toy counts: the Toys tab says so, and nothing failed.
+        worker.handle(Command::StaffQuery(StaffQuery::Toys), t0);
+        assert!(!staff.lock().unwrap().failed);
+        assert!(staff.lock().unwrap().toys_missing);
+        assert_eq!(
+            staff.lock().unwrap().message,
+            "Toy counts need a newer SJK hub"
+        );
         // A plain key is refused here, before the hub hears it.
         lock(&snapshot).me.as_mut().unwrap().staff = false;
         let before = fake.log().len();

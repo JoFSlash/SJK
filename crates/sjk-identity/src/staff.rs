@@ -397,6 +397,9 @@ pub enum StaffQuery {
     Gifts,
     /// How SJK chat translation is used (since 11/11/2026).
     Translation,
+    /// How long players have their look toys out (since 12/11/2026). A hub from before
+    /// answers 404: [`StaffState::toys_missing`].
+    Toys,
 }
 
 /// What the hub answered a [`StaffQuery`].
@@ -418,6 +421,8 @@ pub enum StaffAnswer {
     Gifts(GiftLog),
     /// How chat translation is used.
     Translation(TranslationStats),
+    /// How the look toys are used.
+    Toys(ToyStats),
 }
 
 /// A chat ban in force, as the hub lists them to staff (`PROTOCOL.md`, "Chat bans",
@@ -526,6 +531,70 @@ pub struct TranslationStats {
     pub languages: Vec<TranslationLanguage>,
 }
 
+/// A count over this UTC day, the last 7 UTC days and the last 30 (`PROTOCOL.md` of the
+/// hub, "Toys").
+#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq)]
+pub struct ToyWindows {
+    /// This UTC day.
+    #[serde(default)]
+    pub day: u64,
+    /// The last 7 UTC days.
+    #[serde(default)]
+    pub week: u64,
+    /// The last 30 UTC days.
+    #[serde(default)]
+    pub month: u64,
+}
+
+/// One of the players who had a toy out longest over the last 30 days.
+#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq)]
+pub struct ToyPlayer {
+    /// Their key.
+    #[serde(default)]
+    pub key_id: String,
+    /// Their display name (Q3 colour codes kept), empty for a player since removed.
+    #[serde(default)]
+    pub name: String,
+    /// Seconds they had it out.
+    #[serde(default)]
+    pub secs: u64,
+    /// Times they took it out.
+    #[serde(default)]
+    pub uses: u64,
+}
+
+/// How one look toy is used.
+#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq)]
+pub struct ToyUse {
+    /// The look's toy id (`fishing`, `cardboard_box`), as the clients name it.
+    #[serde(default)]
+    pub toy: String,
+    /// Players who had it out.
+    #[serde(default)]
+    pub people: ToyWindows,
+    /// Seconds it was out, every player's together.
+    #[serde(default)]
+    pub secs: ToyWindows,
+    /// Times it was taken out over the last 30 days.
+    #[serde(default)]
+    pub uses: u64,
+    /// The 10 players who had it out longest over the last 30 days, longest first.
+    #[serde(default)]
+    pub top: Vec<ToyPlayer>,
+}
+
+/// `POST /v1/staff/toys`'s answer (since 12/11/2026): how long players have their look
+/// toys out.
+#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq)]
+pub struct ToyStats {
+    /// Players who had any toy out in the last 30 days.
+    #[serde(default)]
+    pub people: u64,
+    /// The toys, up to 40, the longest out first.
+    #[serde(default)]
+    pub toys: Vec<ToyUse>,
+}
+
 /// `POST /v1/staff/chat-bans`'s answer.
 #[derive(Deserialize)]
 pub(crate) struct ChatBanRows {
@@ -574,6 +643,10 @@ pub struct StaffState {
     pub chat_bans: Vec<ChatBanRow>,
     /// How chat translation is used, once read (`StaffQuery::Translation`).
     pub translation: Option<TranslationStats>,
+    /// How the look toys are used, once read (`StaffQuery::Toys`).
+    pub toys: Option<ToyStats>,
+    /// The hub has no toy counts (404, from before 12/11/2026): the Toys tab says so.
+    pub toys_missing: bool,
     /// The logs or crash report opened last, until the viewer takes it
     /// (`Service::take_opened`).
     pub opened: Option<OpenedText>,
@@ -703,6 +776,15 @@ impl StaffState {
                     count => format!("{count} players translated chat today"),
                 };
                 self.translation = Some(stats);
+                message
+            }
+            StaffAnswer::Toys(stats) => {
+                let message = match stats.people {
+                    1 => "1 player had a toy out in 30 days".to_owned(),
+                    count => format!("{count} players had a toy out in 30 days"),
+                };
+                self.toys = Some(stats);
+                self.toys_missing = false;
                 message
             }
         };

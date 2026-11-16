@@ -74,7 +74,7 @@ pub(crate) mod swatch;
 #[path = "collection_tags.rs"]
 mod tags;
 #[path = "collection_toys.rs"]
-mod toys;
+pub(crate) mod toys;
 #[path = "collection_view.rs"]
 mod view;
 

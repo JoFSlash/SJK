@@ -1806,6 +1806,7 @@ fn staff_query_call(query: &StaffQuery) -> (&'static str, Value) {
         StaffQuery::ChatBans => ("/v1/staff/chat-bans", json!({})),
         StaffQuery::Gifts => ("/v1/staff/gifts", json!({})),
         StaffQuery::Translation => ("/v1/staff/translation", json!({})),
+        StaffQuery::Toys => ("/v1/staff/toys", json!({})),
     }
 }
 
@@ -2002,6 +2003,7 @@ impl Hub for HttpHub {
             StaffQuery::Translation => {
                 StaffAnswer::Translation(parse::<crate::staff::TranslationStats>(answer)?)
             }
+            StaffQuery::Toys => StaffAnswer::Toys(parse::<crate::staff::ToyStats>(answer)?),
         })
     }
 
@@ -3369,6 +3371,35 @@ mod tests {
         let off: crate::staff::TranslationStats =
             parse(json!({"budget": null, "languages": []})).unwrap();
         assert_eq!(off.budget, None, "translation off");
+        // The toy counts, as the hub's PROTOCOL.md "Toys" sends them.
+        assert_eq!(
+            staff_query_call(&StaffQuery::Toys),
+            ("/v1/staff/toys", json!({}))
+        );
+        let toys: crate::staff::ToyStats = parse(json!({
+            "people": 12,
+            "toys": [{"toy": "fishing", "people": {"day": 3, "week": 8, "month": 11},
+                      "secs": {"day": 5_400, "week": 36_000, "month": 90_000}, "uses": 41,
+                      "top": [{"key_id": "0123456789abcdef", "name": "^1Fox",
+                               "secs": 12_000, "uses": 9},
+                              {"key_id": "fedcba9876543210", "name": "",
+                               "secs": 600, "uses": 1}]}]
+        }))
+        .unwrap();
+        assert_eq!(toys.people, 12);
+        assert_eq!(toys.toys[0].toy, "fishing");
+        assert_eq!(
+            (toys.toys[0].people.week, toys.toys[0].secs.month),
+            (8, 90_000)
+        );
+        assert_eq!(toys.toys[0].uses, 41);
+        assert_eq!(
+            (toys.toys[0].top[0].secs, toys.toys[0].top[0].uses),
+            (12_000, 9)
+        );
+        assert_eq!(toys.toys[0].top[1].name, "", "a removed player");
+        let none: crate::staff::ToyStats = parse(json!({"people": 0, "toys": []})).unwrap();
+        assert!(none.toys.is_empty());
     }
 
     #[test]

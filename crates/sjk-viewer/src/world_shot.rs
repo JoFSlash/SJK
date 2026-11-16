@@ -1756,6 +1756,73 @@ like this one.",
                     .collect(),
                 ..Default::default()
             }),
+            // How long players have their look toys out, the Toys tab.
+            toys: Some(sjk_identity::ToyStats {
+                people: 63,
+                toys: [
+                    (
+                        crate::fishing::TOY,
+                        [9, 31, 48],
+                        [21_600, 151_200, 412_000],
+                        214,
+                    ),
+                    (
+                        crate::mining::TOY,
+                        [7, 22, 40],
+                        [14_400, 98_000, 301_000],
+                        160,
+                    ),
+                    (
+                        crate::box_hunt::TOY,
+                        [5, 19, 33],
+                        [6_000, 52_000, 140_000],
+                        95,
+                    ),
+                    (
+                        crate::boombox::TOY,
+                        [4, 12, 25],
+                        [3_000, 21_000, 77_000],
+                        61,
+                    ),
+                    (
+                        crate::cardboard_box::TOY,
+                        [2, 9, 17],
+                        [900, 8_400, 23_000],
+                        48,
+                    ),
+                    (crate::order66::TOY, [3, 8, 15], [1_200, 7_000, 19_500], 22),
+                ]
+                .into_iter()
+                .map(|(toy, people, secs, uses)| sjk_identity::ToyUse {
+                    toy: toy.to_owned(),
+                    people: sjk_identity::ToyWindows {
+                        day: people[0],
+                        week: people[1],
+                        month: people[2],
+                    },
+                    secs: sjk_identity::ToyWindows {
+                        day: secs[0],
+                        week: secs[1],
+                        month: secs[2],
+                    },
+                    uses,
+                    top: [
+                        ("9a0c51e2b7d34f80", "^5Creyon", 52_000, 31),
+                        ("1f2e3d4c5b6a7980", "^3Lumaya", 31_000, 18),
+                        ("0b1c2d3e4f5a6b7c", "Padawan^1Fox", 12_600, 9),
+                        ("", "", 700, 1),
+                    ]
+                    .into_iter()
+                    .map(|(key_id, name, secs, uses)| sjk_identity::ToyPlayer {
+                        key_id: key_id.to_owned(),
+                        name: name.to_owned(),
+                        secs,
+                        uses,
+                    })
+                    .collect(),
+                })
+                .collect(),
+            }),
             gifts: Some(sjk_identity::GiftLog {
                 gifts: vec![
                     sjk_identity::GiftRow {
@@ -1837,6 +1904,11 @@ like this one.",
                 console.staff_tab(crate::console::staff_panel::ShotTab::ChatBans);
             }
             println!("{}", shoot(&mut gpu, 6, "duel6-staff-bans").display());
+            // How long players have their look toys out, fishing's top players beside.
+            if let Some(console) = gpu.console.as_mut() {
+                console.staff_tab(crate::console::staff_panel::ShotTab::Toys);
+            }
+            println!("{}", shoot(&mut gpu, 6, "duel6-staff-toys").display());
             // Another player, holding the Sun blade: Relock offered, Unlock not.
             if let Some(console) = gpu.console.as_mut() {
                 console.staff_choose("9a0c51e2b7d34f80");

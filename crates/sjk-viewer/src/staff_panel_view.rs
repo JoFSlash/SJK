@@ -23,6 +23,9 @@
 //!   Open; the SJK chat bans in force, each with Lift, and beside them how chat
 //!   translation is used (players translating, lines, the month's characters against the
 //!   hub's budget, the languages; counts only, no one named);
+//! - Toys, of every player: how long players have their look toys out (players today, in
+//!   7 and 30 days, time out in 7 and 30 days, uses), the longest out first, and the
+//!   chosen toy's 10 players who had it out longest;
 //! - My gifts: the staff member's own gifts of the last day, each with Undo, and how many
 //!   are left today.
 
@@ -116,6 +119,46 @@ fn cut(text: &str, chars: usize) -> String {
     }
     let kept: String = text.chars().take(chars.saturating_sub(3)).collect();
     format!("{kept}...")
+}
+
+/// The look toys the Collection's Toys tab has no row for, with their names on the Staff
+/// page's Toys tab: a look toy id ([`crate::looks::TOYS`]) that is a choice of the
+/// player's rather than a toy of its own.
+const OTHER_TOY_NAMES: [(&str, &str); 2] = [
+    (crate::toon_choice::TOY, "Toon model"),
+    (crate::hax::AWAY_TOY, "Hax, away"),
+];
+
+/// A look toy's name on the Toys tab: its Collection row's, a playstyle badge's, one of
+/// [`OTHER_TOY_NAMES`], or else its id as the hub sent it (a newer client's toy).
+fn toy_name(id: &str) -> String {
+    if let Some(name) = crate::console::collection_panel::toys::name_of(id) {
+        return name.to_owned();
+    }
+    if let Some(style) = crate::playstyle::Playstyle::ALL
+        .iter()
+        .find(|style| style.toy() == id)
+    {
+        return format!("Playstyle: {}", style.label());
+    }
+    OTHER_TOY_NAMES
+        .iter()
+        .find(|(toy, _)| *toy == id)
+        .map_or_else(|| id.to_owned(), |(_, name)| (*name).to_owned())
+}
+
+/// How long a toy was out, as players read it: "3 h 20 min", "12 min", "less than a
+/// minute", and whole hours only from 100 hours.
+fn time_out(secs: u64) -> String {
+    let minutes = secs / 60;
+    match (minutes / 60, minutes % 60) {
+        (0, 0) if secs == 0 => "none".to_owned(),
+        (0, 0) => "less than a minute".to_owned(),
+        (0, minutes) => format!("{minutes} min"),
+        (hours, _) if hours >= 100 => format!("{} h", crate::cards::grouped(hours)),
+        (hours, 0) => format!("{hours} h"),
+        (hours, minutes) => format!("{hours} h {minutes} min"),
+    }
 }
 
 /// Most players a search answers (the hub's `SEARCH_MAX`).
@@ -298,6 +341,7 @@ impl Panel {
         self.shown.crash_groups.clear();
         self.shown.crash_rows.clear();
         self.shown.ban_rows.clear();
+        self.shown.toy_rows.clear();
         if let Some(profile) = &target {
             self.shown
                 .linked
@@ -348,6 +392,7 @@ impl Panel {
                 View::Crashes => self.crashes(&frame, inputs.staff),
                 View::ChatBans => self.chat_bans(&frame, inputs.staff),
                 View::Gifts => self.gifts(&frame, inputs.staff),
+                View::Toys => self.toys(&frame, inputs.staff),
             }
         }
         if !self.shown.creator {
@@ -2047,6 +2092,254 @@ impl Panel {
         }
     }
 
+    /// The Toys tab: how long players have their look toys out (`POST /v1/staff/toys` of
+    /// the hub), the longest out first, a page of toys at a time, each a row to choose,
+    /// and the chosen toy's top players in the column beside them.
+    fn toys(&mut self, frame: &Frame, staff: &StaffState) {
+        const ROW: f32 = 34.0;
+        let s = frame.s;
+        let mut y = SECTION_TOP + 6.0;
+        kit::button(
+            &mut self.ui,
+            frame,
+            [MIDDLE_X + PANE_WIDTH - 140.0, y, 140.0, 38.0],
+            "Refresh",
+            false,
+            true,
+            self.focus == TOYS_REFRESH_TOKEN,
+            TOYS_REFRESH_TOKEN,
+        );
+        self.order.push(TOYS_REFRESH_TOKEN);
+        text(
+            &mut self.ui,
+            TextFamily::Display,
+            format_args!("Toys out, the longest first"),
+            frame.rect(MIDDLE_X, y + 4.0, PANE_WIDTH - 150.0, 30.0),
+            20.0 * s,
+            color::TEXT,
+            FontWeight::Semibold,
+            TextAlign::Start,
+        );
+        y += 50.0;
+        let Some(stats) = staff.toys.as_ref() else {
+            let line = if staff.toys_missing {
+                "Toy counts need a newer SJK hub."
+            } else {
+                "Reading them from the hub..."
+            };
+            self.right_line(frame, y, line, color::MUTED);
+            return;
+        };
+        let grouped = crate::cards::grouped;
+        self.shown.toys_listed = stats.toys.len();
+        let pages = stats.toys.len().div_ceil(TOY_ROWS_SHOWN).max(1);
+        self.toy_page = self.toy_page.min(pages - 1);
+        self.right_line(
+            frame,
+            y,
+            &match stats.people {
+                1 => "1 player had a toy out in the last 30 days.".to_owned(),
+                count => format!(
+                    "{} players had a toy out in the last 30 days.",
+                    grouped(count)
+                ),
+            },
+            color::MUTED,
+        );
+        y += 30.0;
+        if stats.toys.is_empty() {
+            self.right_line(frame, y, "No toy out in 30 days.", color::MUTED);
+            return;
+        }
+        // The columns: the toy, players today, in 7 and 30 days, time out in 7 and 30
+        // days, and uses in 30 days.
+        let columns: [(f32, f32, TextAlign); 5] = [
+            (MIDDLE_X + 12.0, 210.0, TextAlign::Start),
+            (MIDDLE_X + 226.0, 170.0, TextAlign::Start),
+            (MIDDLE_X + 400.0, 124.0, TextAlign::End),
+            (MIDDLE_X + 530.0, 124.0, TextAlign::End),
+            (MIDDLE_X + 660.0, 88.0, TextAlign::End),
+        ];
+        for ((x, width, align), head) in columns.iter().zip([
+            "Toy",
+            "Players: today, 7, 30 days",
+            "Out, 7 days",
+            "Out, 30 days",
+            "Uses, 30 days",
+        ]) {
+            text(
+                &mut self.ui,
+                TextFamily::Body,
+                format_args!("{head}"),
+                frame.rect(*x, y, *width, 20.0),
+                13.0 * s,
+                color::QUIET,
+                FontWeight::Regular,
+                *align,
+            );
+        }
+        y += 26.0;
+        let chosen = self
+            .toy_chosen
+            .as_deref()
+            .and_then(|id| stats.toys.iter().find(|toy| toy.toy == id))
+            .or(stats.toys.first());
+        let first = self.toy_page * TOY_ROWS_SHOWN;
+        for (row, toy) in stats
+            .toys
+            .iter()
+            .skip(first)
+            .take(TOY_ROWS_SHOWN)
+            .enumerate()
+        {
+            let token = TOY_ROW_BASE + row as u16;
+            let row_y = y + row as f32 * ROW;
+            let picked = chosen.is_some_and(|chosen| chosen.toy == toy.toy);
+            self.shown.toy_rows.push(toy.toy.clone());
+            kit::button(
+                &mut self.ui,
+                frame,
+                [MIDDLE_X, row_y - 2.0, PANE_WIDTH, ROW - 4.0],
+                "",
+                false,
+                true,
+                picked || self.focus == token,
+                token,
+            );
+            self.order.push(token);
+            let cells = [
+                cut(&toy_name(&toy.toy), 22),
+                format!(
+                    "{} / {} / {}",
+                    grouped(toy.people.day),
+                    grouped(toy.people.week),
+                    grouped(toy.people.month)
+                ),
+                time_out(toy.secs.week),
+                time_out(toy.secs.month),
+                grouped(toy.uses),
+            ];
+            for (column, ((x, width, align), cell)) in columns.iter().zip(cells).enumerate() {
+                text(
+                    &mut self.ui,
+                    if column == 0 {
+                        TextFamily::Display
+                    } else {
+                        TextFamily::Body
+                    },
+                    format_args!("{cell}"),
+                    frame.rect(*x, row_y + 3.0, *width, 22.0),
+                    if column == 0 { 16.0 } else { 15.0 } * s,
+                    if picked && column == 0 {
+                        color::GOLD_BRIGHT
+                    } else {
+                        color::TEXT
+                    },
+                    FontWeight::Regular,
+                    *align,
+                );
+            }
+        }
+        if pages > 1 {
+            let page_y = y + TOY_ROWS_SHOWN as f32 * ROW + 4.0;
+            for (token, label, x, enabled) in [
+                (TOYS_PREV_TOKEN, "<", MIDDLE_X, self.toy_page > 0),
+                (
+                    TOYS_NEXT_TOKEN,
+                    ">",
+                    MIDDLE_X + 132.0,
+                    self.toy_page + 1 < pages,
+                ),
+            ] {
+                kit::button(
+                    &mut self.ui,
+                    frame,
+                    [x, page_y, 44.0, 32.0],
+                    label,
+                    false,
+                    enabled,
+                    self.focus == token,
+                    token,
+                );
+                if enabled {
+                    self.order.push(token);
+                }
+            }
+            text(
+                &mut self.ui,
+                TextFamily::Body,
+                format_args!("{} / {pages}", self.toy_page + 1),
+                frame.rect(MIDDLE_X + 44.0, page_y + 6.0, 88.0, 20.0),
+                14.0 * s,
+                color::QUIET,
+                FontWeight::Regular,
+                TextAlign::Center,
+            );
+        }
+        if let Some(toy) = chosen {
+            self.toy_top(frame, toy);
+        }
+    }
+
+    /// The chosen toy's 10 players who had it out longest over 30 days, in the column
+    /// right of the toys: their name, how long and how many times.
+    fn toy_top(&mut self, frame: &Frame, toy: &sjk_identity::ToyUse) {
+        const X: f32 = MIDDLE_X + PANE_WIDTH + 44.0;
+        const WIDTH: f32 = RIGHT_X + RIGHT_WIDTH - X;
+        const ROW: f32 = 46.0;
+        let s = frame.s;
+        let mut y = SECTION_TOP + 10.0;
+        text(
+            &mut self.ui,
+            TextFamily::Display,
+            format_args!("{}", cut(&toy_name(&toy.toy), 24)),
+            frame.rect(X, y, WIDTH, 30.0),
+            20.0 * s,
+            color::TEXT,
+            FontWeight::Semibold,
+            TextAlign::Start,
+        );
+        y += 34.0;
+        self.column_line(frame, X, y, "Out longest, 30 days");
+        y += 34.0;
+        if toy.top.is_empty() {
+            self.column_line(frame, X, y, "No one named.");
+        }
+        for (row, player) in toy.top.iter().take(10).enumerate() {
+            let row_y = y + row as f32 * ROW;
+            let name = if player.name.is_empty() {
+                "(a removed player)".to_owned()
+            } else {
+                cut(&player.name, 22)
+            };
+            text(
+                &mut self.ui,
+                TextFamily::Display,
+                format_args!("{name}"),
+                frame.rect(X, row_y, WIDTH, 22.0),
+                16.0 * s,
+                color::TEXT,
+                FontWeight::Regular,
+                TextAlign::Start,
+            );
+            text(
+                &mut self.ui,
+                TextFamily::Body,
+                format_args!(
+                    "{}, {} use{}",
+                    time_out(player.secs),
+                    crate::cards::grouped(player.uses),
+                    if player.uses == 1 { "" } else { "s" }
+                ),
+                frame.rect(X, row_y + 21.0, WIDTH, 20.0),
+                14.0 * s,
+                color::QUIET,
+                FontWeight::Regular,
+                TextAlign::Start,
+            );
+        }
+    }
+
     /// One line of quiet text in a column at `x`, `y`.
     fn column_line(&mut self, frame: &Frame, x: f32, y: f32, line: &str) {
         text(
@@ -2097,11 +2390,12 @@ impl Panel {
             ),
             ("Keys", 66.0, View::Keys, KEYS_TAB_TOKEN),
             ("Logs", 66.0, View::Logs, LOGS_TAB_TOKEN),
-            ("Crashes", 96.0, View::Crashes, CRASHES_TAB_TOKEN),
-            ("Chat", 104.0, View::ChatBans, CHAT_BANS_TAB_TOKEN),
-            ("My gifts", 96.0, View::Gifts, GIFTS_TAB_TOKEN),
+            ("Crashes", 90.0, View::Crashes, CRASHES_TAB_TOKEN),
+            ("Chat", 66.0, View::ChatBans, CHAT_BANS_TAB_TOKEN),
+            ("Toys", 66.0, View::Toys, TOYS_TAB_TOKEN),
+            ("My gifts", 90.0, View::Gifts, GIFTS_TAB_TOKEN),
         ] {
-            // Crashes, Chat and My gifts are not the chosen player's: a gap sets
+            // Crashes, Chat, Toys and My gifts are not the chosen player's: a gap sets
             // them apart.
             if token == CRASHES_TAB_TOKEN {
                 x += 14.0;
@@ -3253,23 +3547,63 @@ mod tests {
                     .collect(),
                 ..Default::default()
             }),
+            toys: Some(sjk_identity::ToyStats {
+                people: u64::MAX,
+                toys: (0..40)
+                    .map(|index| sjk_identity::ToyUse {
+                        toy: if index == 0 {
+                            crate::box_hunt::TOY.to_owned()
+                        } else {
+                            "t".repeat(40)
+                        },
+                        people: sjk_identity::ToyWindows {
+                            day: u64::MAX,
+                            week: u64::MAX,
+                            month: u64::MAX,
+                        },
+                        secs: sjk_identity::ToyWindows {
+                            day: u64::MAX,
+                            week: u64::MAX,
+                            month: u64::MAX,
+                        },
+                        uses: u64::MAX,
+                        top: (0..10)
+                            .map(|_| sjk_identity::ToyPlayer {
+                                key_id: format!("{index:016x}"),
+                                name: long.clone(),
+                                secs: u64::MAX,
+                                uses: u64::MAX,
+                            })
+                            .collect(),
+                    })
+                    .collect(),
+            }),
             ..StaffState::default()
         };
-        for staff in [full, StaffState::default()].into_iter().flat_map(|staff| {
-            [
-                (staff.clone(), View::Overview, false),
-                (staff.clone(), View::Rewards, false),
-                (staff.clone(), View::Economy, false),
-                (staff.clone(), View::ChatBans, false),
-                (staff.clone(), View::Achievements, false),
-                (staff.clone(), View::Keys, false),
-                (staff.clone(), View::Keys, true),
-                (staff.clone(), View::Logs, false),
-                (staff.clone(), View::Crashes, false),
-                (staff.clone(), View::Gifts, false),
-                (staff, View::Crashes, true),
-            ]
-        }) {
+        let missing = StaffState {
+            toys_missing: true,
+            ..StaffState::default()
+        };
+        for staff in [full, StaffState::default()]
+            .into_iter()
+            .flat_map(|staff| {
+                [
+                    (staff.clone(), View::Overview, false),
+                    (staff.clone(), View::Rewards, false),
+                    (staff.clone(), View::Economy, false),
+                    (staff.clone(), View::ChatBans, false),
+                    (staff.clone(), View::Achievements, false),
+                    (staff.clone(), View::Keys, false),
+                    (staff.clone(), View::Keys, true),
+                    (staff.clone(), View::Logs, false),
+                    (staff.clone(), View::Crashes, false),
+                    (staff.clone(), View::Gifts, false),
+                    (staff.clone(), View::Toys, false),
+                    (staff, View::Crashes, true),
+                ]
+            })
+            .chain([(missing, View::Toys, false)])
+        {
             let (staff, right, pending) = staff;
             let mut panel = Panel::new();
             panel.open(true);

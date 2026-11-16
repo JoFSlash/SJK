@@ -410,6 +410,12 @@ const TOYS: [Toy; TOY_COUNT] = [
     },
 ];
 
+/// The name on the row of the toy whose look toy id (`PROTOCOL.md`, "Looks") is `id`, for
+/// the Staff page's toy counts: a toy's icon is named as its look toy id.
+pub(crate) fn name_of(id: &str) -> Option<&'static str> {
+    TOYS.iter().find(|toy| toy.icon == id).map(|toy| toy.name)
+}
+
 /// The Toy Master's achievements the player holds: the toys they found.
 pub(super) fn toy_master_found(
     standings: &[crate::achievements::Standing],
@@ -1260,6 +1266,27 @@ mod tests {
         ));
         assert_eq!(headline(), format!("{} toys", counts[3].total));
         assert_eq!(headline(), format!("{} toys", TOYS.len()));
+    }
+
+    /// The Staff page's toy counts name the look toys by their rows' names.
+    #[test]
+    fn a_look_toy_id_finds_its_name() {
+        for (id, name) in [
+            (crate::cardboard_box::TOY, "Cardboard box"),
+            (crate::order66::TOY, "Order 66"),
+            (crate::hax::TOY, "Hax"),
+            (crate::drone::TOY, "Drone"),
+            (crate::boombox::TOY, "Boombox"),
+            (crate::monitor::TOY, "Monitor"),
+            (crate::box_hunt::TOY, "Box hunt"),
+            (crate::banana::TOY, "Banana peel"),
+            (crate::fishing::TOY, "Fishing"),
+            (crate::mining::TOY, "Mining"),
+            (crate::quests::TOY, "Quests"),
+        ] {
+            assert_eq!(name_of(id), Some(name), "{id}");
+        }
+        assert_eq!(name_of("a_toy_from_later"), None);
     }
 
     /// Each toy's row, its switch and its card's keys and switch fit over the keys and

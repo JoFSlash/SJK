@@ -1441,7 +1441,7 @@ key ("Merged the other player into this one", "Unlinked the key: it starts afres
   another key into this player ([Players with several keys](#players-with-several-keys));
 - **Logs**: Request logs for the chosen player and the log requests with Open
   ([Log requests](#log-requests));
-- then three tabs set apart, about every player: **Crashes**, every player's crash
+- then the tabs set apart, about every player: **Crashes**, every player's crash
   reports by kind, then one kind's with Open; **Chat** (Chat bans before 11/11/2026), the
   SJK chat bans in force, newest first (`StaffQuery::ChatBans`, `POST
   /v1/staff/chat-bans`), each with who banned them, until when and whether their
@@ -1454,7 +1454,16 @@ key ("Merged the other player into this one", "Unlinked the key: it starts afres
   refusals (the daily cap, the month spent) and failures today, players who hit the
   daily cap in 30 days, the month's characters against the hub's budget ("off at the
   hub" without a translator) and the languages translated from over 30 days. Counts
-  only: the hub names no one; and, since
+  only: the hub names no one; since 12/11/2026, **Toys**, how long players have their
+  look toys out (`StaffQuery::Toys`, `POST /v1/staff/toys` with `{}`, read when the tab
+  opens or Refresh is pressed): how many players had any toy out in the last 30 days,
+  then the toys, up to 40, the longest out first, 14 to a page, each with its players
+  this UTC day, in the last 7 and 30 UTC days, how long it was out in 7 and 30 days
+  ("3 h 20 min") and how many times it was taken out in 30 days. A toy goes by its
+  Collection name, a playstyle's, or else its look toy id. A click on a toy shows its 10
+  players who had it out longest over 30 days beside the list, with how long and how
+  many times (the first toy's until one is chosen). A hub from before the toy counts
+  answers 404: the tab says they need a newer SJK hub and nothing fails; and, since
   08/11/2026, **My gifts**, the staff member's own gifts of the last day, newest first
   (`StaffQuery::Gifts`, `POST /v1/staff/gifts`): what (a medal and its rank, a shader by
   number and name, a holocron or crystal tier), to whom, when and the note, and how many
