@@ -118,7 +118,7 @@ const SELL_ROW: f32 = 42.0;
 /// The log book ([`crate::catch_book`]), in place of the toy's words: its head, a row
 /// of two cells, the head over the junk (or rubble), and the Share row.
 const BOOK_HEAD: f32 = 28.0;
-const BOOK_ROW: f32 = 24.0;
+const BOOK_ROW: f32 = 23.0;
 const BOOK_SUBHEAD: f32 = 22.0;
 const SHARE_ROW: f32 = 44.0;
 
