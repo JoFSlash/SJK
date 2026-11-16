@@ -30,7 +30,15 @@ The site (site/assets/site.js, parseChangelog) reads the release headings,
 introductions and recap lines too.
 Add each release's notes here when it is tagged (docs/sjk.md "Releases").
 -->
-## Unreleased
+## 2026.1117.1 (Alpha) | 17/11/2026
+
+A devmap cheat bar, quicker votes, console translation and a log book for Fishing and Mining.
+
+> Fishing and Mining: A Log book lists every fish, ore and junk you have caught, a rare catch gets its own card, and `fishing_brag` shows it off.
+> Votes: F1 votes YES and F2 votes NO, and once you have voted the card folds to one small row.
+> Translate in console: Click another player's chat line in the console to read it in English.
+> Devmap bar: With cheats on, hold Ctrl for a bar of cheat buttons; `devmap` also starts JoF maps now.
+> Status balloons: `cg_statusBalloons` picks stock, SJK animations or clan pictures for balloons and name tags.
 
 - Status balloons: `cg_statusBalloons` offers stock, SJK animations, static clan pictures or clan animations; name tags select clan art, with static pictures for non-SJK players _(Hormorn, PR #421)_
 - JoF maps: `devmap` and Create game start the maps in the JoF content folder too, instead of the local server stopping at once _(Slash, PR #423)_
