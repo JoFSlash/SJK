@@ -16,7 +16,13 @@ impl HudOverlay {
         self.speed.update(velocity, player.armor(), console);
         self.clock.update(console);
         self.lagometer_readout.add_speed(velocity);
-        self.update_votes(session.game_state(), player.team(), time_ms as i32, console);
+        self.update_votes(
+            session.game_state(),
+            player.team(),
+            time_ms as i32,
+            console,
+            Some(session.sent_commands()),
+        );
         let values = legacy_predicted_hud_data(player, predicted);
         self.update_values(player, values, time_ms)
     }
@@ -34,7 +40,7 @@ impl HudOverlay {
         console: Option<&ViewerConsole>,
     ) {
         self.guides.update(player, None, console);
-        self.update_votes(game_state, player.team(), time_ms as i32, console);
+        self.update_votes(game_state, player.team(), time_ms as i32, console, None);
         self.speed
             .update(player.velocity(), player.armor(), console);
         self.clock.update(console);

@@ -84,7 +84,7 @@ pub const TABLE: &[AdminEntry] = &[
     bit("amweather", 29, None, Players),
     always("amlogout", 30, Some(C::Logout)),
     always("amtelemark", 31, Some(C::TeleMark)),
-    always("ampoll", 32, None),
+    always("ampoll", 32, Some(C::Poll)),
     always("amseeGhost", 33, None),
     always("admCmdPrev", 34, None),
     always("admCmdNext", 35, None),

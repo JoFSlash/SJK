@@ -421,13 +421,14 @@ default masks leave the council without `amslap`, `ammindtrick`, `npc` and `amwe
 | `amlockteam <s\|f\|b\|r>` | yes | A team locked or unlocked (`jp_teamLock` bits 1 to 4, told to everyone): `team` then refuses it with JA+'s texts, an automatic choice takes the other team, and the duels never lock the spectators or the game |
 | `amforceteam <player\|-1> <team>` | yes | Moved to the team, past the locks |
 | `amkillvote` | yes | The vote running fails and nothing of it is carried out |
+| `ampoll <question>` | yes | Everyone votes YES or NO on the question for 30 seconds, as on a vote (`Poll: <question>` on the vote panel, nobody's vote counted at the start); it runs nothing when it passes ([`start_poll`](../crates/sjk-game-jka/src/vote.rs)). On a base game server with `sv_cheats` (a devmap), which has no admins, any player may use it, to try polls |
 | `amdenyvote <player>` | yes | No `callvote` ("You are not allowed to callVote"), or the right back |
 | `ammotd` | | Any player: the message of the day (`jp_motd`) centre printed for `jp_motdtime` seconds with the seconds left |
 | `amShowMotd <player\|-1>` | yes | The same for other players (abuse) |
 
 What the admin system leaves out, each waiting for a whole feature: `amghost`,
 `amempower`, `ammerc`, `ammindtrick`, `amForceAltDim`/`amUnForceAltDim` (the alternate
-dimension), `npc`, `amweather`, `ampoll`, `amvstr`, `amseeGhost`, the admin guns and
+dimension), `npc`, `amweather`, `amvstr`, `amseeGhost`, the admin guns and
 script (`gun*`, `admCmdEXE`, `admCmdPrev`/`Next`, `playerPrev`/`Next`), the rcon rank's
 own `freeze`, `size`, `jpclient`, `amfollow`, `amplayefx` and `amtest`, `say_team_mod`'s
 routes into `amsay`/`ampsay`, the login effect (`jp_admLoginEffect`), the flood

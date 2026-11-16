@@ -31,6 +31,15 @@ impl NativeGame {
             self.mod_command(client, command, text, &words, added, server_time);
             return;
         }
+        // A devmap runs the base game, without JA+'s admins: `ampoll` is any player's
+        // there, to try polls.
+        if command.eq_ignore_ascii_case(b"ampoll")
+            && self.settings.cheats
+            && self.admin_system().is_none()
+        {
+            self.development_poll(client, &words);
+            return;
+        }
         let mut words = words.into_iter();
         if [
             b"kill".as_slice(),

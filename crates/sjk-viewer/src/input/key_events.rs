@@ -26,6 +26,28 @@ impl GpuState {
         }
     }
 
+    /// F1 (`yes`) or F2 voted in the vote on the HUD ([`crate::hud::HudOverlay::take_vote_key`]).
+    fn vote_key(&mut self, yes: bool) -> bool {
+        if self.live_session.is_none() {
+            return false;
+        }
+        match self.hud.take_vote_key(yes) {
+            None => false,
+            Some(crate::hud::VoteKey::Preview) => true,
+            Some(crate::hud::VoteKey::Send(command)) => {
+                if let Some(session) = &mut self.live_session
+                    && let Err(error) = session.send_reliable_command_from(
+                        command.as_bytes(),
+                        sjk_client::ReliableCommandOrigin::Input,
+                    )
+                {
+                    eprintln!("failed to cast vote: {error}");
+                }
+                true
+            }
+        }
+    }
+
     /// A text field has the keyboard: the console, the chat composer or a menu,
     /// rather than the gameplay bindings.
     pub(crate) fn text_has_keyboard(&self) -> bool {
@@ -323,6 +345,14 @@ impl GpuState {
             {
                 console.repeat_bound_key(key);
             }
+            return;
+        }
+        // While a vote shows that the player has not voted in, F1 and F2 vote
+        // instead of running their binds (stock binds them to push and pull).
+        if event.state == ElementState::Pressed
+            && matches!(key, KeyCode::F1 | KeyCode::F2)
+            && self.vote_key(key == KeyCode::F1)
+        {
             return;
         }
         // Releases were handled before routing, including the ones swallowed by
