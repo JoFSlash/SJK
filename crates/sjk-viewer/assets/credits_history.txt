@@ -3682,6 +3682,20 @@
 - fed9acd |  | Hide duel opponents' bars and send nothing while duelling
 
 = Slash
++ 16/11/2026 | - | Collection: log book rows 23 px, so the Fishing card fits with the catch line
+- bf3487e |  | Collection: log book rows 23 px, so the Fishing card fits with the catch line
++ 16/11/2026 | SJK #425 | Fishing and Mining: log book, rare catch card, share in SJK chat
+- a15625b |  | Fishing and Mining: log book, rare catch card, share in SJK chat
++ 16/11/2026 | SJK #424 | Fishing and Mining: kyber finds, daily goals, catch market (adwe's idea)
+- b8dc56e |  | Fishing and Mining: kyber finds, daily goals and the catch market
+- 4543d52 |  | Debug panel: catch goals test names the hub's own --catch-quests switch
++ 16/11/2026 | SJK #422 | Console: click a chat line to translate it, the translation right under it
+- cea0352 |  | Console: click a chat line to translate it, the translation right under it
+- e0d4ddc |  | Translate: is_translation stays inside chat (private_interfaces)
+- 03f5328 |  | cargo fmt: saber_petals.rs and world_shot_saber_skins.rs (main fails the Formatting check)
++ 16/11/2026 | SJK #420 | Staff page: a Toys tab with the hub's toy-use counts
+- cbade36 |  | Staff page: a Toys tab with the hub's toy-use counts
+- 256295f |  | Staff Toys tab: no changelog line (staff tools stay quiet)
 + 16/11/2026 | SJK #427 | Devmap bar: cheat buttons over play, hold Ctrl to click
 - f124da7 |  | Devmap bar: cheat buttons over play, held key lends it the mouse
 - ba23951 |  | Changelog: PR number for the devmap bar
