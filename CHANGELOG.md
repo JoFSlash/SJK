@@ -32,6 +32,7 @@ Add each release's notes here when it is tagged (docs/sjk.md "Releases").
 -->
 ## Unreleased
 
+- Status balloons: `cg_statusBalloons` offers stock, SJK animations, static clan pictures or clan animations; name tags select clan art, with static pictures for non-SJK players _(Hormorn, PR #421)_
 - Chat translation in the console too: click another player's chat line in the console (game or SJK chat) to put it into English; the translation shows right under that line, however fast the chat goes _(Slash)_
 
 ## 2026.1113.1 (Alpha) | 13/11/2026
@@ -267,7 +268,6 @@ The WHEEL OF DOOM, a new Solfox, toon shading by choice, sculpted holocrons and 
 
 = r_toonModels reset: Toon models now shows the toon shading players chose for their own model; off, every model keeps stock shading.
 = cg_toonModel: Toon on my model: your model in toon shading for every SJK player; some models suit it, some don't. Also on the Character tab.
-= cg_statusBalloons: Status bubbles: the chat bubble over SJK players shows why it is up: dots while typing, a pause sign in a menu, a moon while alt-tabbed.
 - Toon shading is now each player's choice for their own model, since some models look better with it and some without: Toon shading on the Profile's Character tab (or Settings, `cg_toonModel`) shows your model toon to every SJK player. Toon models in Settings (`r_toonModels`), now on by default, shows those choices; off, everyone keeps stock shading _(Sol)_
 - JoF EJK players now wear the JoF EJK icon on their nameplate too, small after the name (after the tick for a player whose claim says EJK; alone for one found by their name) _(Sol)_
 - `help_tickrate` explains what players call the tick rate: the frames you draw, the commands you send and the snapshots the server sends back; how SJK sends commands on JoF and why, and how to keep even 8 ms steps there; then what your game uses right now _(Sol)_

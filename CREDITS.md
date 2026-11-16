@@ -1167,12 +1167,15 @@ ideas are under [Ideas](#ideas):
   Shaders tab's New count went behind "i" and "?" notes, the Nameplates preview behind
   Showcase current set, and a shader's extras behind an Extra features chip.
 
-Hormorn ([Hormorn](https://github.com/Hormorn)), contributor, has 1 pull request merged
+Hormorn ([Hormorn](https://github.com/Hormorn)), contributor, has 2 pull requests merged
 into SJK ([all of them](https://github.com/Sol-Vulpes/SJK/pulls?q=is%3Apr+author%3AHormorn)):
 
 - #401 Nameplate height (Settings > HUD, `cg_nameplateOffset`, -100 to 40 game units,
   default 0) moves every nameplate up or down from its point above the head; a plate that
   would overlap an ally's team logo jumps above the logo instead.
+- #421 status balloon modes (`cg_statusBalloons`, Settings > Chat, default 1 as before):
+  0 stock, 1 SJK's reason animations, 2 static clan pictures, 3 animated clan pictures;
+  Hormorn drew the JoF and {{S}} clan artwork, every other player wears the standard one.
 
 ## Art
 

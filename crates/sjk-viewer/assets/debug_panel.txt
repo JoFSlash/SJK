@@ -9799,6 +9799,17 @@ test: Status bubbles off on A: the stock bubble again. B with cl_consoleMove 1: 
 test: A third client joins while B is alt-tabbed: it sees the moon within a second or so.
 note: Untested in game. Others' reason shows about half a second after the stock bubble.
 
+[status-balloon-modes]
+area: Rendering & effects
+title: Status balloon mode: stock, SJK, clan static, clan animated (cg_statusBalloons 0-3)
+change: Settings > Chat > Status balloon mode. 1 (default) is SJK's reason animations as before.
+change: 2 and 3 draw JoF and {{S}} clan art by name tag (others: standard art), non-SJK players too.
+test: 0: every talking player shows the stock balloon. 1: SJK players show dots, pause, moon.
+test: 3: a JoF-tagged SJK player typing shows the JoF dots; a {{S}} player the {{S}} ones.
+test: 2: the same players show their clan's static picture; a non-SJK JoF player too.
+test: cg_clanEmblems 0 with mode 2 or 3: everyone wears the standard art. Tactical 1: stock.
+note: Hormorn's PR #421, tested in game by Hormorn (screenshots on the PR).
+
 [model-texture-pin]
 area: Rendering & effects
 title: No hitch when a player puts on a model with big textures (creyonwolf: 743 ms)

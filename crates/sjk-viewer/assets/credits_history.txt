@@ -9,6 +9,10 @@
 #                               made it when that is not the piece's owner.
 
 = Sol
++ 13/11/2026 | - | Release 2026.1113.1 (Alpha)
+- 4b468cd |  | Release 2026.1113.1 (Alpha)
++ 13/11/2026 | - | Game chat: a claim's client icon with its tick, the EJK icon alone for unclaimed chat readers
+- bf70f0e |  | Game chat: a claim's client icon with its tick, the EJK icon alone for unclaimed chat readers
 + 13/11/2026 | - | Status: staff merge keys deployed, panel too
 - 0caa59e |  | Status: staff merge keys deployed, panel too
 + 13/11/2026 | - | Staff page: every staff member merges keys; unlinking stays the creator's
@@ -3295,6 +3299,15 @@
 - 0874042 |  | Decode print and cp text as legacy bytes
 
 = Hormorn
++ 15/11/2026 | - | Update CHANGELOG.md
+- f141a5d |  | Update CHANGELOG.md
++ 15/11/2026 | - | Cargo fmt --all (fix)
+- 2262415 |  | cargo fmt --all (fix)
++ 15/11/2026 | - | Fix changelog review check for choice settings
+- df6af5d |  | Fix changelog review check for choice settings
++ 15/11/2026 | SJK #421 | Expand cg_statusBalloons into four display modes.
+- c749c5d |  | Expand cg_statusBalloons into four display modes: stock game behavior, original SJK animations, static clan artwork, and animated clan artwork.
+- 98d75ae |  | Fix status balloon CI checks
 + 11/11/2026 | SJK #401 | Add a height slider for nameplates
 - b75be13 |  | Add a height slider for nameplates
 - 41ae5df |  | Update CHANGELOG.md
