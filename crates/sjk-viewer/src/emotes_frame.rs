@@ -60,6 +60,7 @@ impl GpuState {
             }
             crate::emote_icons::service(vfs, &self.ui_shapes, &self.queue);
         }
+        emotes::lock().filters.sync(self.console.as_ref());
         crate::tag_icons::service(&self.ui_shapes, &self.queue);
         crate::quick_wheel::pictures::service(&self.ui_shapes, &self.queue);
         let Some(session) = self.live_session.as_ref() else {
@@ -114,9 +115,11 @@ impl GpuState {
             if !emotes::trusted(&emote, shown.as_deref()) {
                 continue;
             }
-            // Hidden here (`sjkemote mute`), or the player is blocked on this PC.
+            // Hidden here (`sjkemote mute`, the player's or the emote's filters), or
+            // the player is blocked on this PC.
             if state.muted.contains_key(&emote.key_id)
                 || self.muted_players.hides_fun(u16::from(emote.slot))
+                || state.filters.hides(emote.slot, own, &emote.emote)
             {
                 continue;
             }
@@ -213,6 +216,22 @@ impl GpuState {
     /// catalogue's sounds are loaded the first time it is seen.
     pub(crate) fn play_emote_sounds(&mut self, audio: &mut Option<crate::GameAudio>) {
         let mut state = emotes::lock();
+        // Hidden or muted since (`emote_filters.rs`), the player's own emote just
+        // started included, before its sound plays.
+        state.filters.sync(self.console.as_ref());
+        let own = match (&self.live_session, &self.demo_session) {
+            (Some(session), _) => Some(session.latest_snapshot().player.client_num()),
+            (None, Some(demo)) => Some(demo.latest_snapshot().player.client_num()),
+            (None, None) => None,
+        }
+        .and_then(|own| u8::try_from(own).ok());
+        let emotes::State {
+            catalogue,
+            active,
+            filters,
+            ..
+        } = &mut *state;
+        filters.apply(active, catalogue.as_deref(), own, Instant::now());
         let cues = state.active.take_cues();
         let Some(audio) = audio.as_mut() else {
             return;
@@ -234,12 +253,6 @@ impl GpuState {
             .demo_session
             .as_ref()
             .map_or(&self.live_world, crate::demo_playback::Session::world);
-        let own = match (&self.live_session, &self.demo_session) {
-            (Some(session), _) => Some(session.latest_snapshot().player.client_num()),
-            (None, Some(demo)) => Some(demo.latest_snapshot().player.client_num()),
-            (None, None) => None,
-        }
-        .and_then(|own| u8::try_from(own).ok());
         for cue in cues {
             match cue {
                 emotes::Cue::Start {

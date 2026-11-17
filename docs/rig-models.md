@@ -636,7 +636,10 @@ plays its glTF's animations on its own skeleton.
   Groark's idea, hub report #234) puts the emote channel's gain to 0 while the viewed
   player is in a private duel or the server plays Duel or Power Duel (the rule of
   `cg_duelStockBlades`, `duel_blades::in_duel`), so the emotes already playing fall
-  silent too and one still playing when the duel ends is heard again; Typing keeps emote (`cg_emoteTypingKeep`, on) keeps a typing
+  silent too and one still playing when the duel ends is heard again; Hide others'
+  emotes (`cg_hideOthersEmotes`, off), Hidden emotes (`cg_hiddenEmotes`) and Muted
+  emotes (`s_mutedEmotes`) hide other players' emotes, hide single emotes or play them
+  silent on this screen ([hub chat](hub-chat.md#emotes-in-the-client)); Typing keeps emote (`cg_emoteTypingKeep`, on) keeps a typing
   player's emote until they move after; alt-tabbing out always silences an emote's
   sound ([hub chat](hub-chat.md#emotes-in-the-client)).
 - The mixer has 128 voices (32 until 15/10/2026, as retail) and, when they are all

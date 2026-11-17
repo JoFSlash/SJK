@@ -1200,6 +1200,18 @@ The second gap is `s_muteSounds` ([client.md](client.md#muted-sounds)).
   players can be muted, as only they send emotes. `<player>` is a slot number, part of
   the name shown (a whole name wins when several match), or `target`, the player under
   the crosshair.
+- Emotes by kind, on this screen only (since 17/11/2026, mg.perso's idea;
+  [emote_filters.rs](../crates/sjk-viewer/src/emote_filters.rs), Settings > Sound >
+  Emotes, all off or empty by default; nothing is sent): Hide others' emotes
+  (`cg_hideOthersEmotes`) drops every other player's emote, its animation, sound and
+  console line, and ends the ones playing; the player's own still play, and the others
+  still see them. Hidden emotes (`cg_hiddenEmotes`, emote ids separated by spaces or
+  commas; `emote_hide <id>` adds one and again takes it out) does the same for those
+  emotes alone. Muted emotes (`s_mutedEmotes`, `emote_mute <id>`) plays those emotes
+  without their sound, the player's own too: the dance shows and its music keeps time
+  silently (`ActiveEmote::muted`, beside the away emote's `quiet`), so unmuting one
+  that plays brings its music back where it is. Both commands alone list their ids and
+  complete the installed ones on Tab.
 - `sjkemote sync [player]` (since 15/10/2026; the quick wheel's Sync emote) joins
   another player's emote in step: the named player (a slot number or part of the name
   shown), else the one under the crosshair, else the nearest emoting player within 512

@@ -5047,6 +5047,18 @@ test: Fire in third person, then zoomed in: the beam starts at the gun, not wher
 
 # ---- Audio ----
 
+[emote-hide-mute]
+area: Audio
+title: Hide others' emotes, hide or mute single emotes (Slash, mg.perso's idea)
+change: Settings > Sound > Emotes: Hide others' emotes (cg_hideOthersEmotes, off) hides theirs.
+change: Hidden emotes (cg_hiddenEmotes, emote_hide <id>): those ids are hidden when others play.
+change: Muted emotes (s_mutedEmotes, emote_mute <id>): those ids dance without sound, yours too.
+test: Two SJK players: with Hide others' emotes on, the other's dance and music do not play here.
+test: The same: your own emote still plays and the other player still sees it.
+test: emote_hide dance: their dance is hidden, their wave plays; emote_hide dance again shows it.
+test: emote_mute dance while one plays: silent at once; emote_mute dance again: music in place.
+test: emote_hide and emote_mute alone list the ids; Tab completes the installed ones.
+
 [female-voice-missing-model]
 area: Audio
 title: Female voice for a player whose model is missing (Slash, PR #418, hub #312)

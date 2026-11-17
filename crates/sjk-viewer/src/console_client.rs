@@ -247,6 +247,14 @@ pub(super) const COMMANDS: &[(&str, &str)] = &[
         crate::console::SJK_GIF_HELP,
     ),
     (crate::emotes::COMMAND, crate::emotes::HELP),
+    (
+        crate::emote_filters::HIDE_COMMAND,
+        crate::emote_filters::HIDE_HELP,
+    ),
+    (
+        crate::emote_filters::MUTE_COMMAND,
+        crate::emote_filters::MUTE_HELP,
+    ),
     (crate::boombox::TRACK_COMMAND, crate::boombox::HELP),
     (crate::propgun::PICK_COMMAND, crate::propgun::PICK_HELP),
     (
@@ -1270,6 +1278,9 @@ impl crate::GpuState {
                 self.sync_cursor_policy();
             }
             crate::emotes::COMMAND => return self.emote_command(args),
+            crate::emote_filters::HIDE_COMMAND | crate::emote_filters::MUTE_COMMAND => {
+                return self.emote_filter_command(&name, args);
+            }
             crate::boombox::TRACK_COMMAND => return self.boombox_command(args),
             crate::propgun::PICK_COMMAND => return self.propgun_command(args),
             crate::toy_switch_words::COMMAND => return Ok(crate::toy_switch_words::help_lines()),

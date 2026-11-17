@@ -685,6 +685,18 @@ const HELP: &[(&str, &str)] = &[
         "On: emotes go silent while you duel (private or Duel server), even ones playing; one still playing when the duel ends is heard again.",
     ),
     (
+        crate::emote_filters::OTHERS_CVAR,
+        "On: other players' emotes are not shown or heard on your screen. Yours still play, and the others still see them.",
+    ),
+    (
+        crate::emote_filters::HIDE_CVAR,
+        "Emote ids, such as dance wave: not shown when other players play them, on your screen only. Also emote_hide <id>.",
+    ),
+    (
+        crate::emote_filters::MUTE_CVAR,
+        "Emote ids, such as dance wave: they play without their sound on your screen, yours too. Also emote_mute <id>.",
+    ),
+    (
         crate::toy_sounds::VOLUME_CVAR,
         "Loudness of every toy's sounds: 1 as made, 2 twice as loud, 0 silent. Each toy can also be silenced below.",
     ),

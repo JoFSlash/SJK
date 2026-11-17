@@ -637,6 +637,24 @@ pub(super) fn register_daily_cvars(cvars: &mut CvarRegistry) -> Result<(), sjk_s
             "Emote sounds are silent while you are in a duel (SJK)",
         ),
         CvarDefinition::new(
+            crate::emote_filters::OTHERS_CVAR,
+            crate::emote_filters::DEFAULT_OTHERS,
+            archive,
+            "Other players' emotes are not shown or heard on your screen; yours still play (SJK)",
+        ),
+        CvarDefinition::new(
+            crate::emote_filters::HIDE_CVAR,
+            "",
+            archive,
+            "Emote ids not shown when other players play them, separated by spaces or commas (emote_hide <id>) (SJK)",
+        ),
+        CvarDefinition::new(
+            crate::emote_filters::MUTE_CVAR,
+            "",
+            archive,
+            "Emote ids played without their sound on your screen, yours too, separated by spaces or commas (emote_mute <id>) (SJK)",
+        ),
+        CvarDefinition::new(
             crate::toy_sounds::VOLUME_CVAR,
             crate::toy_sounds::DEFAULT_VOLUME,
             archive,

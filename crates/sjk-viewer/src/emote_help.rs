@@ -76,7 +76,7 @@ const PARAGRAPHS: [&str; 3] = [
      group (your emotes, Sync emote, Stop emote), then hold the wheel key (Q by default), \
      move towards one and let go.",
     "Others see your emotes with the SJK identity on (cl_identity 1). Moving ends most \
-     emotes. Their music: Settings > Sound > Emotes.",
+     emotes. Their music, and hiding or muting emotes: Settings > Sound > Emotes.",
 ];
 
 /// What the player chose on the card.

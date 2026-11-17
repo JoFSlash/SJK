@@ -148,6 +148,7 @@ mod devmap_bar;
 mod e2e_whisper_card;
 mod e2e_whispers;
 mod emote_end_debug;
+mod emote_filters;
 mod emote_help;
 mod emote_picker;
 mod emplaced_swivel;

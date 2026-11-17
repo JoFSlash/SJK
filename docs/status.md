@@ -1,3 +1,15 @@
+## Hide or mute emotes (17/11/2026)
+
+`feat/emote-mute`, based on `main` `afd16b60`, mg.perso's idea. Settings > Sound > Emotes:
+Hide others' emotes (`cg_hideOthersEmotes`, off by default) keeps other players' emotes
+off this screen, the player's own untouched; Hidden emotes (`cg_hiddenEmotes`,
+`emote_hide <id>`) hides single emotes others play; Muted emotes (`s_mutedEmotes`,
+`emote_mute <id>`) plays single emotes without their sound
+([hub-chat.md](hub-chat.md#emotes-in-the-client)). Client only, nothing sent to the hub.
+Verified on Windows 11: unit tests in `emote_filters.rs` (the own emote stays, the
+others' playing ones end, a muted emote's music never starts and comes back in place, an
+away emote back from away stays muted, the lists' parsing and toggling).
+
 ## Game chat: client icons and ticks (13/11/2026)
 
 13/11/2026, `personal/chat-client-icons` based on `main` `cdd73b774` (Sol: "I would like to

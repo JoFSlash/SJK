@@ -357,6 +357,21 @@ pub(super) const AUDIO: &[Setting] = &[
         kind: ValueKind::Bool,
     },
     Setting {
+        label: "Hide others' emotes",
+        cvar: crate::emote_filters::OTHERS_CVAR,
+        kind: ValueKind::Bool,
+    },
+    Setting {
+        label: "Hidden emotes",
+        cvar: crate::emote_filters::HIDE_CVAR,
+        kind: ValueKind::Text,
+    },
+    Setting {
+        label: "Muted emotes",
+        cvar: crate::emote_filters::MUTE_CVAR,
+        kind: ValueKind::Text,
+    },
+    Setting {
         label: "Attack ends emote",
         cvar: crate::emotes::ATTACK_STOP_CVAR,
         kind: ValueKind::Bool,

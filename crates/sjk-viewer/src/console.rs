@@ -198,6 +198,16 @@ const ARGUMENT_SOURCES: &[sjk_shell::ArgumentSource] = &[
         label: "Emote",
     },
     sjk_shell::ArgumentSource {
+        command: crate::emote_filters::HIDE_COMMAND,
+        list: crate::emote_filters::ARGUMENTS,
+        label: "Emote",
+    },
+    sjk_shell::ArgumentSource {
+        command: crate::emote_filters::MUTE_COMMAND,
+        list: crate::emote_filters::ARGUMENTS,
+        label: "Emote",
+    },
+    sjk_shell::ArgumentSource {
         command: "vid_restart",
         list: VID_RESTART_ARGUMENTS,
         label: "Option",
@@ -1319,6 +1329,9 @@ impl ViewerConsole {
         let lists = |list: &str| match list {
             sjk_shell::MAP_EXTENSION => resolver.map_names(),
             EMOTE_ARGUMENTS => crate::emotes::argument_words(self.script_vfs.as_deref()),
+            crate::emote_filters::ARGUMENTS => {
+                crate::emotes::installed_ids(self.script_vfs.as_deref())
+            }
             VID_RESTART_ARGUMENTS => vec![console_client::VID_RESTART_FORCE.to_owned()],
             extension => resolver.root_files(extension),
         };

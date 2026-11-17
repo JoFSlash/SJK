@@ -338,9 +338,20 @@ pub(crate) struct ActiveEmote {
     /// Silenced while its player is away ([`ActiveEmotes::set_quiet`]): its music
     /// keeps time without playing.
     pub(crate) quiet: bool,
+    /// Silenced on this screen alone because its id is muted here
+    /// ([`crate::emote_filters::MUTE_CVAR`], [`ActiveEmotes::set_muted`]): as `quiet`,
+    /// its music keeps time without playing.
+    pub(crate) muted: bool,
     /// Its player is typing ([`ActiveEmotes::hold`]): moving or attacking does not
     /// end it until they stop.
     pub(crate) held: bool,
+}
+
+impl ActiveEmote {
+    /// Whether its sound is held back: quiet (its player away) or muted here.
+    pub(crate) fn silent(&self) -> bool {
+        self.quiet || self.muted
+    }
 }
 
 /// An emote's music: its first sound, then the one that repeats after it (its loop,
@@ -484,6 +495,7 @@ impl ActiveEmotes {
             next_sound,
             leader: None,
             quiet: false,
+            muted: false,
             held: false,
         });
     }
@@ -541,6 +553,7 @@ impl ActiveEmotes {
             next_sound,
             leader: Some(leader),
             quiet: false,
+            muted: false,
             held: false,
         });
         true
@@ -583,6 +596,32 @@ impl ActiveEmotes {
         def: Option<&EmoteDef>,
         now: Instant,
     ) -> bool {
+        self.set_silence(slot, |active| &mut active.quiet, quiet, def, now)
+    }
+
+    /// Silence `slot`'s emote on this screen (`muted`: its id is muted here,
+    /// [`crate::emote_filters::MUTE_CVAR`]), or give it its sound again from where its
+    /// music is, unless it is also quiet; as [`Self::set_quiet`] otherwise.
+    pub(crate) fn set_muted(
+        &mut self,
+        slot: u8,
+        muted: bool,
+        def: Option<&EmoteDef>,
+        now: Instant,
+    ) -> bool {
+        self.set_silence(slot, |active| &mut active.muted, muted, def, now)
+    }
+
+    /// [`Self::set_quiet`] and [`Self::set_muted`]: set the `flag` to `on`; the sound
+    /// stops when the emote goes silent and comes back when neither flag holds.
+    fn set_silence(
+        &mut self,
+        slot: u8,
+        flag: fn(&mut ActiveEmote) -> &mut bool,
+        on: bool,
+        def: Option<&EmoteDef>,
+        now: Instant,
+    ) -> bool {
         let align = self.in_step_with(slot);
         let Some(active) = self
             .slots
@@ -591,11 +630,13 @@ impl ActiveEmotes {
         else {
             return false;
         };
-        if active.quiet == quiet {
+        if *flag(active) == on {
             return false;
         }
-        active.quiet = quiet;
-        if active.sound.is_empty() {
+        let was_silent = active.silent();
+        *flag(active) = on;
+        let quiet = active.silent();
+        if active.sound.is_empty() || quiet == was_silent {
             return true;
         }
         if quiet {
@@ -634,7 +675,7 @@ impl ActiveEmotes {
                 && self.follows(slot, other)
                 && self
                     .get(other)
-                    .is_some_and(|it| !it.quiet && !it.sound.is_empty())
+                    .is_some_and(|it| !it.silent() && !it.sound.is_empty())
         };
         if audible(root) {
             return Some(root);
@@ -710,10 +751,11 @@ impl ActiveEmotes {
             let Ok(slot) = u8::try_from(slot) else {
                 continue;
             };
+            let silent = active.silent();
             if let Some((at, sound, length)) = &mut active.next_sound
                 && now >= *at
             {
-                if !active.quiet {
+                if !silent {
                     self.cues.push(Cue::Start {
                         slot,
                         sound: sound.clone(),
@@ -753,7 +795,7 @@ impl ActiveEmotes {
                     }
                 }
             };
-            if gone && !active.sound.is_empty() && !active.quiet {
+            if gone && !active.sound.is_empty() && !active.silent() {
                 self.cues.push(Cue::Stop { slot });
             }
             if over || gone {
@@ -827,6 +869,8 @@ pub(crate) struct State {
     /// The players whose emotes this screen hides (`sjkemote mute`): key id to the
     /// name shown when muted.
     pub(crate) muted: std::collections::BTreeMap<String, String>,
+    /// Which emotes this screen hides or silences (`emote_filters.rs`), as last read.
+    pub(crate) filters: crate::emote_filters::Filters,
 }
 
 static STATE: std::sync::LazyLock<std::sync::Mutex<State>> =
@@ -888,6 +932,24 @@ pub(crate) fn argument_words(vfs: Option<&sjk_vfs::VirtualFileSystem>) -> Vec<St
     words(state.catalogue.as_deref().unwrap_or_default())
 }
 
+/// The installed emotes' ids, loading the catalogue when nothing has yet: what
+/// `emote_hide` and `emote_mute` complete to (`emote_filters.rs`).
+pub(crate) fn installed_ids(vfs: Option<&sjk_vfs::VirtualFileSystem>) -> Vec<String> {
+    let mut state = lock();
+    if state.catalogue.is_none()
+        && let Some(vfs) = vfs
+    {
+        state.catalogue = Some(load(vfs));
+    }
+    state
+        .catalogue
+        .as_deref()
+        .unwrap_or_default()
+        .iter()
+        .map(|def| def.id.clone())
+        .collect()
+}
+
 /// [`argument_words`] of `catalogue`.
 fn words(catalogue: &[EmoteDef]) -> Vec<String> {
     catalogue
@@ -923,6 +985,7 @@ pub(crate) fn listing(catalogue: &[EmoteDef]) -> Vec<String> {
             format!("{COMMAND} {STOP} ends yours; {STOP} {ALL} or {STOP} <player> ends others' here, once."),
             format!("{COMMAND} {SYNC} [player] joins another player's emote in step."),
             format!("{COMMAND} {MUTE} <player>, {UNMUTE} <player|{ALL}>: hide a player's emotes here ({MUTE} alone lists)."),
+            format!("{} <id> hides an emote others play, {} <id> silences one, here only.", crate::emote_filters::HIDE_COMMAND, crate::emote_filters::MUTE_COMMAND),
             format!("{} opens a window to search them and click one to play.", crate::emote_picker::COMMAND),
             format!("{} explains emotes and the quick wheel.", crate::emote_help::COMMAND),
         ])
@@ -1044,6 +1107,7 @@ mod tests {
                 "sjkemote stop ends yours; stop all or stop <player> ends others' here, once.",
                 "sjkemote sync [player] joins another player's emote in step.",
                 "sjkemote mute <player>, unmute <player|all>: hide a player's emotes here (mute alone lists).",
+                "emote_hide <id> hides an emote others play, emote_mute <id> silences one, here only.",
                 "emotes opens a window to search them and click one to play.",
                 "help_emotes explains emotes and the quick wheel."
             ]
