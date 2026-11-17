@@ -1323,6 +1323,11 @@ impl ViewerConsole {
         self.rebuild_prompt();
     }
 
+    /// The emote ids installed in the game data, as `emote_hide`/`emote_mute` complete.
+    pub(crate) fn installed_emote_ids(&self) -> Vec<String> {
+        crate::emotes::installed_ids(self.script_vfs.as_deref())
+    }
+
     fn complete_command(&mut self, key: CompletionKey) {
         let resolver =
             console_scripting::Resolver::new(&self.config_directory, self.script_vfs.as_deref());

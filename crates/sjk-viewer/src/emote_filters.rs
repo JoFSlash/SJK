@@ -31,8 +31,8 @@ pub(crate) const MUTE_CVAR: &str = "s_mutedEmotes";
 pub(crate) const HIDE_COMMAND: &str = "emote_hide";
 pub(crate) const MUTE_COMMAND: &str = "emote_mute";
 /// Help texts for completion and `cmdlist`.
-pub(crate) const HIDE_HELP: &str = "Hide an emote when other players play it, on your screen only: emote_hide <id> (again shows it); alone, list them";
-pub(crate) const MUTE_HELP: &str = "Play an emote without its sound on your screen: emote_mute <id> (again hears it); alone, list them";
+pub(crate) const HIDE_HELP: &str = "Hide an emote when other players play it, on your screen only: emote_hide <id> (again shows it); alone, list them and the installed ids";
+pub(crate) const MUTE_HELP: &str = "Play an emote without its sound on your screen: emote_mute <id> (again hears it); alone, list them and the installed ids";
 /// The list both commands' first argument completes from on Tab: the installed ids.
 pub(crate) const ARGUMENTS: &str = "emote_id";
 
@@ -169,11 +169,16 @@ impl crate::GpuState {
         let list = console.text_value(cvar).unwrap_or_default().to_owned();
         let Some(id) = args.first() else {
             let named: Vec<&str> = ids(&list).collect();
-            return Ok(vec![if named.is_empty() {
+            let mut lines = vec![if named.is_empty() {
                 format!("No emote is {verb} ({command} <id>)")
             } else {
                 format!("Emotes {verb}: {}", named.join(", "))
-            }]);
+            }];
+            let installed = console.installed_emote_ids();
+            if !installed.is_empty() {
+                lines.push(format!("Emote ids: {}", installed.join(", ")));
+            }
+            return Ok(lines);
         };
         let id = id.to_ascii_lowercase();
         if !crate::emotes::valid_id(&id) {
