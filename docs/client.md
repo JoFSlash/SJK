@@ -8423,11 +8423,15 @@ a plain command runs it again; a `+` command ignores the repeated press, as
 repeats once every other frame, 125 presses a second at 250 FPS and more above, each
 possibly a command to the server, which servers that cap commands (JoF's) see as a
 flood; SJK repeats 20 times a second at any frame rate, at most once a frame, on the
-console's clock. Only a press that went to the binds repeats, only while the pointer is
+console's clock. A second (hub report #317): EJK starts repeating on the next frame, so
+even a click runs the bind twice or more; SJK waits 250 ms first, as a held keyboard key
+waits for its system repeats, so a click runs its bind once and only a held button
+repeats. Only a press that went to the binds repeats, only while the pointer is
 the game's and no console, chat or menu has the keys; a release stops it wherever it
 went, and losing the window stops both. See
 [mouse_repeat.rs](../crates/sjk-viewer/src/input/mouse_repeat.rs) and its tests
-(`twenty_presses_a_second_at_any_frame_rate`, `the_setting_picks_the_buttons`).
+(`twenty_presses_a_second_at_any_frame_rate`, `a_click_does_not_repeat`,
+`the_setting_picks_the_buttons`).
 
 `+duck` is JoF EJK's crouch without a roll (`CG_NorollDown_f`). Its press lets go
 of jump and walks for one user command, then it crouches like `+movedown`, sharing

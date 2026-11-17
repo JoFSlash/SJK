@@ -1021,7 +1021,9 @@ area: Input
 title: Held mouse 4/5 repeats its bind, in_mouseRepeat (Kushina's idea)
 change: Settings > Controls > Hold mouse 4/5 repeats: Off, Mouse 4 and 5, Mouse 4 only.
 change: 20 presses a second at any frame rate (EJK: every other frame, a server flood).
+change: Repeats start after 250 ms held: a click runs the bind once (hub #317).
 test: bind mouse4 "echo hi", in_mouseRepeat 1, hold mouse 4 in game: 20 his a second.
+test: click mouse 4 quickly: one hi per click; hold it: the his start after a moment.
 test: in_mouseRepeat 2: mouse 5 no longer repeats; open the console: the repeat stops.
 test: bind mouse4 +attack and hold it: one swing chain, as a held key.
 

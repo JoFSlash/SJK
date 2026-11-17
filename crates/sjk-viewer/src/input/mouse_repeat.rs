@@ -13,6 +13,11 @@
 //! fixed [`RATE`] instead, the same at any frame rate: a press is due [`INTERVAL_MILLIS`]
 //! after the last, at most one a frame, so a slow frame never sends a burst.
 //!
+//! A second (hub report #317): EJK starts repeating on the next frame, so even a quick
+//! click runs its bind twice or more. SJK waits [`DELAY_MILLIS`] first, as a held
+//! keyboard key waits before its system repeats begin: a click, however slow, runs its
+//! bind once, and only a button held past the delay repeats.
+//!
 //! The console tracks the buttons pressed into the bind stream
 //! (`ViewerConsole::queue_bound_script`) and presses the due ones again once a frame,
 //! while the pointer is the game's and no text field, menu or console has the keyboard
@@ -25,6 +30,9 @@ pub(crate) const CVAR: &str = "in_mouseRepeat";
 pub(crate) const RATE: u64 = 20;
 /// Milliseconds from one repeated press to the next.
 pub(crate) const INTERVAL_MILLIS: u64 = 1_000 / RATE;
+/// Milliseconds a button is held before its first repeated press: longer than a click
+/// (one takes about 100 ms), Windows' shortest keyboard repeat delay.
+pub(crate) const DELAY_MILLIS: u64 = 250;
 /// The buttons that repeat, by their bind names.
 const KEYS: [&str; 2] = ["MOUSE4", "MOUSE5"];
 
@@ -46,11 +54,11 @@ pub(crate) struct MouseRepeat {
 }
 
 impl MouseRepeat {
-    /// Bind key `key` went down at `now`; a press of a button already held (a repeat)
-    /// keeps its schedule.
+    /// Bind key `key` went down at `now`: its first repeat is due [`DELAY_MILLIS`] later.
+    /// A press of a button already held (a repeat) keeps its schedule.
     pub(crate) fn press(&mut self, key: &str, now: u64) {
         if let Some(slot) = slot(key) {
-            self.due[slot].get_or_insert(now.saturating_add(INTERVAL_MILLIS));
+            self.due[slot].get_or_insert(now.saturating_add(DELAY_MILLIS));
         }
     }
 
@@ -90,14 +98,17 @@ impl MouseRepeat {
 mod tests {
     use super::*;
 
-    /// Presses of each button over `millis` ms of frames `frame` ms apart, held from 0.
+    /// Repeated presses of each button over `millis` ms of frames `frame` ms apart, from
+    /// the end of the delay of buttons held since 0.
     fn presses(mode: i64, frame: u64, millis: u64) -> [usize; 2] {
         let mut repeat = MouseRepeat::default();
         repeat.press("MOUSE4", 0);
         repeat.press("mouse5", 0);
         let mut counts = [0; 2];
-        let mut now = 0;
-        while now < millis {
+        // The frame before the first repeat is due.
+        let mut now = DELAY_MILLIS - 1;
+        assert_eq!(repeat.due(mode, now), [None, None]);
+        while now < DELAY_MILLIS - 1 + millis {
             now += frame;
             for (slot, key) in repeat.due(mode, now).into_iter().enumerate() {
                 counts[slot] += usize::from(key.is_some());
@@ -123,6 +134,32 @@ mod tests {
         assert_eq!(repeat.due(1, 1_050), [Some("MOUSE4"), None]);
     }
 
+    /// Hub report #317: a click (down and up within the delay) runs its bind once, at
+    /// any frame rate, where the first repeat used to come 50 ms after the press.
+    #[test]
+    fn a_click_does_not_repeat() {
+        for frame in [1, 3, 4, 7, 8, 16] {
+            for held in [50, 100, 150, 200, DELAY_MILLIS - 1] {
+                let mut repeat = MouseRepeat::default();
+                repeat.press("MOUSE4", 0);
+                repeat.press("MOUSE5", 0);
+                let mut now = 0;
+                while now < held {
+                    assert_eq!(repeat.due(1, now), [None, None], "{held} ms click");
+                    now += frame;
+                }
+                repeat.release("MOUSE4");
+                repeat.release("MOUSE5");
+                assert_eq!(repeat.due(1, 10_000), [None, None]);
+            }
+        }
+        // Held to the delay: the first repeat.
+        let mut repeat = MouseRepeat::default();
+        repeat.press("MOUSE4", 1_000);
+        assert_eq!(repeat.due(1, 1_000 + DELAY_MILLIS - 1), [None, None]);
+        assert_eq!(repeat.due(1, 1_000 + DELAY_MILLIS), [Some("MOUSE4"), None]);
+    }
+
     #[test]
     fn the_setting_picks_the_buttons() {
         assert_eq!(presses(0, 4, 1_000), [0, 0], "0: off");
@@ -143,10 +180,10 @@ mod tests {
         }
         assert_eq!(repeat.due(1, 1_000), [None, None]);
         repeat.press("MOUSE4", 0);
-        // A repeated press keeps the schedule: the first repeat is still at 50 ms.
-        repeat.press("MOUSE4", 40);
-        assert_eq!(repeat.due(1, 49), [None, None]);
-        assert_eq!(repeat.due(1, 50), [Some("MOUSE4"), None]);
+        // A repeated press keeps the schedule: the first repeat is still at 250 ms.
+        repeat.press("MOUSE4", 240);
+        assert_eq!(repeat.due(1, 249), [None, None]);
+        assert_eq!(repeat.due(1, 250), [Some("MOUSE4"), None]);
         repeat.release("mouse4");
         assert_eq!(repeat.due(1, 1_000), [None, None], "let go");
         repeat.press("MOUSE4", 0);
