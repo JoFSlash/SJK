@@ -32,7 +32,7 @@ Add each release's notes here when it is tagged (docs/sjk.md "Releases").
 -->
 ## Unreleased
 
-- `in_mouseRepeat`: a click on mouse 4 or 5 runs its bind once again; the repeats start only once the button is held for a quarter of a second, as a held key's do _(Slash, hub report #317, after JoF''kushina's report)_
+- `in_mouseRepeat`: a click on mouse 4 or 5 runs its bind once again; the repeats start only once the button is held for a quarter of a second, as a held key's do _(Slash, PR #434, hub report #317, after JoF''kushina's report)_
 
 ## 2026.1117.1 (Alpha) | 17/11/2026
 
