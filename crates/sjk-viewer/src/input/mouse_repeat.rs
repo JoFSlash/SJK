@@ -98,18 +98,23 @@ impl MouseRepeat {
 mod tests {
     use super::*;
 
-    /// Repeated presses of each button over `millis` ms of frames `frame` ms apart, from
-    /// the end of the delay of buttons held since 0.
+    /// Repeated presses of each button in the `millis` ms of frames `frame` ms apart
+    /// that follow the delay, held since 0.
     fn presses(mode: i64, frame: u64, millis: u64) -> [usize; 2] {
         let mut repeat = MouseRepeat::default();
         repeat.press("MOUSE4", 0);
         repeat.press("mouse5", 0);
         let mut counts = [0; 2];
-        // The frame before the first repeat is due.
-        let mut now = DELAY_MILLIS - 1;
-        assert_eq!(repeat.due(mode, now), [None, None]);
-        while now < DELAY_MILLIS - 1 + millis {
+        let mut now = 0;
+        loop {
             now += frame;
+            if now >= DELAY_MILLIS + millis {
+                break;
+            }
+            if now < DELAY_MILLIS {
+                assert_eq!(repeat.due(mode, now), [None, None], "within the delay");
+                continue;
+            }
             for (slot, key) in repeat.due(mode, now).into_iter().enumerate() {
                 counts[slot] += usize::from(key.is_some());
             }

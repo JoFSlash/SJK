@@ -1565,8 +1565,8 @@ mod tests {
         let seen = run(&mut console, 4_000, 1_000);
         assert_eq!(
             seen.iter().filter(|c| c.starts_with("+attack")).count(),
-            21,
-            "the press and 20 repeats: {seen:?}"
+            17,
+            "the press and, after the delay, 16 repeats: {seen:?}"
         );
         console.clear_force_repeat();
         assert!(run(&mut console, 5_000, 1_000).is_empty(), "window lost");
