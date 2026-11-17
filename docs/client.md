@@ -3381,7 +3381,9 @@ settings, empty (off) by default, in Settings > Chat in both styles: **Duel star
 (`cg_duelLoseLine`). Each is whispered (`tell`) to your private duel opponent, as the duel
 starts, after you win it and after you lose it. A whisper rather than `say`: the duel is
 between two players, the line stays out of everyone else's chat, works on every server and
-counts for nobody's flood guard. JA++ has no built-in setting for it (its players script it on
+counts for nobody's flood guard. **Duel lines to all chat** (`cg_duelLinesToAll`, off by
+default) sends them as `say` instead, for players who want the server to read them; the same
+once-a-duel and 10-second limits apply. JA++ has no built-in setting for it (its players script it on
 its client Lua's `PrivateDuel` event); EternalJK players bind `tell_attacker gg`. The duel is the
 player's own `ps.duelInProgress` with `ps.duelIndex` (never a followed player's, never a Duel
 game type's rounds); its end is told by the obituaries, as the achievements read them: the

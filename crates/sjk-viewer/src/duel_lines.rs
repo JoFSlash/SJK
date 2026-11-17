@@ -19,6 +19,10 @@
 //! sends at most one start line and one end line, and two lines of the same kind are
 //! at least [`GAP`] apart, so a run of duels accepted and ended back to back cannot
 //! turn it into spam.
+//!
+//! [`TO_ALL_CVAR`] (off by default) sends them to all chat instead, for players who
+//! want the server to read their `gl hf` and `gg`; the same once-a-duel and gap limits
+//! apply.
 
 use sjk_client::ObituaryEvent;
 use std::time::{Duration, Instant};
@@ -29,6 +33,9 @@ pub(crate) const START_CVAR: &str = "cg_duelStartLine";
 pub(crate) const WIN_CVAR: &str = "cg_duelWinLine";
 /// Archived, empty by default: the line whispered to the opponent after a duel lost.
 pub(crate) const LOSE_CVAR: &str = "cg_duelLoseLine";
+/// Archived, off by default: the lines go to all chat (`say`) instead of a whisper to
+/// the opponent.
+pub(crate) const TO_ALL_CVAR: &str = "cg_duelLinesToAll";
 
 /// The least time between two lines of the same kind (two start lines, or two end
 /// lines); a line that would come sooner is not sent.
@@ -223,9 +230,17 @@ impl crate::GpuState {
         if !self.chat.in_game(due.to) {
             return;
         }
-        if let Some(command) =
-            sjk_client::chat_command_full(sjk_client::ChatDestination::Player(due.to), &text)
-        {
+        let to_all = self
+            .console
+            .as_ref()
+            .and_then(|console| console.bool_cvar(TO_ALL_CVAR))
+            .unwrap_or(false);
+        let destination = if to_all {
+            sjk_client::ChatDestination::Global
+        } else {
+            sjk_client::ChatDestination::Player(due.to)
+        };
+        if let Some(command) = sjk_client::chat_command_full(destination, &text) {
             self.send_chat_command(&command, None);
         }
     }

@@ -32,7 +32,7 @@ Add each release's notes here when it is tagged (docs/sjk.md "Releases").
 -->
 ## Unreleased
 
-- Duels: `tell_attacker <message>` whispers to the last player who hurt you, as in EternalJK; Duel start, won and lost lines (`cg_duelStartLine`, `cg_duelWinLine`, `cg_duelLoseLine`, Settings > Chat, empty = off) whisper your own line to your private duel opponent as the duel starts and ends _(Slash, after Ric's and Lex Deifaber's idea)_
+- Duels: `tell_attacker <message>` whispers to the last player who hurt you, as in EternalJK; Duel start, won and lost lines (`cg_duelStartLine`, `cg_duelWinLine`, `cg_duelLoseLine`, Settings > Chat, empty = off) whisper your own line to your private duel opponent as the duel starts and ends, or send it to all chat with Duel lines to all chat (`cg_duelLinesToAll`) _(Slash, after Ric's and Lex Deifaber's idea)_
 
 ## 2026.1117.1 (Alpha) | 17/11/2026
 

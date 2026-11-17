@@ -45,6 +45,12 @@ pub(crate) fn register(cvars: &mut CvarRegistry) -> Result<(), sjk_shell::CvarEr
         cvars.register(CvarDefinition::new(name, "", CvarFlags::ARCHIVE, help))?;
     }
     cvars.register(CvarDefinition::new(
+        crate::duel_lines::TO_ALL_CVAR,
+        false,
+        CvarFlags::ARCHIVE,
+        "Send the duel start, won and lost lines to all chat instead of whispering them to your opponent",
+    ))?;
+    cvars.register(CvarDefinition::new(
         crate::chat::quiet::DUEL_CVAR,
         false,
         CvarFlags::ARCHIVE,

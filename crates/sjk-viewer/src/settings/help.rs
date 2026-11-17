@@ -1254,6 +1254,10 @@ const HELP: &[(&str, &str)] = &[
         "Whispered to your opponent when you lose a private duel. Empty: nothing is sent.",
     ),
     (
+        crate::duel_lines::TO_ALL_CVAR,
+        "The duel lines go to all chat instead of a whisper to your opponent.",
+    ),
+    (
         crate::tactical::MODEL_CVAR,
         "The model everyone else wears at Tactical Max: model or model/skin, kyle by default. Teams keep red and blue.",
     ),
