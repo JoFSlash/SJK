@@ -232,7 +232,12 @@ mod tests {
                 changes.len()
             );
             let mut last_open = 1_000;
-            for pair in changes.chunks_exact(2) {
+            let (shuts, opens): (Vec<_>, Vec<_>) = changes
+                .iter()
+                .enumerate()
+                .partition(|(index, _)| index % 2 == 0);
+            for (shut, open) in shuts.into_iter().zip(opens) {
+                let pair = [*shut.1, *open.1];
                 let (shut_at, BlinkChange::Shut { .. }) = pair[0] else {
                     panic!("seed {seed}: blink did not start with a shut: {pair:?}");
                 };
