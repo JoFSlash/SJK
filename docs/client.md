@@ -1270,6 +1270,25 @@ then kept the finished kick's clock, the legs started their kick on its frame, a
 kick stood frozen while the server kept kicking (Slash, 30/10/2026). Other players are
 shown the server's animation, which carries no timers, so this does not reach them.
 
+## Blinking and facial expressions
+
+Humanoid players and NPCs whose skeleton has a `face` bone blink and change their
+expression as stock cgame's `CG_G2PlayerHeadAnims` makes them (`cg_players.c`), run after
+the player angles each frame. Each actor keeps its own timers (`clientInfo_t::facial_*`):
+the eyes shut every 4 to 8 seconds for 300 ms (`CG_G2SetHeadBlink`: `leye` and `reye`
+turned `(0, -50, 0)`, `BONE_ANGLES_POSTMULT` about `POSITIVE_Y`, `POSITIVE_Z`,
+`POSITIVE_X`), one blink in twenty a wink of the left eye; every 7 to 10 seconds the
+`face` bone plays `FACE_ALERT`, or `FACE_FROWN` when that timer is due too, for 2
+seconds (`CG_G2SetHeadAnim`, set again each frame without a blend, so it holds its first
+frame and plays on after); a dead player's face plays `FACE_DEAD`, frozen, which shuts the
+eyes. The talking faces need the voice channel's lip-sync amplitude
+(`S_GetVoiceVolume`), which SJK's mixer does not measure, so faces never talk yet. Body
+copies and cut-off limbs keep the face they were copied with. Rig (glTF) models are left
+out: they map the stock skeleton onto their own bones. Before 17/11/2026 SJK had none of
+this and models never blinked (Goylander's report). See
+[head_anims.rs](../crates/sjk-client/src/head_anims.rs) and
+[ghoul2_pose.rs](../crates/sjk-client/src/ghoul2_pose.rs).
+
 ## Tavion and Desann idle poses
 
 Tavion and Desann saber styles use their distinct JoF EJK standing poses by

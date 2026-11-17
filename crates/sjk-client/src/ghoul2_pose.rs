@@ -45,6 +45,19 @@ struct HumanoidBones {
     angle_bones: [usize; 5],
 }
 
+/// The `face` bone cgame animates and the eye bones it turns to blink
+/// (`CG_G2PlayerHeadAnims`, `CG_G2SetHeadBlink`). A skeleton without `face` is cgame's
+/// `noFace`: no blinks, no expressions.
+#[derive(Clone, Copy, Debug)]
+struct FaceBones {
+    face: usize,
+    /// `leye` and `reye`; without `leye` cgame does not blink at all.
+    eyes: [Option<usize>; 2],
+}
+
+/// Distinct blink timers per actor, as each client info draws its own.
+static HEAD_SEEDS: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0x5eed);
+
 /// Per-actor BaseJKA controller translating cgame track changes into
 /// engine-generic captured-frame bone overrides.
 #[derive(Clone, Debug)]
@@ -57,6 +70,10 @@ pub struct LegacyGhoul2Animator {
     /// Humanoid-only spine bones (`localAnimIndex <= 1` in cgame). `None`
     /// for other skeletons: no `Motion` override, no player-angle commands.
     humanoid: Option<HumanoidBones>,
+    /// Humanoid face bones; `None` is `noFace` or a non-humanoid.
+    face: Option<FaceBones>,
+    /// `clientInfo_t::facial_*`.
+    head_timers: crate::head_anims::LegacyHeadAnimTimers,
     applied_lower: Option<AnimationTrackState>,
     applied_upper: Option<AnimationTrackState>,
     /// The override installed for `applied_upper`, kept so the torso frame
@@ -100,11 +117,22 @@ impl LegacyGhoul2Animator {
                 ],
             })
         })();
+        let face = humanoid.and_then(|_| {
+            Some(FaceBones {
+                face: find("face")?,
+                eyes: [find("leye"), find("reye")],
+            })
+        });
+        let seed = HEAD_SEEDS
+            .fetch_add(0x9e37_79b9, std::sync::atomic::Ordering::Relaxed)
+            .rotate_left(7);
         Ok(Self {
             pose: BoneOverridePose::new(animation.bones.len()),
             legs_root,
             torso_root,
             humanoid,
+            face,
+            head_timers: crate::head_anims::LegacyHeadAnimTimers::new(seed),
             applied_lower: None,
             applied_upper: None,
             upper_command: None,
@@ -276,6 +304,92 @@ impl LegacyGhoul2Animator {
             forward,
         };
         self.pose.set_bone_angles(animation, bone, command)
+    }
+
+    /// `CG_G2PlayerHeadAnims` (`cg_players.c`), run after the player angles each frame
+    /// for a humanoid with a `face` bone: blink the eyes and set the face's
+    /// expression ([`crate::head_anims`]). `dead` is `EF_DEAD`. A body-queue copy or
+    /// a cut-off limb keeps the face it was copied with.
+    pub fn head_anims(
+        &mut self,
+        animation: &Gla,
+        config: &AnimationConfig,
+        time_millis: i64,
+        dead: bool,
+    ) {
+        let Some(bones) = self.face.filter(|_| !self.body) else {
+            return;
+        };
+        let step = self.head_timers.step(time_millis, dead);
+        if let Some(change) = step.blink
+            && bones.eyes[0].is_some()
+        {
+            for (bone, angles) in bones.eyes.into_iter().zip(change.eye_angles()) {
+                let (Some(bone), Some(angles)) = (bone, angles) else {
+                    continue;
+                };
+                // `G2API_SetBoneAngles(..., POSITIVE_Y, POSITIVE_Z, POSITIVE_X, ...)`:
+                // up, left, forward. Its blend time is never read (head_anims.rs).
+                let command = BoneAngleCommand {
+                    angles_degrees: angles,
+                    mode: BoneAngleMode::PostMultiply,
+                    up: BoneAxis::PositiveY,
+                    left: BoneAxis::PositiveZ,
+                    forward: BoneAxis::PositiveX,
+                };
+                // Angles are always finite and the bone exists: nothing to report.
+                let _ = self.pose.set_bone_angles(animation, bone, command);
+            }
+        }
+        if let Some(face) = step.face {
+            self.set_head_anim(animation, config, bones.face, face, time_millis);
+        }
+    }
+
+    /// `CG_G2SetHeadAnim`: `G2API_SetBoneAnim` on `face` at `cg.time`, without
+    /// `BONE_ANIM_BLEND`, every frame the expression lasts, so it holds its first frame
+    /// and plays on once cgame stops setting it (`FACE_DEAD` then freezes on its last
+    /// frame, the others end and the face follows the head again).
+    fn set_head_anim(
+        &mut self,
+        animation: &Gla,
+        config: &AnimationConfig,
+        bone: usize,
+        face: crate::head_anims::FaceAnimation,
+        time_millis: i64,
+    ) {
+        let Some(sequence) = config
+            .get_exact(face.sequence_name())
+            .filter(|sequence| sequence.frame_count > 0)
+        else {
+            return;
+        };
+        let speed = LegacyGhoul2PosePolicy::animation_speed(sequence, 1_000);
+        let first = sequence.first_frame as i32;
+        let count = sequence.frame_count as i32;
+        let (start_frame, end_frame) = if speed < 0.0 {
+            (first + count - 1, first - 1)
+        } else {
+            (first, first + count)
+        };
+        let command = BoneAnimationCommand {
+            clip: face.animation_number(),
+            start_frame,
+            end_frame,
+            speed,
+            time_millis,
+            set_frame: None,
+            end_behavior: if face.freezes() {
+                OverrideEndBehavior::Freeze
+            } else {
+                OverrideEndBehavior::Stop
+            },
+            blend: false,
+            blend_millis: 0,
+        };
+        // A model whose table puts the face sequence outside its frames keeps its face,
+        // as Ghoul2 refuses the range; the rest of the actor still poses.
+        let _ = self.pose.set_bone_animation(animation, bone, command);
     }
 
     /// Clear all player-angle commands for root-locked/ragdoll policy paths.
@@ -572,5 +686,127 @@ mod disintegration_tests {
             .expect("evaluate later");
         let frames = animator.event_frames(&animation, 1_500);
         assert_eq!(frames[0].map(|(_, frame)| frame), Some(5));
+    }
+}
+
+#[cfg(test)]
+mod head_anim_tests {
+    use super::LegacyGhoul2Animator;
+    use sjk_model::{AnimationConfig, Gla, GlaBone};
+
+    fn identity() -> [[f32; 4]; 3] {
+        [
+            [1.0, 0.0, 0.0, 0.0],
+            [0.0, 1.0, 0.0, 0.0],
+            [0.0, 0.0, 1.0, 0.0],
+        ]
+    }
+
+    /// A humanoid spine, optionally with the face and eye bones.
+    fn skeleton(face: bool) -> Gla {
+        let mut names = vec![
+            "model_root",
+            "lower_lumbar",
+            "upper_lumbar",
+            "thoracic",
+            "cervical",
+            "cranium",
+            "Motion",
+        ];
+        if face {
+            names.extend(["face", "leye", "reye"]);
+        }
+        let count = names.len();
+        let bones = names
+            .into_iter()
+            .enumerate()
+            .map(|(index, name)| GlaBone {
+                name: name.into(),
+                flags: 0,
+                parent: index.checked_sub(1),
+                base_pose: identity(),
+                inverse_base_pose: identity(),
+                children: if index + 1 < count {
+                    vec![index + 1]
+                } else {
+                    Vec::new()
+                },
+            })
+            .collect();
+        Gla {
+            name: "_humanoid".into(),
+            scale: 1.0,
+            bones,
+            frames: vec![vec![0; count]; 4],
+            compressed_bones: vec![[0; 14]],
+        }
+    }
+
+    fn is_identity(matrix: [[f32; 4]; 3]) -> bool {
+        matrix
+            .iter()
+            .flatten()
+            .zip(identity().iter().flatten())
+            .all(|(a, b)| (a - b).abs() < 1e-5)
+    }
+
+    #[test]
+    fn a_face_blinks_its_eye_bones_shut_and_open() {
+        let animation = skeleton(true);
+        let config = AnimationConfig::parse(b"FACE_DEAD 0 1 -1 20\n").expect("config");
+        let mut animator = LegacyGhoul2Animator::new(&animation).expect("animator");
+        let (leye, reye) = (8, 9);
+        let mut time = 1_000;
+        while !animator.head_timers.blinking() {
+            assert_eq!(
+                animator.pose.bone_angle_matrix(leye),
+                None,
+                "open before the first blink"
+            );
+            animator.head_anims(&animation, &config, time, false);
+            time += 1;
+        }
+        let shut = animator
+            .pose
+            .bone_angle_matrix(leye)
+            .expect("left eye shut");
+        assert!(!is_identity(shut));
+        // The right eye shuts too unless the blink is a wink; either way it matches.
+        if let Some(right) = animator.pose.bone_angle_matrix(reye) {
+            assert_eq!(right, shut);
+        }
+        while animator.head_timers.blinking() {
+            animator.head_anims(&animation, &config, time, false);
+            time += 1;
+        }
+        for eye in [leye, reye] {
+            let open = animator.pose.bone_angle_matrix(eye).expect("eye set open");
+            assert!(is_identity(open), "eye {eye} open again");
+        }
+    }
+
+    #[test]
+    fn a_skeleton_without_a_face_never_blinks() {
+        let animation = skeleton(false);
+        let config = AnimationConfig::parse(b"FACE_DEAD 0 1 -1 20\n").expect("config");
+        let mut animator = LegacyGhoul2Animator::new(&animation).expect("animator");
+        for time in 1_000..30_000 {
+            animator.head_anims(&animation, &config, time, time > 20_000);
+        }
+        for bone in 0..animation.bones.len() {
+            assert_eq!(animator.pose.bone_angle_matrix(bone), None);
+        }
+    }
+
+    #[test]
+    fn a_body_copy_keeps_its_face() {
+        let animation = skeleton(true);
+        let config = AnimationConfig::parse(b"FACE_DEAD 0 1 -1 20\n").expect("config");
+        let mut animator = LegacyGhoul2Animator::new(&animation).expect("animator");
+        animator.body = true;
+        for time in 1_000..30_000 {
+            animator.head_anims(&animation, &config, time, false);
+        }
+        assert_eq!(animator.pose.bone_angle_matrix(8), None);
     }
 }

@@ -170,6 +170,16 @@ test: On a jaPRO server: strafehelper 1, strafe-jump in JKA style: the lines sho
 test: /move cpm: the lines still show and sit at CPM's angles; /move siege: none.
 test: On a JoF or stock server the helper looks as before.
 
+[model-blink]
+area: Rendering & effects
+title: Models blink, change their face now and then, and the dead shut their eyes
+change: Stock CG_G2PlayerHeadAnims: leye/reye shut for 300 ms every 4-8 s (1 in 20 a wink),
+change: FACE_ALERT or FACE_FROWN on the face bone every 7-10 s, FACE_DEAD while dead.
+test: Third person (cg_thirdPerson 1), look at your face up close: the eyes shut now and then.
+test: Look at another player or a humanoid NPC: it blinks too, not in step with you.
+test: Die (kill): the eyes stay shut on the body. Respawn: blinking starts again.
+test: A rig (glTF) model looks and moves as before (it is left out on purpose).
+
 [rgb-model-colour]
 area: Rendering & effects
 title: RGB models (char_color) show the colour as in retail, not pale

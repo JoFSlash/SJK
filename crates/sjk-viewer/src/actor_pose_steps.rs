@@ -20,6 +20,27 @@ fn standing_clip(clip: usize) -> bool {
     })
 }
 
+/// `EF_DEAD` (`bg_public.h`).
+const EF_DEAD: u32 = 1 << 1;
+
+/// Whether the actor's entity carries `EF_DEAD`; the local player's flags are its
+/// player state's.
+fn dead(snapshot: Option<&Snapshot>, entity_id: Option<EntityId>, local: bool) -> bool {
+    let (Some(snapshot), Some(id)) = (snapshot, entity_id) else {
+        return false;
+    };
+    let flags = if local {
+        snapshot.player.entity_flags()
+    } else {
+        snapshot
+            .entities
+            .iter()
+            .find(|state| u64::from(state.number()) + 1 == id.get())
+            .map_or(0, |state| state.e_flags())
+    };
+    flags & EF_DEAD != 0
+}
+
 /// Immutable inputs shared by independently prepared actors in one frame.
 pub(super) struct Frame<'a> {
     pub flame: Option<&'static crate::actor_world_submission::force_powers::flame::Contract>,
@@ -265,6 +286,18 @@ pub(super) fn prepare(mesh: &mut ActorMesh, frame: &Frame<'_>) -> Result<(), Box
     } else {
         mesh.animator.clear_player_angles();
         mesh.preview.rig_pose.halt_motion();
+    }
+    // `CG_G2PlayerHeadAnims` follows the player angles: blinks and the face's
+    // expressions. A rig model maps the stock skeleton onto its own bones, whose eyes
+    // a stock blink would turn the wrong way, so it keeps its face.
+    if mesh.animator.humanoid() && !mesh.corpse_pool && mesh.preview.rig.is_none() {
+        let dead = dead(snapshot, mesh.entity_id, mesh.entity_id == local_entity);
+        mesh.animator.head_anims(
+            &mesh.preview.animation,
+            &mesh.preview.config,
+            presentation_time,
+            dead,
+        );
     }
     mesh.animator.requested = Some(state);
     Ok(())

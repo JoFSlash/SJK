@@ -60,6 +60,7 @@ mod force_rank_reply;
 mod freeze_probe;
 mod gamestate_probe;
 mod ghoul2_pose;
+pub mod head_anims;
 mod impact_events;
 mod information;
 mod jof_cosmetics;

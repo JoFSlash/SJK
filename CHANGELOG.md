@@ -30,6 +30,10 @@ The site (site/assets/site.js, parseChangelog) reads the release headings,
 introductions and recap lines too.
 Add each release's notes here when it is tagged (docs/sjk.md "Releases").
 -->
+## Unreleased
+
+- Faces: players and NPCs blink again every 4 to 8 seconds (now and then a wink), their faces turn alert or frown now and then, and the dead close their eyes, as in the stock game _(Slash, after Goylander's report)_
+
 ## 2026.1117.1 (Alpha) | 17/11/2026
 
 A devmap cheat bar, quicker votes, console translation and a log book for Fishing and Mining.
