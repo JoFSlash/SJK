@@ -246,6 +246,9 @@ mod tests {
             message: "",
             attacker_message: None,
             local_fragged: attacker == ME,
+            local_was_killed: target == ME && attacker != ME,
+            server_time: 0,
+            attacker_force: 0,
         }
     }
 
