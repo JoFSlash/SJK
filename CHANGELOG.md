@@ -32,7 +32,7 @@ Add each release's notes here when it is tagged (docs/sjk.md "Releases").
 -->
 ## Unreleased
 
-- Emotes your way: Settings > Sound > Emotes "Hide others' emotes" (`cg_hideOthersEmotes`, off) stops other players' emotes showing or playing on your screen while yours still play, "Hidden emotes" (`emote_hide <id>`) hides single emotes when others play them, and "Muted emotes" (`emote_mute <id>`) plays single emotes without their sound _(Slash, after mg.perso's idea)_
+- Emotes your way: Settings > Sound > Emotes "Hide others' emotes" (`cg_hideOthersEmotes`, off) stops other players' emotes showing or playing on your screen while yours still play, "Hidden emotes" (`emote_hide <id>`) hides single emotes when others play them, and "Muted emotes" (`emote_mute <id>`) plays single emotes without their sound _(Slash, after mg.perso's idea, PR #437)_
 
 ## 2026.1117.1 (Alpha) | 17/11/2026
 
