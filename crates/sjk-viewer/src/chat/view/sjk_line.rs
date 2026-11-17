@@ -819,14 +819,19 @@ mod tests {
                 ("Figo", icons[1], ticks[1]),
             ] {
                 let (_, text, _) = drawn(&texts, name);
-                // A pixel's play: the small sizes round to fractions of a pixel.
-                let (top, bottom) = (text.y - 1.0, text.y + row + 1.0);
-                for (what, rect) in [("icon", icon), ("tick", tick)] {
-                    assert!(
-                        rect.y >= top && rect.bottom() <= bottom,
-                        "{name}'s {what} {rect:?} leaves its row {top}..{bottom} at {size}"
-                    );
-                }
+                // Half a pixel's play: the small sizes round to fractions of a pixel.
+                let (top, bottom) = (text.y - 0.5, text.y + row + 0.5);
+                assert!(
+                    icon.y >= top && icon.bottom() <= bottom,
+                    "{name}'s icon {icon:?} leaves its row {top}..{bottom} at {size}"
+                );
+                // The tick sits on the name's cap line, a little over the text's top, so
+                // it is held to the row's height and its middle to the row.
+                let middle = tick.y + tick.height / 2.0;
+                assert!(
+                    tick.height <= row && middle > text.y && middle < text.y + row,
+                    "{name}'s tick {tick:?} is taller than or outside its row {row} at {size}"
+                );
                 assert!(icon.right() < text.x, "the icon before the name at {size}");
             }
         }
