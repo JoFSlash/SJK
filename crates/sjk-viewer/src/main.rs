@@ -53,6 +53,7 @@ mod debug_collectibles;
 mod drone;
 mod duel_blades;
 mod duel_ghost;
+mod duel_lines;
 mod duel_visibility;
 mod economy;
 mod editions;
@@ -950,6 +951,8 @@ struct GpuState {
     forced_disintegrations: disintegration::Forced,
     /// What the player does in matches, for the achievements (`achievements.rs`).
     achievement_tracker: achievements::tracker::Tracker,
+    /// The private duel followed for its lines (`duel_lines.rs`).
+    duel_lines: duel_lines::DuelLines,
     lagometer: sjk_client::LagometerSamples,
     crosshair_scan: crosshair_scan::State,
     auto_switch: auto_switch::Tracker,
@@ -1946,6 +1949,7 @@ impl GpuState {
             saber_kills_seen: 0,
             forced_disintegrations: disintegration::Forced::default(),
             achievement_tracker: achievements::tracker::Tracker::default(),
+            duel_lines: duel_lines::DuelLines::default(),
             lagometer: sjk_client::LagometerSamples::new(),
             auto_switch: auto_switch::Tracker::default(),
             previous_particle_events: HashMap::new(),

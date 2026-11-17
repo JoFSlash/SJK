@@ -214,6 +214,7 @@ impl GpuState {
             Instant::now(),
         );
         self.local_actor_state = Default::default();
+        self.duel_lines = Default::default();
         // A blade skin's burns belong to the old timeline: their start times and entity
         // numbers mean nothing on a new one (`disintegration::Forced`).
         self.forced_disintegrations = Default::default();
@@ -434,6 +435,19 @@ impl GpuState {
                 toys,
                 visual_now,
             );
+            if let Ok(me) = u16::try_from(session.game_state().client_num) {
+                let fresh = crate::achievements_frame::fresh_obituaries(
+                    &self.obituaries,
+                    obituaries_before,
+                );
+                self.duel_lines
+                    .observe(&crate::duel_lines::Seen::from_player(
+                        &snapshot.player,
+                        me,
+                        &fresh,
+                        visual_now,
+                    ));
+            }
         }
         if let Some(adapter) = &mut self.legacy_world_adapter {
             // oldServerTime disappears after the server acknowledges admission.

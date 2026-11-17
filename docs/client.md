@@ -3375,6 +3375,27 @@ in [quiet_chat.rs](../crates/sjk-client/src/quiet_chat.rs)). The SJK scoreboard 
 needs the hub to relay the flag (for example a `dnd` field in the look of
 `POST /v1/look`, given back in presence and look events), which it does not yet.
 
+**Duel lines** (Ric's idea, extended by Lex Deifaber, #ideas 04/11/2026): three archived text
+settings, empty (off) by default, in Settings > Chat in both styles: **Duel start line**
+(`cg_duelStartLine`), **Duel won line** (`cg_duelWinLine`) and **Duel lost line**
+(`cg_duelLoseLine`). Each is whispered (`tell`) to your private duel opponent, as the duel
+starts, after you win it and after you lose it. A whisper rather than `say`: the duel is
+between two players, the line stays out of everyone else's chat, works on every server and
+counts for nobody's flood guard. JA++ has no built-in setting for it (its players script it on
+its client Lua's `PrivateDuel` event); EternalJK players bind `tell_attacker gg`. The duel is the
+player's own `ps.duelInProgress` with `ps.duelIndex` (never a followed player's, never a Duel
+game type's rounds); its end is told by the obituaries, as the achievements read them: the
+opponent's means won, your own (or the duel ending with you dead) lost, waiting up to two
+seconds for an obituary that comes a snapshot late. A duel that ends any other way (the
+opponent leaves, the map changes, you go to spectators) sends no end line, and a line goes only
+while the opponent is still in the game. Each duel sends one start and one end line at most,
+and two lines of a kind are at least 10 seconds apart (a later one is dropped, not queued), so
+duels accepted and ended back to back cannot turn it into spam. The line is sent as typed chat
+is: substitutions, colours, encrypted to an SJK player who takes encrypted whispers
+([duel_lines.rs](../crates/sjk-viewer/src/duel_lines.rs)). The quick wheel is not used for
+it: its choices are console commands of any kind (emotes, toys, weather), not lines of text,
+and running one by itself at a duel's start would run whatever the slot holds.
+
 Chat remains connected to the real server during intermission, including
 global/team/private composer messages and console/bound chat commands. Messages
 received during background loading are retained; its loading notice hides the HUD. The scoreboard reserves a separate left column for messages and the
@@ -3649,6 +3670,15 @@ composer reaches the same whisper after SJK (All, Team, SJK, the last whisperer)
 Your own whispers, which the server echoes back, do not count; when nobody has
 whispered, or the player left or renamed, `reply` says so and sends nothing
 ([chat/reply.rs](../crates/sjk-viewer/src/chat/reply.rs)).
+
+`tell_attacker <message>` (stock cgame's `CG_TellAttacker_f`, which EternalJK players bind to
+a key as an auto-reply, after Ric's idea of 04/11/2026) whispers `message` to the last player
+who hurt you: `ps.persistant[PERS_ATTACKER]`, once a hit has set stock's `cg.attackerTime`
+gate, the same one `messagemode4` uses. Where stock sends a `tell` the server refuses when
+the last hurt came from the world or from yourself, SJK says "no player has hurt you yet"
+and sends nothing, and it says so as well when that player has left. The message goes the
+way a typed `tell` goes: substitutions, colours, encrypted to an SJK player who takes
+encrypted whispers ([console_client.rs](../crates/sjk-viewer/src/console_client.rs)).
 
 `clientlist` (also `showplayerid`, JoF EJK's `showPlayerId` spelling) lists each player
 in the console: the client number, a team letter (F free, R red, B blue, S spectator),

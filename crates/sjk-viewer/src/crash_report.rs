@@ -151,13 +151,14 @@ pub(crate) fn trail(line: &str) {
 
 /// Commands (lowercase) whose arguments are a chat message, so a line typed with
 /// one stays out of the trail as received chat does ([`typed_chat`]): `say`,
-/// `say_team`, `tell`, the game's chat (OpenJK `g_cmds.c`). A server family's chat
+/// `say_team`, `tell`, the game's chat (OpenJK `g_cmds.c`), and `tell_attacker`, the
+/// client's whisper to whoever last hurt the player. A server family's chat
 /// commands (JA+'s `amsay`) come with its client mod's
 /// [`sjk_mod::Secrets::chat_commands`], applied whatever the server.
 ///
 /// The line stays in the scrollback; it is left out of crash reports, log uploads
 /// and the session log only.
-pub(crate) const CHAT_COMMANDS: &[&str] = &["say", "say_team", "tell"];
+pub(crate) const CHAT_COMMANDS: &[&str] = &["say", "say_team", "tell", "tell_attacker"];
 
 /// Whether a typed console line sends a chat message ([`CHAT_COMMANDS`] or one of
 /// `mods`) in any of its commands; a line the tokenizer refuses counts by its first

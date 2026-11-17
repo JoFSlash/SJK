@@ -1242,6 +1242,18 @@ const HELP: &[(&str, &str)] = &[
         "Do not disturb turns on as each duel starts and off as it ends.",
     ),
     (
+        crate::duel_lines::START_CVAR,
+        "Whispered to your opponent as a private duel starts, once a duel. Empty: nothing is sent.",
+    ),
+    (
+        crate::duel_lines::WIN_CVAR,
+        "Whispered to your opponent when you win a private duel, say gg. Empty: nothing is sent.",
+    ),
+    (
+        crate::duel_lines::LOSE_CVAR,
+        "Whispered to your opponent when you lose a private duel. Empty: nothing is sent.",
+    ),
+    (
         crate::tactical::MODEL_CVAR,
         "The model everyone else wears at Tactical Max: model or model/skin, kyle by default. Teams keep red and blue.",
     ),

@@ -159,6 +159,8 @@ impl GpuState {
         if caught_up {
             self.server_clock.adjust(Instant::now());
         }
+        // A duel line the snapshots made due (`duel_lines.rs`).
+        self.send_duel_line();
         timing.mark(Phase::Commands);
         self.ghost_frame();
         let talking = self.talk_button();

@@ -1039,6 +1039,21 @@ pub(super) const HUD: &[Setting] = &[
         kind: ValueKind::Bool,
     },
     Setting {
+        label: "Duel start line",
+        cvar: crate::duel_lines::START_CVAR,
+        kind: ValueKind::Text,
+    },
+    Setting {
+        label: "Duel won line",
+        cvar: crate::duel_lines::WIN_CVAR,
+        kind: ValueKind::Text,
+    },
+    Setting {
+        label: "Duel lost line",
+        cvar: crate::duel_lines::LOSE_CVAR,
+        kind: ValueKind::Text,
+    },
+    Setting {
         label: "Do not disturb",
         cvar: crate::chat::quiet::CVAR,
         kind: ValueKind::Bool,

@@ -20,13 +20,7 @@ pub(crate) fn observe(
     toys: achievements::tracker::Toys,
     now: Instant,
 ) {
-    // The feed keeps the newest eight; more in one snapshot than that is unheard of.
-    let new = (obituaries.decoded() - obituaries_before).min(8) as usize;
-    let mut events = [None; 8];
-    for (slot, offset) in events.iter_mut().zip((0..new).rev()) {
-        *slot = obituaries.feed().newest(offset);
-    }
-    let events: Vec<sjk_client::ObituaryEvent> = events.into_iter().flatten().collect();
+    let events = fresh_obituaries(obituaries, obituaries_before);
     // The play signals the next holocron claim carries (`holocrons/signals.rs`).
     crate::holocrons::signals::snapshot(&snapshot.player, session.game_state().client_num, &events);
     let seen = achievements::tracker::Seen {
@@ -40,6 +34,20 @@ pub(crate) fn observe(
         now,
     };
     achievements::update(|record| tracker.observe(&seen, record));
+}
+
+/// The obituaries decoded since the tracker counted `before`, oldest first.
+pub(crate) fn fresh_obituaries(
+    obituaries: &sjk_client::ObituaryTracker,
+    before: u64,
+) -> Vec<sjk_client::ObituaryEvent> {
+    // The feed keeps the newest eight; more in one snapshot than that is unheard of.
+    let new = (obituaries.decoded() - before).min(8) as usize;
+    let mut events = [None; 8];
+    for (slot, offset) in events.iter_mut().zip((0..new).rev()) {
+        *slot = obituaries.feed().newest(offset);
+    }
+    events.into_iter().flatten().collect()
 }
 
 impl GpuState {

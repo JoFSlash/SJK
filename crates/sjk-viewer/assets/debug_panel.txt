@@ -5146,6 +5146,17 @@ change: The Heart's odds and pity are unchanged; no clean strike, nothing change
 test: Mine boulders hitting the glint every time: iron still turns up now and then.
 test: Prospector (mine_kinds) can reach 9/9 for a player who always strikes clean.
 
+[duel-lines]
+area: Console & chat
+title: tell_attacker and duel start, won and lost lines (Ric, Lex Deifaber)
+change: tell_attacker <message> whispers to the last player who hurt you (EJK's).
+change: cg_duelStartLine, cg_duelWinLine, cg_duelLoseLine: whispered to the duel opponent.
+change: Empty (the default) sends nothing; one of each a duel, 10 s apart per kind.
+test: Get hit by a player, tell_attacker hi: they get the whisper. After a fall: refused.
+test: Settings > Chat: set the three lines, start a private duel: the start line goes once.
+test: Win it: the won line goes; lose one: the lost line. Opponent leaves: no end line.
+test: Two duels within 10 s: the second sends no start line.
+
 [duel-modes]
 area: Gameplay
 title: Tactical in duels, Do not disturb in duels (quiet mode renamed dnd)

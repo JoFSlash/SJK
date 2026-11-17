@@ -833,6 +833,11 @@ impl ChatOverlay {
     }
 
     /// Toggle a whisper composer only for a currently occupied roster slot.
+    /// Whether a player is in `slot` of the roster.
+    pub(crate) fn in_game(&self, slot: u16) -> bool {
+        self.roster.target(Some(slot)).is_some()
+    }
+
     pub(crate) fn whisper_to(&mut self, slot: Option<u16>) -> bool {
         let Some(target) = self.roster.target(slot) else {
             return false;
