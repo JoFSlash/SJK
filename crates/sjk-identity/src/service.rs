@@ -1053,6 +1053,8 @@ enum Command {
     MakeGifTag(String),
     /// The feed relayed a holocron drop of the player's own key.
     OwnDrop,
+    /// The hub's event says it paid the player credits (`Service::credits_came`).
+    CreditsCame,
     /// The viewer wants fresh holocron progress.
     RefreshHolocrons,
     /// The game menu opened (`Service::menu_opened`).
@@ -2224,6 +2226,7 @@ impl Worker {
             Command::CraftTags(copies) => self.tag_trade(TagTrade::Craft(copies)),
             Command::MakeGifTag(giphy) => self.tag_trade(TagTrade::Gif(giphy)),
             Command::OwnDrop => self.own_drop(now),
+            Command::CreditsCame => self.profile_soon(now),
             Command::RefreshHolocrons => self.holocrons_soon(now),
             Command::MenuOpened => self.menu_opened(now),
             Command::OpenHolocrons(ids) => self.open_holocrons(&ids, now),
@@ -5107,6 +5110,13 @@ impl Service {
         let _ = self.commands.send(Command::RefreshHolocrons);
     }
 
+    /// A hub event (the box hunt's) says it paid the player credits: the profile, which
+    /// counts them, is read soon, at most twice a minute (hub report #314: else the
+    /// credits showed up to 10 minutes after they were announced).
+    pub fn credits_came(&self) {
+        let _ = self.commands.send(Command::CreditsCame);
+    }
+
     /// The game menu opened: read the profile, the holocron progress and the trades
     /// again, and send changed achievement counts, each with a short cooldown.
     pub fn menu_opened(&self) {
@@ -7055,6 +7065,29 @@ mod tests {
         worker.tick(menu);
         assert_eq!(holocron_reads(&fake), 4);
         assert_eq!(lock(&snapshot).holocrons.unwrap().remaining_secs(), 300);
+    }
+
+    #[test]
+    fn credits_an_event_paid_read_the_profile_soon_at_most_twice_a_minute() {
+        let fake = Fake::default();
+        let t0 = Instant::now();
+        let (mut worker, _) = worker(&fake, t0);
+        worker.handle(Command::Configure(on("https://hub")), t0);
+        worker.tick(t0);
+        let reads = profile_reads(&fake);
+        let at = |seconds| t0 + Duration::from_secs(seconds);
+        // Without it the profile waits for its 10 minutes (hub report #314).
+        worker.tick(at(5));
+        assert_eq!(profile_reads(&fake), reads);
+        worker.handle(Command::CreditsCame, at(5));
+        worker.tick(at(5));
+        assert_eq!(profile_reads(&fake), reads + 1);
+        // Another within the half minute waits for it.
+        worker.handle(Command::CreditsCame, at(15));
+        worker.tick(at(34));
+        assert_eq!(profile_reads(&fake), reads + 1);
+        worker.tick(at(35));
+        assert_eq!(profile_reads(&fake), reads + 2);
     }
 
     #[test]

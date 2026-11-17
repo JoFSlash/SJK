@@ -511,6 +511,17 @@ test: Main menu > SJK > Report a bug: the card opens; type a report and Send.
 test: The hub's report shows map "menu" and an empty server.
 test: In a match, Escape > Report a bug still sends the real map and server.
 
+[box-hunt-out-again]
+area: Gameplay
+title: Box hunt: a lost out report goes again; paid credits show soon (#304, #314)
+change: A hunter out on their screen but still in the chase by the hub's read reports it again.
+change: The mark's win (or a blown box's price) reads the profile within 30 s for the credits.
+test: 3 SJK players with Box hunt on; as a hunter, amtele/japlus.goto to the mark: you are out.
+test: On the mark's screen that hunter loses the red ring and the card counts one less.
+test: The mark kills the other hunters: You outlasted every hunter, and the credits rise <30 s.
+test: Collection > History has the line Box hunt: you outlasted every hunter.
+note: A lost report is hard to force in game; unit tests in mystery_box/hunt.rs cover it.
+
 [box-hunt-1103]
 area: Gameplay
 title: Box hunt: only your own teleports cheat; caps from 09:00; japlus.guntelewall

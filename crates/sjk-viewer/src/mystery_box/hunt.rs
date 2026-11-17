@@ -39,6 +39,25 @@ const CHAT_LIMIT: Duration = Duration::from_secs(30);
 const CHAT_WARN: Duration = Duration::from_secs(20);
 /// The sound source of a mark's explosion, past the alarm's.
 const BLAST_SOURCE: sjk_audio::SourceId = sjk_audio::SourceId(super::SOURCE_BASE | 0x1_0001);
+/// How long after telling the hub the player is out a read that still has them in the
+/// chase sends the report again (hub report #304: a report lost on the way left the
+/// player out on their screen and in the chase on the hub's, so the mark could never win).
+const RESEND_AFTER: Duration = Duration::from_secs(5);
+/// How many times the report goes again at most, a read apart.
+const RESEND_MAX: u8 = 3;
+
+/// The player's own report that they are out of the chase, kept until the hub's read or
+/// event shows it counted.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct Unconfirmed {
+    /// The mark of the chase it was told in.
+    mark: u8,
+    out: HuntOut,
+    /// When it last went.
+    sent: Instant,
+    /// How many times it went again.
+    again: u8,
+}
 
 /// The hunt as this client follows it.
 #[derive(Default)]
@@ -68,6 +87,8 @@ pub(crate) struct Hunt {
     /// The player is out of the told mark's chase (killed by the mark, or caught
     /// cheating): the mark is no longer shown to them, and nothing more is told.
     out: Option<HuntOut>,
+    /// That out as this client told the hub, until the hub shows it counted.
+    unconfirmed: Option<Unconfirmed>,
     /// The player's own state and commands, watched for teleports and noclip.
     watch: super::hunt_watch::Watch,
     /// The map watched (its BSP's address): a new one starts the watch again.
@@ -111,6 +132,7 @@ impl Hunt {
     fn tell(&mut self, slot: u8, own: u8, name: &str, now: Instant) -> (bool, String) {
         self.told = Some(slot);
         self.out = None;
+        self.unconfirmed = None;
         self.card = Some(Card {
             slot,
             name: name.to_owned(),
@@ -129,10 +151,47 @@ impl Hunt {
         self.card = None;
         self.ends = None;
         self.out = None;
+        self.unconfirmed = None;
         self.typing = None;
         if let Some((_, state)) = &mut self.state {
             state.mark = None;
         }
+    }
+
+    /// The player told the hub at `now` they are out of the chase of the mark on `mark`.
+    fn reported(&mut self, mark: u8, out: HuntOut, now: Instant) {
+        self.unconfirmed = Some(Unconfirmed {
+            mark,
+            out,
+            sent: now,
+            again: 0,
+        });
+    }
+
+    /// A read of the hunt taken at `now`: whether the player's out, told before, goes to
+    /// the hub again. The hub counted it when the read says the player is out, or has no
+    /// mark or another one (a mark who blew up rests the hunt); a read that still has the
+    /// player in the same chase [`RESEND_AFTER`] the report means the report was lost
+    /// (hub report #304), and it goes again, [`RESEND_MAX`] times at most. The hub counts
+    /// an out once, so a report sent twice pays nothing twice.
+    fn confirm(&mut self, state: &HuntState, now: Instant) -> Option<HuntOut> {
+        let told = self.unconfirmed.as_mut()?;
+        let same_chase = state.hunting
+            && state.out.is_none()
+            && state
+                .mark
+                .as_ref()
+                .is_some_and(|mark| mark.slot == told.mark);
+        if !same_chase || told.again >= RESEND_MAX {
+            self.unconfirmed = None;
+            return None;
+        }
+        if now.saturating_duration_since(told.sent) < RESEND_AFTER {
+            return None;
+        }
+        told.sent = now;
+        told.again += 1;
+        Some(told.out)
     }
 
     /// Whether the player is the mark: the last read says so, or the hub's event did
@@ -277,6 +336,16 @@ fn survived_words(slot: u8, own: u8, credits: u64, hunters: u32, name: &str) -> 
     }
 }
 
+/// Whether hunt event `said` paid the player on `own` credits: the mark's win when they
+/// outlasted every hunter, or the price of a box that blew up handed to them.
+fn pays(said: HuntEvent, own: u8) -> bool {
+    match said {
+        HuntEvent::Survived { slot, credits, .. } => slot == own && credits > 0,
+        HuntEvent::Laugh { to, credits, .. } => to == Some(own) && credits > 0,
+        _ => false,
+    }
+}
+
 /// What the player on `own` is told when the mark on `slot` (named `name`) blew up,
 /// caught cheating or in the `chat` too long, and the hunter on `to` (named `to_name`)
 /// was picked for a free box roll, which they `won` or not.
@@ -388,9 +457,12 @@ impl GpuState {
                 .cloned()
         })
         .flatten();
+        // The player's out, told before, that this read shows the hub never counted.
+        let mut again = None;
         if let Some((serial, read_on, mut state)) = read {
             hunt.seen = serial;
             self.mystery_boxes.free = state.free;
+            again = hunt.confirm(&state, now);
             if let Some(mark) = state.mark.as_ref().filter(|_| state.hunting) {
                 let unix = std::time::SystemTime::now()
                     .duration_since(std::time::UNIX_EPOCH)
@@ -442,6 +514,9 @@ impl GpuState {
         let mut lines = Vec::new();
         // Marks that blew up, for their explosions.
         let mut blown = Vec::new();
+        // An event that paid the player credits: the profile, which counts them, is read
+        // soon (hub report #314: else the next read came up to 10 minutes later).
+        let mut paid = false;
         for event in events.iter().filter(|event| event.toy == wire::HUNT_TOY) {
             let Some(said) = wire::parse_hunt_event(&event.event) else {
                 continue;
@@ -450,6 +525,7 @@ impl GpuState {
             if !on {
                 continue;
             }
+            paid |= pays(said, own);
             match said {
                 HuntEvent::Mark(slot) if hunt.told != Some(slot) => {
                     lines.push(hunt.tell(slot, own, &event.claimed_name, now));
@@ -479,6 +555,7 @@ impl GpuState {
                 HuntEvent::Out { slot, cheat } => {
                     hunt.chaser_out(slot);
                     if slot == own {
+                        hunt.unconfirmed = None;
                         hunt.out.get_or_insert(if cheat {
                             HuntOut::Cheat
                         } else {
@@ -539,6 +616,9 @@ impl GpuState {
                 }
                 HuntEvent::Mark(_) => {}
             }
+        }
+        if paid {
+            crate::player_identity::with_service(|service| service.credits_came());
         }
         // The mark read without its event (joining mid-hunt): told once too.
         let read_mark = hunt.mark().map(|mark| (mark.slot, mark.name.clone()));
@@ -634,7 +714,13 @@ impl GpuState {
             hunt.asked = Some(now);
             hunt.stale = false;
         }
-        if let Some(out) = out {
+        if let (Some(out), Some(mark)) = (out, chased) {
+            hunt.reported(mark, out, now);
+        }
+        // A new out, or one told before that the hub's read shows was lost: told again,
+        // still in the same chase (the out is the player's even when no longer in it).
+        let report = out.or(again.filter(|_| on && chased.is_some()));
+        if let Some(out) = report {
             hunt.asked = Some(now);
             crate::player_identity::with_service(|service| {
                 service.box_hunt_out(server.to_owned(), out, away);
@@ -906,6 +992,100 @@ mod tests {
         hunt.out = Some(HuntOut::Cheat);
         hunt.hunted();
         assert_eq!(hunt.out, None);
+    }
+
+    /// A read of the hunt on `server` with mark `slot` (none for `None`), the player out
+    /// by the hub's word or not.
+    fn read(slot: Option<u8>, out: Option<&str>) -> HuntState {
+        HuntState {
+            hunting: true,
+            mark: slot.map(|slot| wire::HuntMark {
+                slot,
+                ..wire::HuntMark::default()
+            }),
+            out: out.map(str::to_owned),
+            ..HuntState::default()
+        }
+    }
+
+    #[test]
+    fn an_out_the_hub_never_counted_goes_again() {
+        // Hub report #304: a hunter's cheat report was lost; their screen had them out,
+        // the hub (and the mark) still had them in the chase, so the mark never won.
+        let now = Instant::now();
+        let later = |seconds| now + Duration::from_secs(seconds);
+        let mut hunt = Hunt::default();
+        hunt.tell(4, 2, "Kyle", now);
+        hunt.reported(4, HuntOut::Cheat, now);
+        // A read that left before the report counted is not proof of a loss.
+        assert_eq!(hunt.confirm(&read(Some(4), None), later(1)), None);
+        // Still in the chase by the hub's read after: told again, a read apart.
+        assert_eq!(
+            hunt.confirm(&read(Some(4), None), later(20)),
+            Some(HuntOut::Cheat)
+        );
+        assert_eq!(hunt.confirm(&read(Some(4), None), later(22)), None);
+        assert_eq!(
+            hunt.confirm(&read(Some(4), None), later(40)),
+            Some(HuntOut::Cheat)
+        );
+        assert_eq!(
+            hunt.confirm(&read(Some(4), None), later(60)),
+            Some(HuntOut::Cheat)
+        );
+        // Three times at most.
+        assert_eq!(hunt.confirm(&read(Some(4), None), later(80)), None);
+        assert_eq!(hunt.unconfirmed, None);
+    }
+
+    #[test]
+    fn an_out_the_hub_counted_is_not_told_again() {
+        let now = Instant::now();
+        let later = now + Duration::from_secs(20);
+        let mut hunt = Hunt::default();
+        let dead = HuntOut::Dead { by: 4 };
+        // The hub's read says the player is out.
+        hunt.tell(4, 2, "Kyle", now);
+        hunt.reported(4, dead, now);
+        assert_eq!(hunt.confirm(&read(Some(4), Some("dead")), later), None);
+        assert_eq!(hunt.confirm(&read(Some(4), None), later), None);
+        // No mark any more (a mark who blew up rests the hunt), or another one.
+        for state in [read(None, None), read(Some(5), None)] {
+            hunt.reported(4, dead, now);
+            assert_eq!(hunt.confirm(&state, later), None);
+            assert_eq!(hunt.unconfirmed, None);
+        }
+        // The hub's out event, the mark hunted, or a new mark.
+        hunt.reported(4, dead, now);
+        hunt.hunted();
+        assert_eq!(hunt.confirm(&read(Some(4), None), later), None);
+        hunt.reported(4, dead, now);
+        hunt.tell(5, 2, "Jan", now);
+        assert_eq!(hunt.confirm(&read(Some(4), None), later), None);
+    }
+
+    #[test]
+    fn only_the_events_that_pay_the_player_ask_for_their_credits() {
+        // Hub report #314: the mark's win showed in the credits up to 10 minutes late.
+        let survived = |slot, credits| HuntEvent::Survived {
+            slot,
+            credits,
+            hunters: 3,
+        };
+        assert!(pays(survived(2, 300), 2));
+        assert!(!pays(survived(2, 0), 2));
+        assert!(!pays(survived(4, 300), 2));
+        let laugh = |to, credits| HuntEvent::Laugh {
+            opener: 5,
+            to,
+            credits,
+        };
+        assert!(pays(laugh(Some(2), 100), 2));
+        assert!(!pays(laugh(Some(4), 100), 2));
+        assert!(!pays(laugh(Some(2), 0), 2));
+        assert!(!pays(laugh(None, 100), 2));
+        assert!(!pays(HuntEvent::Mark(2), 2));
+        assert!(!pays(HuntEvent::Hunted { slot: 2, won: true }, 2));
     }
 
     #[test]

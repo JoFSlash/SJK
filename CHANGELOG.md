@@ -30,6 +30,10 @@ The site (site/assets/site.js, parseChangelog) reads the release headings,
 introductions and recap lines too.
 Add each release's notes here when it is tagged (docs/sjk.md "Releases").
 -->
+## Unreleased
+
+- Box hunt: a hunter out on their own screen (a teleport, or killed by the mark) whose word never reached the hub is told again, so the mark can still outlast every hunter and win, and credits the hunt pays show in your count within half a minute instead of up to 10 minutes later (hub reports #304 and #314) _(Slash)_
+
 ## 2026.1117.1 (Alpha) | 17/11/2026
 
 A devmap cheat bar, quicker votes, console translation and a log book for Fishing and Mining.

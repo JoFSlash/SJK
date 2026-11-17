@@ -276,6 +276,18 @@ away a minute stands in nobody's way and is not counted. The card counts the hun
 left ("2 OF 3 HUNTERS LEFT", from the hub's read). Hunters out only for cheating hand the
 mark nothing: one must have been killed.
 
+A player's report that they are out (killed by the mark, a cheat, or the mark's chat) is
+kept by their client until the hub shows it counted: a read of the hunt at least 5 seconds
+after it that still has them in the same chase (the hub's `out` empty, the same mark) sends
+it again, 3 times at most, a read apart (17/11/2026, hub report #304: a hunter's teleport
+report never reached the hub, so they were out on their screen and in the chase on the
+hub's and the mark's, ringed in red and counted, and the mark's kills of them and its win
+never counted). The hub counts an out once, so a report sent again pays nothing twice. The
+hub pays the mark's win the moment it is told; an event that paid the player (their
+`survived_` win, a blown box's price handed to them) asks for their profile within half a
+minute, so the credits count follows (hub report #314: before, the next read of the
+profile, up to 10 minutes later, and the win looked lost).
+
 **Cheating** (Sol, 01/11/2026): a player in a hunt, mark or hunter, who teleports
 themselves or flies in noclip is out of it at once. The hub sees neither, so the player's
 own client watches its own player state and its own commands
