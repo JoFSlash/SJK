@@ -2585,6 +2585,18 @@ test: Only chat, team chat and whispers show; cvar changes and connect lines do 
 test: Select across a few lines and Ctrl+C: only the chat lines are copied.
 test: Switch it off: every line is back, in order. Both con_style sjk and classic.
 
+[console-find]
+area: Console & chat
+title: Console find bar: Ctrl+F (Slash, after headshotsmcgee117's idea)
+change: Ctrl+F in the open console puts a find field in place of the input line.
+change: Matches are marked (any case, colour codes ignored), the count shows n/m from the newest.
+test: Open the console with lots of output, Ctrl+F, type a word: matches are marked, 1/m shows.
+test: Enter or F3 goes to older matches, Shift+Enter or Shift+F3 to newer, scrolling there.
+test: Type a word with a colour code inside it in the scrollback (^1He^7llo): hello finds it.
+test: Ctrl+A, C, V and a held Backspace work in the field; Page Up and Down still scroll.
+test: Escape: the input line is back as it was. With con_chatOnly 1 only chat is searched.
+test: Both con_style sjk and classic.
+
 [console-feed]
 area: Console & chat
 title: Console feed (top left notify lines) off by default, con_drawNotify

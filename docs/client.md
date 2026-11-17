@@ -7963,6 +7963,7 @@ never shows through an opaque console.
 | Up, Down, keypad 8 and 2 (Num Lock off), Shift+wheel, Ctrl+P, Ctrl+N | Command history (32 commands) |
 | Ctrl+L | Clear the scrollback |
 | Insert | Toggle overstrike: typing replaces the character after the cursor |
+| Ctrl+F | Find in the scrollback (below) |
 
 Shift's heights follow EternalJK's `CL_KeyDownEvent` by default; `con_shiftHeight`
 (archived, off; Settings > Interface, "Swap Shift console size") swaps
@@ -8030,6 +8031,24 @@ all again, and a selection copies only the chat lines it spans. The header (SJK 
 console) or the version line (classic) says "Chat only" while it is on. The feed over
 the game, the console socket and `cl_logChat` are unchanged
 ([console_chat_only.rs](../crates/sjk-viewer/src/console_chat_only.rs)).
+
+Ctrl+F, after headshotsmcgee117's idea (Sol's ideas recap, 16/11/2026), puts a find
+field in place of the input line, in both looks: "Find:" where the prompt's mark is,
+the search, and at the right which match is current of how many, counted from the
+newest (`1/5`; `0/0` in red when nothing matches). What is typed is looked for in the
+scrollback ignoring case and `^0`-`^9` colour codes (`hello` finds `^1He^7llo`): every
+match is marked in gold, the current one brighter, and the console scrolls to the
+newest. Enter, F3 or Up goes to the next older match, Shift+Enter, Shift+F3 or Down
+to the next newer one, wrapping round, each scrolling the match to the middle of the
+rows. Page Up and Down and Ctrl+Home and End still scroll; the field has the input
+line's caret, deletion and clipboard keys (Ctrl+A, C, V, X, Shift+Insert, a held
+Backspace), and Ctrl+F again selects its text. Escape closes the field and gives the
+input line back as it was; closing the console closes it too, and the next Ctrl+F
+brings the last search back, selected. With `con_chatOnly` on only the chat lines on
+show are searched; translations under chat lines are not. Matches are found again
+only when the search, the scrollback or `con_chatOnly` changes
+([console_find.rs](../crates/sjk-viewer/src/console_find.rs)). Verified by unit tests
+(matching, the count and its steps, the scroll, chat only).
 
 ### SJK UI console
 

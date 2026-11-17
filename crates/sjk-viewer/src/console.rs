@@ -1292,6 +1292,7 @@ impl ViewerConsole {
             self.holocrons_panel.close();
             self.sjk_chat_panel.close();
             self.config_import.close();
+            self.classic.find.close();
         }
     }
 

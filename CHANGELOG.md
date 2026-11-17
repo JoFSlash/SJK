@@ -30,6 +30,10 @@ The site (site/assets/site.js, parseChangelog) reads the release headings,
 introductions and recap lines too.
 Add each release's notes here when it is tagged (docs/sjk.md "Releases").
 -->
+## Unreleased
+
+- Console find: Ctrl+F in the open console opens a find field; what you type is marked in the scrollback (any case, colour codes ignored) with how many matches there are, Enter or F3 goes to the next older one and Shift+Enter or Shift+F3 to the next newer one, scrolling there, and Escape gives the input line back _(Slash, after headshotsmcgee117's idea)_
+
 ## 2026.1117.1 (Alpha) | 17/11/2026
 
 A devmap cheat bar, quicker votes, console translation and a log book for Fishing and Mining.

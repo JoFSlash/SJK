@@ -27,6 +27,8 @@
 /// What the console says while `con_chatOnly` shows chat alone.
 pub(super) const CHAT_ONLY: &str = "Chat only";
 
+#[path = "console_find.rs"]
+mod find;
 #[path = "console_sjk.rs"]
 pub(crate) mod sjk;
 
@@ -420,6 +422,8 @@ pub(super) struct State {
     clock: [u8; 8],
     /// What the SJK UI's console keeps between frames.
     pub(super) sjk: sjk::Chrome,
+    /// The find bar (Ctrl+F, `console_find.rs`).
+    pub(super) find: find::Find,
 }
 
 impl State {
@@ -693,6 +697,7 @@ impl ViewerConsole {
         // Scrollback rows at this width, new rows keeping a scrolled-back view.
         let text_columns = grid.text_columns(stamps);
         let added = self.classic_rows(text_columns, options.chat_only);
+        self.refresh_find(options.chat_only);
         let total = self.classic.rows.len();
         if self.scroll_offset > 0 {
             self.scroll_offset = self.scroll_offset.saturating_add(added);
@@ -704,6 +709,8 @@ impl ViewerConsole {
         } else {
             self.classic_chrome(frame, &painter, fraction, lines, options)
         };
+        let visible = ((layout.rows_y - layout.rows_top) / grid.pitch).max(0.0) as usize + 1;
+        self.find_jump(visible);
         let mut y = layout.rows_y;
         if self.scroll_offset > 0 {
             if sjk_look {
@@ -749,8 +756,12 @@ impl ViewerConsole {
             } else {
                 Prompt::CLASSIC
             };
-            self.classic_input(frame, &painter, layout.input_y, prompt);
-            if sjk_look {
+            if self.open && self.classic.find.is_open() {
+                self.find_row(frame, &painter, layout.input_y, prompt);
+            } else {
+                self.classic_input(frame, &painter, layout.input_y, prompt);
+            }
+            if sjk_look && !self.classic.find.is_open() {
                 self.sjk_ghost(frame, &painter, layout.input_y, prompt);
             }
         }
@@ -995,6 +1006,11 @@ impl ViewerConsole {
                         color: ink.highlight,
                     });
                 }
+            }
+            if visible {
+                self.classic
+                    .find
+                    .highlight(frame, &grid, line, span, text, text_column, y);
             }
             if visible && translate_hover == Some(line) {
                 frame.quads.push(SolidQuad {

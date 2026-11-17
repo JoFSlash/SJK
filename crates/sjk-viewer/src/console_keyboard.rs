@@ -317,7 +317,7 @@ impl ViewerConsole {
             self.browser_action(action);
             return true;
         }
-        if self.classic_key(event, key) {
+        if self.find_key(event, key) || self.classic_key(event, key) {
             return true;
         }
         // Keys the console acts on itself end a pending composition when the platform
