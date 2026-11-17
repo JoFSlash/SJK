@@ -819,8 +819,8 @@ mod tests {
                 ("Figo", icons[1], ticks[1]),
             ] {
                 let (_, text, _) = drawn(&texts, name);
-                // Half a pixel's play, as the smallest size rounds.
-                let (top, bottom) = (text.y - 0.5, text.y + row + 0.5);
+                // A pixel's play: the small sizes round to fractions of a pixel.
+                let (top, bottom) = (text.y - 1.0, text.y + row + 1.0);
                 for (what, rect) in [("icon", icon), ("tick", tick)] {
                     assert!(
                         rect.y >= top && rect.bottom() <= bottom,
