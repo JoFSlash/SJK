@@ -769,7 +769,9 @@ request, 08/10/2026):
   holocron's or crystal's picture instead (01/11/2026,
   [holocrons.md](holocrons.md#chat-lines)). The dock and the page, which show only SJK
   chat, have no mark. A message sent from another client that takes part in SJK chat
-  starts with that client's icon instead, at the same size: the clients are the
+  starts with that client's icon instead, sized to its row (0.9 of the row pitch, as
+  the backdrop's band; a full disc at the emblem's side reached over the rows above and
+  below, hub report #321, 17/11/2026): the clients are the
   entries of [chat/client_icons.rs](../crates/sjk-viewer/src/chat/client_icons.rs)
   (`KNOWN`, each with why and its evidence; today JoF EternalJK, `client` `ejk`,
   `ui_renderer::EJK_TEXTURE`, `assets/branding/jof-ejk-icon.png`, 21/10/2026, and the
