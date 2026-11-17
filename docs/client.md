@@ -4651,7 +4651,9 @@ command new for them (`DrawCommand::Polygon`, [rendering.md](rendering.md#submis
   `cg_nameplateDuel` (on; Settings >
   Quick > Nameplates > Duel badge) turns it off, and it shows with the name, so
   `cg_nameplate 0` hides it too. The duellist's body is drawn as JoF EJK draws it (see
-  [Entity render effects](rendering.md#entity-render-effects)).
+  [Entity render effects](rendering.md#entity-render-effects)); with `cg_duelGhost 2`
+  (Duel figures (JoF): Hidden) a player in no duel does not see the duellists, their
+  plates or their sounds at all.
 - `cg_duelHideOthers` (1, Auto; Settings > Advanced > Gameplay > Hide others in
   duel) hides everyone but you and your duel partner while you, or the player you
   follow, are in a private duel, as JoF EJK does (EternalJK `CG_Player`,

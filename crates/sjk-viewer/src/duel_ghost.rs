@@ -18,15 +18,40 @@
 //! Its `textures/colors/red` and `textures/colors/blue` are plain colours; SJK
 //! mounts its own below game data in case an installation lacks them.
 //!
-//! `cg_duelGhost` (default on) chooses it; off keeps the stock look.
+//! `cg_duelGhost` ([`Look`]) chooses it (1, the default); 0 keeps the stock look, and
+//! 2 hides the duellists altogether, with their sabers, shots, events and sounds
+//! (headshotsmcgee117's idea, [`sjk_client::DuelHideScope::Duellists`]). Each holds
+//! only while the viewer (or the player it follows) is in no duel itself.
 
 use sjk_vfs::{VfsError, VirtualFileSystem};
 
 /// The figure's shader: EternalJK's `gfx/effects/duelShader` (`cgs.media.duelShader`),
 /// with a lighter blue.
 pub(crate) const SHADER: &str = "sjk/duelFigure";
-/// On: duellists as blue figures (JoF EJK); off: dark bodies under the sight bubble.
+/// How players in others' duels look: [`Look`].
 pub(crate) const CVAR: &str = "cg_duelGhost";
+
+/// `cg_duelGhost`: how a viewer in no duel sees the players in a private duel.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum Look {
+    /// 0: dark under the blue sight bubble, as stock JKA draws them.
+    Dark,
+    /// 1, the default: JoF EJK's see-through blue figures.
+    Figures,
+    /// 2: not drawn or heard at all.
+    Hidden,
+}
+
+impl Look {
+    /// The look a cvar value names; values out of range are the default.
+    pub(crate) fn from_cvar(value: i64) -> Self {
+        match value {
+            0 => Self::Dark,
+            2 => Self::Hidden,
+            _ => Self::Figures,
+        }
+    }
+}
 
 const SHADER_FILE: &str = "// SJK: JoF EJK's duel look (duel_ghost.rs), after EternalJK's
 // assets/japro/shaders/japro_players.shader (gfx/effects/duelShader), its last blue
@@ -95,6 +120,23 @@ mod tests {
         assert!(shaders[0].name.eq_ignore_ascii_case(SHADER));
         assert_eq!(shaders[0].stages.len(), 3);
         assert_eq!(shaders[0].stages[0].rgb_constant, Some([0.1, 0.1, 0.4]));
+    }
+
+    #[test]
+    fn the_look_follows_the_cvar_and_hidden_reaches_the_duel_hiding() {
+        assert_eq!(Look::from_cvar(0), Look::Dark);
+        assert_eq!(Look::from_cvar(1), Look::Figures);
+        assert_eq!(Look::from_cvar(2), Look::Hidden);
+        assert_eq!(Look::from_cvar(9), Look::Figures);
+        let directory = tempfile::tempdir().unwrap();
+        let mut console =
+            crate::console::ViewerConsole::new(directory.path().join("config.cfg")).unwrap();
+        assert_eq!(console.integer_cvar(CVAR), Some(1));
+        assert!(!console.duel_hide().hide_duellists);
+        assert!(console.set_cvar(CVAR, "2"));
+        assert!(console.duel_hide().hide_duellists);
+        assert!(console.set_cvar(CVAR, "0"));
+        assert!(!console.duel_hide().hide_duellists);
     }
 
     #[test]

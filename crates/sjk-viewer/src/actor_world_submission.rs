@@ -254,8 +254,10 @@ pub(crate) fn submit(
     let duel_ghosts = gpu
         .console
         .as_ref()
-        .and_then(|console| console.bool_cvar(crate::duel_ghost::CVAR))
-        .unwrap_or(true);
+        .and_then(|console| console.integer_cvar(crate::duel_ghost::CVAR))
+        .is_none_or(|value| {
+            crate::duel_ghost::Look::from_cvar(value) != crate::duel_ghost::Look::Dark
+        });
     let shield_passes = gpu
         .console
         .as_ref()

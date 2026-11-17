@@ -695,6 +695,7 @@ mod duel_visibility_tests {
         assert!(adapter.set_duel_hide(crate::DuelHideSettings {
             mode: crate::DuelHideMode::Always,
             plugin_disable: 0,
+            hide_duellists: false,
         }));
         assert!(adapter.apply_snapshot(&duel, &game, &mut world));
         assert!(present(&world, 1), "the partner stays");
@@ -702,6 +703,7 @@ mod duel_visibility_tests {
         assert!(adapter.set_duel_hide(crate::DuelHideSettings {
             mode: crate::DuelHideMode::Off,
             plugin_disable: 0,
+            hide_duellists: false,
         }));
         assert!(adapter.apply_snapshot(&duel, &game, &mut world));
         assert!(present(&world, 2));

@@ -10255,3 +10255,12 @@ change: While an NPC's model loads on the worker it is drawn as nothing, not the
 change: An NPC whose model failed to load still shows the stand-in.
 test: Kill tauntauns where they respawn: no Kyle appears before the next one.
 test: devmap, npc spawn reborn and a vehicle from the spawn list: no Kyle for a moment.
+
+[duel-hidden-duellists]
+area: Rendering & effects
+title: Others' duellists can be hidden (cg_duelGhost 2, after headshotsmcgee117's idea)
+change: Duel figures (JoF) has a third choice, Hidden: players in others' duels are not drawn.
+change: Their sabers, shadow, nameplate, effects and sounds go too; your own duel is untouched.
+test: Settings > Quick > Duel figures (JoF): Hidden. Two others duel: they vanish, silent.
+test: The duel ends: both show again. Figures (default) and Dark look as before.
+test: Follow a duellist as a spectator, or duel yourself: you and your opponent show.

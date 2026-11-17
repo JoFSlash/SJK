@@ -92,6 +92,7 @@ mod tests {
             DuelHideSettings {
                 mode: DuelHideMode::Always,
                 plugin_disable: 2,
+                hide_duellists: false,
             }
         );
         assert!(console.set_cvar(HIDE_OTHERS_CVAR, "0"));
@@ -104,6 +105,7 @@ mod tests {
         let always = DuelHideSettings {
             mode: DuelHideMode::Always,
             plugin_disable: 0,
+            hide_duellists: false,
         };
         let mut view = HiddenView::default();
         let snapshot = duel(1);

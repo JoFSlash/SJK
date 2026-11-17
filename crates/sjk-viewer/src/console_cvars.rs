@@ -1392,9 +1392,9 @@ pub(super) fn register_daily_cvars(cvars: &mut CvarRegistry) -> Result<(), sjk_s
         ),
         CvarDefinition::new(
             crate::duel_ghost::CVAR,
-            true,
+            1_i64,
             archive,
-            "Players in a duel show as see-through blue figures, as on JoF EJK (1), or dark under the blue bubble (0)",
+            "Players in others' duels: 0 dark under the blue bubble (stock), 1 see-through blue figures as on JoF EJK, 2 hidden",
         ),
         CvarDefinition::new(
             "cg_shieldBrightnessDefaultVersion",

@@ -45,7 +45,8 @@ pub use duel_isolation::{DuelIsolation, duel_passes_through};
 mod duel_hide;
 pub use duel_hide::{
     DUEL_HIDE_SERVERS, DUEL_SEE_OTHERS, DuelHide, DuelHideMode, DuelHidePolicy, DuelHideRule,
-    DuelHideServer, DuelHideSettings, EVENT_ACTORS, EventActor, duel_hidden_snapshot,
+    DuelHideScope, DuelHideServer, DuelHideSettings, EVENT_ACTORS, EventActor,
+    duel_hidden_snapshot,
 };
 mod duel_look;
 pub use duel_look::{DuelActor, DuelViewer, legacy_duel_ghost, legacy_duel_tint};

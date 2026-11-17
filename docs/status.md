@@ -1,3 +1,16 @@
+## Duels: others' duellists can be hidden (17/11/2026)
+
+17/11/2026, `feat/duel-invisible` (Slash, after headshotsmcgee117's idea in #ideas,
+13/11/2026): players outside a duel wanted duellists gone altogether, not shown as
+figures. `cg_duelGhost` is now 0 Dark (stock), 1 Figures (the default, unchanged) or
+2 Hidden; Hidden leaves every player whose `bolt1` is set out of what is presented
+while the viewer, or the player it follows, is in no duel
+([duel_hide.rs](../crates/sjk-client/src/duel_hide.rs), `DuelHideScope::Duellists`,
+read from `DuelHideSettings::hide_duellists`), so body, sabers, shadow, nameplate,
+effects, loops and their `EVENT_ACTORS` events go, on every server. Unit tests only;
+known limits: shots of a duellist stay where the server does not set the missile owner
+(stock, JA+), and a saber clash flare (`EV_SABER_CLASH`, no wielder in it) still shows.
+
 ## Game chat: client icons and ticks (13/11/2026)
 
 13/11/2026, `personal/chat-client-icons` based on `main` `cdd73b774` (Sol: "I would like to

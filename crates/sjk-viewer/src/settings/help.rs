@@ -211,6 +211,9 @@ const CHOICE_NAMES: &[(&str, &str, &str)] = &[
     (crate::text::charset::CVAR, "auto", "Auto"),
     (crate::text::charset::CVAR, "western", "Western"),
     (crate::text::charset::CVAR, "cyrillic", "Cyrillic"),
+    (crate::duel_ghost::CVAR, "0", "Dark"),
+    (crate::duel_ghost::CVAR, "1", "Figures"),
+    (crate::duel_ghost::CVAR, "2", "Hidden"),
     (crate::duel_visibility::HIDE_OTHERS_CVAR, "0", "Off"),
     (crate::duel_visibility::HIDE_OTHERS_CVAR, "1", "Auto"),
     (crate::duel_visibility::HIDE_OTHERS_CVAR, "2", "Always"),
@@ -1307,7 +1310,7 @@ const HELP: &[(&str, &str)] = &[
     ),
     (
         crate::duel_ghost::CVAR,
-        "On: players in a duel show as see-through blue figures, as on JoF EJK. Off: dark under a blue bubble, as in the base game.",
+        "Others' duels, when you are in none. Figures: see-through blue, as on JoF EJK. Dark: under a blue bubble, as stock. Hidden: gone.",
     ),
     (
         crate::duel_visibility::HIDE_OTHERS_CVAR,

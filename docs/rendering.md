@@ -2161,6 +2161,16 @@ Private duels are drawn as JoF EJK's `CG_Player` draws them (EternalJK
   50) under the `gfx/misc/sightbubble` shell at JoF EJK's 100 100 255
   ([force_overlays.rs](../crates/sjk-client/src/force_overlays.rs)), a lighter blue than
   stock's 50 50 255.
+- With `cg_duelGhost 2` (Hidden, headshotsmcgee117's idea), a viewer in no duel does
+  not see the duellists at all: every player whose `bolt1` is set leaves what is
+  presented, as `cg_duelHideOthers` leaves out bystanders the other way round
+  (`DuelHideScope::Duellists` in
+  [duel_hide.rs](../crates/sjk-client/src/duel_hide.rs)), so the body, its sabers and
+  their glow, shadow, Force effects, nameplate, loops and its events (footsteps,
+  swings, saber hits and blocks by the wielder, pain; table `EVENT_ACTORS`) go with it,
+  and its thrown saber too. Shots are hidden by their owner only where the server sets
+  it (jaPRO). It holds on every server. The viewer's own duel, or the duel of the
+  player it follows, is never hidden by it.
 - In a duel, everyone but the two duellists is drawn at a fifth of their colour
   (`RF_RGB_TINT`). The two duellists look as they are: stock's distance-lit
   `powerups/forceshell` on them is EternalJK's `cg_stylePlayer` shell bit, off by

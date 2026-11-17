@@ -20,6 +20,13 @@
 //! skips for a non-duellist (`cgame/cg_event.c`, [`EVENT_ACTORS`]). Their sounds,
 //! effects and trails go with them. Movement prediction, the HUD and demos keep the
 //! snapshot as received.
+//!
+//! The other way round, `cg_duelGhost 2` ([`DuelHideSettings::hide_duellists`],
+//! headshotsmcgee117's idea) hides the duellists from a viewer in no duel: every
+//! player whose `bolt1` says it duels goes the same way, with its thrown saber, its
+//! events and, where the server says who fired them, its shots
+//! ([`DuelHideScope::Duellists`]). It holds on every server; stock draws them dark
+//! under the sight bubble and JoF EJK as blue figures instead.
 
 use crate::CompatProfile;
 use sjk_protocol::{EntityState, GameState, PlayerState, Snapshot};
@@ -113,6 +120,9 @@ pub struct DuelHideSettings {
     /// The `cp_pluginDisable` the server is sent ([`crate::PLUGIN_DISABLE_DEFAULT`]
     /// when unset).
     pub plugin_disable: u32,
+    /// `cg_duelGhost 2`: players in a private duel are hidden while the viewer is in
+    /// none. Off by default.
+    pub hide_duellists: bool,
 }
 
 impl Default for DuelHideSettings {
@@ -120,6 +130,7 @@ impl Default for DuelHideSettings {
         Self {
             mode: DuelHideMode::Auto,
             plugin_disable: crate::PLUGIN_DISABLE_DEFAULT,
+            hide_duellists: false,
         }
     }
 }
@@ -134,9 +145,7 @@ pub struct DuelHidePolicy {
 impl DuelHideSettings {
     /// Whether bystanders are hidden on a server of `profile`, and how.
     pub fn policy(&self, profile: &CompatProfile) -> Option<DuelHidePolicy> {
-        let family = DUEL_HIDE_SERVERS
-            .iter()
-            .find(|family| family.profile == profile.id());
+        let family = duel_hide_family(profile);
         let missiles = family.is_some_and(|family| family.missile_owners);
         let hides = match self.mode {
             DuelHideMode::Off => false,
@@ -148,6 +157,13 @@ impl DuelHideSettings {
         };
         hides.then_some(DuelHidePolicy { missiles })
     }
+}
+
+/// The [`DUEL_HIDE_SERVERS`] entry of `profile`, if it has one.
+fn duel_hide_family(profile: &CompatProfile) -> Option<&'static DuelHideServer> {
+    DUEL_HIDE_SERVERS
+        .iter()
+        .find(|family| family.profile == profile.id())
 }
 
 /// Who a temporary event entity is from, when EJK skips it for a non-duellist.
@@ -182,13 +198,27 @@ pub const EVENT_ACTORS: &[(u16, EventActor)] = &[
     (115, EventActor::Client),      // EV_TAUNT, :2202
 ];
 
-/// The duel of one snapshot's player whose outsiders are hidden.
+/// Who [`DuelHide`] leaves out.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum DuelHideScope {
+    /// The viewer duels `partner` (`ps.duelIndex`): everyone outside the pair.
+    Outsiders {
+        /// The duel partner.
+        partner: u16,
+    },
+    /// The viewer is in no duel: the players duelling, one bit per client number
+    /// (`cg_duelGhost 2`).
+    Duellists(u64),
+}
+
+/// What one snapshot's player does not see of a private duel: the players outside
+/// its own duel, or the duellists of others' duels.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct DuelHide {
     /// The viewer (`ps.clientNum`, the followed player when following).
     pub client: u16,
-    /// The duel partner (`ps.duelIndex`).
-    pub partner: u16,
+    /// Who is left out.
+    pub scope: DuelHideScope,
     /// Missiles are hidden by their owner.
     pub missiles: bool,
 }
@@ -199,8 +229,38 @@ impl DuelHide {
         let policy = policy?;
         player.duel_in_progress().then(|| Self {
             client: player.client_num(),
-            partner: player.duel_index(),
+            scope: DuelHideScope::Outsiders {
+                partner: player.duel_index(),
+            },
             missiles: policy.missiles,
+        })
+    }
+
+    /// The duellists that `snapshot`'s player, in no duel itself, does not see when
+    /// `settings` hides them: every other player whose `bolt1` is set.
+    pub fn duellists(
+        snapshot: &Snapshot,
+        profile: &CompatProfile,
+        settings: DuelHideSettings,
+    ) -> Option<Self> {
+        if !settings.hide_duellists || snapshot.player.duel_in_progress() {
+            return None;
+        }
+        let client = snapshot.player.client_num();
+        let duellists = snapshot
+            .entities
+            .iter()
+            .filter(|state| {
+                state.entity_type() == ET_PLAYER
+                    && state.bolt1()
+                    && state.number() != client
+                    && state.number() < 64
+            })
+            .fold(0u64, |bits, state| bits | 1 << state.number());
+        (duellists != 0).then(|| Self {
+            client,
+            scope: DuelHideScope::Duellists(duellists),
+            missiles: duel_hide_family(profile).is_some_and(|family| family.missile_owners),
         })
     }
 
@@ -210,36 +270,54 @@ impl DuelHide {
         game: &GameState,
         settings: DuelHideSettings,
     ) -> Option<Self> {
-        if settings.mode == DuelHideMode::Off || !snapshot.player.duel_in_progress() {
+        if snapshot.player.duel_in_progress() {
+            if settings.mode == DuelHideMode::Off {
+                return None;
+            }
+            return Self::new(
+                &snapshot.player,
+                settings.policy(&CompatProfile::from_game_state(game)),
+            );
+        }
+        if !settings.hide_duellists {
             return None;
         }
-        Self::new(
-            &snapshot.player,
-            settings.policy(&CompatProfile::from_game_state(game)),
-        )
+        Self::duellists(snapshot, &CompatProfile::from_game_state(game), settings)
     }
 
-    fn in_duel(&self, number: u16) -> bool {
-        number == self.client || number == self.partner
+    /// Whether client (or entity) `number` is one of those left out.
+    fn hidden(&self, number: u16) -> bool {
+        match self.scope {
+            DuelHideScope::Outsiders { partner } => number != self.client && number != partner,
+            DuelHideScope::Duellists(bits) => {
+                number != self.client && number < 64 && bits & 1 << number != 0
+            }
+        }
     }
 
     /// Whether `state` is left out of what is presented.
     pub fn hides(&self, state: &EntityState) -> bool {
         match state.entity_type() {
-            ET_PLAYER => !self.in_duel(state.number()),
-            // Every NPC but the viewer's own vehicle (`cg_players.c:11983`).
-            ET_NPC => !(state.npc_class() == CLASS_VEHICLE && state.owner() == self.client),
+            ET_PLAYER => self.hidden(state.number()),
+            // Every NPC but the viewer's own vehicle (`cg_players.c:11983`); NPCs do
+            // not duel.
+            ET_NPC => match self.scope {
+                DuelHideScope::Outsiders { .. } => {
+                    !(state.npc_class() == CLASS_VEHICLE && state.owner() == self.client)
+                }
+                DuelHideScope::Duellists(_) => false,
+            },
             ET_GENERAL => {
-                crate::legacy_thrown_saber_owner(state).is_some_and(|owner| !self.in_duel(owner))
+                crate::legacy_thrown_saber_owner(state).is_some_and(|owner| self.hidden(owner))
             }
-            ET_MISSILE => self.missiles && !self.in_duel(state.owner()),
+            ET_MISSILE => self.missiles && self.hidden(state.owner()),
             kind if kind >= ET_EVENTS => {
                 let event = u16::from(kind - ET_EVENTS);
                 EVENT_ACTORS
                     .iter()
                     .find(|(listed, _)| *listed == event)
                     .is_some_and(|(_, actor)| {
-                        !self.in_duel(match actor {
+                        self.hidden(match actor {
                             EventActor::Client => state.client_num(),
                             EventActor::OtherEntity2 => state.other_entity_num2(),
                         })
@@ -285,7 +363,7 @@ mod tests {
     fn duel(missiles: bool) -> DuelHide {
         DuelHide {
             client: 0,
-            partner: 1,
+            scope: DuelHideScope::Outsiders { partner: 1 },
             missiles,
         }
     }
@@ -294,6 +372,7 @@ mod tests {
         DuelHideSettings {
             mode,
             plugin_disable,
+            hide_duellists: false,
         }
     }
 
@@ -358,7 +437,8 @@ mod tests {
         player.set_raw_field(119, 1);
         player.set_raw_field(44, 5);
         let hide = DuelHide::new(&player, policy).unwrap();
-        assert_eq!((hide.client, hide.partner), (3, 5));
+        assert_eq!(hide.client, 3);
+        assert_eq!(hide.scope, DuelHideScope::Outsiders { partner: 5 });
         assert_eq!(DuelHide::new(&player, None), None);
     }
 
@@ -452,5 +532,115 @@ mod tests {
         assert!(duel_hidden_snapshot(&snapshot, &game, off).is_none());
         snapshot.entities.remove(1);
         assert!(duel_hidden_snapshot(&snapshot, &game, always).is_none());
+    }
+
+    /// Clients 1 and 2 duelling (`bolt1`), client 3 not, seen by client 0.
+    fn others_duel() -> Snapshot {
+        let duellist = |number| with(entity(number, ET_PLAYER), 91, 1);
+        Snapshot {
+            message_sequence: 1,
+            reliable_acknowledge: 0,
+            server_commands: Vec::new(),
+            server_time: 1_000,
+            delta_from: None,
+            flags: 0,
+            area_mask: Vec::new(),
+            player: PlayerState::default(),
+            vehicle_player: None,
+            entities: vec![
+                duellist(1),
+                duellist(2),
+                entity(3, ET_PLAYER),
+                with(entity(40, ET_NPC), 91, 1),
+                entity(60, 4),
+            ],
+            consumed_bits: 0,
+        }
+    }
+
+    fn hide_duellists(mode: DuelHideMode) -> DuelHideSettings {
+        DuelHideSettings {
+            hide_duellists: true,
+            ..settings(mode, 0)
+        }
+    }
+
+    #[test]
+    fn hidden_duellists_leave_a_bystanders_view_on_every_server() {
+        let game = GameState::empty_local(0);
+        let snapshot = others_duel();
+        // Off by default: others' duels as received.
+        assert!(!DuelHideSettings::default().hide_duellists);
+        assert!(duel_hidden_snapshot(&snapshot, &game, DuelHideSettings::default()).is_none());
+        // On, even with cg_duelHideOthers 0: only the two duellists go.
+        for mode in [DuelHideMode::Off, DuelHideMode::Auto, DuelHideMode::Always] {
+            let hidden = duel_hidden_snapshot(&snapshot, &game, hide_duellists(mode)).unwrap();
+            let numbers: Vec<u16> = hidden.entities.iter().map(EntityState::number).collect();
+            assert_eq!(numbers, [3, 40, 60], "{mode:?}");
+        }
+        let hide = DuelHide::duellists(
+            &snapshot,
+            &CompatProfile::BaseJka,
+            hide_duellists(DuelHideMode::Auto),
+        )
+        .unwrap();
+        assert_eq!(hide.scope, DuelHideScope::Duellists(0b110));
+        assert!(!hide.missiles);
+        // No duel in sight: nothing to hide.
+        let mut calm = snapshot.clone();
+        calm.entities.drain(..2);
+        assert!(duel_hidden_snapshot(&calm, &game, hide_duellists(DuelHideMode::Auto)).is_none());
+    }
+
+    #[test]
+    fn a_duellist_or_its_follower_sees_its_own_duel_whatever_the_setting() {
+        let game = GameState::empty_local(0);
+        let mut snapshot = others_duel();
+        // The viewer (or the player it follows) is client 1, duelling client 2.
+        snapshot.player.set_client_num(1);
+        snapshot.player.set_raw_field(119, 1);
+        snapshot.player.set_raw_field(44, 2);
+        let off = DuelHideSettings {
+            hide_duellists: true,
+            ..settings(DuelHideMode::Off, 0)
+        };
+        assert!(duel_hidden_snapshot(&snapshot, &game, off).is_none());
+        let always = hide_duellists(DuelHideMode::Always);
+        let hidden = duel_hidden_snapshot(&snapshot, &game, always).unwrap();
+        let numbers: Vec<u16> = hidden.entities.iter().map(EntityState::number).collect();
+        // The outsiders go as before; the partner stays.
+        assert_eq!(numbers, [1, 2, 60]);
+    }
+
+    #[test]
+    fn a_hidden_duellists_saber_events_and_known_shots_go_too() {
+        let hide = DuelHide {
+            client: 0,
+            scope: DuelHideScope::Duellists(0b110),
+            missiles: true,
+        };
+        assert!(hide.hides(&entity(1, ET_PLAYER)));
+        assert!(!hide.hides(&entity(3, ET_PLAYER)));
+        assert!(!hide.hides(&entity(0, ET_PLAYER)), "never the viewer");
+        assert!(!hide.hides(&entity(40, ET_NPC)));
+        let saber =
+            |number, owner: u32| with(with(entity(number, ET_GENERAL), 14, 3), 18, 1_024 + owner);
+        assert!(hide.hides(&saber(200, 2)));
+        assert!(!hide.hides(&saber(201, 3)));
+        let rocket = |owner| with(entity(300, ET_MISSILE), 40, owner);
+        assert!(hide.hides(&rocket(1)));
+        assert!(!hide.hides(&rocket(3)));
+        let without_owners = DuelHide {
+            missiles: false,
+            ..hide
+        };
+        assert!(!without_owners.hides(&rocket(1)));
+        let event = |kind: u16| entity(500, ET_EVENTS + kind as u8);
+        // EV_FOOTSTEP by clientNum, EV_SABER_HIT by its wielder.
+        assert!(hide.hides(&with(event(2), 32, 1)));
+        assert!(!hide.hides(&with(event(2), 32, 3)));
+        assert!(hide.hides(&with(event(30), 39, 2)));
+        // Client numbers past the mask are never hidden.
+        assert!(!hide.hides(&entity(64, ET_PLAYER)));
     }
 }

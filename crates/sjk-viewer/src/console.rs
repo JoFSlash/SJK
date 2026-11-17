@@ -354,6 +354,8 @@ pub(crate) struct ViewerConsole {
     hide_pickups_in_duel: console_cvars::IntegerSetting,
     /// `cg_duelHideOthers`.
     duel_hide_others: console_cvars::IntegerSetting,
+    /// `cg_duelGhost`: 2 hides the duellists of others' duels.
+    duel_ghost: console_cvars::IntegerSetting,
     /// `cp_pluginDisable`, read by `cg_duelHideOthers`'s Auto on JA+.
     plugin_disable: console_cvars::IntegerSetting,
     draw_fog: console_cvars::IntegerSetting,
@@ -488,6 +490,8 @@ impl ViewerConsole {
             mode: sjk_client::DuelHideMode::from_cvar(self.duel_hide_others.value()),
             plugin_disable: u32::try_from(self.plugin_disable.value())
                 .unwrap_or(sjk_client::PLUGIN_DISABLE_DEFAULT),
+            hide_duellists: crate::duel_ghost::Look::from_cvar(self.duel_ghost.value())
+                == crate::duel_ghost::Look::Hidden,
         }
     }
 
