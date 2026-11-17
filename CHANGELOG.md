@@ -30,6 +30,10 @@ The site (site/assets/site.js, parseChangelog) reads the release headings,
 introductions and recap lines too.
 Add each release's notes here when it is tagged (docs/sjk.md "Releases").
 -->
+## Unreleased
+
+- Identity: `identity link` takes a code typed in two halves (ABCD EFGH) too, and a staff key, which the hub never joins to another account, is told at once to make the code on its own page with `identity site` and type it on the other computer instead _(Slash)_
+
 ## 2026.1117.1 (Alpha) | 17/11/2026
 
 A devmap cheat bar, quicker votes, console translation and a log book for Fishing and Mining.

@@ -1538,8 +1538,11 @@ leaves the game.
   moves there; `identity link <code> confirm` joins it (the hub's usual merge,
   [Players with several keys](#players-with-several-keys)). The code is made on the
   page and typed in the game, never the other way round: a code the game showed could
-  be read on a stream and typed by someone else first. A staff key cannot join another
-  account.
+  be read on a stream and typed by someone else first. The code may be typed in two
+  halves (`identity link ABCD EFGH`). A staff key cannot join another account (the hub
+  never merges a staff player away), so it is the one kept: the game says so before it
+  sends anything, and the code is made on the staff key's own page (`identity site` on
+  that computer) and typed on the other (hub report #316, 17/11/2026).
 - Video bounties: the SJK team posts what to film and its reward. A signed-in player
   sends a link to the original file, or uploads it (straight from the browser to SJK's
   video storage, MP4, WebM, MOV or MKV), ticking that SJK may use the video and credit

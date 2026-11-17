@@ -33,6 +33,15 @@ test: With a JoF EJK player on the server, their All chat lines start with the E
 test: A verified EJK beta player shows their tick after the name; cl_sjkChatClientIcons 0 = SJK.
 note: World shot: game_lines_with_marks (Figo = claim, dart_mario = name match).
 
+[identity-link-staff]
+area: Console & chat
+title: identity link: a code in two halves, and a staff key told which way it goes
+change: identity link ABCD EFGH reads as ABCD-EFGH (a last word confirm still joins).
+change: A staff key typing a code is told to make the code on its own page instead.
+test: On a second PC, make a code on your page, type identity link with a space in it.
+test: The console names the account; add confirm and the key joins it.
+test: With a staff key, identity link <code> says to use identity site here instead.
+
 [staff-merge-keys]
 area: Menus & settings
 title: Every staff member merges keys (Staff page, Keys and merge)

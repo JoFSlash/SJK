@@ -58,6 +58,12 @@ pub struct SiteOutcome {
     pub result: Result<SiteAnswer, String>,
 }
 
+/// The refusal of a staff key typing a code: a staff account is never joined away, so
+/// it keeps the other key, and the code has to be made on its own page.
+pub const FROM_STAFF: &str = "This key is staff, so it cannot join another account: \
+the other key joins this one. Here, type identity site and make a code on that page; \
+then type identity link <code> in SJK on the other computer.";
+
 /// The player's words for a refused site request.
 pub fn refusal(error: &crate::HubError) -> String {
     use crate::HubError;
@@ -69,7 +75,8 @@ pub fn refusal(error: &crate::HubError) -> String {
             "That code does not work: make a new one on your SJK page.".to_owned()
         }
         HubError::Rejected { code, .. } if code == "from_staff" => {
-            "A staff key cannot join another account.".to_owned()
+            // Hub report #316: the code goes the other way round for a staff key.
+            FROM_STAFF.to_owned()
         }
         HubError::Rejected { message, .. } if !message.is_empty() => message.clone(),
         HubError::Rejected { code, .. } => format!("The SJK hub refused it ({code})."),
@@ -93,6 +100,17 @@ mod tests {
         assert_eq!(code(" ABCD EFGH ").as_deref(), Some("ABCD-EFGH"));
         assert_eq!(code("ABCDEFG"), None);
         assert_eq!(code("ABCD-EFG!"), None);
+    }
+
+    #[test]
+    fn a_staff_key_is_told_which_way_the_code_goes() {
+        let error = crate::HubError::Rejected {
+            status: 409,
+            code: "from_staff".to_owned(),
+            message: "staff cannot merge a staff player away".to_owned(),
+        };
+        let words = refusal(&error);
+        assert!(words.contains("identity site") && words.contains("other computer"));
     }
 
     #[test]

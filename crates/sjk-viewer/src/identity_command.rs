@@ -62,15 +62,16 @@ pub(crate) fn parse(args: &[String]) -> Result<Action, String> {
             let usage = || {
                 "usage: identity link <code> [confirm], with the code your SJK page made".to_owned()
             };
-            let code = args
-                .get(1)
-                .and_then(|code| sjk_identity::site::code(code))
-                .ok_or_else(usage)?;
-            let confirm = match args.get(2).map(|word| word.to_ascii_lowercase()) {
-                None => false,
-                Some(word) if word == "confirm" => true,
-                Some(_) => return Err(usage()),
-            };
+            // The code may come in two halves ("ABCD EFGH", as it reads on the page):
+            // everything up to a last `confirm` is the code.
+            let mut words = &args[1..];
+            let confirm = words
+                .last()
+                .is_some_and(|word| word.eq_ignore_ascii_case("confirm"));
+            if confirm {
+                words = &words[..words.len() - 1];
+            }
+            let code = sjk_identity::site::code(&words.concat()).ok_or_else(usage)?;
             Ok(Action::Link { code, confirm })
         }
         "name" => Err(NAME_FROM_GAME.to_owned()),
@@ -170,6 +171,13 @@ pub(crate) fn profile_blocker(snapshot: Option<&Snapshot>) -> Option<&'static st
     }
 }
 
+/// Whether this key's person is staff, as the hub last answered.
+fn is_staff(snapshot: Option<&Snapshot>) -> bool {
+    snapshot
+        .and_then(|snapshot| snapshot.me.as_ref())
+        .is_some_and(|me| me.staff)
+}
+
 impl crate::GpuState {
     /// `identity <words>`: the subcommands that are not "open the page".
     pub(crate) fn identity_command(&mut self, args: &[String]) -> Result<Vec<String>, String> {
@@ -205,6 +213,11 @@ impl crate::GpuState {
             Action::Link { code, confirm } => {
                 if let Some(reason) = profile_blocker(snapshot.as_ref()) {
                     return Err(reason.to_owned());
+                }
+                // The hub never joins a staff account away: say which way round the
+                // code goes before the preview promises a join (hub report #316).
+                if is_staff(snapshot.as_ref()) {
+                    return Err(sjk_identity::site::FROM_STAFF.to_owned());
                 }
                 player_identity::with_service(|service| service.site_link(code, confirm));
                 Ok(vec![if confirm {
@@ -398,9 +411,29 @@ mod tests {
                 confirm: true
             })
         );
+        // Hub report #316: a code typed in two halves, as the page spaces it, is one code.
+        for typed in ["link ABCD EFGH", "link abcd - efgh", "link AB CD EF GH"] {
+            assert_eq!(
+                parse(&words(typed)),
+                Ok(Action::Link {
+                    code: "ABCD-EFGH".to_owned(),
+                    confirm: false
+                }),
+                "{typed}"
+            );
+        }
+        assert_eq!(
+            parse(&words("link ABCD EFGH confirm")),
+            Ok(Action::Link {
+                code: "ABCD-EFGH".to_owned(),
+                confirm: true
+            })
+        );
         assert!(parse(&words("link")).is_err());
+        assert!(parse(&words("link confirm")).is_err());
         assert!(parse(&words("link ABC")).is_err());
         assert!(parse(&words("link ABCD-EFGH yes")).is_err());
+        assert!(parse(&words("link ABCD-EFGH confirm confirm")).is_err());
     }
 
     #[test]
@@ -487,6 +520,15 @@ mod tests {
         );
         assert!(lines[0].contains("copied"), "{lines:?}");
         assert!(lines.iter().all(|line| !line.contains("0123456789abcdef")));
+    }
+
+    #[test]
+    fn a_staff_key_makes_the_code_instead_of_typing_one() {
+        let mut state = snapshot();
+        assert!(!is_staff(Some(&state)));
+        state.me.as_mut().unwrap().staff = true;
+        assert!(is_staff(Some(&state)));
+        assert!(!is_staff(None));
     }
 
     #[test]
