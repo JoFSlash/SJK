@@ -272,6 +272,11 @@ pub struct HuntState {
     /// For the mark: the slots of the hunters still in the chase (since 02/11/2026).
     #[serde(default)]
     pub chasers: Vec<u8>,
+    /// How long the grapple hook rests after each release for a player in a hunt's
+    /// chase, the mark or a hunter still in it, in seconds (since 17/11/2026, hub report
+    /// #320); `None` from a hub that does not say, 0 for none.
+    #[serde(default)]
+    pub grapple_cooldown: Option<u64>,
     /// How long a mark lasts, in seconds.
     #[serde(default)]
     pub every: u64,
@@ -532,6 +537,10 @@ mod tests {
         .unwrap();
         assert_eq!(state.mark.map(|mark| mark.slot), Some(4));
         assert_eq!(state.free, 1);
+        assert_eq!(state.grapple_cooldown, None);
+        let state: HuntState =
+            serde_json::from_str(r#"{"hunting":true,"grapple_cooldown":5}"#).unwrap();
+        assert_eq!(state.grapple_cooldown, Some(5));
     }
 
     #[test]

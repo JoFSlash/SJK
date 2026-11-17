@@ -769,6 +769,8 @@ impl super::GpuState {
                     self.camera_pitch = 0.0;
                 }
             }
+            // A hook the box hunt's cooldown held back lets go of nothing: no `+use`.
+            Some(InputAction::GrappleReleased) if self.box_hunt_grapple().held_back() => {}
             Some(InputAction::GrappleReleased) => {
                 if self.live_session.as_ref().is_some_and(|session| {
                     matches!(

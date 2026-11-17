@@ -5126,6 +5126,16 @@ test: s_language english, snd_restart: they are English again.
 
 # ---- Gameplay ----
 
+[box-hunt-grapple-cd]
+area: Gameplay
+title: Box hunt: grapple cooldown in a chase, mark and hunters (hub report #320, adwe)
+change: In a chase the grapple hook rests after each release (hub's grapple_cooldown, 5 s).
+change: A plate under the hunt's card says "Grapple ready in Ns"; no +use on a held-back release.
+test: As the mark on a JA+ box server: grapple, let go, grapple again: nothing for 5 s, plate.
+test: Hold +grapple through the cooldown: the hook fires as it ends. Use does not open a door.
+test: As a hunter out of the chase, or with no mark: the hook works as ever, no plate.
+note: Client-side only: JA+ owns the hook; a changed client could still send it.
+
 [catch-log-book]
 area: Gameplay
 title: Fishing/Mining: log book, rare catch card, share in SJK chat (Slash, after adwe)

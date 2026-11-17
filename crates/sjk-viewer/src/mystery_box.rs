@@ -9,6 +9,7 @@
 //! box is drawn by SJK clients only and has no collision.
 
 mod hunt;
+pub(crate) mod hunt_grapple;
 mod hunt_watch;
 pub(crate) mod label;
 
@@ -576,6 +577,8 @@ pub(crate) struct MysteryBoxes {
     /// Free openings the player won in the box hunt and has not spent.
     free: u64,
     hunt: hunt::Hunt,
+    /// The box hunt's grapple cooldown (hub report #320).
+    grapple: hunt_grapple::Cooldown,
     /// Boxes whose prize the player took, and the slots of the SJK players still to tell
     /// (a bit a slot), and when the next may be told.
     takes: Vec<(i64, u64)>,

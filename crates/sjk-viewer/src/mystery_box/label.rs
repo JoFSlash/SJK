@@ -299,6 +299,28 @@ impl GpuState {
             push_card(&mut self.mystery_boxes.labels, card, since, viewport, unit);
             top += CARD_HEIGHT + CARD_GAP;
         }
+        // The grapple hook resting in a chase (`hunt_grapple`), under the card.
+        if let Some(left) = self.mystery_boxes.grapple.left(now)
+            && self.box_hunt_grapple_cooldown().is_some()
+        {
+            let (caption, line) = super::hunt_grapple::words(left);
+            let plate = Plate {
+                caption,
+                line,
+                fill: Color::new(0.06, 0.05, 0.03, 0.82),
+                edge: Tone::Mark,
+                top,
+            };
+            // Steady: no flash for a plate that comes after every hook.
+            push_plate(
+                &mut self.mystery_boxes.labels,
+                plate,
+                CARD_PULSE,
+                viewport,
+                unit,
+            );
+            top += CARD_HEIGHT + CARD_GAP;
+        }
         if let Some(card) = self.quest_card(now) {
             let since = now.saturating_duration_since(card.since).as_secs_f32();
             let fill = if card.own {

@@ -30,6 +30,10 @@ The site (site/assets/site.js, parseChangelog) reads the release headings,
 introductions and recap lines too.
 Add each release's notes here when it is tagged (docs/sjk.md "Releases").
 -->
+## Unreleased
+
+- Box hunt: while you are in a chase, the mark or a hunter still in it, the grapple hook rests 5 seconds after each release (the hub sets how long), and a plate under the hunt's card counts it down; out of a chase it is as ever (hub report #320) _(Slash, after adwe's idea)_
+
 ## 2026.1117.1 (Alpha) | 17/11/2026
 
 A devmap cheat bar, quicker votes, console translation and a log book for Fishing and Mining.

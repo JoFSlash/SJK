@@ -319,6 +319,9 @@ impl GpuState {
             .as_ref()
             .map(crate::console::ViewerConsole::flip_kick_timing)
             .unwrap_or_default();
+        // In a box hunt's chase the grapple hook rests after each release (hub report
+        // #320, `mystery_box::hunt_grapple`).
+        let grapple_cooldown = self.mystery_boxes.grapple_cooldown(self.box_hunt.on());
         // A frame slower than 8 ms makes a command for each slot it passed; the
         // first carries the frame's presses, the rest the keys still held.
         let last_stamp = due.as_slice().last().copied().unwrap_or_default();
@@ -372,6 +375,9 @@ impl GpuState {
                 .gameplay_input
                 .force_wheel_buttons(command.buttons, known);
             command.buttons = buttons;
+            self.mystery_boxes
+                .grapple_mut()
+                .shape(&mut command.buttons, grapple_cooldown, now);
             // A ghost replay sends the recorded command instead (`ghost_replay`).
             if self.local_prediction.fake_noclip() {
                 self.ghost.interrupt("you are flying");

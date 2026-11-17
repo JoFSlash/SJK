@@ -300,6 +300,19 @@ counted unless the player landed within 128 units of a point the map names for i
 teleporters or a spawn point, which missed teleporters a server adds and every admin
 teleport.
 
+**Grapple cooldown** (17/11/2026, hub report #320, adwe's idea; Sol: "Maybe a CD"): a mark
+who grappled away each time could not be caught, so while the player is in a chase, the
+mark or a hunter not out of it (the hunt's card shown, not "YOU'RE OUT"), the JA+ grapple
+hook (`+grapple`, `+button12`) rests after each release for the hub's `grapple_cooldown`
+seconds (5, provisional and Sol's to tune; 5 too from a hub that does not say; 0 for
+none): the client keeps button 12 off its user commands meanwhile, and a plate under the
+card says "Grapple ready in 3s". A press held through the end hooks as it ends; a release
+of a press held back sends no `+use` (JA+'s let go), so it opens no door. Out of a chase
+the hook is as ever ([hunt_grapple.rs](../crates/sjk-viewer/src/mystery_box/hunt_grapple.rs)).
+The hook is the game server's (JA+), which knows nothing of the hunt, so only the
+player's own client holds it back: a client changed to send the button anyway is not
+stopped.
+
 **The mark blows up** (Sol, 02/11/2026): a mark caught cheating, or typing in the chat
 for 30 seconds straight (warned "Leave the chat!" at 20; their client watches it and says
 `chat`), blows up and the hunt ends. A hunter still in the chase picked at random by the
