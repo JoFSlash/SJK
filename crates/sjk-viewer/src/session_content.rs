@@ -18,9 +18,8 @@ impl Selection {
     /// Parse stock's references, which sv_init.cpp publishes on both pure and unpure servers.
     pub(crate) fn from_game(game: &GameState) -> Result<Self, Box<dyn Error>> {
         let mut selection = Self::from_system_info(game.config_string(1).unwrap_or(b""))?;
-        selection.map = std::str::from_utf8(game.config_string(0).unwrap_or(b""))
-            .ok()
-            .and_then(|text| InfoString::parse(text).ok())
+        selection.map = game
+            .server_info()
             .and_then(|info| info.get("mapname").map(str::to_owned))
             .filter(|map| sjk_vfs::VirtualPath::new(&format!("maps/{map}.bsp")).is_ok());
         Ok(selection)

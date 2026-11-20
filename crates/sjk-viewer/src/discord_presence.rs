@@ -273,9 +273,7 @@ fn activity(place: &Place, start: Option<u64>) -> Activity {
 }
 
 fn server_info(game: &GameState) -> Option<InfoString> {
-    game.config_string(0)
-        .and_then(|bytes| std::str::from_utf8(bytes).ok())
-        .and_then(|text| InfoString::parse(text).ok())
+    game.server_info()
 }
 
 fn map_of(game: &GameState) -> String {

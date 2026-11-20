@@ -56,9 +56,7 @@ impl State {
             session: None,
             bound: game.is_some(),
             map: game
-                .and_then(|game| game.config_string(0))
-                .and_then(|raw| std::str::from_utf8(raw).ok())
-                .and_then(|text| sjk_protocol::InfoString::parse(text).ok())
+                .and_then(|game| game.server_info())
                 .and_then(|info| info.get("mapname").map(|name| format!("maps/{name}.bsp")))
                 .unwrap_or_default(),
             walk: None,
@@ -315,9 +313,7 @@ impl GpuState {
             return;
         }
         let Some(map) = game
-            .config_string(0)
-            .and_then(|raw| std::str::from_utf8(raw).ok())
-            .and_then(|text| sjk_protocol::InfoString::parse(text).ok())
+            .server_info()
             .and_then(|info| info.get("mapname").map(str::to_owned))
         else {
             return;
@@ -346,9 +342,7 @@ impl GpuState {
         }
         // Server-info also carries changing game metadata. Only the map name
         // identifies geometry; other server metadata can change during a restart.
-        let info = |game: &sjk_protocol::GameState| {
-            sjk_protocol::InfoString::parse(std::str::from_utf8(game.config_string(0)?).ok()?).ok()
-        };
+        let info = sjk_protocol::GameState::server_info;
         let (Some(prepared_info), Some(current_info)) = (info(prepared), info(current)) else {
             return false;
         };

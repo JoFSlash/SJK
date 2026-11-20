@@ -51,9 +51,7 @@ pub struct DebugMelee {
 impl DebugMelee {
     /// The value and its dialect's reading from `CS_SERVERINFO`.
     pub fn from_game_state(game: &GameState) -> Self {
-        game.config_string(0)
-            .and_then(|bytes| std::str::from_utf8(bytes).ok())
-            .and_then(|text| InfoString::parse(text).ok())
+        game.server_info()
             .map_or_else(Self::default, |info| Self::from_server_info(&info))
     }
 

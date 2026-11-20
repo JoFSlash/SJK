@@ -30,6 +30,10 @@ The site (site/assets/site.js, parseChangelog) reads the release headings,
 introductions and recap lines too.
 Add each release's notes here when it is tagged (docs/sjk.md "Releases").
 -->
+## Unreleased
+
+- Servers whose name carries unusual bytes (the KR main server) no longer leave you stuck on the loading screen, and a JA+ one among them is seen as JA+ again, without a second connect that lost the client plugin _(Slash)_
+
 ## 2026.1117.1 (Alpha) | 17/11/2026
 
 A devmap cheat bar, quicker votes, console translation and a log book for Fishing and Mining.

@@ -4,7 +4,6 @@ use super::Page;
 use sjk_protocol::{GameState, InfoString};
 use sjk_vfs::VirtualFileSystem;
 
-const CS_SERVERINFO: usize = 0;
 const CS_PLAYERS: usize = 1_131;
 pub(super) const PAGE_ITEMS: usize = 16;
 const PLAYER_LIMIT: usize = 32;
@@ -189,13 +188,7 @@ impl State {
     }
 
     fn read_server_maps(&mut self, game_state: &GameState) {
-        let Some(text) = game_state
-            .config_string(CS_SERVERINFO)
-            .and_then(|value| std::str::from_utf8(value).ok())
-        else {
-            return;
-        };
-        let Ok(info) = InfoString::parse(text) else {
+        let Some(info) = game_state.server_info() else {
             return;
         };
         let Some(list) = info.get("sv_maplist").or_else(|| info.get("maplist")) else {
@@ -384,9 +377,8 @@ struct VoteMap {
 
 /// The game type in the server's serverinfo (`g_gametype`).
 fn server_gametype(game_state: &GameState) -> Option<i32> {
-    let text = std::str::from_utf8(game_state.config_string(CS_SERVERINFO)?).ok()?;
-    InfoString::parse(text)
-        .ok()?
+    game_state
+        .server_info()?
         .get("g_gametype")?
         .trim()
         .parse()

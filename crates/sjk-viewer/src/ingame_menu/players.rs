@@ -578,9 +578,7 @@ impl State {
 
 /// Whether `game`'s server plays in teams (`g_gametype` 6 and up).
 fn team_game(game: &GameState) -> bool {
-    game.config_string(0)
-        .and_then(|bytes| std::str::from_utf8(bytes).ok())
-        .and_then(|text| sjk_protocol::InfoString::parse(text).ok())
+    game.server_info()
         .and_then(|info| info.get_i32("g_gametype"))
         .is_some_and(|gametype| gametype >= 6)
 }

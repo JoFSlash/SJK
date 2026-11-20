@@ -87,13 +87,7 @@ impl RollRules {
 
     /// Read roll dialect flags and gametype from `CS_SERVERINFO`.
     pub fn from_game_state(game_state: &GameState) -> Self {
-        let Some(bytes) = game_state.config_string(0) else {
-            return Self::default();
-        };
-        let Ok(text) = std::str::from_utf8(bytes) else {
-            return Self::default();
-        };
-        let Ok(info) = sjk_protocol::InfoString::parse(text) else {
+        let Some(info) = game_state.server_info() else {
             return Self::default();
         };
         let mut rules = Self::from_dialect(&ServerProfile::from_server_info(&info).dialect);

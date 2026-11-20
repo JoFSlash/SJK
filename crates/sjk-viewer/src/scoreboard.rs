@@ -20,7 +20,7 @@ use crate::game_font::{GameFonts, RetailFont};
 use crate::menu_widgets::MenuCanvas;
 use crate::text::{TextStyle, TextVertex, UiFont};
 use sjk_client::{ClientSession, ScoreEntry};
-use sjk_protocol::{GameState, InfoString};
+use sjk_protocol::GameState;
 use sjk_ui::DrawList;
 
 const CS_PLAYERS: usize = 1_131;
@@ -463,10 +463,7 @@ impl Scoreboard {
         self.map.push_str(&server.0);
         self.mode.clear();
         self.mode.push_str(server.1);
-        let info = game
-            .config_string(0)
-            .and_then(|v| std::str::from_utf8(v).ok())
-            .and_then(|v| InfoString::parse(v).ok());
+        let info = game.server_info();
         self.hostname.clear();
         self.hostname.push_str(
             info.as_ref()
@@ -712,10 +709,7 @@ fn retail_font(text: &str) -> RetailFont {
 }
 
 fn server_info(game_state: &GameState) -> (String, &'static str) {
-    let info = game_state
-        .config_string(0)
-        .and_then(|v| std::str::from_utf8(v).ok())
-        .and_then(|v| InfoString::parse(v).ok());
+    let info = game_state.server_info();
     let Some(info) = info else {
         return ("UNKNOWN MAP".to_owned(), "MATCH");
     };
@@ -784,9 +778,7 @@ fn client_extra(game_state: &GameState, client_num: u8) -> ClientExtra {
 
 fn is_team_game(game_state: &GameState) -> bool {
     game_state
-        .config_string(0)
-        .and_then(|v| std::str::from_utf8(v).ok())
-        .and_then(|v| InfoString::parse(v).ok())
+        .server_info()
         .and_then(|v| v.get_i32("g_gametype"))
         .is_some_and(|v| v >= 6)
 }

@@ -221,9 +221,7 @@ impl GpuState {
     pub(crate) fn is_team_game(&self) -> bool {
         self.live_session
             .as_ref()
-            .and_then(|session| session.game_state().config_string(0))
-            .and_then(|info| std::str::from_utf8(info).ok())
-            .and_then(|info| InfoString::parse(info).ok())
+            .and_then(|session| session.game_state().server_info())
             .and_then(|info| info.get_i32("g_gametype"))
             .is_some_and(|gametype| gametype >= 6)
     }

@@ -152,9 +152,8 @@ pub(super) fn run() -> Result<(), Box<dyn Error>> {
 
 pub(super) fn map_path_from_gamestate(game_state: &GameState) -> Result<String, Box<dyn Error>> {
     let server_info = game_state
-        .config_string(0)
-        .ok_or("gamestate has no CS_SERVERINFO")?;
-    let server_info = InfoString::parse(std::str::from_utf8(server_info)?)?;
+        .server_info()
+        .ok_or("gamestate has no readable CS_SERVERINFO")?;
     Ok(format!(
         "maps/{}.bsp",
         server_info

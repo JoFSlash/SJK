@@ -121,14 +121,10 @@ impl CompatProfile {
     /// observed product name opt into JA+ or TaystJK behavior.  Everything else
     /// remains BaseJKA only when both game identifiers are empty/base-like.
     pub fn from_game_state(game_state: &GameState) -> Self {
-        game_state
-            .config_string(0)
-            .and_then(|bytes| std::str::from_utf8(bytes).ok())
-            .and_then(|text| InfoString::parse(text).ok())
-            .map_or_else(
-                || Self::Unknown(String::new()),
-                |info| Self::from_server_info(&info),
-            )
+        game_state.server_info().map_or_else(
+            || Self::Unknown(String::new()),
+            |info| Self::from_server_info(&info),
+        )
     }
 
     /// Detect a profile from an already parsed serverinfo string, or from a
@@ -239,6 +235,27 @@ mod tests {
             CompatProfile::from_server_info(&other),
             CompatProfile::Unknown("MBII".to_owned())
         );
+    }
+
+    #[test]
+    fn non_utf8_hostname_keeps_the_serverinfo() {
+        // The KR main server pads `sv_hostname` with 0x80 bytes (#319, #325).
+        // Read strictly, the whole string was dropped: no mapname and an
+        // unknown profile, so the client reconnected and never left loading.
+        let mut serverinfo = br"\g_gametype\0\gamename\JA+ Mod v2.4 B7\mapname\mp/ffa3".to_vec();
+        serverinfo.extend_from_slice(b"\\sv_hostname\\");
+        serverinfo.extend_from_slice(&[0x80; 24]);
+        serverinfo.extend_from_slice(b" KR ^0-[^1KR^0]-^2Server\\version\\JAmp: v1.0.1.0");
+        let mut game = GameState::empty_local(0);
+        game.replace_config_string(0, serverinfo).unwrap();
+
+        let info = game.server_info().expect("serverinfo parses");
+        assert_eq!(info.get("mapname"), Some("mp/ffa3"));
+        assert_eq!(info.get_i32("g_gametype"), Some(0));
+        assert!(matches!(
+            CompatProfile::from_game_state(&game),
+            CompatProfile::JaPlus { version: Some(version) } if version == "JA+ Mod v2.4 B7"
+        ));
     }
 
     #[test]

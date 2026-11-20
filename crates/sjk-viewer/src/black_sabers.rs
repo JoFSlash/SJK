@@ -34,12 +34,12 @@ fn supports_black(game: &GameState) -> bool {
     }
     let info = game
         .config_string(0)
-        .and_then(|bytes| std::str::from_utf8(bytes).ok())
+        .map(String::from_utf8_lossy)
         .unwrap_or_default();
     let server = sjk_mod::Server {
         kind: crate::mods::server_kind(&profile),
         address: String::new(),
-        info: info.to_owned(),
+        info: info.into_owned(),
     };
     sjk_mod::known_servers::identify(&server)
         .is_some_and(|family| FAMILIES.iter().any(|(id, _)| *id == family.id))

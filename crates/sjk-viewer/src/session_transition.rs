@@ -8,7 +8,6 @@ pub(crate) mod resident;
 
 use super::{GpuState, GpuWorldInput, assets};
 use sjk_client::{ServerClock, SessionTransition, SessionTransitionKind};
-use sjk_protocol::InfoString;
 use std::error::Error;
 use std::sync::Arc;
 use std::sync::mpsc::{self, Receiver, TryRecvError};
@@ -652,9 +651,8 @@ impl GpuState {
             })
             .ok_or("map transition lost its session")?;
         let server_info = game_state
-            .config_string(0)
-            .ok_or("new gamestate has no CS_SERVERINFO")?;
-        let server_info = InfoString::parse(std::str::from_utf8(server_info)?)?;
+            .server_info()
+            .ok_or("new gamestate has no readable CS_SERVERINFO")?;
         let map_name = server_info
             .get("mapname")
             .ok_or("new CS_SERVERINFO has no mapname")?;

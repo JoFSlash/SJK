@@ -13,7 +13,7 @@
 //! as a community map's may, still plays as written.
 
 use crate::ingame_menu::siege_data::{group, is_siege, read, value};
-use sjk_protocol::{GameState, InfoString};
+use sjk_protocol::GameState;
 use sjk_vfs::VirtualFileSystem;
 use std::time::Instant;
 
@@ -161,11 +161,7 @@ impl Notices {
     /// `CG_InitSiegeMode`'s read of `maps/<map>.siege`: the `Teams` group names each
     /// team's group, unless the server overrides it (`g_siegeTeam1`, `g_siegeTeam2`).
     fn load(&mut self, game: &GameState, vfs: &VirtualFileSystem) {
-        let Some(info) = game
-            .config_string(0)
-            .and_then(|bytes| std::str::from_utf8(bytes).ok())
-            .and_then(|text| InfoString::parse(text).ok())
-        else {
+        let Some(info) = game.server_info() else {
             return;
         };
         let Some(map) = info.get("mapname") else {

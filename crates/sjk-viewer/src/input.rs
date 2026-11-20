@@ -819,9 +819,7 @@ impl super::GpuState {
                 let restricted = self.live_session.as_ref().is_some_and(|session| {
                     session
                         .game_state()
-                        .config_string(0)
-                        .and_then(|bytes| std::str::from_utf8(bytes).ok())
-                        .and_then(|text| sjk_protocol::InfoString::parse(text).ok())
+                        .server_info()
                         .and_then(|info| info.get_i32("restricts"))
                         .is_some_and(|bits| bits & flip_kick::RESTRICT_BIT != 0)
                 });

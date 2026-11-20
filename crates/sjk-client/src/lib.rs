@@ -1534,9 +1534,7 @@ fn tokenize_command(command: &[u8]) -> Vec<Vec<u8>> {
 
 fn legacy_map_name(game_state: &GameState) -> Option<String> {
     game_state
-        .config_string(0)
-        .and_then(|bytes| std::str::from_utf8(bytes).ok())
-        .and_then(|text| InfoString::parse(text).ok())
+        .server_info()
         .and_then(|info| info.get("mapname").map(str::to_owned))
 }
 

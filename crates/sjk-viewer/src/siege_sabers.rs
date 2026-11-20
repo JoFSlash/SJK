@@ -11,7 +11,7 @@
 //! blade too and a blade shader is still worn over it.
 
 use sjk_game_jka::siege_class::{MAX_SIEGE_CLASSES, SiegeRegistry};
-use sjk_protocol::{GameState, InfoString, LEGACY_MAX_CLIENTS};
+use sjk_protocol::{GameState, LEGACY_MAX_CLIENTS};
 use sjk_vfs::VirtualFileSystem;
 
 /// Each client slot's class-forced colours (primary, secondary); `None` keeps the
@@ -81,9 +81,7 @@ fn siege_map(game: &GameState) -> Option<String> {
     if !crate::ingame_menu::siege_data::is_siege(Some(game)) {
         return None;
     }
-    let text = std::str::from_utf8(game.config_string(0)?).ok()?;
-    let info = InfoString::parse(text).ok()?;
-    info.get("mapname").map(str::to_owned)
+    game.server_info()?.get("mapname").map(str::to_owned)
 }
 
 /// Every installed class file in the game's listing order (`BG_SiegeLoadClasses`, as

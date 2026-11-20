@@ -38,10 +38,7 @@ pub enum DuelIsolation {
 impl DuelIsolation {
     /// The isolation `CS_SERVERINFO` announces, if any.
     pub fn from_game_state(game_state: &GameState) -> Option<Self> {
-        let info = game_state
-            .config_string(0)
-            .and_then(|bytes| std::str::from_utf8(bytes).ok())
-            .and_then(|text| InfoString::parse(text).ok())?;
+        let info = game_state.server_info()?;
         Self::from_server_info(&info)
     }
 

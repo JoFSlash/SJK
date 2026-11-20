@@ -44,7 +44,7 @@ use crate::force_rank_reply::{
 use crate::team_commands::{LegacyTeamChoice, legacy_team_command};
 use crate::{ClientError, ClientSession, UserinfoUpdateStatus};
 use sjk_network::LegacyUserInfo;
-use sjk_protocol::{GameState, InfoString};
+use sjk_protocol::GameState;
 use std::time::{Duration, Instant};
 
 /// `switchTeamTime` window (`g_cmds.c:1031`) plus transport slack.
@@ -218,9 +218,7 @@ fn receive_quietly(session: &mut ClientSession) -> Result<(), ClientError> {
 
 fn serverinfo_i32(game_state: &GameState, key: &str) -> i32 {
     game_state
-        .config_string(0)
-        .and_then(|raw| std::str::from_utf8(raw).ok())
-        .and_then(|text| InfoString::parse(text).ok())
+        .server_info()
         .and_then(|info| info.get_i32(key))
         .unwrap_or(0)
 }

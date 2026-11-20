@@ -3,7 +3,7 @@
 //! current game type — read from the server's serverinfo config string.
 
 use crate::server_browser::gametype_name;
-use sjk_protocol::{GameState, InfoString};
+use sjk_protocol::GameState;
 use std::fmt::Write as _;
 
 /// Info lines the page can carry.
@@ -32,10 +32,7 @@ impl State {
     /// the client connected to.
     pub(super) fn refresh(&mut self, game_state: Option<&GameState>, address: Option<&str>) {
         self.len = 0;
-        let info = game_state
-            .and_then(|state| state.config_string(0))
-            .and_then(|bytes| std::str::from_utf8(bytes).ok())
-            .and_then(|text| InfoString::parse(text).ok());
+        let info = game_state.and_then(GameState::server_info);
         let Some(info) = info else {
             self.push("Server info", "unavailable");
             return;

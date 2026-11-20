@@ -14,9 +14,8 @@
 
 use crate::force_profile::{ForceLegalizeRules, ForceSide, legalize_force_powers};
 use crate::team_commands::LegacyTeamChoice;
-use sjk_protocol::{GameState, InfoString, Snapshot};
+use sjk_protocol::{GameState, Snapshot};
 
-const CS_SERVERINFO: usize = 0;
 /// `gametype_t` values from `codemp/game/bg_public.h:235-244`.
 const GT_JEDIMASTER: i32 = 2;
 const GT_DUEL: i32 = 3;
@@ -62,10 +61,7 @@ pub fn free_saber_event(snapshot: &Snapshot) -> Option<bool> {
 /// Master needs neither). Without it, whether saber skills come free is unknown
 /// until the server's `EV_SET_FREE_SABER` ([`free_saber_event`]).
 pub fn serverinfo_shows_free_saber(game_state: &GameState) -> bool {
-    let info = game_state
-        .config_string(CS_SERVERINFO)
-        .and_then(|raw| std::str::from_utf8(raw).ok())
-        .and_then(|text| InfoString::parse(text).ok());
+    let info = game_state.server_info();
     let Some(info) = info else {
         return false;
     };
@@ -103,10 +99,7 @@ pub fn force_rules_from_serverinfo(
     rank: i32,
     team: i32,
 ) -> ForceLegalizeRules {
-    let info = game_state
-        .config_string(CS_SERVERINFO)
-        .and_then(|raw| std::str::from_utf8(raw).ok())
-        .and_then(|text| InfoString::parse(text).ok());
+    let info = game_state.server_info();
     let integer = |key: &str| {
         info.as_ref()
             .and_then(|info| info.get_i32(key))
@@ -148,9 +141,7 @@ pub fn force_rules_from_serverinfo(
 /// range one back to Jedi Master, `w_force.c:164-167`).
 pub fn server_force_rules(game_state: &GameState) -> ForceLegalizeRules {
     let max_rank = game_state
-        .config_string(CS_SERVERINFO)
-        .and_then(|raw| std::str::from_utf8(raw).ok())
-        .and_then(|text| InfoString::parse(text).ok())
+        .server_info()
         .and_then(|info| info.get_i32("g_maxForceRank"))
         .unwrap_or(0);
     force_rules_from_serverinfo(game_state, max_rank, 0)

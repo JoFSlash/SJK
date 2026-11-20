@@ -21,7 +21,7 @@
 
 use super::*;
 use crate::pmove_anim::{SETANIM_FLAG_HOLD, SETANIM_FLAG_OVERRIDE, SETANIM_LEGS};
-use sjk_protocol::{GameState, InfoString, ServerDialect, ServerProfile};
+use sjk_protocol::{GameState, ServerDialect, ServerProfile};
 
 /// `PMF_GRAPPLE` (EternalJK `bg_public.h:575`): the game pulls the player to a hook.
 pub const PMF_GRAPPLE: u16 = 32_768;
@@ -54,10 +54,7 @@ impl GrappleRules {
 
     /// The rules for the server whose `CS_SERVERINFO` `game` carries.
     pub fn from_game_state(game: &GameState) -> Option<Self> {
-        let info = game
-            .config_string(0)
-            .and_then(|bytes| std::str::from_utf8(bytes).ok())
-            .and_then(|text| InfoString::parse(text).ok())?;
+        let info = game.server_info()?;
         Self::from_dialect(&ServerProfile::from_server_info(&info).dialect)
     }
 }

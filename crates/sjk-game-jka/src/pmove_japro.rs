@@ -1,6 +1,6 @@
 //! jaPRO command policy from TaystJK `2d60c0fa5`, multiplayer `codemp/game/bg_pmove.c`.
 //! These rules interpret existing snapshot slots only for the advertised jaPRO dialect.
-use sjk_protocol::{GameState, InfoString, PlayerState, ServerDialect, ServerProfile};
+use sjk_protocol::{GameState, PlayerState, ServerDialect, ServerProfile};
 
 use crate::pmove::MovementState;
 use crate::pmove_roll::{BOTH_ROLL_F, BOTH_ROLL_R};
@@ -88,11 +88,7 @@ impl JaProRules {
 
     /// Resolve the existing server dialect once when serverinfo changes.
     pub fn from_game_state(game: &GameState) -> Self {
-        let Some(info) = game
-            .config_string(0)
-            .and_then(|bytes| std::str::from_utf8(bytes).ok())
-            .and_then(|text| InfoString::parse(text).ok())
-        else {
+        let Some(info) = game.server_info() else {
             return Self::default();
         };
         match ServerProfile::from_server_info(&info).dialect {

@@ -142,6 +142,13 @@ prints an empty one, and SJK prints a whole name where OpenJK cuts it to 29 byte
 (`obituary_name`, [obituary.rs](../crates/sjk-client/src/obituary.rs), which the
 [kill feed](client.md#kill-feed) shares).
 
+The server's `CS_SERVERINFO` (configstring 0) is read the same way: lossily, through
+`GameState::server_info` ([gamestate.rs](../crates/sjk-protocol/src/gamestate.rs)),
+never through a strict UTF-8 view. Servers pad `sv_hostname` with bytes such as 0x80
+(the KR main server does), and read strictly one such byte dropped the whole string:
+the client found no `mapname` and stayed on the loading screen, and the JA+ server
+looked unknown, so SJK reconnected without its plugin keys (#319, #325).
+
 ### Player-state arrays
 
 The snapshot's `stats`, `persistant` and `ammo` arrays carry 16-bit entries that

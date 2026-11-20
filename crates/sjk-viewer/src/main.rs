@@ -452,7 +452,7 @@ use sjk_client::{
 };
 use sjk_effect::ComponentKind;
 use sjk_model::{AnimationConfig, AnimationSequence, Gla, Glm, Md3, Md3Tag, Skin, SkinnedVertex};
-use sjk_protocol::{GameState, InfoString, Snapshot};
+use sjk_protocol::{GameState, Snapshot};
 use sjk_runtime::{Appearance, EntityId, EntityKind, World, WorldId};
 use sjk_scene::{MeshBuildOptions, StaticWorld};
 use sjk_shader::{ShaderCatalog, StageBlend, WaveForm};

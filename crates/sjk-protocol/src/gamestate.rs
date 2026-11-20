@@ -42,6 +42,17 @@ impl GameState {
         self.config_strings.get(index)?.as_deref()
     }
 
+    /// `CS_SERVERINFO` (config string 0) parsed as an info string.
+    ///
+    /// Read lossily: servers pad `sv_hostname` with bytes such as `0x80`
+    /// (the KR main server does), which are not UTF-8. Read strictly, one such
+    /// byte dropped the whole string, so the client saw no `mapname` and stayed
+    /// on the loading screen, and a JA+ server looked unknown (#319, #325).
+    pub fn server_info(&self) -> Option<crate::InfoString> {
+        let bytes = self.config_string(0)?;
+        crate::InfoString::parse(&String::from_utf8_lossy(bytes)).ok()
+    }
+
     pub fn config_strings(&self) -> impl Iterator<Item = (usize, &[u8])> {
         self.config_strings
             .iter()

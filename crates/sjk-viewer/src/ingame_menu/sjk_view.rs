@@ -1590,10 +1590,7 @@ impl Card {
 
     /// Read the server's info and count its players.
     fn read_server(&mut self, game: &GameState, address: Option<&str>) {
-        let info = game
-            .config_string(0)
-            .and_then(|bytes| std::str::from_utf8(bytes).ok())
-            .and_then(|text| InfoString::parse(text).ok());
+        let info = game.server_info();
         let get = |key: &str| info.as_ref().and_then(|info| info.get(key)).unwrap_or("");
         let number = |key: &str| {
             info.as_ref()

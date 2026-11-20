@@ -14,7 +14,7 @@
 //! move from the jump code (`bg_pmove.c:3165-3203`); and the animation stiffening for
 //! JA+'s extra GLA animations, which stock animation tables lack.
 
-use sjk_protocol::{GameState, InfoString, JaPlusCapabilities, ServerDialect, ServerProfile};
+use sjk_protocol::{GameState, JaPlusCapabilities, ServerDialect, ServerProfile};
 
 /// `WP_MELEE`.
 const WP_MELEE: u8 = 2;
@@ -93,25 +93,21 @@ impl JaPlusRules {
 
     /// Read the dialect from `CS_SERVERINFO`.
     pub fn from_game_state(game_state: &GameState) -> Self {
-        game_state
-            .config_string(0)
-            .and_then(|bytes| std::str::from_utf8(bytes).ok())
-            .and_then(|text| InfoString::parse(text).ok())
-            .map_or_else(Self::default, |info| {
-                let rules = Self::from_dialect(&ServerProfile::from_server_info(&info).dialect);
-                Self {
-                    // `cgs.dmflags`, `atoi` of the serverinfo key (`cg_servercmds.c`).
-                    old_collision: rules.enabled
-                        && info.get_i32("dmflags").unwrap_or_default() & JP_DF_OLD_COLLISION != 0,
-                    // `atof` of the serverinfo key, as VisionJK's cgame reads it
-                    // (`codemp/cgame/cg_servercmds.c:160`). A JA+ server always publishes
-                    // it (`CVAR_SERVERINFO`); without it the module's default stands.
-                    grip_speed: info
-                        .get("jp_gripSpeedScale")
-                        .map_or(JP_GRIP_SPEED_SCALE, atof),
-                    ..rules
-                }
-            })
+        game_state.server_info().map_or_else(Self::default, |info| {
+            let rules = Self::from_dialect(&ServerProfile::from_server_info(&info).dialect);
+            Self {
+                // `cgs.dmflags`, `atoi` of the serverinfo key (`cg_servercmds.c`).
+                old_collision: rules.enabled
+                    && info.get_i32("dmflags").unwrap_or_default() & JP_DF_OLD_COLLISION != 0,
+                // `atof` of the serverinfo key, as VisionJK's cgame reads it
+                // (`codemp/cgame/cg_servercmds.c:160`). A JA+ server always publishes
+                // it (`CVAR_SERVERINFO`); without it the module's default stands.
+                grip_speed: info
+                    .get("jp_gripSpeedScale")
+                    .map_or(JP_GRIP_SPEED_SCALE, atof),
+                ..rules
+            }
+        })
     }
 
     /// Whether standing on a player is frictionless, as stock has it
@@ -210,6 +206,7 @@ fn atof(text: &str) -> f32 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use sjk_protocol::InfoString;
 
     fn rules(gamename: &str, cinfo: u32) -> JaPlusRules {
         let info =
